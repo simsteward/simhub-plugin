@@ -1,0 +1,16 @@
+---
+description: Memory Bank - primary project context; supersedes other rules when in conflict
+alwaysApply: true
+---
+
+# Memory Bank
+
+At the start of every task, read all files in `memory-bank/` in order. This is your only link to previous work.
+
+**Files:** projectbrief.md → productContext.md → systemPatterns.md → techContext.md → activeContext.md → progress.md → journal.md
+
+**Priority:** Memory Bank supersedes other rules, skills, and agents when in conflict.
+
+**Update when:** After significant changes; when user says "update memory bank"; when context needs clarification. Focus on activeContext.md and progress.md. When user says "update memory bank", review ALL files.
+
+**MCP:** Cloudflare, GitHub, Statsig – use when relevant.

@@ -1,0 +1,33 @@
+---
+description: Orchestration - routes tasks to the right subagent automatically
+alwaysApply: true
+---
+
+# Delegation
+
+After reading memory-bank, check if the current task matches a subagent below. Delegate automatically; do not wait for user to name the agent.
+
+## When to Delegate
+
+| Intent / Trigger | Subagent |
+|---|---|
+| Editing `plugin/**`, SimHub SDK, telemetry buffer, incident detection, iRacing | simhub-developer |
+| Editing Worker code, R2, Workers AI, API contract | cloudflare-worker |
+| "what's next?", priorities, sprint, backlog, reprioritize | priority-steward |
+| After completing a task or implementation | priority-steward (update Done, promote Next) |
+| Code review, PR review, diff feedback | code-reviewer |
+| Verify PRD compliance, trace FR-IDs, requirement gaps | prd-compliance |
+| Create/update feature flags, gates, Statsig | statsig-feature-ops (Alpha only) |
+| "update memory bank", after major implementation | memory-bank-updater |
+
+## Model Preferences
+
+- **code-reviewer, simhub-developer, cloudflare-worker**: Prefer code-focused model
+- **prd-compliance, memory-bank-updater**: Prefer reasoning model
+- **priority-steward, statsig-feature-ops**: Default model is fine
+
+## Rules
+
+- Memory Bank rule takes priority over this rule when in conflict.
+- Do not delegate simple one-step tasks; handle them directly.
+- When statsig-feature-ops proposes a gate change, prd-compliance adjudicates first.

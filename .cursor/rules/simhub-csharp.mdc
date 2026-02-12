@@ -1,0 +1,21 @@
+---
+description: SimHub plugin and C# coding standards
+globs: plugin/**/*.cs
+alwaysApply: false
+---
+
+# SimHub Plugin & C#
+
+- Follow SimHub SDK conventions (device extensions, properties, actions)
+- Use async/await for I/O; proper error handling and logging
+- Keep plugin logic in `plugin/`; reference memory-bank for requirements
+
+```csharp
+// ✅ Clear error handling
+try {
+  await SendTelemetryAsync(payload);
+} catch (HttpRequestException ex) {
+  LogError("Telemetry send failed", ex);
+  throw;
+}
+```

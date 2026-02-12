@@ -1,0 +1,18 @@
+# Build outputs
+bin/
+obj/
+*.dll
+*.pdb
+*.user
+*.suo
+.vs/
+*.csproj.user
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
