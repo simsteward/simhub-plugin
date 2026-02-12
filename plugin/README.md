@@ -1,6 +1,6 @@
-# SimSteward SimHub Plugin
+# Sim Steward SimHub Plugin
 
-The official SimHub plugin for SimSteward.com – incident detection and protest automation for iRacing.
+The official SimHub plugin for simsteward.com – incident detection and protest automation for iRacing.
 
 ## Structure
 

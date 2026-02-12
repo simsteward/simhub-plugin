@@ -1,6 +1,6 @@
 # Technical Architecture
 
-> Placeholder for SimSteward technical architecture.
+> Placeholder for Sim Steward technical architecture.
 
 ## Overview
 

@@ -1,6 +1,6 @@
 # User Stories
 
-> Placeholder for SimSteward user stories.
+> Placeholder for Sim Steward user stories.
 
 ## Overview
 

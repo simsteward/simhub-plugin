@@ -1,6 +1,6 @@
 # Technical Plans
 
-Technical architecture, API design, and engineering decisions for SimSteward.
+Technical architecture, API design, and engineering decisions for Sim Steward.
 
 ## Contents
 

@@ -1,4 +1,4 @@
-# Product Requirements Document: GridMarshal
+# Product Requirements Document: Sim Steward
 
 **Status:** Approved for Alpha  
 **Version:** 1.1  
@@ -20,7 +20,7 @@
 
 ## 1. Executive Summary
 
-GridMarshal is a SimHub plugin designed to automate the friction-heavy process of reviewing incidents and filing protests in iRacing. By combining an "always-on" telemetry buffer with a serverless AI backend, the tool acts as an automated Race Control, instantly providing the driver with a ruling on fault, a detailed timeline of events, and a pre-written protest statement.
+Sim Steward is a SimHub plugin designed to automate the friction-heavy process of reviewing incidents and filing protests in iRacing. By combining an "always-on" telemetry buffer with a serverless AI backend, the tool acts as an automated Race Control, instantly providing the driver with a ruling on fault, a detailed timeline of events, and a pre-written protest statement.
 
 ### Phased Goals
 
@@ -87,7 +87,7 @@ GridMarshal is a SimHub plugin designed to automate the friction-heavy process o
 |----|-------------|
 | FR-B-001 | **Whop Marketplace Listing:** The product MUST be listed on Whop with a "Pro" subscription tier. |
 | FR-B-002 | **License Generation:** Whop MUST automatically generate a License Key upon purchase. |
-| FR-B-003 | **Discord Sync:** Whop MUST automatically assign a "GridMarshal Pro" role to the user's Discord account upon purchase (and remove it on cancellation). |
+| FR-B-003 | **Discord Sync:** Whop MUST automatically assign a "Sim Steward Pro" role to the user's Discord account upon purchase (and remove it on cancellation). |
 | FR-B-004 | **Client Validation:** The SimHub Plugin Settings tab MUST have a field for "License Key." |
 | FR-B-005 | **Server Validation:** The Cloudflare Worker MUST validate the incoming License Key against the Whop API (`GET /api/v2/memberships/{key}/validate`) before processing any AI requests. If invalid, return `403 Forbidden`. |
 
@@ -95,7 +95,7 @@ GridMarshal is a SimHub plugin designed to automate the friction-heavy process o
 
 | ID | Requirement |
 |----|-------------|
-| FR-B-006 | **Landing Page:** A dedicated website (gridmarshal.io TBD) containing: Hero Section (value proposition + "Get Access" CTA linking to Whop); How it Works (visual diagram); Features (Instant Replay Search, Unbiased Rulings, Protest Generator); Social Proof (testimonials, partner logos). |
+| FR-B-006 | **Landing Page:** A dedicated website (simsteward.com) containing: Hero Section (value proposition + "Get Access" CTA linking to Whop); How it Works (visual diagram); Features (Instant Replay Search, Unbiased Rulings, Protest Generator); Social Proof (testimonials, partner logos). |
 | FR-B-007 | **Documentation Section:** Installation Guide; Configuration Guide (License Key setup); Troubleshooting (common SimHub/iRacing issues). |
 | FR-B-008 | **Support:** Direct link to the Discord community for support tickets. |
 

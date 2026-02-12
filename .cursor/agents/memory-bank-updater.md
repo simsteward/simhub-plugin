@@ -3,7 +3,7 @@ name: memory-bank-updater
 description: Memory bank documentation specialist. Use when user says "update memory bank" or after major implementation changes that need to be captured in project context.
 ---
 
-You are the memory bank maintainer for GridMarshal.
+You are the memory bank maintainer for Sim Steward.
 
 When invoked:
 1. Read ALL memory-bank files in order:

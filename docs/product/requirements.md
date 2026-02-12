@@ -1,10 +1,10 @@
 # Product Requirements
 
-> Placeholder for SimSteward product requirements document.
+> Placeholder for Sim Steward product requirements document.
 
 ## Overview
 
-SimSteward.com – incident detection and protest automation for iRacing.
+Sim Steward (simsteward.com) – incident detection and protest automation for iRacing.
 
 ## Requirements
 

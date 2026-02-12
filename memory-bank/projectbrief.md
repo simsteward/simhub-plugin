@@ -2,7 +2,7 @@
 
 ## Project
 
-**GridMarshal** (SimSteward) – AI-powered incident review and protest automation for iRacing.
+**Sim Steward** – AI-powered incident review and protest automation for iRacing.
 
 ## Core Requirements
 

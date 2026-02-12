@@ -1,6 +1,6 @@
 # API Design
 
-> Placeholder for SimSteward API design and contracts.
+> Placeholder for Sim Steward API design and contracts.
 
 ## Overview
 
