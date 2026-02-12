@@ -1,6 +1,6 @@
 # {Title}
 
-**FR-ID:** {FR-A-XXX}  
+**FR-IDs:** {FR-A-XXX} or {FR-A-XXX, FR-A-YYY} for multi-FR stories  
 **Status:** Draft | Ready | In Progress | Done  
 **Created:** {date}
 

@@ -1,8 +1,8 @@
 # Priority Tracker
 
-> Single source of truth for work priorities. **Phase: Alpha** – Prove the core loop (Telemetry → AI Ruling).
+> Single source of truth for work priorities. **Phase: Alpha (SimHub-First)** -- Plugin: Telemetry -> POST -> UI. Worker deferred to separate repo.
 
-**Last updated:** 2025-02-11
+**Last updated:** 2026-02-12
 
 ---
 
@@ -10,25 +10,27 @@
 
 | Item | Owner | Notes |
 |------|-------|-------|
-| Scaffold SimHub plugin + telemetry buffer | | FR-A-001 to FR-A-005 |
+| SCAFFOLD-SimHub-Plugin | | Plugin shell, iRacing SDK, placeholder tab |
 
 ---
 
 ## Next (Queued)
 
 | Priority | Item | Depends On |
-|---------|------|------------|
-| 1 | Cloudflare Worker: receive POST, archive to R2 | Plugin sends data |
-| 2 | Cloudflare Worker: Workers AI + Steward prompt | R2 archiving |
-| 3 | SimHub UI: Main tab + incident list | Plugin + Worker response |
-| 4 | SimHub UI: In-game overlay + Mark button | Main tab |
-| 5 | Replay jumping (irsdk_BroadcastReplaySearch) | UI + iRacing SDK |
+|---------|------|-------------|
+| 1 | FR-A-001-002-Telemetry-Buffer | SCAFFOLD |
+| 2 | FR-A-003-Incident-Detection | Buffer |
+| 3 | FR-A-004-005-Telemetry-Serialization | Detection |
+| 4 | FR-A-006-HTTPS-POST | Serialization |
+| 5 | FR-A-012-014-Main-Tab-Incident-List | Detection (build dep), POST (runtime dep) |
+| 6 | FR-A-013-In-Game-Overlay | Detection, Main Tab (verdict mapping) |
+| 7 | FR-A-015-Replay-Jumping | Main Tab (spike first) |
 
 ---
 
 ## Backlog
 
-- Visual grading (🔴🟡☠️) – FR-A-014
+- Cloudflare Worker (FR-A-007 to FR-A-011) -- separate private repo
 - Beta: Whop integration
 - Beta: Product website
 
@@ -46,4 +48,6 @@
 
 | Item | Completed |
 |------|-----------|
+| Stories rewritten (product-owner scrutiny, merged FR-A-014 into FR-A-012) | 2026-02-12 |
+| Product plan (SimHub-first), stories, API contract, PRD compliance | 2026-02-11 |
 | Project structure + PRD + priorities | 2025-02-11 |

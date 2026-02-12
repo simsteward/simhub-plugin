@@ -1,126 +1,136 @@
 ---
-name: Alpha User Stories
-overview: Full pipeline from PRD to implementation-ready tech plans -- product-owner writes stories, prd-compliance reviews, priority-steward schedules, domain agents write tech plans.
+name: Alpha User Stories (SimHub-First)
+overview: SimHub-first pipeline: product-owner writes plugin stories, prd-compliance reviews, priority-steward schedules, simhub-developer writes tech plan. Cloudflare Worker deferred to separate private repo.
 todos:
   - id: write-stories
-    content: Delegate to product-owner subagent to decompose all 15 Alpha FR-IDs into atomic user stories in docs/product/stories/
-    status: in_progress
+    content: Delegate to product-owner to decompose plugin FR-IDs (001-006, 012-015) into atomic user stories
+    status: pending
+  - id: api-contract
+    content: Define API contract (request + response schemas) in docs/tech/api-design.md
+    status: pending
   - id: prd-review
-    content: Delegate to prd-compliance to verify stories cover all Alpha FR-IDs and stay within scope
+    content: Delegate to prd-compliance to verify stories cover scope, no Beta drift, adjudicate [PROPOSED]
     status: pending
   - id: schedule-stories
-    content: Delegate to priority-steward to add stories to docs/product/priorities.md with dependency ordering
+    content: Delegate to priority-steward to add stories to docs/product/priorities.md
     status: pending
-  - id: tech-plans-plugin
-    content: Delegate to simhub-developer to write tech plans for plugin-side stories (buffer, detection, serialization, UI)
-    status: pending
-  - id: tech-plans-backend
-    content: Delegate to cloudflare-worker to write tech plans for backend stories (Worker, R2, AI, prompt)
+  - id: tech-plan-plugin
+    content: Delegate to simhub-developer to write tech plan to docs/product/plans/tech-plugin.md
     status: pending
   - id: user-review
-    content: Present complete stories + tech plans to user for final review before implementation
-    status: pending
+    content: Present complete stories + tech plan + API contract to user for final review
+    status: in_progress
 isProject: false
 ---
 
-# Alpha: Stories to Tech Plans Pipeline
+# Alpha: SimHub-First Stories to Tech Plan Pipeline
 
-## Context
+## Scope
 
-The PRD ([docs/product/prd.md](docs/product/prd.md)) defines 15 Alpha requirements across 4 domains. No user stories exist yet -- `docs/product/stories/` only has `_template.md`. The full agent chain is ready: product-owner, prd-compliance, priority-steward, simhub-developer, cloudflare-worker.
+**In scope (this repo):** SimHub plugin only – FR-A-001 through FR-A-006 (telemetry, buffer, detection, serialization, POST) and FR-A-012 through FR-A-015 (UI).
 
-## Scope: All Alpha FR-IDs
+**Deferred (separate private repo):** Cloudflare Worker, R2, Workers AI, Steward prompt – FR-A-007 through FR-A-011.
 
-**Telemetry Recorder (Client-Side):** FR-A-001 through FR-A-005
-**Cloudflare Integration (Server-Side):** FR-A-006 through FR-A-009
-**AI Steward Persona:** FR-A-010, FR-A-011
-**User Interface (SimHub):** FR-A-012 through FR-A-015
+The plugin implements the full send path (POST with CSV payload) against a **configurable endpoint URL**. Until the Worker repo exists, use a mock endpoint or stub. The plugin defines and consumes the **expected response schema** (per FR-A-011) so the UI can display rulings; mock JSON will be used until the Worker is live.
 
 ## Pipeline
 
 ```mermaid
 flowchart LR
-    PO[ProductOwner] -->|stories| PRD[PrdCompliance]
-    PRD -->|approved| PS[PrioritySteward]
+    PO[ProductOwner] -->|plugin stories| PRD[PrdCompliance]
+    PRD -->|approved| API[APIContract]
+    API -->|schemas| PS[PrioritySteward]
     PS -->|scheduled| SH[SimHubDeveloper]
-    PS -->|scheduled| CW[CloudflareWorker]
-    SH -->|tech plans| Review[UserReview]
-    CW -->|tech plans| Review
+    SH -->|tech plan| Review[UserReview]
 ```
-
-
 
 ### Step 1: Product-Owner writes stories
 
-Delegate to `product-owner` to decompose all 15 Alpha FR-IDs into atomic user stories:
+Delegate to `product-owner` to decompose plugin FR-IDs into atomic user stories:
 
-- Group closely related FRs into single stories (e.g., FR-A-001 + FR-A-002 = buffer story)
+- FR-A-001 through FR-A-006 (telemetry, buffer, detection, serialization, POST)
+- FR-A-012 through FR-A-015 (main tab, overlay, grading, replay)
+- Add explicit **Scaffold** story (SimHub plugin shell, iRacing SDK wiring, main loop, placeholder UI tab)
+- Group closely related FRs (e.g., FR-A-001 + FR-A-002 = buffer story)
 - Split FRs with multiple concerns (e.g., FR-A-003 auto vs manual detection)
 - Write each story to `docs/product/stories/{FR-ID}-{slug}.md` using the template
 - Include acceptance criteria, subtasks, dependency chains
 - Flag PRD gaps as `[PROPOSED]` amendments
 
-Expected output: ~10-15 story files.
+Expected output: ~8–12 story files.
 
-### Step 2: PRD-Compliance reviews stories
+### Step 2: API contract
+
+Define request and response schemas in `docs/tech/api-design.md`:
+
+- **Request:** CSV payload format, headers, `SessionTick`, `SessionNum` (FR-A-004, 005, 006)
+- **Response:** JSON structure per FR-A-011 (Short Summary, Detailed Report, Ruling, Protest Statement)
+- Endpoint path, method, headers
+
+### Step 3: PRD-Compliance reviews stories
 
 Delegate to `prd-compliance` to verify:
 
-- Every Alpha FR-ID (FR-A-001 through FR-A-015) is covered by at least one story
+- Every plugin FR-ID (001–006, 012–015) is covered by at least one story
 - No story drifts into Beta scope (FR-B-xxx)
 - Acceptance criteria align with PRD requirement language
-- Report any gaps or coverage issues back for product-owner to fix
+- Review `[PROPOSED]` amendments – accept (PRD update) or reject (product-owner revises)
 
-### Step 3: Priority-Steward schedules stories
+### Step 4: Priority-Steward schedules stories
 
 Delegate to `priority-steward` to:
 
 - Add each approved story to `docs/product/priorities.md`
-- Order by dependency chain (buffer -> serialization -> POST -> Worker -> AI -> UI)
+- Order by dependency chain: scaffold → buffer → detection → serialization → POST → UI
 - Replace the high-level "Scaffold SimHub plugin" entry with granular story references
 
-### Step 4: Domain agents write tech plans
+### Step 5: SimHub-Developer writes tech plan
 
-Run in parallel:
-
-- **simhub-developer**: Tech plans for plugin-side stories (telemetry buffer, incident detection, CSV serialization, HTTPS POST, main tab UI, overlay, replay jumping, visual grading)
-- **cloudflare-worker**: Tech plans for backend stories (Worker endpoint, R2 archival, Workers AI integration, Steward prompt + JSON output)
-
-Each tech plan should include:
+Delegate to `simhub-developer` to write `docs/product/plans/tech-plugin.md` covering:
 
 - Architecture decisions and component design
 - Key code patterns / classes / interfaces
 - File paths and project structure changes
-- External dependencies (NuGet packages, Cloudflare bindings)
-- Integration points between client and server
+- External dependencies (NuGet packages, SimHub SDK)
+- Integration points (API contract, configurable endpoint)
+- Verify `irsdk_BroadcastReplaySearch` availability for FR-A-015
 
-### Step 5: User review
+### Step 6: User review
 
 Present complete deliverables:
 
 - Story files with acceptance criteria
-- Priority ordering
-- Tech plans per domain
+- API contract in `docs/tech/api-design.md`
+- Priority ordering in `docs/product/priorities.md`
+- Tech plan in `docs/product/plans/tech-plugin.md`
 - Any `[PROPOSED]` PRD amendments
 
 User approves before implementation begins.
 
-## Story Grouping (Proposed)
+## Story Grouping (Plugin-Only)
 
-Based on dependency analysis, stories will cluster into implementation phases:
+| Phase | Stories | FR-IDs |
+|-------|---------|--------|
+| **0. Scaffold** | SimHub plugin shell | (new) |
+| **1. Foundation** | Buffer + incident detection | FR-A-001, 002, 003 |
+| **2. Data Pipeline** | Serialization + POST + API contract | FR-A-004, 005, 006 |
+| **3. UI** | Main tab + grading (merged), overlay | FR-A-012, 014, 013 |
+| **4. Replay** | Replay jumping (spike first) | FR-A-015 |
 
-1. **Foundation** -- Buffer + incident detection (FR-A-001, 002, 003)
-2. **Data Pipeline** -- Serialization + POST (FR-A-004, 005, 006)
-3. **Backend Core** -- R2 archival + AI processing (FR-A-007, 008, 009)
-4. **AI Logic** -- Steward prompt + output format (FR-A-010, 011)
-5. **UI Shell** -- Main tab + overlay (FR-A-012, 013)
-6. **UI Polish** -- Grading + replay (FR-A-014, 015)
+## Story Files (8 total)
 
-Product-owner will finalize groupings based on atomicity and session-size constraints.
+- `docs/product/stories/SCAFFOLD-SimHub-Plugin.md`
+- `docs/product/stories/FR-A-001-002-Telemetry-Buffer.md`
+- `docs/product/stories/FR-A-003-Incident-Detection.md`
+- `docs/product/stories/FR-A-004-005-Telemetry-Serialization.md`
+- `docs/product/stories/FR-A-006-HTTPS-POST.md`
+- `docs/product/stories/FR-A-012-014-Main-Tab-Incident-List.md` (FR-A-014 merged here)
+- `docs/product/stories/FR-A-013-In-Game-Overlay.md`
+- `docs/product/stories/FR-A-015-Replay-Jumping.md`
 
-## Files Created
+## Other Files
 
-- `docs/product/stories/FR-A-*-*.md` (one per story, ~10-15 files)
-- Tech plan files (location TBD by domain agents, likely in `docs/product/` or as Cursor plan files)
+- `docs/tech/api-design.md` (request + response schemas)
+- `docs/product/plans/tech-plugin.md` (simhub-developer tech plan)
+- `docs/product/prd-compliance-report.md`
 - Updated `docs/product/priorities.md`
-
