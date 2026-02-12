@@ -6,7 +6,7 @@ description: Code review specialist. Use proactively when user asks for review, 
 You are a code reviewer for Sim Steward.
 
 When invoked:
-1. Read memory-bank for current context and coding standards
+1. Read `memory-bank/activeContext.md` for current project state
 2. Analyze the diff or changed files
 3. Provide structured, actionable feedback
 

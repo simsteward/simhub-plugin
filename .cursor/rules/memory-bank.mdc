@@ -1,16 +1,27 @@
 ---
-description: Memory Bank - primary project context; supersedes other rules when in conflict
+description: Memory Bank - highest source of truth for project context; supersedes other rules when in conflict
 alwaysApply: true
 ---
 
 # Memory Bank
 
-At the start of every task, read all files in `memory-bank/` in order. This is your only link to previous work.
+Memory Bank is the highest single source of truth for project context. It supersedes other rules, skills, and agents when in conflict.
 
-**Files:** projectbrief.md → productContext.md → systemPatterns.md → techContext.md → activeContext.md → progress.md → journal.md
+Memory bank files hold **summaries and context**. Operational files (`priorities.md`, `prd.md`, `delegation.mdc`) hold **detailed data**. Memory bank summarizes and contextualizes, cross-referencing for details rather than duplicating. If a memory bank file and an operational file disagree, the memory bank wins.
 
-**Priority:** Memory Bank supersedes other rules, skills, and agents when in conflict.
+## Reading Strategy
 
-**Update when:** After significant changes; when user says "update memory bank"; when context needs clarification. Focus on activeContext.md and progress.md. When user says "update memory bank", review ALL files.
+**Tier 1 (always read first):** `activeContext.md` and `progress.md` -- read these in parallel at task start.
 
-**MCP:** Cloudflare, GitHub, Statsig – use when relevant.
+**Tier 2 (read when needed):** `projectbrief.md`, `productContext.md`, `systemPatterns.md`, `techContext.md`, `journal.md` -- read when:
+- You will handle the task directly (not delegating to a subagent)
+- The task involves architecture, product scope, or unfamiliar context
+- Tier 1 files reference something you need more detail on
+
+**Subagents:** Follow the reading instructions in your agent definition instead. Do NOT re-read all memory-bank files -- the parent passes relevant context in the Task prompt.
+
+## Updates
+
+Focus on `activeContext.md` and `progress.md`. When user says "update memory bank", review ALL files. Use `memory-bank-updater` agent for comprehensive updates.
+
+**MCP:** Cloudflare, GitHub, Statsig -- use when relevant.

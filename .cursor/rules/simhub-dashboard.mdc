@@ -1,0 +1,42 @@
+---
+description: SimHub dashboard, overlay, and plugin tab UI conventions
+globs: plugin/**/*.html, plugin/**/*.xaml, plugin/**/*.simhubdash
+alwaysApply: false
+---
+
+# SimHub Dashboard & Overlay Conventions
+
+> **Note:** Glob patterns above are provisional. Update them once the dashboard file format and directory structure are finalized.
+
+## Plugin Tab UI (FR-A-012)
+
+- The main plugin tab is HTML-rendered inside SimHub's desktop shell
+- Contains the Master Incident List and Detailed Report View
+- Keep HTML/CSS self-contained; avoid external dependencies
+
+## In-Game Overlay (FR-A-013)
+
+- Transparent overlay: status indicator, last 3 incidents, "Mark" button
+- Minimize screen real estate; overlay must not obstruct driving view
+- Design for readability at a glance (large fonts, high contrast)
+
+## Visual Grading (FR-A-014)
+
+Use consistent color coding for incident fault:
+
+| Verdict | Color | Icon |
+|---------|-------|------|
+| Opponent At Fault | Red (#E53935 or similar) | Red circle |
+| Racing Incident | Yellow (#FDD835 or similar) | Yellow circle |
+| Player At Fault | Dark/Skull (#424242 or similar) | Skull icon |
+
+## Property Binding
+
+- Expose all data needed by dashboards as SimHub plugin properties
+- Name properties with the `SimSteward.` prefix for namespace clarity
+- Ensure property updates are throttled appropriately to avoid UI flicker
+
+## Replay Integration (FR-A-015)
+
+- "Review" button wires to `irsdk_BroadcastReplaySearch` targeting `IncidentTime - 30s`
+- Provide visual feedback when replay jump is triggered

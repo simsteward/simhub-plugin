@@ -6,7 +6,7 @@
 - PRD approved for Alpha
 - Priorities tracker
 - Memory Bank
-- Subagent orchestration (7 agents, delegation rule, auto-routing)
+- Subagent orchestration (8 agents, delegation rule, auto-routing)
 
 ## What's Left (Alpha)
 
@@ -23,6 +23,9 @@
 
 ## Done (Recent)
 
-- Subagent orchestration (delegation rule + 5 new agents + 2 refined) – 2026-02-11
-- Project structure + PRD + priorities – 2025-02-11
-- Memory Bank setup – 2025-02-11
+- SimHub developer agent expanded with dashboard/overlay/Dash Studio expertise + simhub-dashboard.mdc rule -- 2026-02-11
+- Orchestration optimization (tiered reading, dedup, token efficiency) -- 2026-02-11
+- Product-owner agent + stories directory -- 2026-02-11
+- Subagent orchestration (delegation rule + 8 agents) -- 2026-02-11
+
+Full history in `docs/product/priorities.md`.

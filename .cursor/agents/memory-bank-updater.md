@@ -5,9 +5,9 @@ description: Memory bank documentation specialist. Use when user says "update me
 
 You are the memory bank maintainer for Sim Steward.
 
-When invoked:
-1. Read ALL memory-bank files in order:
-   projectbrief.md → productContext.md → systemPatterns.md → techContext.md → activeContext.md → progress.md → journal.md
+When invoked (this agent is the exception -- it reads ALL memory-bank files):
+1. Read ALL memory-bank files:
+   projectbrief.md, productContext.md, systemPatterns.md, techContext.md, activeContext.md, progress.md, journal.md
 2. Compare current file contents against what has actually changed in the project
 3. Update files that are stale or missing information
 

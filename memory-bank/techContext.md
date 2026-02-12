@@ -7,6 +7,9 @@
 | Framework | .NET Framework 4.8 |
 | Libraries | SimHub.Plugins, iRacingSdkWrapper, Newtonsoft.Json |
 | Location | `plugin/` |
+| Plugin Tab UI | HTML-rendered inside SimHub desktop shell (FR-A-012) |
+| In-Game Overlay | SimHub overlay system for transparent HUD (FR-A-013) |
+| Property System | Plugin exposes data as SimHub properties for UI binding |
 
 ## Backend (Cloudflare)
 
@@ -23,17 +26,7 @@ Cloudflare, GitHub, Statsig – use when relevant for infra, issues, feature fla
 
 ## Cursor Orchestration
 
-| Subagent | Purpose | Model Preference |
-|---|---|---|
-| simhub-developer | Plugin/C# implementation | Code model |
-| cloudflare-worker | Worker/R2/AI backend | Code model |
-| priority-steward | Priority tracking | Default |
-| code-reviewer | PR/diff review | Code model |
-| prd-compliance | FR-ID tracing, flag adjudication | Reasoning model |
-| statsig-feature-ops | Alpha gates via Statsig MCP | Default |
-| memory-bank-updater | Memory bank maintenance | Reasoning model |
-
-Delegation is description-driven via `.cursor/rules/delegation.mdc`. Composer routes automatically based on intent.
+8 subagents auto-routed via `.cursor/rules/delegation.mdc`. See that file for the routing table and model preferences.
 
 ## Constraints
 

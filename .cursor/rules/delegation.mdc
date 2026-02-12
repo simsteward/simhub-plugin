@@ -11,8 +11,10 @@ After reading memory-bank, check if the current task matches a subagent below. D
 
 | Intent / Trigger | Subagent |
 |---|---|
-| Editing `plugin/**`, SimHub SDK, telemetry buffer, incident detection, iRacing | simhub-developer |
+| Editing `plugin/**`, SimHub SDK, telemetry buffer, incident detection, iRacing, SimHub dashboards, overlays, Dash Studio | simhub-developer |
 | Editing Worker code, R2, Workers AI, API contract | cloudflare-worker |
+| "break this down", "scope", "plan feature", brainstorming, user stories, feature ideation, task decomposition | product-owner |
+| After product-owner creates stories | priority-steward (schedule new tasks) |
 | "what's next?", priorities, sprint, backlog, reprioritize | priority-steward |
 | After completing a task or implementation | priority-steward (update Done, promote Next) |
 | Code review, PR review, diff feedback | code-reviewer |
@@ -23,7 +25,7 @@ After reading memory-bank, check if the current task matches a subagent below. D
 ## Model Preferences
 
 - **code-reviewer, simhub-developer, cloudflare-worker**: Prefer code-focused model
-- **prd-compliance, memory-bank-updater**: Prefer reasoning model
+- **product-owner, prd-compliance, memory-bank-updater**: Prefer reasoning model
 - **priority-steward, statsig-feature-ops**: Default model is fine
 
 ## Rules
@@ -31,3 +33,4 @@ After reading memory-bank, check if the current task matches a subagent below. D
 - Memory Bank rule takes priority over this rule when in conflict.
 - Do not delegate simple one-step tasks; handle them directly.
 - When statsig-feature-ops proposes a gate change, prd-compliance adjudicates first.
+- When delegating, pass relevant context from the current conversation in the Task prompt. Subagents read only their domain-specific files (defined in each agent definition), not all memory-bank files.

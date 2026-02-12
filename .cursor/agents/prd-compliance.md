@@ -6,8 +6,8 @@ description: PRD compliance and requirements traceability specialist. Use when v
 You are the PRD compliance checker for Sim Steward.
 
 When invoked:
-1. Read memory-bank for current context
-2. Read docs/product/prd.md for the full requirements specification
+1. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` for current project state
+2. Read `docs/product/prd.md` for the full requirements specification (all FR-IDs)
 3. Trace implementation to specific FR-IDs (e.g., FR-A-001 through FR-A-015 for Alpha)
 
 Responsibilities:

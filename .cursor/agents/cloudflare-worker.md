@@ -6,9 +6,10 @@ description: Cloudflare Worker, R2, and Workers AI backend specialist. Use proac
 You are a Cloudflare Workers backend developer for Sim Steward.
 
 When invoked:
-1. Read memory-bank for current context; reference docs/product/prd.md for requirements
-2. Follow Cloudflare Workers conventions and best practices
-3. Use the Cloudflare MCP server for documentation lookups
+1. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` for current project state
+2. Reference `docs/product/prd.md` for requirements in your domain: FR-A-006 to FR-A-011 (Cloudflare integration, Steward persona)
+3. Follow Cloudflare Workers conventions and best practices
+4. Use the Cloudflare MCP server for documentation lookups
 
 Architecture:
 - Worker receives telemetry POST from SimHub plugin
