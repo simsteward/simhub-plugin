@@ -1,0 +1,35 @@
+---
+description: Orchestration - routes tasks to the right subagent automatically
+alwaysApply: true
+---
+
+# Delegation
+
+After reading memory-bank, check if the current task matches a subagent below. Delegate automatically; do not wait for user to name the agent.
+
+## When to Delegate
+
+| Intent / Trigger | Subagent |
+|---|---|
+| Editing `website/**`, Astro, Tailwind, landing page, docs site, Cloudflare Pages, marketing site | web-developer |
+| "break this down", "scope", "plan feature", brainstorming, user stories, feature ideation, task decomposition | product-owner |
+| After product-owner creates stories | priority-steward (schedule new tasks) |
+| "what's next?", priorities, sprint, backlog, reprioritize | priority-steward |
+| After completing a task or implementation | priority-steward (update Done, promote Next) |
+| Code review, PR review, diff feedback | code-reviewer |
+| Verify PRD compliance, trace FR-IDs / WR-IDs, requirement gaps | prd-compliance |
+| "update memory bank", after major implementation | memory-bank-updater |
+| User gives process/workflow/style guidance | Handle directly: update relevant rules/skills/agents |
+
+## Model Preferences
+
+- **code-reviewer, web-developer**: Prefer code-focused model
+- **product-owner, prd-compliance, memory-bank-updater**: Prefer reasoning model
+- **priority-steward**: Default model is fine
+
+## Rules
+
+- Memory Bank rule takes priority over this rule when in conflict.
+- All agents must follow `incremental-work.mdc`. Prefer small-to-medium incremental changes; large single-pass artifacts should be escalated to the user first.
+- Do not delegate simple one-step tasks; handle them directly.
+- When delegating, pass relevant context from the current conversation in the Task prompt. Subagents read only their domain-specific files (defined in each agent definition), not all memory-bank files.

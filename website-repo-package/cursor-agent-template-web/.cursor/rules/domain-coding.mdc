@@ -1,0 +1,26 @@
+---
+description: Sim Steward website coding standards for Astro, Tailwind, static site
+globs: "website/**/*.{astro,ts,tsx,js,jsx,css,md,mdx}"
+alwaysApply: false
+---
+
+# Website Coding Standards
+
+Applies when editing files in `website/` (Astro, Tailwind, Markdown/MDX).
+
+## Conventions
+
+- Follow Astro and Tailwind best practices. Prefer zero-JS by default; add islands only when needed.
+- Use semantic HTML and clear structure. Keep content in Markdown/MDX where possible.
+- Design system (colors, spacing, typography) in Tailwind config; avoid one-off values in components.
+- Image optimization: use Astro's Image component or appropriate sizing; keep assets in repo.
+
+## Structure
+
+- Site code and content live under `website/`. Do not put site logic outside this directory.
+- Reference `docs/product/prd.md` (and WR-IDs) for content and feature scope.
+
+## Quality
+
+- Fast load: minimal client JS. Accessibility: semantic markup, focus, contrast.
+- SEO: meta tags, Open Graph; document in layout or frontmatter as appropriate.

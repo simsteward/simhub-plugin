@@ -1,0 +1,45 @@
+---
+description: Incremental work governance - small-to-medium changes, review checkpoints, guidance capture
+alwaysApply: true
+---
+
+# Incremental Work
+
+All agents and the orchestrator must follow these principles.
+
+## Small-to-Medium Scope
+
+- Encourage small-to-medium changes (code, docs, plans). No hard size limits -- use judgment.
+- Prefer outline first, then expand iteratively after review.
+- The goal: each change is well-understood, not that it fits an arbitrary line count.
+
+## Document Brevity
+
+- Detail where it matters: key decisions, non-obvious design, risks.
+- Omit boilerplate and obvious details. Scannable over exhaustive.
+- Tech plans, stories, and docs should be concise -- not walls of text.
+- Use a hierarchy: high-level plans stay concise; complex components get their own focused plans with more detail, written just-in-time when the work is next up.
+
+## Review Checkpoints
+
+After producing any artifact (document, code, plan), self-assess confidence:
+
+| Confidence | Action |
+|---|---|
+| **High** | Summarize what was produced and continue |
+| **Medium** | Delegate to code-reviewer or prd-compliance for review; proceed if pass, escalate if fail |
+| **Low** | Escalate to user before proceeding |
+
+## Iterative Refinement
+
+- Prefer multiple small passes over one large pass.
+- Example: write an outline, get review, then expand one section at a time.
+- Do not generate large artifacts in a single pass without intermediate checkpoints.
+
+## Guidance Capture
+
+When the user gives process, style, or workflow guidance:
+
+1. Identify the relevant rule, skill, or agent definition that should reflect the guidance.
+2. Update that file to capture the guidance **before** proceeding with the rest of the task.
+3. This ensures guidance persists across sessions and agents.

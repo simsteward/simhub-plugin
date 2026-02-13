@@ -661,6 +661,6 @@ Per PRD Section 8, these are **not on this roadmap** and will be scoped separate
 - AI-powered incident analysis (fault determination, protest text generation)
 - Backend server / cloud processing
 - Monetization (no Pro tier, no licensing)
-- Web platform
+- Web platform (website scope captured in [roadmap-website-for-analysis.md](roadmap-website-for-analysis.md) for later analysis)
 
 These are considered only after Part 1 has real users and validated the clipping workflow.
