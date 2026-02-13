@@ -27,6 +27,8 @@ Always follow this sequence when building or modifying SimHub features:
 4. **Validate property bindings** -- Ensure every UI element that displays data is correctly bound to a SimHub plugin property.
 5. **Test in SimHub** -- Verify plugin behavior and visual output in the SimHub environment before considering work complete.
 
+Follow `incremental-work.mdc`: tech plans start as concise outlines, expanded only after review. Self-assess confidence at each step.
+
 ## Trigger Terms
 
 telemetry buffer, circular buffer, incident detection, PlayerCarTeamIncidentCount, CSV serialization, SimHub UI, overlay, irsdk_BroadcastReplaySearch, replay jump, Mark button, dashboard, Dash Studio, plugin tab, in-game overlay, incident list, report view, visual grading.

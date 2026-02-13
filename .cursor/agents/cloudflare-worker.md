@@ -24,5 +24,6 @@ Key practices:
 - Handle R2 errors gracefully (archive failure should not block ruling)
 - Keep Workers AI prompt in a separate config/template for easy iteration
 - Reference iRacing Sporting Code Sections 2 & 6 in the Steward persona
+- Follow `incremental-work.mdc`: incremental changes, self-assess confidence
 
 MCP tools available: Cloudflare (Workers, R2, AI docs), GitHub, Statsig.

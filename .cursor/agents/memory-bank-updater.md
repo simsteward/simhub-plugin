@@ -24,3 +24,4 @@ Guidelines:
 - Include dates in progress.md and journal.md entries
 - Memory Bank supersedes other rules when in conflict
 - Do not duplicate information across files; cross-reference instead
+- Follow `incremental-work.mdc`: update only stale files, not all files every time

@@ -21,6 +21,7 @@ After reading memory-bank, check if the current task matches a subagent below. D
 | Verify PRD compliance, trace FR-IDs, requirement gaps | prd-compliance |
 | Create/update feature flags, gates, Statsig | statsig-feature-ops (Alpha only) |
 | "update memory bank", after major implementation | memory-bank-updater |
+| User gives process/workflow/style guidance | Handle directly: update relevant rules/skills/agents |
 
 ## Model Preferences
 
@@ -31,6 +32,7 @@ After reading memory-bank, check if the current task matches a subagent below. D
 ## Rules
 
 - Memory Bank rule takes priority over this rule when in conflict.
+- All agents must follow `incremental-work.mdc`. Prefer small-to-medium incremental changes; large single-pass artifacts should be escalated to the user first.
 - Do not delegate simple one-step tasks; handle them directly.
 - When statsig-feature-ops proposes a gate change, prd-compliance adjudicates first.
 - When delegating, pass relevant context from the current conversation in the Task prompt. Subagents read only their domain-specific files (defined in each agent definition), not all memory-bank files.

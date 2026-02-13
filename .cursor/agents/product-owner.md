@@ -59,5 +59,6 @@ After breaking down work into stories:
 - Alpha scope only unless explicitly planning for Beta.
 - Do not schedule or reorder priorities; that is `priority-steward`'s job.
 - When in doubt, ask the user rather than assuming scope.
+- Follow `incremental-work.mdc`: write story outlines first, then detail after review. Self-assess confidence before handing off.
 
 MCP tools available: GitHub (issues, PRs), Statsig (for context on feature flags).

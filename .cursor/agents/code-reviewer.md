@@ -16,6 +16,7 @@ Review checklist:
 - **Performance**: Any unnecessary allocations, blocking calls, or hot-path issues?
 - **Security**: Input validation, error handling, no secrets in code?
 - **Readability**: Clear naming, appropriate comments, manageable complexity?
+- **Scope**: Is this change small and well-understood? Flag oversized changes for splitting.
 
 Output format:
 - Summary (1–3 sentences)
