@@ -1,148 +1,203 @@
-# Product Requirements Document: Sim Steward
+# Sim Steward -- Product Requirements Document
 
-**Status:** Approved for Alpha  
-**Version:** 1.1  
-**Target Platform:** SimHub / iRacing / Cloudflare / Whop
-
----
-
-## Table of Contents
-
-1. [Executive Summary](#1-executive-summary)
-2. [User Personas](#2-user-personas)
-3. [Phase 1: Alpha Requirements](#3-phase-1-alpha-requirements)
-4. [Phase 2: Beta Requirements](#4-phase-2-beta-requirements)
-5. [Technical Architecture](#5-technical-architecture)
-6. [Constraints & Risks](#6-constraints--risks)
-7. [Appendix A: Steward System Prompt](#appendix-a-the-steward-system-prompt-strategy)
+> **Version:** 3.0  
+> **Date:** 2026-02-13  
+> **Status:** Draft  
+> **Detail:** Per-FR specs in `docs/product/specs/`. Tech plans in `docs/tech/plans/`.
 
 ---
 
 ## 1. Executive Summary
 
-Sim Steward is a SimHub plugin designed to automate the friction-heavy process of reviewing incidents and filing protests in iRacing. By combining an "always-on" telemetry buffer with a serverless AI backend, the tool acts as an automated Race Control, instantly providing the driver with a ruling on fault, a detailed timeline of events, and a pre-written protest statement.
-
-### Phased Goals
-
-| Phase | Goal |
-|-------|------|
-| **Alpha** | Prove the core loop (Telemetry → AI Ruling) works reliably. |
-| **Beta** | Validate the business model using Whop for licensing and launch a dedicated marketing website. |
+Sim Steward is a SimHub plugin that turns iRacing incident clipping from a 15-minute chore into a one-click action. It detects incidents, jumps to replay, records clips via OBS, and (in Part 2) automates multi-camera angles — producing protest-ready video in seconds.
 
 ---
 
-## 2. User Personas
+## 2. Problem Statement
 
-| Persona | Description |
-|---------|-------------|
-| **The League Racer** | Wants unbiased rulings on incidents to improve their racecraft and settle disputes with data. |
-| **The Public Lobby Driver** | Needs a fast, low-effort way to report bad actors (intentional wrecking, unsafe rejoins) without spending 20 minutes finding and editing video. |
+Filing an iRacing protest requires manually scrubbing replay to find the incident, setting up screen recording, capturing the clip, editing it, and uploading. This takes **5-15 minutes per incident**. Most drivers don't bother. Bad actors go unreported. Sim racing stays dirty.
 
----
-
-## 3. Phase 1: Alpha Requirements
-
-### 3.1. Telemetry Recorder (Client-Side / SimHub)
-
-| ID | Requirement |
-|----|-------------|
-| FR-A-001 | The system MUST maintain a circular buffer of telemetry data in RAM while the game is running. |
-| FR-A-002 | The buffer MUST hold a minimum of 30 seconds of pre-incident data and 30 seconds of post-incident data. |
-| FR-A-003 | The system MUST detect an "Incident" via two triggers: **Auto:** Increase in `PlayerCarTeamIncidentCount` (0x, 1x, 2x, 4x). **Manual:** User maps a specific button/hotkey to "Mark Incident." |
-| FR-A-004 | Upon trigger, the system MUST serialize the telemetry window to a minimized format (CSV-style) to reduce payload size before transmission. |
-| FR-A-005 | The serialized data MUST include `SessionTick` (for replay syncing) and `SessionNum`. |
-
-### 3.2. Cloudflare Integration (Server-Side)
-
-| ID | Requirement |
-|----|-------------|
-| FR-A-006 | The SimHub plugin MUST send telemetry data via HTTPS POST to a Cloudflare Worker. |
-| FR-A-007 | The Cloudflare Worker MUST archive the raw telemetry to Cloudflare R2 (Object Storage) for debugging and future model training ("The Evidence Locker"). |
-| FR-A-008 | The Cloudflare Worker MUST utilize Cloudflare Workers AI (Llama-3-8b-instruct or similar) to process the telemetry. |
-| FR-A-009 | **The Token Diet:** The backend MUST process data in a token-efficient text format (Time-Series CSV) rather than raw JSON to ensure low latency and high accuracy. |
-
-### 3.3. The "Steward" Persona (AI Logic)
-
-| ID | Requirement |
-|----|-------------|
-| FR-A-010 | The AI prompt MUST enforce a "Chief Steward" persona, referencing the iRacing Official Sporting Code (Sections 2 & 6). |
-| FR-A-011 | The AI output MUST be returned as a JSON object containing: **Short Summary** (1-sentence synopsis); **Detailed Report** (chronological timeline of inputs and physics events); **The Ruling** (clear verdict of fault); **Protest Statement** (formal text block ready for submission). |
-
-### 3.4. User Interface (SimHub)
-
-| ID | Requirement |
-|----|-------------|
-| FR-A-012 | **Main Plugin Tab:** Desktop UI containing the Master Incident List and Detailed Report View (HTML Rendered). |
-| FR-A-013 | **In-Game Overlay:** Transparent overlay showing Status, Last 3 Incidents, and a "Mark" button. |
-| FR-A-014 | **Visual Grading System:** Incidents must be visually categorized: 🔴 Red (Opponent At Fault); 🟡 Yellow (Racing Incident); ☠️ Skull (Player At Fault). |
-| FR-A-015 | **Replay Jumping:** Clicking "Review" MUST send `irsdk_BroadcastReplaySearch` to jump to `IncidentTime - 30s`. |
+**Sim Steward fixes this:** incident happens → you clip it → you file. Seconds, not minutes.
 
 ---
 
-## 4. Phase 2: Beta Requirements
+## 3. User Personas
 
-### 4.1. Whop Integration (Commerce & Licensing)
-
-| ID | Requirement |
-|----|-------------|
-| FR-B-001 | **Whop Marketplace Listing:** The product MUST be listed on Whop with a "Pro" subscription tier. |
-| FR-B-002 | **License Generation:** Whop MUST automatically generate a License Key upon purchase. |
-| FR-B-003 | **Discord Sync:** Whop MUST automatically assign a "Sim Steward Pro" role to the user's Discord account upon purchase (and remove it on cancellation). |
-| FR-B-004 | **Client Validation:** The SimHub Plugin Settings tab MUST have a field for "License Key." |
-| FR-B-005 | **Server Validation:** The Cloudflare Worker MUST validate the incoming License Key against the Whop API (`GET /api/v2/memberships/{key}/validate`) before processing any AI requests. If invalid, return `403 Forbidden`. |
-
-### 4.2. Product Website (Marketing)
-
-| ID | Requirement |
-|----|-------------|
-| FR-B-006 | **Landing Page:** A dedicated website (simsteward.com) containing: Hero Section (value proposition + "Get Access" CTA linking to Whop); How it Works (visual diagram); Features (Instant Replay Search, Unbiased Rulings, Protest Generator); Social Proof (testimonials, partner logos). |
-| FR-B-007 | **Documentation Section:** Installation Guide; Configuration Guide (License Key setup); Troubleshooting (common SimHub/iRacing issues). |
-| FR-B-008 | **Support:** Direct link to the Discord community for support tickets. |
+| Persona | Goal | Pain Point |
+|---------|------|------------|
+| **The Protester** | Report bad driving (intentional wrecking, unsafe rejoins) | The 15-20 min manual process kills motivation to protest |
+| **The Clean Racer** | Make sim racing cleaner through accountability | Knows bad behavior goes unreported because protesting is too hard |
 
 ---
 
-## 5. Technical Architecture
+## 4. Part 1 Requirements — Detect + Clip + Save (MVP)
 
-### 5.1. Client-Side: SimHub Plugin (C#)
+Core loop: **Detect (while racing) → Review in Replay → Jump → Record → Save**
 
-| Component | Details |
-|-----------|---------|
-| Framework | .NET Framework 4.8 |
-| Key Libraries | SimHub.Plugins, iRacingSdkWrapper, Newtonsoft.Json |
-| Responsibility | Reading Game Data → Buffering → Feature Engineering (CSV conversion) → HTTPS POST (with License Header) |
+| ID | Requirement | Description | Priority | Key behaviors & edge cases |
+|----|-------------|-------------|----------|----------------------------|
+| FR-001 | Auto Incident Detection | Detect iRacing incidents via `PlayerCarTeamIncidentCount` delta. Fire event with session timestamp on change. | Must | Delta > 0 triggers; merge/debounce within 5s; clear list on SessionNum change or disconnect; works at 10Hz or 60Hz DataUpdate. Spec: [FR-001-002-Incident-Detection](specs/FR-001-002-Incident-Detection.md). |
+| FR-002 | Manual Incident Mark | Hotkey to manually mark "incident happened now" with current session timestamp. | Must | SimHub `AddAction("SimSteward.MarkIncident")`; records same IncidentRecord model as auto. Spec: same as FR-001. |
+| FR-003 | Replay Mode Overlay | In replay mode: overlay shows incidents, jump controls, OBS record, connection status. Live racing: minimal toast only. | Must | Visibility bound to IsReplayMode; 8-slot incident list; clip save/discard prompt (R-OVR-09). Specs: [FR-003a-Replay-Overlay](specs/FR-003a-Replay-Overlay.md), [FR-003b-Live-Toast](specs/FR-003b-Live-Toast.md). Tech: [dash-studio-overlay](../tech/plans/dash-studio-overlay.md). |
+| FR-004 | Replay Jump | Send iRacing to replay at incident timestamp using `irsdk_BroadcastReplaySearchSessionTime`. Offset before incident. | Must | JumpToReplay(sessionNum, sessionTime, offsetSeconds); target = (time - offset)*1000 ms, clamp ≥ 0; fallback message if broadcast fails. Spec: [FR-004-Replay-Control](specs/FR-004-Replay-Control.md). |
+| FR-005 | OBS Connection | Connect to OBS via WebSocket (obs-websocket 5.x). Handle connect/disconnect/reconnect. Surface status in UI. | Must | State machine: Disconnected/Connecting/Connected/Reconnecting/Error; exponential backoff; properties SimSteward.OBS.StatusText, IsConnected. Spec: [FR-005-OBS-Connection](specs/FR-005-OBS-Connection.md). Tech: [obs-websocket-spike](../tech/plans/obs-websocket-spike.md). |
+| FR-006 | Start/Stop Recording | Start OBS recording on user action. Stop on user action. OBS saves file per its own settings. | Must | ToggleRecording action; state Idle→Recording→Stopping→Idle; sync GetRecordStatus on connect; handle OBS disconnect mid-recording. Spec: [FR-006-007-Recording-Clips](specs/FR-006-007-Recording-Clips.md). |
+| FR-007 | Clip Save Prompt | After recording stops, show clip path in overlay/UI. Confirm save or discard. | Should | LastClipPath, LastClipStatus; Save = confirm keep; Discard = delete with confirmation; handle file locked/not found. Spec: same as FR-006. |
+| FR-008 | Plugin Settings Tab | SimHub settings: OBS URL/password, hotkeys, auto-detect, replay offset, toast duration. | Must | Persist via SimHub APIs; immediate effect; OBS test button; ToastDurationSeconds 2–8s. Spec: [FR-008-Plugin-Settings](specs/FR-008-Plugin-Settings.md). |
+| FR-009 | Incident Log | In-session list of incidents with timestamps. User can select any to jump to replay. | Should | WPF list in settings tab; newest-first; Jump to Replay per row; clear on session change. Spec: [FR-009-Incident-Log](specs/FR-009-Incident-Log.md). |
 
-### 5.2. Backend-Side: Cloudflare Serverless
-
-| Component | Details |
-|-----------|---------|
-| Infrastructure | 100% Cloudflare (Worker + R2 + Workers AI) |
-| Auth Middleware | Intercepts every request to validate `X-License-Key` against Whop API |
-| Cost Control | Caching valid license checks in Cloudflare KV for 1 hour to reduce Whop API calls |
-
----
-
-## 6. Constraints & Risks
-
-| Constraint / Risk | Mitigation |
-|------------------|------------|
-| **iRacing SDK Limitations** | Cannot "cut" the .rpy file directly. User must manually record video if needed. |
-| **Whop Dependency** | If Whop API goes down, new users cannot activate. Cached users may still work (depending on KV logic). |
-| **LLM Hallucinations** | The AI may misinterpret telemetry. Manual Override in UI is the fail-safe. |
+**Foundation (no FR-ID):** Plugin shell, telemetry read, placeholder settings. Spec: [SCAFFOLD-Plugin-Foundation](specs/SCAFFOLD-Plugin-Foundation.md). Tech: [scaffold-plugin-setup](../tech/plans/scaffold-plugin-setup.md).
 
 ---
 
-## Appendix A: The Steward System Prompt Strategy
+## 5. Part 2 Requirements — Automated Multi-Camera Clipping
 
-*To be implemented in the Cloudflare Worker*
+Builds on Part 1. Camera control and automated replay loops.
+
+| ID | Requirement | Description | Priority | Key behaviors & edge cases |
+|----|-------------|-------------|----------|----------------------------|
+| FR-010 | Camera Selection | User configures which camera angles to use. Settings tab checklist. | Must | Enumerate from session info (spike); select 1–4; persist; fallback if selected camera not in session. Spec: [FR-010-011-Camera-Control](specs/FR-010-011-Camera-Control.md). Tech: [camera-enumeration-spike](../tech/plans/camera-enumeration-spike.md). |
+| FR-011 | Camera Switching | Switch iRacing replay camera via `irsdk_broadcastMsg` `CamSwitchNum`. | Must | SwitchCamera(cameraGroupId); player car index from telemetry; works during replay. Spec: same as FR-010. |
+| FR-012 | Automated Replay Loop | One-click multi-camera recording: jump → camera 1 → record → rewind → camera 2 → record... | Must | Record All Angles trigger; loop per camera with delays; cancel keeps completed clips; one angle fails → continue rest. Spec: [FR-012-Recording-Orchestrator](specs/FR-012-Recording-Orchestrator.md). Tech: [recording-orchestrator-timing](../tech/plans/recording-orchestrator-timing.md). |
+| FR-013 | Single Output File | Combine camera angles into one sequential video (angle 1 then angle 2). | Must | Async stitch (e.g. FFmpeg concat); notify on complete; failure preserves individual clips. Spec: [FR-013-Video-Stitching](specs/FR-013-Video-Stitching.md). Tech: [video-stitching-spike](../tech/plans/video-stitching-spike.md). |
+| FR-014 | Clip Duration Control | User sets clip duration (seconds before/after incident). | Should | Settings: before (default 5), after (default 10); orchestrator uses for replay start and record length. Spec: [FR-014-015-Clip-Duration-Progress](specs/FR-014-015-Clip-Duration-Progress.md). |
+| FR-015 | Recording Progress Indicator | Overlay shows which angle is recording (e.g. "Recording angle 1 of 2..."). | Should | SimSteward.MultiCam.* properties (IsActive, CurrentAngleIndex, TotalAngles, ProgressText). Spec: same as FR-014. |
+
+---
+
+## 6. Dependency Graph
+
+```mermaid
+graph TD
+    SCAFFOLD["SCAFFOLD"]
+    FR001["FR-001-002"]
+    FR008["FR-008"]
+    FR005["FR-005"]
+    FR004["FR-004"]
+    FR009["FR-009"]
+    FR003["FR-003"]
+    FR010["FR-010-011"]
+    FR012["FR-012"]
+    FR013["FR-013"]
+
+    SCAFFOLD --> FR001
+    SCAFFOLD --> FR008
+    SCAFFOLD --> FR005
+    FR001 --> FR004
+    FR001 --> FR009
+    FR004 --> FR009
+    FR001 --> FR003
+    FR004 --> FR003
+    FR005 --> FR003
+    SCAFFOLD --> FR010
+    FR008 --> FR010
+    FR004 --> FR012
+    FR005 --> FR012
+    FR010 --> FR012
+    FR012 --> FR013
+```
+
+---
+
+## 7. Data Model Summary
+
+| Model | Key fields | Used by |
+|-------|------------|---------|
+| **IncidentRecord** | Id, SessionTime, SessionNum, Delta, Source (Auto/Manual), DetectedAt | FR-001/002, FR-003a/b, FR-004, FR-009 |
+| **Settings (Part 1)** | ObsWebSocketUrl, ObsWebSocketPassword, AutoDetectIncidents, ReplayOffsetSeconds, ToastDurationSeconds | FR-005, FR-001, FR-004, FR-003b, FR-008 |
+| **Settings (Part 2)** | SelectedCameraIds, ClipBeforeSeconds, ClipAfterSeconds | FR-010, FR-012, FR-014 |
+| **OBS connection state** | Disconnected / Connecting / Connected / Reconnecting / Error | FR-005, FR-003a |
+| **RecordingState** | Idle / Recording / Stopping | FR-006, FR-003a |
+| **ClipRecord** | OutputPath, CreatedAt, Status (Pending/Saved/Discarded) | FR-007, FR-003a |
+
+---
+
+## 8. Spec Index
+
+| FR-ID | Spec | Tech plan(s) |
+|-------|------|--------------|
+| — | [SCAFFOLD-Plugin-Foundation](specs/SCAFFOLD-Plugin-Foundation.md) | [scaffold-plugin-setup](../tech/plans/scaffold-plugin-setup.md) |
+| FR-001, FR-002 | [FR-001-002-Incident-Detection](specs/FR-001-002-Incident-Detection.md) | — |
+| FR-003 | [FR-003a-Replay-Overlay](specs/FR-003a-Replay-Overlay.md), [FR-003b-Live-Toast](specs/FR-003b-Live-Toast.md) | [dash-studio-overlay](../tech/plans/dash-studio-overlay.md) |
+| FR-004 | [FR-004-Replay-Control](specs/FR-004-Replay-Control.md) | — |
+| FR-005 | [FR-005-OBS-Connection](specs/FR-005-OBS-Connection.md) | [obs-websocket-spike](../tech/plans/obs-websocket-spike.md) |
+| FR-006, FR-007 | [FR-006-007-Recording-Clips](specs/FR-006-007-Recording-Clips.md) | — |
+| FR-008 | [FR-008-Plugin-Settings](specs/FR-008-Plugin-Settings.md) | — |
+| FR-009 | [FR-009-Incident-Log](specs/FR-009-Incident-Log.md) | — |
+| FR-010, FR-011 | [FR-010-011-Camera-Control](specs/FR-010-011-Camera-Control.md) | [camera-enumeration-spike](../tech/plans/camera-enumeration-spike.md) |
+| FR-012 | [FR-012-Recording-Orchestrator](specs/FR-012-Recording-Orchestrator.md) | [recording-orchestrator-timing](../tech/plans/recording-orchestrator-timing.md) |
+| FR-013 | [FR-013-Video-Stitching](specs/FR-013-Video-Stitching.md) | [video-stitching-spike](../tech/plans/video-stitching-spike.md) |
+| FR-014, FR-015 | [FR-014-015-Clip-Duration-Progress](specs/FR-014-015-Clip-Duration-Progress.md) | — |
+
+---
+
+## 9. Spike Summary
+
+| # | Risk | Blocks | Tech plan | Status |
+|---|------|--------|-----------|--------|
+| 1 | OBS WebSocket from .NET 4.8 | FR-005, FR-006 | [obs-websocket-spike](../tech/plans/obs-websocket-spike.md) | Pending |
+| 2 | Video stitching (one file from N clips) | FR-013 | [video-stitching-spike](../tech/plans/video-stitching-spike.md) | Pending |
+| 3 | iRacing camera enumeration | FR-010, FR-011 | [camera-enumeration-spike](../tech/plans/camera-enumeration-spike.md) | Pending |
+
+---
+
+## 10. Technical Architecture
 
 ```
-You are the Chief Steward for an iRacing league. Analyze this telemetry CSV.
-
-Rules: iRacing Sporting Code Section 2 (On-Track Conduct).
-
-Input: Time-Series CSV (Time, Speed, Brake%, Steer%, Gap, Overlap).
-
-Output: JSON containing:
-  - verdict: PlayerAtFault | RacingIncident | OpponentAtFault
-  - protest_text: Formal FIA style
+┌──────────────────────────────────────────────┐
+│                  SimHub Host                  │
+│  ┌──────────────────────────────────────┐    │
+│  │        Sim Steward Plugin (C#)       │    │
+│  │  Incident Detector │ Replay Control  │    │
+│  │  OBS WebSocket Client                │    │
+│  │  Overlay / Settings UI               │    │
+│  └──────────────────────────────────────┘    │
+└──────────────────────────────────────────────┘
+         │                      │
+         ▼                      ▼
+   ┌───────────┐         ┌───────────┐
+   │  iRacing   │         │    OBS    │
+   │  (irsdk)   │         │ (ws 5.x)  │
+   └───────────┘         └───────────┘
 ```
+
+| Component | Technology | Notes |
+|-----------|-----------|-------|
+| Plugin runtime | C# / .NET Framework 4.8 | SimHub plugin contract |
+| iRacing | iRSDKSharp.dll (bundled) | Telemetry + replay broadcast + CamSwitchNum (Part 2) |
+| OBS | obs-websocket 5.x | WebSocket in plugin; OBS must be running |
+| Video stitching | TBD per spike (FFmpeg concat preferred) | See Section 9 |
+| UI | Dash Studio (overlay) + WPF (settings) | |
+
+**No backend.** Everything runs locally.
+
+---
+
+## 11. Constraints & Risks
+
+| # | Item | Type | Impact | Mitigation |
+|---|------|------|--------|------------|
+| 1 | OBS WebSocket from SimHub (.NET 4.8) | Spike | Blocks FR-005, FR-006 | [obs-websocket-spike](../tech/plans/obs-websocket-spike.md); fallback: out-of-process bridge |
+| 2 | Video stitching | Spike | Blocks FR-013 | [video-stitching-spike](../tech/plans/video-stitching-spike.md); option C: ship separate files first |
+| 3 | iRacing camera enumeration | Spike | Blocks FR-010, FR-011 | [camera-enumeration-spike](../tech/plans/camera-enumeration-spike.md) |
+| 4 | Replay timing accuracy | Unknown | Clip quality | Configurable offset (FR-008); test in implementation |
+| 5 | OBS must be running | Dependency | UX | Connection status (FR-005), clear messaging |
+| 6 | SimHub overlay API | Low | UI limits | Dash Studio + WPF fallback |
+
+---
+
+## 12. Future — AI Analysis
+
+Once Sim Steward has real users and a validated clipping workflow, a future phase may explore AI-powered analysis (e.g. fault determination, protest text). **Out of scope** for this PRD; scoped separately after user feedback.
+
+---
+
+## Appendix: Glossary
+
+| Term | Definition |
+|------|-----------|
+| irsdk | iRacing SDK — C API (iRSDKSharp in .NET) for telemetry and broadcast commands |
+| obs-websocket | OBS plugin (built-in since OBS 28) — WebSocket server for remote control |
+| Session timestamp | iRacing `SessionTime` (seconds from session start) |
+| CamSwitchNum | iRacing broadcast to change replay camera (group/number) |
+| Dash Studio | SimHub overlay/dashboard editor |

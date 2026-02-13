@@ -1,0 +1,38 @@
+---
+description: "{PROJECT_NAME} coding standards for {TECH_STACK}"
+globs: "{GLOB_PATTERNS}"
+alwaysApply: false
+---
+
+# {PROJECT_NAME} Coding Standards
+
+<!-- This is a sample conditional rule. It activates only when editing files matching
+     the glob pattern above. Customize it for your tech stack.
+
+     Examples:
+       globs: "src/**/*.ts"        -- TypeScript source files
+       globs: "backend/**/*.go"    -- Go backend files
+       globs: "app/**/*.py"        -- Python app files
+
+     Add your project's conventions below. Delete the examples and replace with your own. -->
+
+## Conventions
+
+- Follow {TECH_STACK} best practices and idioms
+- Use async/await for I/O operations; handle errors explicitly
+- Keep source code in `{SOURCE_DIR}/`; reference memory-bank for requirements
+
+## Example Pattern
+
+<!-- Replace this with a real example from your codebase -->
+
+```
+// Example: proper error handling
+try {
+  const result = await someAsyncOperation();
+  return result;
+} catch (error) {
+  logger.error("Operation failed", error);
+  throw new AppError("Operation failed", { cause: error });
+}
+```

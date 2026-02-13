@@ -11,28 +11,36 @@ After reading memory-bank, check if the current task matches a subagent below. D
 
 | Intent / Trigger | Subagent |
 |---|---|
-| Editing `plugin/**`, SimHub SDK, telemetry buffer, incident detection, iRacing, SimHub dashboards, overlays, Dash Studio | simhub-developer |
-| Editing Worker code, R2, Workers AI, API contract | cloudflare-worker |
+| Editing `plugin/**`, SimHub SDK, incident detection, iRacing, SimHub dashboards, overlays, Dash Studio | simhub-developer |
+| Writing tech plans, spike plans, technical design docs | simhub-developer |
+| Editing `website/**`, Astro, Tailwind, landing page, docs site, Cloudflare Pages, marketing site | web-developer |
 | "break this down", "scope", "plan feature", brainstorming, user stories, feature ideation, task decomposition | product-owner |
+| Writing PRD specs, feature specs, detailed requirement docs | product-owner |
 | After product-owner creates stories | priority-steward (schedule new tasks) |
 | "what's next?", priorities, sprint, backlog, reprioritize | priority-steward |
 | After completing a task or implementation | priority-steward (update Done, promote Next) |
 | Code review, PR review, diff feedback | code-reviewer |
 | Verify PRD compliance, trace FR-IDs, requirement gaps | prd-compliance |
-| Create/update feature flags, gates, Statsig | statsig-feature-ops (Alpha only) |
 | "update memory bank", after major implementation | memory-bank-updater |
 | User gives process/workflow/style guidance | Handle directly: update relevant rules/skills/agents |
 
+## Document Dependency Orchestration
+
+When writing multiple dependent documents (PRD specs, tech plans, stories):
+
+- **Orchestrator handles sequencing.** Read the dependency graph, identify which documents can be written in parallel (shared dependencies resolved), and launch subagents concurrently (max 4).
+- **Tech plans gate PRD specs.** If a PRD spec depends on a tech plan (e.g., spike results), write the tech plan first, then launch the dependent PRDs.
+- **Review at phase boundaries.** Delegate to prd-compliance after completing a phase (not per-document). Fix issues before proceeding.
+
 ## Model Preferences
 
-- **code-reviewer, simhub-developer, cloudflare-worker**: Prefer code-focused model
+- **code-reviewer, simhub-developer, web-developer**: Prefer code-focused model
 - **product-owner, prd-compliance, memory-bank-updater**: Prefer reasoning model
-- **priority-steward, statsig-feature-ops**: Default model is fine
+- **priority-steward**: Default model is fine
 
 ## Rules
 
 - Memory Bank rule takes priority over this rule when in conflict.
 - All agents must follow `incremental-work.mdc`. Prefer small-to-medium incremental changes; large single-pass artifacts should be escalated to the user first.
 - Do not delegate simple one-step tasks; handle them directly.
-- When statsig-feature-ops proposes a gate change, prd-compliance adjudicates first.
 - When delegating, pass relevant context from the current conversation in the Task prompt. Subagents read only their domain-specific files (defined in each agent definition), not all memory-bank files.

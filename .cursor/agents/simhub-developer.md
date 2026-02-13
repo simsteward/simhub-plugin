@@ -29,6 +29,15 @@ Always follow this sequence when building or modifying SimHub features:
 
 Follow `incremental-work.mdc`: tech plans start as concise outlines, expanded only after review. Self-assess confidence at each step.
 
+## Tech Plan Writing
+
+Write technical design and spike plan documents in `docs/tech/plans/`.
+
+- Tech plans cover: architecture decisions, API surface, library choices, spike investigation scope, risk mitigation, and implementation approach.
+- Reference the corresponding user story in `docs/product/stories/` and any existing technical research (e.g., `docs/tech/sdk-investigation.md`).
+- For spike plans: define the question to answer, the test approach, success criteria, and expected output.
+- Keep plans concise and actionable. Detail where it matters (key decisions, non-obvious design, risks); omit boilerplate.
+
 ## Trigger Terms
 
 telemetry buffer, circular buffer, incident detection, PlayerCarTeamIncidentCount, CSV serialization, SimHub UI, overlay, irsdk_BroadcastReplaySearch, replay jump, Mark button, dashboard, Dash Studio, plugin tab, in-game overlay, incident list, report view, visual grading.

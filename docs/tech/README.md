@@ -1,18 +1,17 @@
-# Technical Plans
+# Technical Documentation
 
-Technical architecture, API design, and engineering decisions for Sim Steward.
+Technical architecture, spike plans, and engineering research for Sim Steward.
 
 ## Contents
 
-- **architecture.md** – System architecture and design
-- **api-design.md** – API specifications and contracts
-- **decisions/** – Architecture Decision Records (ADRs)
+- **sdk-investigation.md** -- iRacing SDK findings (incident detection, replay broadcast, camera control, telemetry variable mapping)
+- **plans/** -- Tech plans and spike plans (scaffold setup, OBS WebSocket spike, Dash Studio overlay, camera enumeration, recording orchestrator timing, video stitching)
 
 ## Quick Links
 
-- [Architecture](./architecture.md)
-- [API Design](./api-design.md)
+- [SDK Investigation](./sdk-investigation.md)
+- [Tech Plans](./plans/)
 
 ## MCP Servers
 
-Cloudflare, GitHub, and Statsig MCP servers are configured for this project. Available for rules, agents, and skills.
+GitHub MCP server is configured for issues and PRs.

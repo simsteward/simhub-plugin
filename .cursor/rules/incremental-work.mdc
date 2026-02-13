@@ -18,6 +18,7 @@ All agents and the orchestrator must follow these principles.
 - Detail where it matters: key decisions, non-obvious design, risks.
 - Omit boilerplate and obvious details. Scannable over exhaustive.
 - Tech plans, stories, and docs should be concise -- not walls of text.
+- Use a hierarchy: high-level plans stay concise; complex components get their own focused plans with more detail, written just-in-time when the work is next up.
 
 ## Review Checkpoints
 

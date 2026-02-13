@@ -1,0 +1,27 @@
+---
+description: Memory Bank - highest source of truth for project context; supersedes other rules when in conflict
+alwaysApply: true
+---
+
+# Memory Bank
+
+Memory Bank is the highest single source of truth for project context. It supersedes other rules, skills, and agents when in conflict.
+
+Memory bank files hold **summaries and context**. Operational files (`priorities.md`, `prd.md`, `delegation.mdc`) hold **detailed data**. Memory bank summarizes and contextualizes, cross-referencing for details rather than duplicating. If a memory bank file and an operational file disagree, the memory bank wins.
+
+## Reading Strategy
+
+**Tier 1 (always read first):** `activeContext.md` and `progress.md` -- read these in parallel at task start.
+
+**Tier 2 (read when needed):** `projectbrief.md`, `productContext.md`, `systemPatterns.md`, `techContext.md`, `journal.md` -- read when:
+- You will handle the task directly (not delegating to a subagent)
+- The task involves architecture, product scope, or unfamiliar context
+- Tier 1 files reference something you need more detail on
+
+**Subagents:** Follow the reading instructions in your agent definition instead. Do NOT re-read all memory-bank files -- the parent passes relevant context in the Task prompt.
+
+## Updates
+
+Focus on `activeContext.md` and `progress.md`. When user says "update memory bank", review ALL files. Use `memory-bank-updater` agent for comprehensive updates.
+
+When the user gives process guidance, ensure the relevant rules, skills, or agent definitions are updated to capture it (per `incremental-work.mdc`).

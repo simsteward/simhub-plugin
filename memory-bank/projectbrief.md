@@ -2,19 +2,20 @@
 
 ## Project
 
-**Sim Steward** – AI-powered incident review and protest automation for iRacing.
+**Sim Steward** -- Fast incident clipping tool for iRacing protests. Detect incidents, jump to replay, record clips via OBS, save locally.
 
 ## Core Requirements
 
-- SimHub plugin with telemetry buffer → Cloudflare Worker → AI ruling → verdict + protest statement
-- Phase Alpha: Prove Telemetry → AI Ruling loop works reliably
-- Phase Beta: Whop licensing, marketing website
+- SimHub plugin that detects iRacing incidents (auto + manual)
+- In-game overlay notification with replay jump
+- OBS WebSocket integration for one-click clip recording
+- Part 2: Automated multi-camera replay loops with video stitching
 
 ## Scope
 
-- **In**: SimHub plugin (C#), Cloudflare Workers + R2 + Workers AI, iRacing SDK integration
-- **Out (Alpha)**: Whop, licensing, public website
+- **In:** SimHub plugin (C#), iRacing SDK (replay/camera control), OBS WebSocket 5.x (recording)
+- **Out:** Backend server, AI analysis, monetization, web platform
 
 ## Success Criteria
 
-Alpha complete when: incident trigger → telemetry POST → AI ruling JSON returned → displayed in SimHub UI.
+MVP complete when: incident detected -> overlay notification -> replay jump -> OBS records clip -> file saved locally. End-to-end in seconds, not minutes.

@@ -8,35 +8,41 @@ alwaysApply: false
 
 > **Note:** Glob patterns above are provisional. Update them once the dashboard file format and directory structure are finalized.
 
-## Plugin Tab UI (FR-A-012)
+## Replay Mode Overlay (FR-003)
 
-- The main plugin tab is HTML-rendered inside SimHub's desktop shell
-- Contains the Master Incident List and Detailed Report View
-- Keep HTML/CSS self-contained; avoid external dependencies
-
-## In-Game Overlay (FR-A-013)
-
-- Transparent overlay: status indicator, last 3 incidents, "Mark" button
-- Minimize screen real estate; overlay must not obstruct driving view
+- Built in SimHub Dash Studio as a transparent overlay
+- Visible only during iRacing replay mode; hidden during live racing
+- Shows: incident list (time, severity, source), jump-to-incident controls, OBS record buttons, connection status
+- Positioned unobtrusively -- must not block critical replay HUD elements
 - Design for readability at a glance (large fonts, high contrast)
 
-## Visual Grading (FR-A-014)
+## Live Racing Toast (FR-003)
 
-Use consistent color coding for incident fault:
+- Minimal, non-interactive notification during live racing
+- Shows incident time and severity (e.g., "4x captured at 12:34")
+- Auto-dismisses after a few seconds -- the driver is driving
+- No interactive buttons during live racing
 
-| Verdict | Color | Icon |
-|---------|-------|------|
-| Opponent At Fault | Red (#E53935 or similar) | Red circle |
-| Racing Incident | Yellow (#FDD835 or similar) | Yellow circle |
-| Player At Fault | Dark/Skull (#424242 or similar) | Skull icon |
+## Plugin Settings Tab (FR-008)
+
+- WPF `UserControl` rendered inside SimHub's desktop settings shell
+- Sections: OBS connection, hotkeys, detection toggle, replay offset
+- Not Dash Studio -- settings use SimHub's built-in WPF hosting
+
+## Incident Log (FR-009)
+
+- WPF ListView or DataGrid in the settings tab area
+- Shows all session incidents with timestamps, severity, source
+- "Jump to Replay" action per incident row
 
 ## Property Binding
 
-- Expose all data needed by dashboards as SimHub plugin properties
+- Expose all data needed by dashboards/overlays as SimHub plugin properties
 - Name properties with the `SimSteward.` prefix for namespace clarity
 - Ensure property updates are throttled appropriately to avoid UI flicker
+- Key properties: incident list, OBS connection status, replay mode state, recording state
 
-## Replay Integration (FR-A-015)
+## Recording Progress (FR-015, Part 2)
 
-- "Review" button wires to `irsdk_BroadcastReplaySearch` targeting `IncidentTime - 30s`
-- Provide visual feedback when replay jump is triggered
+- Overlay shows which camera angle is currently recording (e.g., "Recording angle 1 of 2...")
+- Extends the replay mode overlay from FR-003

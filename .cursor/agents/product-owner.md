@@ -26,10 +26,19 @@ When invoked:
 
 - Break complex features into individual user stories.
 - Each story gets its own file in `docs/product/stories/` following the template in `docs/product/stories/_template.md`.
-- Stories should be atomic – small enough to implement in a single session.
+- Stories should be atomic -- small enough to implement in a single session.
 - Include acceptance criteria for every story.
 - Identify dependencies between stories.
 - Prefer breadth-first decomposition: outline all stories first, then detail each one.
+
+### PRD Spec Writing
+
+- Write detailed PRD spec documents in `docs/product/specs/`.
+- Specs are more detailed than stories: formal requirements with edge cases, error states, and technical design notes.
+- Each spec traces back to FR-IDs and references the corresponding user story in `docs/product/stories/`.
+- Spec structure: Header (FR-IDs, priority, status, part), Overview, Detailed Requirements, Technical Design Notes, Dependencies & Constraints, Open Questions.
+- When a user story covers multiple distinct product concerns (e.g., two UI surfaces, or connection layer vs. consumer layer), split into multiple specs.
+- Read the corresponding user story file and any referenced tech plans before writing a spec.
 
 ### PRD Amendments
 
