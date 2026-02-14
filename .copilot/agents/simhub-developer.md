@@ -37,9 +37,8 @@ When returning implementation results to the coding agent, include:
 - Self-review findings (critical/warning/nit)
 - Fixes already applied during self-review
 - Remaining risks or follow-up checks
-- **Reminder:** Ask the receiving agent to run `plugin/scripts/deploy-plugin.ps1` after applying changes and to report its output (per delegation.mdc mandatory post-implementation path).
 
-The coding agent should apply code changes only once, after this self-review handoff is complete, then run deploy and report output.
+The coding agent should apply code changes only once, after this self-review handoff is complete.
 
 Follow `incremental-work.mdc`: tech plans start as concise outlines, expanded only after review. Self-assess confidence at each step.
 
@@ -79,4 +78,4 @@ telemetry buffer, circular buffer, incident detection, PlayerCarTeamIncidentCoun
 - **Overlay transparency:** Keep in-game overlays non-intrusive; status and incident summaries only
 - **Replay integration:** Wire "Review" actions to `irsdk_BroadcastReplaySearch` for instant replay jumping (FR-A-015)
 
-MCP tools available: Cloudflare, GitHub, Statsig. Use when creating issues, PRs, feature flags, or infrastructure. For Grafana/telemetry work (dashboards, Loki queries, folders), use the Grafana MCP; see `docs/tech/grafana-mcp.md`.
+MCP tools available: Cloudflare, GitHub, Statsig. Use when creating issues, PRs, feature flags, or infrastructure.

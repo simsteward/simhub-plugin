@@ -3,9 +3,11 @@
 ## Current Focus
 
 **Phase:** MVP (Part 1 -- Incident Clipping Tool)  
-**Now:** SCAFFOLD-Plugin-Foundation (plugin shell, iRacing SDK connection, SimHub property layer, settings stub)
+**Now:** FR-001-002-Incident-Detection (core detection loop; unblocks overlay, replay, OBS integration)
 
-Full priority queue in `docs/product/priorities.md`.
+SCAFFOLD was closed for scheduling per [priority-product-sync](docs/product/priority-product-sync.md). Next work is the core detection loop. Full priority queue in `docs/product/priorities.md`.
+
+**Recent (2026-02-14):** Priority-product-sync executed: SCAFFOLD moved to Done, FR-001-002 promoted to Now; memory-bank updated. Grafana remains deferred; replay overlay (FR-003) is the user-facing goal, reached by doing dependencies in order (detection first).
 
 ## Active Decisions
 
@@ -17,6 +19,7 @@ Full priority queue in `docs/product/priorities.md`.
 - **Two-part roadmap.** Part 1: Detect + Clip + Save (single camera). Part 2: Automated multi-camera clipping (camera control + replay loops + video stitching).
 - Memory Bank is primary context; supersedes other rules when in conflict.
 - Subagent orchestration via `delegation.mdc` (auto-routing to specialists).
+- Process guidance captured: direct execution is allowed, but plugin implementation requires simhub-developer review + code-reviewer review, then self-documentation in memory-bank.
 
 ## Three Spikes Needed
 

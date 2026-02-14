@@ -20,6 +20,13 @@ All agents and the orchestrator must follow these principles.
 - Tech plans, stories, and docs should be concise -- not walls of text.
 - Use a hierarchy: high-level plans stay concise; complex components get their own focused plans with more detail, written just-in-time when the work is next up.
 
+## External Context & Tooling
+
+- If repository context is insufficient, agents may search the internet for additional technical context.
+- Prefer authoritative sources first (official docs, vendor docs, language/framework references, release notes).
+- Agents may use additional tooling when needed, including command-line workflows (build/test/lint/package managers, SDK CLIs, diagnostics).
+- Keep tool usage safe and scoped: avoid destructive commands unless explicitly requested.
+
 ## Review Checkpoints
 
 After producing any artifact (document, code, plan), self-assess confidence:

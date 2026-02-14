@@ -37,7 +37,8 @@ There is no server component. No Cloudflare, no R2, no Workers AI, no API. Every
 
 ## MCP Servers
 
-GitHub -- use for issues and PRs.
+- **GitHub** — issues and PRs.
+- **Grafana** — https://wgutmann.grafana.net; create/query dashboards, folders, Loki. See `docs/tech/grafana-mcp.md`.
 
 ## Cursor Orchestration
 

@@ -4,7 +4,9 @@
 **Priority:** Must  
 **Status:** Ready  
 **Created:** 2026-02-13  
-**Updated:** 2026-02-13
+**Updated:** 2026-02-14
+
+**Scheduling:** This story is split into two queue items for delivery: [FR-003a-Replay-Overlay.md](FR-003a-Replay-Overlay.md) (replay overlay) and [FR-003b-Live-Toast.md](FR-003b-Live-Toast.md) (live toast). This file remains the parent story for both.
 
 ## Description
 

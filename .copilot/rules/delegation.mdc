@@ -53,7 +53,6 @@ When writing multiple dependent documents (PRD specs, tech plans, stories):
 	1. Delegate implementation to `simhub-developer`.
 	2. `simhub-developer` performs a successful build (msbuild or dotnet build) and self-review, then returns a reviewed, consolidated change set.
 	3. The coding agent executes code changes once (single apply pass) after SimHub self-review is complete.
-	4. **Deploy (mandatory):** The agent that applied plugin code—whether after a simhub-developer handoff or when implementing plugin changes directly—**must** run `plugin/scripts/deploy-plugin.ps1` at the end of that change iteration and report its output. Do not consider plugin implementation complete until deploy has been run and output reported.
-- If plugin changes were made without delegating (e.g. plan execution or small fixes), the agent that made the changes still must run `plugin/scripts/deploy-plugin.ps1` and report output.
+	4. At the end of each change iteration, run `plugin/scripts/deploy-plugin.ps1` and report output.
 - `code-reviewer` is optional for plugin work unless the user explicitly requests it or confidence is Medium/Low.
 - After implementation, document outcomes in Memory Bank (`activeContext.md`, `progress.md`, and `journal.md` as needed).

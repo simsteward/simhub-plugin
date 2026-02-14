@@ -31,5 +31,7 @@ After reading memory-bank, check if the current task matches a subagent below. D
 
 - Memory Bank rule takes priority over this rule when in conflict.
 - All agents must follow `incremental-work.mdc`. Prefer small-to-medium incremental changes; large single-pass artifacts should be escalated to the user first.
+- All agents may search the internet for additional context when project files are insufficient; prefer authoritative sources.
+- All agents may use additional tooling, including command-line workflows and relevant CLIs, when needed to complete tasks.
 - Do not delegate simple one-step tasks; handle them directly.
 - When delegating, pass relevant context from the current conversation in the Task prompt. Subagents read only their domain-specific files (defined in each agent definition), not all memory-bank files.

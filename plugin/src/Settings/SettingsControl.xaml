@@ -1,0 +1,826 @@
+<UserControl x:Class="SimStewardPlugin.Settings.SettingsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SimStewardPlugin.Settings"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <local:BooleanToVisibilityInverseConverter x:Key="BooleanToVisibilityInverseConverter" />
+
+        <!-- PITWALL NOC base brush keys (populated by code-behind to support Dark/Light/System). -->
+        <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#FF080C14" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#FF0F1923" />
+        <SolidColorBrush x:Key="SectionBackgroundBrush" Color="#FF0F1923" />
+        <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FF141E2B" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#FF1E2D3D" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF00BFFF" />
+        <SolidColorBrush x:Key="HeaderBrush" Color="#FF00BFFF" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#FF7B8CA0" />
+        <SolidColorBrush x:Key="ValueBrush" Color="#FFE0E8F0" />
+        <SolidColorBrush x:Key="OkBrush" Color="#FF00E676" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#FFFFB300" />
+        <SolidColorBrush x:Key="ErrorBrush" Color="#FFFF3D3D" />
+        <SolidColorBrush x:Key="InactiveBrush" Color="#FF3A4A5A" />
+        <SolidColorBrush x:Key="NetworkBrush" Color="#FF2196F3" />
+
+        <SolidColorBrush x:Key="SuccessBrush" Color="#FF00E676" />
+
+        <Style x:Key="SectionHeaderText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        </Style>
+
+        <Style x:Key="LabelText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        </Style>
+
+        <Style x:Key="ValueText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource ValueBrush}" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        </Style>
+
+        <Style x:Key="MetricLabelText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        </Style>
+
+        <Style x:Key="MetricValueText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        </Style>
+
+        <Style x:Key="SectionPanel" TargetType="Border">
+            <Setter Property="Margin" Value="0,0,0,14" />
+            <Setter Property="Background" Value="{DynamicResource SectionBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14,12" />
+        </Style>
+
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Text" Value="" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+        </Style>
+
+        <Style x:Key="DotText" TargetType="TextBlock">
+            <Setter Property="Text" Value="●" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+        </Style>
+
+        <Style x:Key="RuntimeDot" TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PluginState}" Value="Running">
+                    <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PluginState}" Value="Starting">
+                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PluginState}" Value="Error">
+                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding PluginState}" Value="Shutdown">
+                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ConnectionDot" TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IRacingConnection}" Value="Connected">
+                    <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IRacingConnection}" Value="Error">
+                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IRacingConnection}" Value="Disconnected">
+                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="FeatureDot" TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding}" Value="Active">
+                    <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="Waiting">
+                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="Warning">
+                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="Error">
+                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="Disabled">
+                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding}" Value="NotConfigured">
+                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MetricCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+    </UserControl.Resources>
+    <Grid Background="{DynamicResource PanelBackgroundBrush}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <Border Margin="16,14,16,16" Padding="18,16" Background="{DynamicResource SurfaceBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <StackPanel>
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="SIM STEWARD" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource ValueBrush}" />
+                        <TextBlock Margin="0,4,0,0" Text="THE PITWALL NOC" FontSize="11" FontFamily="Consolas" Foreground="{DynamicResource MutedBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                        <TextBlock Text="Theme" Style="{StaticResource LabelText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox x:Name="ThemeModeComboBox" Width="120" Height="24" SelectionChanged="ThemeModeComboBox_SelectionChanged">
+                            <ComboBoxItem Content="Dark" />
+                            <ComboBoxItem Content="Light" />
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+
+                <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,0,0,16" />
+
+                <!-- STATUS MONITORS: all features in one section -->
+                <Border Style="{StaticResource SectionPanel}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource AccentBrush}" CornerRadius="6,0,0,6" />
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="STATUS MONITORS" Style="{StaticResource SectionHeader}" />
+                            <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,6,0,10" />
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                    <TextBlock Style="{StaticResource RuntimeDot}" />
+                                    <TextBlock Text="Plugin Runtime" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding PluginStateText}" Style="{StaticResource ValueText}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                    <TextBlock Style="{StaticResource ConnectionDot}" />
+                                    <TextBlock Text="iRacing Connection" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding IRacingConnectionText}" Style="{StaticResource ValueText}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding MonitoringState}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding MonitoringState}" Value="Waiting">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding MonitoringState}" Value="Warning">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding MonitoringState}" Value="Error">
+                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding MonitoringState}" Value="Disabled">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding MonitoringState}" Value="NotConfigured">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="Monitoring (Grafana)" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding MonitoringStateText}" Style="{StaticResource ValueText}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ObsState}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ObsState}" Value="Waiting">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ObsState}" Value="Warning">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ObsState}" Value="Error">
+                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ObsState}" Value="Disabled">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ObsState}" Value="NotConfigured">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="OBS Connection" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding ObsStateText}" Style="{StaticResource ValueText}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Waiting">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Warning">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Error">
+                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Disabled">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IncidentDetectionState}" Value="NotConfigured">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="Incident Detection" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding IncidentDetectionStateText}" Style="{StaticResource ValueText}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding RecordingState}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RecordingState}" Value="Waiting">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RecordingState}" Value="Warning">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RecordingState}" Value="Error">
+                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RecordingState}" Value="Disabled">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RecordingState}" Value="NotConfigured">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="Recording" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding RecordingStateText}" Style="{StaticResource ValueText}" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ReplayState}" Value="Active">
+                                                        <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ReplayState}" Value="Waiting">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ReplayState}" Value="Warning">
+                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ReplayState}" Value="Error">
+                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ReplayState}" Value="Disabled">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ReplayState}" Value="NotConfigured">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="Replay Control" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding ReplayStateText}" Style="{StaticResource ValueText}" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource SectionPanel}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource AccentBrush}" CornerRadius="6,0,0,6" />
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="TELEMETRY (GRAFANA CLOUD)" Style="{StaticResource SectionHeader}" />
+                            <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,6,0,10" />
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Enabled" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <CheckBox x:Name="TelemetryEnabledCheckBox" Grid.Column="1" VerticalAlignment="Center" Content="Send health telemetry" Checked="TelemetryEnabledCheckBox_Changed" Unchecked="TelemetryEnabledCheckBox_Changed" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Loki URL" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBox x:Name="GrafanaLokiUrlTextBox" Height="24" LostFocus="GrafanaTelemetryField_LostFocus" />
+                                    <TextBlock Margin="0,2,0,0" Text="e.g. https://….grafana.net/loki/api/v1/push" Foreground="{DynamicResource MutedBrush}" FontSize="11" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Loki Username" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <TextBox x:Name="GrafanaLokiUsernameTextBox" Grid.Column="1" Height="24" LostFocus="GrafanaTelemetryField_LostFocus" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Loki API Key" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <PasswordBox x:Name="GrafanaLokiApiKeyPasswordBox" Grid.Column="1" Height="24" PasswordChanged="GrafanaLokiApiKeyPasswordBox_PasswordChanged" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Key Status" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <TextBlock x:Name="GrafanaLokiKeyStatusTextBlock" Grid.Column="1" Style="{StaticResource ValueText}" VerticalAlignment="Center" Text="Not set" />
+                                <Button Grid.Column="2" Margin="10,0,0,0" Padding="10,2" MinWidth="84" Content="Clear" Click="ClearLokiApiKey_Click" />
+                            </Grid>
+
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Flush Interval (sec)" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <TextBox x:Name="TelemetryFlushIntervalTextBox" Grid.Column="1" Width="120" Height="24" HorizontalAlignment="Left" LostFocus="GrafanaTelemetryField_LostFocus" />
+                            </Grid>
+
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Heartbeat Interval (sec)" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <TextBox x:Name="TelemetryHeartbeatIntervalTextBox" Grid.Column="1" Width="120" Height="24" HorizontalAlignment="Left" LostFocus="GrafanaTelemetryField_LostFocus" />
+                            </Grid>
+
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <CheckBox x:Name="TelemetryLogToDiskCheckBox" Content="Log to disk (same format as Loki)" IsChecked="False" VerticalAlignment="Center" Checked="TelemetryLogToDisk_Changed" Unchecked="TelemetryLogToDisk_Changed" />
+                            </Grid>
+
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Log directory (optional)" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <TextBox x:Name="TelemetryLogDirectoryTextBox" Grid.Column="1" Height="24" HorizontalAlignment="Stretch" LostFocus="GrafanaTelemetryField_LostFocus" ToolTip="Empty = use default (e.g. %LocalAppData%\Sim Steward\logs)" />
+                            </Grid>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Connection" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <TextBlock x:Name="GrafanaTelemetryConnectionTextBlock" Grid.Column="1" Style="{StaticResource ValueText}" VerticalAlignment="Center" Text="Disconnected" />
+                                <Button x:Name="GrafanaTelemetryConnectButton" Grid.Column="2" Margin="10,0,0,0" Padding="10,2" MinWidth="140" Content="Connect telemetry" Click="GrafanaTelemetryConnectButton_Click" />
+                            </Grid>
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Heartbeat" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="HeartbeatGlyph" Text="♥" FontSize="22" Foreground="{DynamicResource OkBrush}" Opacity="0.18" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                        <TextBlock.RenderTransform>
+                                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                                        </TextBlock.RenderTransform>
+                                        <TextBlock.Effect>
+                                            <DropShadowEffect Color="#00E676" BlurRadius="0" ShadowDepth="0" Opacity="0" />
+                                        </TextBlock.Effect>
+                                    </TextBlock>
+                                    <TextBlock x:Name="HeartbeatAgoText" Margin="10,0,0,0" Style="{StaticResource LabelText}" VerticalAlignment="Center" FontSize="11" Text="" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock x:Name="GrafanaTelemetryLastErrorTextBlock" Margin="0,8,0,0" Text="" Foreground="{DynamicResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+
+                            <TextBlock Margin="0,10,0,0" Text="Sends lightweight health events to Grafana Cloud Loki over HTTPS. Network IO is batched on a timer (not every telemetry tick)." Foreground="{DynamicResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,6,0,0" Text="API keys are stored encrypted for the current Windows user. Saved keys are not shown here; re-enter to update." Foreground="{DynamicResource MutedBrush}" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource SectionPanel}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource AccentBrush}" CornerRadius="6,0,0,6" />
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="CORE STATUS" Style="{StaticResource SectionHeader}" />
+                            <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,6,0,10" />
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                <TextBlock Style="{StaticResource RuntimeDot}" />
+                                <TextBlock Text="Plugin Runtime" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding PluginStateText}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                <TextBlock Style="{StaticResource ConnectionDot}" />
+                                <TextBlock Text="iRacing Connection" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding IRacingConnectionText}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Active Game" Style="{StaticResource LabelText}" />
+                            <TextBlock Grid.Column="1" Text="{Binding LastGameName}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid Margin="0,6,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource MetricCard}">
+                                <StackPanel>
+                                    <TextBlock Text="UPDATES" Style="{StaticResource MetricLabelText}" />
+                                    <TextBlock Text="{Binding TelemetryUpdateCount}" Style="{StaticResource MetricValueText}" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource MetricCard}">
+                                <StackPanel>
+                                    <TextBlock Text="SESSION" Style="{StaticResource MetricLabelText}" />
+                                    <TextBlock Text="{Binding LastSessionTimeFormatted}" Style="{StaticResource MetricValueText}" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                                <StackPanel>
+                                    <TextBlock Text="INCIDENTS" Style="{StaticResource MetricLabelText}" />
+                                    <TextBlock Text="{Binding LastIncidentCount}" Style="{StaticResource MetricValueText}" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Session Number" Style="{StaticResource LabelText}" />
+                            <TextBlock Grid.Column="1" Text="{Binding LastSessionNum}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Last Status Change (UTC)" Style="{StaticResource LabelText}" />
+                            <TextBlock Grid.Column="1" Text="{Binding LastStatusChangeUtcFormatted}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Heartbeat (UTC)" Style="{StaticResource LabelText}" />
+                            <TextBlock Grid.Column="1" Text="{Binding LastHeartbeatUtcFormatted}" Style="{StaticResource ValueText}" />
+                        </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource SectionPanel}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource AccentBrush}" CornerRadius="6,0,0,6" />
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="SUBSYSTEMS" Style="{StaticResource SectionHeader}" />
+                            <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,6,0,10" />
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                            <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ObsState}" Value="Active">
+                                                    <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ObsState}" Value="Waiting">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ObsState}" Value="Warning">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ObsState}" Value="Error">
+                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ObsState}" Value="Disabled">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ObsState}" Value="NotConfigured">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="OBS Connection" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding ObsStateText}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                            <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Active">
+                                                    <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Waiting">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Warning">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Error">
+                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IncidentDetectionState}" Value="Disabled">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IncidentDetectionState}" Value="NotConfigured">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="Incident Detection" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding IncidentDetectionStateText}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                            <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RecordingState}" Value="Active">
+                                                    <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RecordingState}" Value="Waiting">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RecordingState}" Value="Warning">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RecordingState}" Value="Error">
+                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RecordingState}" Value="Disabled">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding RecordingState}" Value="NotConfigured">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="Recording" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding RecordingStateText}" Style="{StaticResource ValueText}" />
+                        </Grid>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Grid.Column="0">
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DotText}">
+                                            <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ReplayState}" Value="Active">
+                                                    <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ReplayState}" Value="Waiting">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ReplayState}" Value="Warning">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ReplayState}" Value="Error">
+                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ReplayState}" Value="Disabled">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ReplayState}" Value="NotConfigured">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InactiveBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="Replay Control" Style="{StaticResource LabelText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding ReplayStateText}" Style="{StaticResource ValueText}" />
+                        </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource SectionPanel}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource AccentBrush}" CornerRadius="6,0,0,6" />
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="ALERTS" Style="{StaticResource SectionHeader}" />
+                            <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,6,0,10" />
+                            <Grid Margin="0,10,0,0">
+                                <TextBlock Text="✓ No active errors" Foreground="{DynamicResource OkBrush}" Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityInverseConverter}}" FontFamily="Consolas" />
+                                <TextBlock Text="{Binding LastErrorMessage}" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}" FontFamily="Consolas" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+            </Border>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
