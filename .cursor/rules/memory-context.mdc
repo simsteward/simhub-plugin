@@ -1,0 +1,16 @@
+---
+description: Rules for reading and writing the Docker-hosted Cursor Memory Bank so project context stays compact across commands.
+globs: []
+alwaysApply: true
+---
+
+# Memory Bank Context Sync
+
+- SimSteward now mirrors its telemetry/state snapshot (`snapshot.json`) plus Markdown helpers (`tasks.md`, `activeContext.md`, `progress.md`) into `memory-bank/`. The actual path comes from `MEMORY_BANK_PATH` (default: `SimSteward` plugin data directory → `memory-bank/`). Keep this directory writable so the MCP server can read/write the files without blocking `DataUpdate`.
+- The Memory Bank snapshot carries the fields from `SimStewardPlugin.BuildStateJson` plus `ProjectMarkers` (task id, task description, complexity level, last dashboard action). When you need incident data, look at `snapshot.json` first; it is the authoritative JSON dump the plugin writes.
+- Command ordering for lean context:
+  - **Core**: `/van` always loads `activeContext.md` to resume the ticket, so the assistant stays on the right story with minimal tokens.
+  - **Planning/Implementation**: `/plan`, `/build`, and `/creative` load `tasks.md`, `progress.md`, and creative archives only when corresponding flags indicate higher complexity (level 2+). That keeps the window slim until extra detail is needed.
+  - **Reflection/Archive**: After finishing work, update `activeContext.md`/`progress.md` plus the new `snapshot.json` so the next session resumes immediately.
+- When the user changes status or marks a sub-task done, write back to `tasks.md` and `progress.md` using the same Markdown structure the plugin produces (notes in `tasks.md`, counts in `progress.md`). These writes are what keep the Memory Bank consistent across commands and sessions.
+- Respect the Memory Bank hierarchy: read only what you need (core files first, then specialized files) and let the plugin continue writing snapshots in the background without reloading its entire context.

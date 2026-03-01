@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sim Steward</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --surface: rgba(255,255,255,0.03);
+            --border: rgba(255,255,255,0.08);
+            --accent: #1f9cff;
+            --green: #0ef272;
+            --red: #ff5f5f;
+            --yellow: #ffc840;
+            --cyan: #0dd8ff;
+            --text: #f5f5f5;
+            --muted: rgba(245,245,245,0.5);
+            font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: radial-gradient(circle at top, rgba(31,156,255,0.08), transparent 50%), var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .app {
+            width: min(600px, 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(8,8,8,0.85);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 24px 56px rgba(0,0,0,0.5);
+        }
+
+        /* ── Status bar ───────────────────────────────────────────── */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .dot {
+            width: 9px; height: 9px;
+            border-radius: 50%;
+            background: #444;
+            border: 1px solid rgba(255,255,255,0.25);
+            flex-shrink: 0;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .dot.live  { background: var(--green); box-shadow: 0 0 6px rgba(14,242,114,0.6); }
+        .dot.replay { background: var(--accent); box-shadow: 0 0 6px rgba(31,156,255,0.6); }
+        #status-text { font-size: 0.85rem; color: var(--muted); flex: 1; cursor: pointer; }
+        .ir-status { font-size: 0.8rem; color: var(--muted); }
+        .ir-status.connected { color: var(--green); }
+        #plugin-mode { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+        #session-time { font-family: "Courier New", monospace; font-size: 0.95rem; color: var(--text); margin-left: auto; }
+
+        /* ── Replay controls ──────────────────────────────────────── */
+        .replay-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn {
+            flex: 1 1 auto;
+            min-width: 56px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: rgba(255,255,255,0.03);
+            color: var(--text);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, transform 0.1s;
+        }
+        .btn:hover { border-color: var(--accent); background: rgba(31,156,255,0.08); }
+        .btn:active { transform: scale(0.97); }
+        .btn.primary {
+            background: linear-gradient(135deg, #1f9cff, #1480ff);
+            border-color: transparent;
+            font-weight: 600;
+        }
+        .btn.primary:hover { background: linear-gradient(135deg, #4db2ff, #1f9cff); }
+        .btn.active-speed { border-color: var(--accent); background: rgba(31,156,255,0.15); }
+
+        .progress-row { display: flex; flex-direction: column; gap: 6px; }
+        .frame-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
+        .progress-track {
+            height: 8px; border-radius: 6px;
+            background: rgba(255,255,255,0.05); overflow: hidden;
+        }
+        #progress-fill {
+            height: 100%; width: 0;
+            border-radius: 6px;
+            background: linear-gradient(90deg, var(--accent), #0dd8ff);
+            transition: width 0.2s ease;
+        }
+
+        /* ── Section header ───────────────────────────────────────── */
+        .section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
+            color: var(--muted); margin-bottom: 4px;
+        }
+        .badge {
+            background: rgba(255,255,255,0.08);
+            border-radius: 99px;
+            padding: 2px 8px;
+            font-size: 0.72rem;
+        }
+
+        /* ── Filter bar ───────────────────────────────────────────── */
+        .filter-bar {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            padding: 0 0 4px 0;
+        }
+        .filter-chip {
+            font-size: 0.72rem;
+            padding: 3px 10px;
+            border-radius: 99px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .filter-chip.active {
+            border-color: var(--accent);
+            background: rgba(31,156,255,0.12);
+            color: var(--text);
+        }
+        .filter-chip:hover { border-color: var(--accent); }
+
+        /* ── Driver standings ─────────────────────────────────────── */
+        .drivers-panel {
+            display: flex; flex-direction: column; gap: 6px;
+            padding: 12px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        #driver-list { display: flex; flex-direction: column; gap: 4px; }
+        .driver-row {
+            display: grid;
+            grid-template-columns: 2.2rem 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .driver-row.player {
+            border-color: rgba(31,156,255,0.3);
+            background: rgba(31,156,255,0.06);
+        }
+        .car-num {
+            font-family: "Courier New", monospace;
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-align: center;
+            background: rgba(255,255,255,0.06);
+            border-radius: 5px;
+            padding: 2px 4px;
+        }
+        .driver-name { font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .driver-incidents {
+            font-family: "Courier New", monospace;
+            font-size: 0.88rem;
+            font-weight: 600;
+            min-width: 28px;
+            text-align: right;
+        }
+        .driver-incidents.zero { color: var(--muted); }
+        .driver-incidents.low { color: var(--green); }
+        .driver-incidents.mid { color: var(--yellow); }
+        .driver-incidents.high { color: var(--red); }
+
+        .empty-state {
+            text-align: center;
+            padding: 16px;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        /* ── Incident feed ────────────────────────────────────────── */
+        .incidents-panel {
+            display: flex; flex-direction: column; gap: 6px;
+            padding: 12px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        #incident-feed { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
+        #incident-feed::-webkit-scrollbar { width: 4px; }
+        #incident-feed::-webkit-scrollbar-track { background: transparent; }
+        #incident-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+        .incident-card {
+            display: grid;
+            grid-template-columns: 3.4rem 1fr auto;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.06);
+            animation: slideIn 0.2s ease;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .incident-card:hover {
+            background: rgba(255,255,255,0.07);
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .incident-card.player-incident { border-color: rgba(31,156,255,0.25); }
+        .incident-card.detected-incident { border-color: rgba(13,216,255,0.18); border-style: dashed; }
+        .incident-card.zero-x-incident { border-color: rgba(255,255,255,0.12); }
+        .incident-time {
+            font-family: "Courier New", monospace;
+            font-size: 0.78rem;
+            color: var(--muted);
+            text-align: center;
+        }
+        .incident-body { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+        .incident-driver { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .incident-detail { font-size: 0.75rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+        .incident-cause-tag {
+            display: inline-block;
+            font-size: 0.68rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.06);
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .incident-cause-tag.off-track { background: rgba(14,242,114,0.12); color: var(--green); }
+        .incident-cause-tag.wall { background: rgba(255,200,64,0.12); color: var(--yellow); }
+        .incident-cause-tag.spin { background: rgba(255,200,64,0.12); color: var(--yellow); }
+        .incident-cause-tag.contact { background: rgba(255,95,95,0.12); color: var(--red); }
+        .incident-cause-tag.impact { background: rgba(255,95,95,0.08); color: rgba(255,95,95,0.7); }
+        .incident-badge {
+            font-family: "Courier New", monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 3px 7px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+        .badge-0x { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid rgba(255,255,255,0.12); }
+        .badge-1x { background: rgba(14,242,114,0.15); color: var(--green); border: 1px solid rgba(14,242,114,0.3); }
+        .badge-2x { background: rgba(255,200,64,0.15); color: var(--yellow); border: 1px solid rgba(255,200,64,0.3); }
+        .badge-4x { background: rgba(255,95,95,0.15); color: var(--red); border: 1px solid rgba(255,95,95,0.35); }
+        .badge-Nx { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+        .badge-detected { background: rgba(13,216,255,0.1); color: var(--cyan); border: 1px dashed rgba(13,216,255,0.35); font-size: 0.7rem; }
+
+        /* ── Event stream ─────────────────────────────────────────── */
+        .stream-panel {
+            display: flex; flex-direction: column; gap: 6px;
+            padding: 12px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .stream-header {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .stream-clear-btn {
+            font-size: 0.72rem; color: var(--muted); background: none; border: none;
+            cursor: pointer; padding: 2px 6px; border-radius: 4px;
+            transition: color 0.15s;
+        }
+        .stream-clear-btn:hover { color: var(--text); }
+        #event-stream {
+            display: flex; flex-direction: column; gap: 3px;
+            max-height: 220px; overflow-y: auto;
+            font-family: "Courier New", monospace;
+            font-size: 0.76rem;
+        }
+        #event-stream::-webkit-scrollbar { width: 4px; }
+        #event-stream::-webkit-scrollbar-track { background: transparent; }
+        #event-stream::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+        .stream-entry {
+            display: flex; gap: 8px; align-items: baseline;
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            line-height: 1.4;
+        }
+        .stream-ts { color: rgba(245,245,245,0.3); flex-shrink: 0; }
+        .stream-lvl {
+            flex-shrink: 0; width: 3.5em; text-align: right;
+            font-weight: 700;
+        }
+        .stream-lvl.INFO  { color: rgba(245,245,245,0.5); }
+        .stream-lvl.WARN  { color: var(--yellow); }
+        .stream-lvl.ERROR { color: var(--red); }
+        .stream-lvl.INCIDENT { color: var(--accent); }
+        .stream-lvl.DETECT { color: var(--cyan); }
+        .stream-lvl.ZEROX { color: var(--muted); }
+        .stream-msg { color: var(--text); word-break: break-all; }
+
+        /* ── Diagnostics / metrics panel ─────────────────────────── */
+        .diag-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        .diag-header {
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; user-select: none;
+        }
+        .diag-header-left { display: flex; align-items: center; gap: 8px; }
+        .diag-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+        .diag-toggle { font-size: 0.7rem; color: var(--muted); transition: color 0.15s; }
+        .diag-header:hover .diag-toggle { color: var(--text); }
+        .diag-body { display: flex; flex-direction: column; gap: 8px; }
+
+        /* Infrastructure row */
+        .infra-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 6px;
+        }
+        .infra-item {
+            display: flex; align-items: center; gap: 5px;
+            font-size: 0.76rem; color: var(--muted);
+        }
+        .infra-dot {
+            width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+            background: #333; border: 1px solid rgba(255,255,255,0.2);
+        }
+        .infra-dot.ok   { background: var(--green); box-shadow: 0 0 4px rgba(14,242,114,0.5); }
+        .infra-dot.warn { background: var(--yellow); box-shadow: 0 0 4px rgba(255,200,64,0.4); }
+        .infra-dot.err  { background: var(--red);    box-shadow: 0 0 4px rgba(255,95,95,0.4); }
+
+        /* Layer metrics bar */
+        .layers-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+        }
+        .layer-cell {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 2px;
+            padding: 5px 4px;
+            border-radius: 7px;
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.06);
+            cursor: default;
+        }
+        .layer-cell.active { border-color: rgba(31,156,255,0.3); background: rgba(31,156,255,0.06); }
+        .layer-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .layer-count { font-family: "Courier New", monospace; font-size: 0.92rem; font-weight: 700; color: var(--text); }
+        .layer-count.zero { color: rgba(245,245,245,0.25); }
+        .layer-desc { font-size: 0.62rem; color: rgba(245,245,245,0.3); text-align: center; line-height: 1.2; }
+
+        /* yaml updates pill */
+        .diag-footer { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .diag-pill {
+            font-size: 0.7rem; color: var(--muted);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 99px;
+            padding: 2px 9px;
+        }
+
+        /* ── Feedback ─────────────────────────────────────────────── */
+        .feedback {
+            padding: 8px 12px;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+            font-size: 0.82rem;
+            color: var(--muted);
+            min-height: 34px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .feedback.error   { border-color: rgba(255,95,95,0.5); background: rgba(255,95,95,0.08); color: var(--red); }
+        .feedback.success { border-color: rgba(14,242,114,0.4); background: rgba(14,242,114,0.08); color: var(--green); }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- Status bar -->
+    <header class="status-bar">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text" title="Click to retry">Connecting…</span>
+        <span id="ir-status" class="ir-status"></span>
+        <span id="plugin-mode">—</span>
+        <span id="session-time">—</span>
+    </header>
+
+    <!-- Diagnostics & Metrics -->
+    <section class="diag-panel" id="diag-panel">
+        <div class="diag-header" id="diag-toggle-btn" title="Toggle diagnostics">
+            <div class="diag-header-left">
+                <span class="diag-title">Diagnostics &amp; Metrics</span>
+            </div>
+            <span class="diag-toggle" id="diag-toggle-icon">▼</span>
+        </div>
+        <div class="diag-body" id="diag-body">
+            <!-- Infrastructure indicators -->
+            <div class="infra-grid" id="infra-grid">
+                <div class="infra-item"><span class="infra-dot" id="di-irsdk"></span><span id="di-irsdk-lbl">iRacing SDK</span></div>
+                <div class="infra-item"><span class="infra-dot" id="di-ws"></span><span id="di-ws-lbl">WebSocket</span></div>
+                <div class="infra-item"><span class="infra-dot" id="di-mb"></span><span id="di-mb-lbl" title="">Memory Bank</span></div>
+                <div class="infra-item"><span class="infra-dot" id="di-car"></span><span id="di-car-lbl">Player Car</span></div>
+            </div>
+            <!-- Per-layer detection counts -->
+            <div class="layers-grid">
+                <div class="layer-cell" id="lc-l1" title="Layer 1 — PlayerCarMyIncidentCount (player/focused car, 60 Hz, exact type)">
+                    <span class="layer-label">L1</span>
+                    <span class="layer-count zero" id="lc-l1-count">0</span>
+                    <span class="layer-desc">Player telemetry</span>
+                </div>
+                <div class="layer-cell" id="lc-l2" title="Layer 2 — G-force impact (all cars)">
+                    <span class="layer-label">L2</span>
+                    <span class="layer-count zero" id="lc-l2-count">0</span>
+                    <span class="layer-desc">Physics impact</span>
+                </div>
+                <div class="layer-cell" id="lc-l3" title="Layer 3 — Track surface off-track (all cars)">
+                    <span class="layer-label">L3</span>
+                    <span class="layer-count zero" id="lc-l3-count">0</span>
+                    <span class="layer-desc">Off-track</span>
+                </div>
+                <div class="layer-cell" id="lc-l4" title="Layer 4 — Session YAML deltas (all drivers, batched)">
+                    <span class="layer-label">L4</span>
+                    <span class="layer-count zero" id="lc-l4-count">0</span>
+                    <span class="layer-desc">YAML session</span>
+                </div>
+                <div class="layer-cell" id="lc-0x" title="0x — Player contact/off-track without official count change">
+                    <span class="layer-label">0x</span>
+                    <span class="layer-count zero" id="lc-0x-count">0</span>
+                    <span class="layer-desc">Contact (no pts)</span>
+                </div>
+            </div>
+            <!-- Summary pills -->
+            <div class="diag-footer">
+                <span class="diag-pill" id="dp-total">Total: 0 events</span>
+                <span class="diag-pill" id="dp-yaml">YAML updates: 0</span>
+                <span class="diag-pill" id="dp-last">Last: —</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Replay controls -->
+    <section class="replay-panel">
+        <div class="btn-row">
+            <button id="sessionStartBtn" class="btn" style="flex:1 1 70px;" title="Seek to start of session">⏮ Start</button>
+            <button id="stepBack" class="btn" style="flex:0 1 50px;" title="Step back 1 frame">|◀</button>
+            <button id="playPauseBtn" class="btn primary" style="flex:2 1 120px;">Play</button>
+            <button id="stepFwd" class="btn" style="flex:0 1 50px;" title="Step forward 1 frame">▶|</button>
+            <button id="prevIncident" class="btn" style="flex:1 1 80px;">◀ Inc</button>
+            <button id="nextIncident" class="btn" style="flex:1 1 80px;">Inc ▶</button>
+        </div>
+        <div class="btn-row" id="speed-row">
+            <button class="btn" data-speed="1">1×</button>
+            <button class="btn" data-speed="2">2×</button>
+            <button class="btn" data-speed="4">4×</button>
+            <button class="btn" data-speed="8">8×</button>
+            <button class="btn" data-speed="16">16×</button>
+        </div>
+        <div class="progress-row">
+            <div class="frame-label">
+                <span id="frame-cur">0</span>
+                <span id="frame-end">0</span>
+            </div>
+            <div class="progress-track"><div id="progress-fill"></div></div>
+        </div>
+    </section>
+
+    <!-- Driver standings -->
+    <section class="drivers-panel">
+        <div class="section-header">
+            <span>Drivers</span>
+            <span class="badge" id="driver-count">0</span>
+        </div>
+        <div id="driver-list"><div class="empty-state">Waiting for iRacing…</div></div>
+    </section>
+
+    <!-- Incident feed -->
+    <section class="incidents-panel">
+        <div class="section-header">
+            <span>Incidents</span>
+            <span class="badge" id="incident-count">0</span>
+        </div>
+        <div class="filter-bar" id="filter-bar">
+            <span class="filter-chip active" data-filter="all">All</span>
+            <span class="filter-chip" data-filter="0x">0x</span>
+            <span class="filter-chip" data-filter="1x">1x</span>
+            <span class="filter-chip" data-filter="2x">2x</span>
+            <span class="filter-chip" data-filter="4x">4x+</span>
+            <span class="filter-chip" data-filter="detected">Detected</span>
+            <span class="filter-chip" data-filter="player">Player</span>
+        </div>
+        <div id="incident-feed"><div class="empty-state">No incidents detected yet.</div></div>
+    </section>
+
+    <!-- Live event stream -->
+    <section class="stream-panel">
+        <div class="section-header stream-header">
+            <span>Live Event Stream</span>
+            <button class="stream-clear-btn" id="stream-clear-btn">clear</button>
+        </div>
+        <div id="event-stream"><div class="empty-state">Waiting for events…</div></div>
+    </section>
+
+    <!-- Feedback -->
+    <div class="feedback" id="action-feedback">
+        If the dot stays grey, the Sim Steward plugin is not running.
+    </div>
+
+</div>
+<script>
+(function () {
+    const statusDot   = document.getElementById("status-dot");
+    const statusText  = document.getElementById("status-text");
+    const modeEl      = document.getElementById("plugin-mode");
+    const timeEl      = document.getElementById("session-time");
+    const playBtn     = document.getElementById("playPauseBtn");
+    const prevBtn     = document.getElementById("prevIncident");
+    const nextBtn     = document.getElementById("nextIncident");
+    const speedRow    = document.getElementById("speed-row");
+    const frameCur    = document.getElementById("frame-cur");
+    const frameEnd    = document.getElementById("frame-end");
+    const fill        = document.getElementById("progress-fill");
+    const driverList  = document.getElementById("driver-list");
+    const driverCount = document.getElementById("driver-count");
+    const incidentFeed  = document.getElementById("incident-feed");
+    const incidentCount = document.getElementById("incident-count");
+    const eventStream = document.getElementById("event-stream");
+    const filterBar   = document.getElementById("filter-bar");
+    const feedback    = document.getElementById("action-feedback");
+    const MAX_STREAM_ENTRIES = 200;
+    const DATA_UPDATE_THROTTLE_MS = 400;
+    let lastDataUpdateAt = 0;
+    let lastIncidentKey = "";
+    let lastDriverKey = "";
+    let activeFilter = "all";
+    let allIncidents = [];
+    let lastIncidentContext = { hasLiveIncidentData: false, irsdkConnected: false };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const wsToken = urlParams.get("token") || urlParams.get("wsToken");
+    const wsPort = 19847;
+    const tokenQuery = wsToken ? `?token=${encodeURIComponent(wsToken)}` : "";
+    const buildWsUrl = host => `ws://${host}:${wsPort}${tokenQuery}`;
+    const wsHost = (window.location.hostname || "localhost");
+    let ws, reconnectTimer, feedbackTimer, reconnectDelay = 2000, useFallback = false;
+
+    // ── Connection ─────────────────────────────────────────────────
+    function connect() {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+        const url = useFallback ? buildWsUrl("127.0.0.1") : buildWsUrl(wsHost);
+        ws = new WebSocket(url);
+        ws.addEventListener("open",    onOpen);
+        ws.addEventListener("error",   onError);
+        ws.addEventListener("close",   onClose);
+        ws.addEventListener("message", e => handleMessage(e.data));
+    }
+    function onOpen() {
+        statusDot.className = "dot live";
+        statusText.textContent = "Connected";
+        reconnectDelay = 2000; useFallback = false;
+        flash("success", "Connected to Sim Steward");
+    }
+    function onError() { statusText.textContent = "Connection error"; }
+    function onClose(ev) {
+        statusDot.className = "dot";
+        const msg = ev.code === 1006
+            ? "Plugin not reachable (port 19847)"
+            : (ev.reason || "Disconnected");
+        statusText.textContent = msg;
+        flash("error", msg + " – retrying…");
+        clearDiagnostics();
+        lastIncidentContext = { hasLiveIncidentData: false, irsdkConnected: false };
+        renderIncidents(filterIncidents(allIncidents));
+        if (!useFallback && ev.code === 1006) { useFallback = true; setTimeout(connect, 600); }
+        else scheduleReconnect();
+    }
+
+    function clearDiagnostics() {
+        ["di-irsdk", "di-ws", "di-mb", "di-car"].forEach(id => {
+            const dot = document.getElementById(id);
+            if (dot) dot.className = "infra-dot";
+        });
+        const irStatusEl = document.getElementById("ir-status");
+        if (irStatusEl) {
+            irStatusEl.textContent = "";
+            irStatusEl.classList.remove("connected");
+        }
+        const labels = {
+            "di-irsdk-lbl": "iRacing SDK",
+            "di-ws-lbl":    "WebSocket",
+            "di-mb-lbl":    "Memory Bank",
+            "di-car-lbl":   "Player Car"
+        };
+        Object.entries(labels).forEach(([id, text]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        });
+        ["lc-l1", "lc-l2", "lc-l3", "lc-l4", "lc-0x"].forEach(id => setLayerCount(id, 0));
+        document.getElementById("dp-total").textContent = "Total: 0 events";
+        document.getElementById("dp-yaml").textContent  = "YAML updates: 0";
+        document.getElementById("dp-last").textContent  = "Last: —";
+    }
+    function scheduleReconnect() {
+        if (reconnectTimer) return;
+        reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); reconnectDelay = Math.min(30000, reconnectDelay * 1.5); }, reconnectDelay);
+    }
+
+    // ── Message handling ───────────────────────────────────────────
+    function handleMessage(raw) {
+        let p;
+        try { p = JSON.parse(raw); } catch { return; }
+        if (p.type === "state")             applyState(p);
+        else if (p.type === "actionResult") flash(p.success ? "success" : "error", p.success ? `${p.action} ok` : `${p.action}: ${p.error || "failed"}`);
+        else if (p.type === "pong")         flash("success", "pong");
+        else if (p.type === "error")        flash("error", p.error || "error");
+        else if (p.type === "logEvents")    appendLogEntries(p.entries ?? []);
+        else if (p.type === "incidentEvents") { appendIncidentEntries(p.events ?? []); flashIncidentsCaptured(p.events ?? []); }
+    }
+
+    // ── Event stream rendering ─────────────────────────────────────
+    function appendLogEntries(entries) {
+        if (!entries.length) return;
+        clearStreamPlaceholder();
+        const atBottom = isStreamAtBottom();
+        for (const e of entries) {
+            const row = document.createElement("div");
+            row.className = "stream-entry";
+            const ts = (e.timestamp || "").replace("T", " ").replace("Z", "").substring(11, 23);
+            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${esc(e.level || "INFO")}">${esc(e.level || "INFO")}</span><span class="stream-msg">${esc(e.message || "")}</span>`;
+            eventStream.appendChild(row);
+        }
+        trimStream();
+        if (atBottom) eventStream.scrollTop = eventStream.scrollHeight;
+    }
+
+    function flashIncidentsCaptured(events) {
+        if (!events.length) return;
+        const first = events[0];
+        const typeLabel = first.type || "?";
+        const causeLabel = first.cause ? ` (${first.cause})` : "";
+        const gLabel = first.peakG > 0 ? ` ${first.peakG.toFixed(1)}g` : "";
+        const label = events.length === 1
+            ? `Captured: ${typeLabel} #${first.carNumber ?? "?"} ${first.driverName ?? "Unknown"}${causeLabel}${gLabel}`
+            : `Captured ${events.length} incidents (latest: ${typeLabel} #${first.carNumber ?? "?"})`;
+        flash("success", label);
+    }
+
+    function appendIncidentEntries(events) {
+        if (!events.length) return;
+        clearStreamPlaceholder();
+        const atBottom = isStreamAtBottom();
+        for (const ev of events) {
+            const row = document.createElement("div");
+            row.className = "stream-entry";
+            const ts = ev.sessionTimeFormatted || "—";
+            const typeStr = ev.type || "?";
+            const causeStr = ev.cause ? ` [${ev.cause}]` : "";
+            const gStr = ev.peakG > 0 ? ` ${ev.peakG.toFixed(1)}g` : "";
+            const otherStr = ev.otherDriverName ? ` vs #${ev.otherCarNumber} ${ev.otherDriverName}` : "";
+            const label = `${typeStr} — #${ev.carNumber ?? "?"} ${ev.driverName ?? "Unknown"}${causeStr}${gStr}${otherStr} (${ev.totalAfter ?? "?"} total)`;
+
+            let lvlClass = "INCIDENT";
+            let lvlText = "INC";
+            if (ev.type === "detected") { lvlClass = "DETECT"; lvlText = "DET"; }
+            else if (ev.type === "0x") { lvlClass = "ZEROX"; lvlText = "0x"; }
+
+            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${lvlClass}">${lvlText}</span><span class="stream-msg">${esc(label)}</span>`;
+            eventStream.appendChild(row);
+        }
+        trimStream();
+        if (atBottom) eventStream.scrollTop = eventStream.scrollHeight;
+    }
+
+    function clearStreamPlaceholder() {
+        const placeholder = eventStream.querySelector(".empty-state");
+        if (placeholder) placeholder.remove();
+    }
+
+    function trimStream() {
+        while (eventStream.children.length > MAX_STREAM_ENTRIES)
+            eventStream.removeChild(eventStream.firstChild);
+    }
+
+    function isStreamAtBottom() {
+        return eventStream.scrollHeight - eventStream.scrollTop - eventStream.clientHeight < 32;
+    }
+
+    // ── Diagnostics panel ─────────────────────────────────────────
+    let diagOpen = false;
+    // Start collapsed
+    document.getElementById("diag-body").style.display = "none";
+    document.getElementById("diag-toggle-icon").textContent = "▶";
+    document.getElementById("diag-toggle-btn").addEventListener("click", () => {
+        diagOpen = !diagOpen;
+        document.getElementById("diag-body").style.display = diagOpen ? "" : "none";
+        document.getElementById("diag-toggle-icon").textContent = diagOpen ? "▼" : "▶";
+    });
+
+    function setInfraDot(id, status, label) {
+        const dot = document.getElementById(id);
+        const lbl = document.getElementById(id + "-lbl");
+        dot.className = "infra-dot " + status;
+        if (lbl && label) lbl.textContent = label;
+    }
+
+    function setLayerCount(id, count) {
+        const el = document.getElementById(id + "-count");
+        const cell = document.getElementById(id);
+        if (!el) return;
+        el.textContent = count;
+        el.className = "layer-count" + (count > 0 ? "" : " zero");
+        if (cell) cell.classList.toggle("active", count > 0);
+    }
+
+    function applyDiagnostics(diag, metrics) {
+        if (!diag && !metrics) return;
+
+        if (diag) {
+            const irOk = diag.irsdkConnected;
+            const irStarted = diag.irsdkStarted;
+            const irStatusEl = document.getElementById("ir-status");
+            if (irStatusEl) {
+                irStatusEl.textContent = irOk ? "iRacing ✓" : "iRacing: waiting";
+                irStatusEl.classList.toggle("connected", !!irOk);
+            }
+            setInfraDot("di-irsdk",
+                irOk ? "ok" : (irStarted ? "warn" : "err"),
+                irOk ? "iRacing: Connected" : (irStarted ? "iRacing: Waiting" : "iRacing: Not started"));
+
+            setInfraDot("di-ws",
+                diag.wsRunning ? "ok" : "err",
+                diag.wsRunning ? `WS :${diag.wsPort} (${diag.wsClients} client${diag.wsClients === 1 ? "" : "s"})` : "WS: Not running");
+
+            setInfraDot("di-mb",
+                diag.memoryBankAvailable ? "ok" : "warn",
+                null);
+            const mbLbl = document.getElementById("di-mb-lbl");
+            if (mbLbl) {
+                mbLbl.textContent = diag.memoryBankAvailable ? "Memory Bank: Active" : "Memory Bank: Unavailable";
+                mbLbl.title = diag.memoryBankPath || "";
+            }
+
+            const carKnown = (diag.playerCarIdx ?? -1) >= 0;
+            setInfraDot("di-car",
+                carKnown ? "ok" : "warn",
+                carKnown ? `Player car: #${diag.playerCarIdx}` : "Player car: Unknown");
+        }
+
+        if (metrics) {
+            setLayerCount("lc-l1", metrics.l1PlayerEvents ?? 0);
+            setLayerCount("lc-l2", metrics.l2PhysicsImpacts ?? 0);
+            setLayerCount("lc-l3", metrics.l3OffTrackEvents ?? 0);
+            setLayerCount("lc-l4", metrics.l4YamlEvents ?? 0);
+            setLayerCount("lc-0x", metrics.zeroXEvents ?? 0);
+
+            document.getElementById("dp-total").textContent = `Total: ${metrics.totalEvents ?? 0} events`;
+            document.getElementById("dp-yaml").textContent  = `YAML updates: ${metrics.yamlUpdates ?? 0}`;
+            const lastT = (metrics.lastDetectionSessionTime ?? -1) >= 0
+                ? `Last: t=${formatSessionTime(metrics.lastDetectionSessionTime)}`
+                : "Last: —";
+            document.getElementById("dp-last").textContent = lastT;
+        }
+    }
+
+    function formatSessionTime(totalSeconds) {
+        if (!isFinite(totalSeconds) || totalSeconds < 0) return "0:00";
+        const m = Math.floor(totalSeconds / 60);
+        const s = Math.floor(totalSeconds % 60);
+        return `${m}:${s.toString().padStart(2, "0")}`;
+    }
+
+    // ── State rendering ────────────────────────────────────────────
+    function applyState(s) {
+        applyDiagnostics(s.diagnostics ?? null, s.metrics ?? null);
+
+        const mode = s.pluginMode ?? "Unknown";
+        modeEl.textContent = mode;
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            if (mode === "Replay")     statusDot.className = "dot replay";
+            else if (mode === "Live")  statusDot.className = "dot live";
+            else                       statusDot.className = "dot live";
+        }
+
+        timeEl.textContent = s.currentSessionTimeFormatted ?? "—";
+
+        const frameNum = s.replayFrameNum ?? 0;
+        const frameMax = s.replayFrameNumEnd ?? 0;
+        frameCur.textContent = frameNum.toLocaleString();
+        frameEnd.textContent = frameMax.toLocaleString();
+        fill.style.width = frameMax > 0 ? `${Math.max(0, Math.min(1, frameNum / frameMax)) * 100}%` : "0%";
+
+        const playing = s.replayIsPlaying ?? (s.replayPlaySpeed ?? 0) !== 0;
+        playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
+
+        const curSpeed = s.replayPlaySpeed ?? 0;
+        speedRow.querySelectorAll("[data-speed]").forEach(btn => {
+            btn.classList.toggle("active-speed", parseInt(btn.dataset.speed) === curSpeed && playing);
+        });
+
+        const drivers = s.drivers ?? [];
+        const incidents = s.incidents ?? [];
+        const incidentKey = `${incidents.length}|${(incidents[0]?.id ?? "")}|${(incidents[incidents.length-1]?.id ?? "")}`;
+        const driverKey = drivers.map(d=>`${d.carIdx}:${d.incidents}`).join("|");
+        const now = Date.now();
+        const dataChanged = incidentKey !== lastIncidentKey || driverKey !== lastDriverKey;
+        const throttleElapsed = now - lastDataUpdateAt >= DATA_UPDATE_THROTTLE_MS;
+        if (dataChanged || throttleElapsed) {
+            lastIncidentKey = incidentKey;
+            lastDriverKey = driverKey;
+            lastDataUpdateAt = now;
+            lastIncidentContext = { hasLiveIncidentData: !!s.hasLiveIncidentData, irsdkConnected: !!s.diagnostics?.irsdkConnected };
+            renderDrivers(drivers, s.playerCarIdx ?? -1);
+            allIncidents = incidents;
+            renderIncidents(filterIncidents(incidents));
+        }
+    }
+
+    function renderDrivers(drivers, playerCarIdx) {
+        const active = drivers.filter(d => !d.isSpectator);
+        active.sort((a, b) => (b.incidents ?? 0) - (a.incidents ?? 0) || (a.userName || "").localeCompare(b.userName || ""));
+
+        driverCount.textContent = active.length;
+
+        if (active.length === 0) {
+            driverList.innerHTML = '<div class="empty-state">Waiting for session info…</div>';
+            return;
+        }
+
+        driverList.innerHTML = active.map(d => {
+            const raw = d.incidents ?? 0;
+            const pts = Math.max(0, Math.min(99, raw));
+            const ptsLabel = raw > 99 ? "99+" : pts;
+            const cls = pts === 0 ? "zero" : pts <= 4 ? "low" : pts <= 8 ? "mid" : "high";
+            const isPlayer = d.carIdx === playerCarIdx;
+            return `
+                <div class="driver-row${isPlayer ? " player" : ""}">
+                    <span class="car-num">#${d.carNumber ?? "?"}</span>
+                    <span class="driver-name">${esc(d.userName ?? "Unknown")}${isPlayer ? " ★" : ""}</span>
+                    <span class="driver-incidents ${cls}">${ptsLabel}x</span>
+                </div>`;
+        }).join("");
+    }
+
+    // ── Incident filtering ─────────────────────────────────────────
+    function filterIncidents(incidents) {
+        if (activeFilter === "all") return incidents;
+        return incidents.filter(ev => {
+            switch (activeFilter) {
+                case "0x": return ev.type === "0x";
+                case "1x": return ev.type === "1x";
+                case "2x": return ev.type === "2x";
+                case "4x": return ev.delta >= 4 && ev.type !== "0x" && ev.type !== "detected";
+                case "detected": return ev.type === "detected";
+                case "player": return ev.source === "player" || ev.source === "physics" && ev.carIdx !== undefined;
+                default: return true;
+            }
+        });
+    }
+
+    function renderIncidents(incidents) {
+        const totalAll = allIncidents.length;
+        const countLabel = activeFilter === "all" ? totalAll : `${incidents.length}/${totalAll}`;
+        incidentCount.textContent = countLabel;
+
+        if (incidents.length === 0) {
+            let msg;
+            if (allIncidents.length > 0) {
+                msg = "No incidents match this filter.";
+            } else if (!lastIncidentContext.irsdkConnected) {
+                msg = "Waiting for iRacing to connect…";
+            } else if (!lastIncidentContext.hasLiveIncidentData) {
+                msg = "Connected — establishing baseline…";
+            } else {
+                msg = "No incidents detected yet.";
+            }
+            incidentFeed.innerHTML = `<div class="empty-state">${msg}</div>`;
+            return;
+        }
+
+        incidentFeed.innerHTML = incidents.map(ev => {
+            const badgeCls = ev.type === "0x" ? "badge-0x"
+                           : ev.type === "1x" ? "badge-1x"
+                           : ev.type === "2x" ? "badge-2x"
+                           : ev.type === "4x" ? "badge-4x"
+                           : ev.type === "detected" ? "badge-detected"
+                           : "badge-Nx";
+
+            const isPlayer = ev.source === "player";
+            const isDetected = ev.type === "detected";
+            const is0x = ev.type === "0x";
+            const cardClass = isPlayer ? "player-incident" : isDetected ? "detected-incident" : is0x ? "zero-x-incident" : "";
+
+            const badgeLabel = ev.type === "detected" ? "DET" : `+${ev.delta ?? 0}x`;
+
+            const causeTag = formatCauseTag(ev.cause);
+            const gLabel = ev.peakG > 0 ? `${ev.peakG.toFixed(1)}g` : "";
+            const srcLabel = ev.source === "player" ? "player" : ev.source === "yaml" ? "session" : "physics";
+            const otherLabel = ev.otherDriverName ? `vs #${esc(ev.otherCarNumber || "?")} ${esc(ev.otherDriverName)}` : "";
+            const lapLabel = ev.lap > 0 ? `Lap ${ev.lap}` : "";
+            const pctLabel = ev.trackPct > 0 ? `T${(ev.trackPct * 100).toFixed(1)}%` : "";
+
+            const detailParts = [
+                ev.totalAfter != null && ev.delta > 0 ? `${Math.min(999, Math.max(0, ev.totalAfter))} pts` : "",
+                causeTag,
+                gLabel,
+                otherLabel,
+                lapLabel,
+                pctLabel,
+                srcLabel
+            ].filter(Boolean);
+
+            return `
+                <div class="incident-card ${cardClass}" data-incident-id="${esc(ev.id ?? "")}" title="Click to seek replay">
+                    <span class="incident-time">${esc(ev.sessionTimeFormatted ?? "—")}</span>
+                    <div class="incident-body">
+                        <span class="incident-driver">#${esc(ev.carNumber ?? "?")} ${esc(ev.driverName ?? "Unknown")}</span>
+                        <span class="incident-detail">${detailParts.join(" · ")}</span>
+                    </div>
+                    <span class="incident-badge ${badgeCls}">${badgeLabel}</span>
+                </div>`;
+        }).join("");
+
+        incidentFeed.querySelectorAll("[data-incident-id]").forEach(card => {
+            card.addEventListener("click", () => {
+                const id = card.dataset.incidentId;
+                if (id) send("SelectIncidentAndSeek", id);
+            });
+        });
+    }
+
+    function formatCauseTag(cause) {
+        if (!cause) return "";
+        const causeLabels = {
+            "off-track": "OFF-TRACK",
+            "wall": "WALL",
+            "spin": "SPIN",
+            "wall-or-spin": "WALL/SPIN",
+            "car-contact": "CONTACT",
+            "heavy-contact": "HEAVY CONTACT",
+            "impact": "IMPACT"
+        };
+        const label = causeLabels[cause] || cause.toUpperCase();
+        let cls = "incident-cause-tag";
+        if (cause === "off-track") cls += " off-track";
+        else if (cause === "wall" || cause === "spin" || cause === "wall-or-spin") cls += " wall";
+        else if (cause.includes("contact")) cls += " contact";
+        else if (cause === "impact") cls += " impact";
+        return `<span class="${cls}">${label}</span>`;
+    }
+
+    // ── Actions ────────────────────────────────────────────────────
+    function send(action, arg) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) { flash("error", "Not connected"); return; }
+        const p = { action };
+        if (arg !== undefined) p.arg = arg;
+        ws.send(JSON.stringify(p));
+    }
+
+    function flash(type, msg) {
+        feedback.textContent = msg;
+        feedback.className = "feedback" + (type ? " " + type : "");
+        clearTimeout(feedbackTimer);
+        feedbackTimer = setTimeout(() => { feedback.textContent = ""; feedback.className = "feedback"; }, 7000);
+    }
+
+    function esc(s) {
+        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    // ── Event listeners ────────────────────────────────────────────
+    statusText.addEventListener("click", () => { if (!ws || ws.readyState > WebSocket.OPEN) { useFallback = false; connect(); } });
+    document.getElementById("stream-clear-btn").addEventListener("click", () => {
+        eventStream.innerHTML = '<div class="empty-state">Stream cleared.</div>';
+    });
+    document.getElementById("sessionStartBtn").addEventListener("click", () => send("ReplaySeekSessionStart"));
+    playBtn.addEventListener("click", () => send("ReplayPlayPause"));
+    document.getElementById("stepBack").addEventListener("click", () => send("ReplayStepFrame", "-1"));
+    document.getElementById("stepFwd").addEventListener("click", () => send("ReplayStepFrame", "1"));
+    prevBtn.addEventListener("click", () => send("PrevIncident"));
+    nextBtn.addEventListener("click", () => send("NextIncident"));
+    speedRow.querySelectorAll("[data-speed]").forEach(btn => btn.addEventListener("click", () => send("ReplaySetSpeed", btn.dataset.speed)));
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (!ws || ws.readyState > WebSocket.OPEN)) connect(); });
+
+    filterBar.querySelectorAll(".filter-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            filterBar.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
+            chip.classList.add("active");
+            activeFilter = chip.dataset.filter;
+            renderIncidents(filterIncidents(allIncidents));
+        });
+    });
+
+    connect();
+})();
+</script>
+</body>
+</html>

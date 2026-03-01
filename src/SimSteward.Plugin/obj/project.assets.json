@@ -1,0 +1,214 @@
+{
+  "version": 3,
+  "targets": {
+    ".NETFramework,Version=v4.8": {
+      "Fleck/1.2.0": {
+        "type": "package",
+        "compile": {
+          "lib/net45/Fleck.dll": {}
+        },
+        "runtime": {
+          "lib/net45/Fleck.dll": {}
+        }
+      },
+      "IRSDKSharper/1.1.4": {
+        "type": "package",
+        "dependencies": {
+          "YamlDotNet": "16.3.0"
+        },
+        "compile": {
+          "lib/net471/IRSDKSharper.dll": {}
+        },
+        "runtime": {
+          "lib/net471/IRSDKSharper.dll": {}
+        }
+      },
+      "Newtonsoft.Json/13.0.3": {
+        "type": "package",
+        "compile": {
+          "lib/net45/Newtonsoft.Json.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net45/Newtonsoft.Json.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "YamlDotNet/16.3.0": {
+        "type": "package",
+        "compile": {
+          "lib/net47/YamlDotNet.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net47/YamlDotNet.dll": {
+            "related": ".xml"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Fleck/1.2.0": {
+      "sha512": "bPLXn6QbLAFoviur6XbrKB0Zn6x04E8VibHXyHZeJsoC7bkUl5DVtzM5cZgDuqHkIrBqAXJyTNJwSNIc6wBJ2Q==",
+      "type": "package",
+      "path": "fleck/1.2.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "fleck.1.2.0.nupkg.sha512",
+        "fleck.nuspec",
+        "lib/net40/Fleck.dll",
+        "lib/net45/Fleck.dll",
+        "lib/netcoreapp2.0/Fleck.dll",
+        "lib/netstandard2.0/Fleck.dll"
+      ]
+    },
+    "IRSDKSharper/1.1.4": {
+      "sha512": "jjbJWfWlqL0i9WwbLIC9zv9lBmdcZBldyg0IfLYc0gsgeaNRTRfxpfjHGQFsVu9LKPjXmpAQ2J7/WJ3d3Kx8SA==",
+      "type": "package",
+      "path": "irsdksharper/1.1.4",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE",
+        "README.md",
+        "irsdksharper.1.1.4.nupkg.sha512",
+        "irsdksharper.nuspec",
+        "lib/net471/IRSDKSharper.dll",
+        "lib/net6.0-windows7.0/IRSDKSharper.dll",
+        "lib/net7.0-windows7.0/IRSDKSharper.dll"
+      ]
+    },
+    "Newtonsoft.Json/13.0.3": {
+      "sha512": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==",
+      "type": "package",
+      "path": "newtonsoft.json/13.0.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE.md",
+        "README.md",
+        "lib/net20/Newtonsoft.Json.dll",
+        "lib/net20/Newtonsoft.Json.xml",
+        "lib/net35/Newtonsoft.Json.dll",
+        "lib/net35/Newtonsoft.Json.xml",
+        "lib/net40/Newtonsoft.Json.dll",
+        "lib/net40/Newtonsoft.Json.xml",
+        "lib/net45/Newtonsoft.Json.dll",
+        "lib/net45/Newtonsoft.Json.xml",
+        "lib/net6.0/Newtonsoft.Json.dll",
+        "lib/net6.0/Newtonsoft.Json.xml",
+        "lib/netstandard1.0/Newtonsoft.Json.dll",
+        "lib/netstandard1.0/Newtonsoft.Json.xml",
+        "lib/netstandard1.3/Newtonsoft.Json.dll",
+        "lib/netstandard1.3/Newtonsoft.Json.xml",
+        "lib/netstandard2.0/Newtonsoft.Json.dll",
+        "lib/netstandard2.0/Newtonsoft.Json.xml",
+        "newtonsoft.json.13.0.3.nupkg.sha512",
+        "newtonsoft.json.nuspec",
+        "packageIcon.png"
+      ]
+    },
+    "YamlDotNet/16.3.0": {
+      "sha512": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA==",
+      "type": "package",
+      "path": "yamldotnet/16.3.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "images/yamldotnet.png",
+        "lib/net47/YamlDotNet.dll",
+        "lib/net47/YamlDotNet.xml",
+        "lib/net6.0/YamlDotNet.dll",
+        "lib/net6.0/YamlDotNet.xml",
+        "lib/net8.0/YamlDotNet.dll",
+        "lib/net8.0/YamlDotNet.xml",
+        "lib/netstandard2.0/YamlDotNet.dll",
+        "lib/netstandard2.0/YamlDotNet.xml",
+        "lib/netstandard2.1/YamlDotNet.dll",
+        "lib/netstandard2.1/YamlDotNet.xml",
+        "yamldotnet.16.3.0.nupkg.sha512",
+        "yamldotnet.nuspec"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    ".NETFramework,Version=v4.8": [
+      "Fleck >= 1.2.0",
+      "IRSDKSharper >= 1.1.4",
+      "Newtonsoft.Json >= 13.0.3"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\winth\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "C:\\Users\\winth\\dev\\sim-steward\\plugin\\src\\SimSteward.Plugin\\SimSteward.Plugin.csproj",
+      "projectName": "SimSteward.Plugin",
+      "projectPath": "C:\\Users\\winth\\dev\\sim-steward\\plugin\\src\\SimSteward.Plugin\\SimSteward.Plugin.csproj",
+      "packagesPath": "C:\\Users\\winth\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\winth\\dev\\sim-steward\\plugin\\src\\SimSteward.Plugin\\obj\\",
+      "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      ],
+      "configFilePaths": [
+        "C:\\Users\\winth\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+      ],
+      "originalTargetFrameworks": [
+        "net48"
+      ],
+      "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "net48",
+          "projectReferences": {}
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "10.0.100"
+    },
+    "frameworks": {
+      "net48": {
+        "targetAlias": "net48",
+        "dependencies": {
+          "Fleck": {
+            "target": "Package",
+            "version": "[1.2.0, )"
+          },
+          "IRSDKSharper": {
+            "target": "Package",
+            "version": "[1.1.4, )"
+          },
+          "Newtonsoft.Json": {
+            "target": "Package",
+            "version": "[13.0.3, )"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101\\RuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

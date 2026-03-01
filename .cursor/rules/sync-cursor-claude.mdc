@@ -1,0 +1,29 @@
+---
+description: Keep Cursor rules and Claude project instructions in sync.
+globs:
+alwaysApply: true
+---
+
+# Sync Cursor ↔ Claude instructions
+
+Project instructions are duplicated for **Cursor** (`.cursor/rules/`) and **Claude** (`.claude/`) so both IDEs can use the same conventions.
+
+## Pairs to keep in sync
+
+| Cursor (source) | Claude |
+|-----------------|--------|
+| `.cursor/rules/SimHub.mdc` | `.claude/CLAUDE.md` |
+
+- **Cursor rule**: `.mdc` with YAML frontmatter (`description`, `globs`, `alwaysApply`). Content starts after the closing `---`.
+- **Claude instructions**: Plain markdown in `.claude/CLAUDE.md` (no frontmatter). Same body text as the Cursor rule.
+
+## When editing project instructions
+
+1. **Edit the Cursor rule first** (e.g. `.cursor/rules/SimHub.mdc`).
+2. **Update the Claude side**: Copy the rule **body only** (everything after the frontmatter) into `.claude/CLAUDE.md`. Preserve the first line of `CLAUDE.md` that states it stays in sync with the Cursor rule; replace only the main content below it.
+3. If you add a **new** Cursor rule that should apply in Claude too, add the same content (no frontmatter) to `.claude/CLAUDE.md` under a new heading, or add `.claude/rules/<name>.md` and reference it from `CLAUDE.md`.
+
+## Do not
+
+- Remove the sync reminder at the top of `.claude/CLAUDE.md`.
+- Change only one side; always update both when changing shared conventions.

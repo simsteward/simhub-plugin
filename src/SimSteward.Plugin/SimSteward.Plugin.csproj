@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>SimSteward.Plugin</RootNamespace>
+    <AssemblyName>SimSteward.Plugin</AssemblyName>
+    <OutputPath>..\..\bin\Plugin\</OutputPath>
+    <UseWPF>true</UseWPF>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <!-- SimHub SDK DLLs must be in lib/SimHub/ for build. When missing, build without plugin entry point. -->
+  </PropertyGroup>
+
+  <!-- When SimHub SDK is present, define SIMHUB_SDK -->
+  <PropertyGroup Condition="Exists('$(MSBuildProjectDirectory)\..\..\lib\SimHub\SimHub.Plugins.dll')">
+    <DefineConstants>$(DefineConstants);SIMHUB_SDK</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)\..\..\lib\SimHub\SimHub.Plugins.dll')">
+    <Reference Include="SimHub.Plugins">
+      <HintPath>..\..\lib\SimHub\SimHub.Plugins.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GameReaderCommon">
+      <HintPath>..\..\lib\SimHub\GameReaderCommon.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fleck" Version="1.2.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="IRSDKSharper" Version="1.1.4" />
+  </ItemGroup>
+
+</Project>
