@@ -7,14 +7,16 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using Newtonsoft.Json;
-using SimSteward.Plugin.MemoryBank;
 
 namespace SimSteward.Plugin
 {
     public class DriverRecord
     {
         [JsonProperty("carIdx")]     public int CarIdx { get; set; }
+        [JsonProperty("userId")]     public int UserId { get; set; }
         [JsonProperty("userName")]   public string UserName { get; set; }
         [JsonProperty("carNumber")]  public string CarNumber { get; set; }
         [JsonProperty("incidents")]  public int IncidentCount { get; set; }
@@ -25,6 +27,8 @@ namespace SimSteward.Plugin
     public class IncidentEvent
     {
         [JsonProperty("id")]                    public string Id { get; set; }
+        [JsonProperty("subSessionId")]          public int SubSessionId { get; set; }
+        [JsonProperty("userId")]                public int UserId { get; set; }
         [JsonProperty("sessionTime")]           public double SessionTime { get; set; }
         [JsonProperty("sessionTimeFormatted")]  public string SessionTimeFormatted { get; set; }
         [JsonProperty("carIdx")]                public int CarIdx { get; set; }
@@ -38,64 +42,30 @@ namespace SimSteward.Plugin
         [JsonProperty("otherCarNumber")]        public string OtherCarNumber { get; set; }
         [JsonProperty("otherDriverName")]       public string OtherDriverName { get; set; }
         [JsonProperty("cause")]                 public string Cause { get; set; }
-        [JsonProperty("peakG")]                 public float PeakG { get; set; }
         [JsonProperty("lap")]                   public int Lap { get; set; }
         [JsonProperty("trackPct")]              public float TrackPct { get; set; }
+        /// <summary>iRacing replay frame number at incident time. OBS uses this to seek the replay to the exact frame before starting a clip. 0 if unavailable.</summary>
+        [JsonProperty("replayFrameNum")]        public int ReplayFrameNum { get; set; }
     }
 
     /// <summary>
-    /// Multi-layer incident detection from iRacing shared memory.
-    ///
-    ///   Layer 1 — PlayerCarMyIncidentCount telemetry (60 Hz): exact per-incident
-    ///             deltas for the player. Delta value IS the type (1x/2x/4x).
-    ///             Cross-referenced with LongAccel/LatAccel/YawRate for cause.
-    ///
-    ///   Layer 2 — CarIdxLapDistPct velocity → G-force (all cars, ~60 Hz):
-    ///             detects impacts via sudden deceleration for every car on track.
-    ///
-    ///   Layer 3 — CarIdxTrackSurface transitions (all cars, ~60 Hz):
-    ///             detects off-track events via OnTrack→OffTrack for every car.
-    ///
-    ///   Layer 4 — Session YAML ResultsPositions[].Incidents (all drivers):
-    ///             authoritative totals, batched at high replay speeds.
-    ///
-    ///   0x      — Physics-detected events (contact/off-track) without a
-    ///             corresponding incident count change → light contact or brush.
+    /// Incident detection from iRacing session YAML (Layer 4 only).
+    /// Session YAML DriverInfo.Drivers[].CurDriverIncidentCount (all drivers):
+    /// authoritative totals, batched at high replay speeds. Same admin
+    /// restriction as ResultsPositions: non-admin live race = 0 for others.
     /// </summary>
     public class IncidentTracker
     {
         private const int MaxCars = 64;
-        private const int MaxIncidents = 200;
-        private const int MaxPendingBroadcast = 50;
+        /// <summary>Only trim in extreme cases; persisted file holds full history. No drop in normal use.</summary>
+        private const int MaxIncidents = 500000;
+        /// <summary>No cap; every incident is pushed to dashboard in real time.</summary>
+        private const int MaxPendingBroadcast = 500000;
 
-        private const float GForceImpactThreshold = 3.0f;
-        private const float GForcePlayerContactThreshold = 5.0f;
         private const float ProximityPctClose = 0.008f;
         private const float ProximityPctNear = 0.025f;
-        private const double PhysicsEventCooldownSec = 3.0;
-        private const float YawRateSpinThreshold = 1.2f;
-
-        private class CarPhysicsState
-        {
-            public float PrevDistPct = -1;
-            public float Velocity;
-            public float PrevVelocity;
-            public int PrevTrackSurface = -1;
-            public double LastImpactEventTime = -999;
-            public double LastOffTrackEventTime = -999;
-            public bool HasPrev;
-
-            public void Clear()
-            {
-                PrevDistPct = -1;
-                Velocity = 0;
-                PrevVelocity = 0;
-                PrevTrackSurface = -1;
-                LastImpactEventTime = -999;
-                LastOffTrackEventTime = -999;
-                HasPrev = false;
-            }
-        }
+        /// <summary>Session-time bucket (seconds) for fingerprint; absorbs YAML lag at high replay speed.</summary>
+        private const double GraceWindowSeconds = 2.0;
 
         // Layer 4 state
         private readonly Dictionary<int, int> _prevYamlIncidents = new Dictionary<int, int>();
@@ -103,31 +73,34 @@ namespace SimSteward.Plugin
         private readonly List<IncidentEvent> _incidents = new List<IncidentEvent>();
         private readonly ConcurrentQueue<IncidentEvent> _pendingBroadcast = new ConcurrentQueue<IncidentEvent>();
 
-        // Layer 1 state
-        private int _prevPlayerIncidentCount = -1;
         private int _lastSessionInfoUpdate = -1;
         private bool _baselineEstablished;
         private double _lastSessionTime = -1;
         private int _lastReplayFrameNum = -1;
+        private int _lastReplayPositionFrame = -1;
         private int _lastKnownSessionNum = -1; // -1 = not yet seen; used for session-change detection
         private bool _sessionInfoNullLogged;   // suppress repeated "SessionInfo is null" log entries
         private bool _baselineJustEstablished; // true for one Update() after baseline is established
+        private bool _yamlAllZeroLogged;       // suppress repeated "CurDriverIncidentCount all zero" (admin restriction) log
 
-        // Layer 2/3 state
-        private readonly CarPhysicsState[] _carPhysics;
         private readonly float[] _distPctBuf = new float[MaxCars];
-        private readonly int[] _trackSurfBuf = new int[MaxCars];
         private float _trackLengthM = 3000f;
         private bool _isDirt;
-        private double _prevPhysicsTime = -1;
-        private bool _intArrayAvailable = true;
         private bool _trackMetadataRead;
+
+        private int _subSessionId;
+        private DateTime _lastHighSpeedSiuLogAt = DateTime.MinValue;
 
         // Metrics state — cumulative per iRacing connection, reset on disconnect
         private readonly DetectionMetrics _metrics = new DetectionMetrics();
 
+        /// <summary>iRacing SubSessionID from WeekendInfo YAML. 0 until YAML is loaded.</summary>
+        public int SubSessionId => _subSessionId;
+
         public int PlayerCarIdx { get; private set; } = -1;
-        public int PlayerIncidentCount { get; private set; }
+        /// <summary>Player incident count from YAML (DriverInfo.Drivers[].CurDriverIncidentCount).</summary>
+        public int PlayerIncidentCount =>
+            PlayerCarIdx >= 0 && _drivers.TryGetValue(PlayerCarIdx, out var dr) ? dr.IncidentCount : 0;
         public bool BaselineEstablished => _baselineEstablished;
         /// <summary>True for one Update() after baseline transitions to established; plugin can emit a log event then clear.</summary>
         public bool BaselineJustEstablished => _baselineJustEstablished;
@@ -138,14 +111,38 @@ namespace SimSteward.Plugin
         public string TrackName { get; private set; } = "";
         public string TrackCategory { get; private set; } = "Road";
 
-        // Optional log callback: (message) => logger.Info(message). Set by the plugin after construction.
+        /// <summary>Structured log callback. Set by the plugin. Emits incident_detected, baseline_established, session_reset, seek_backward_detected (diagnostic only; incident counts are not reset).</summary>
+        public Action<LogEntry> LogStructured { get; set; }
+
+        /// <summary>Optional plain log callback for non-structured messages. Set by the plugin if needed.</summary>
         public Action<string> LogInfo { get; set; }
+
+        /// <summary>Optional persistence: called for every incident added (after dedupe). Plugin can append to file for full history.</summary>
+        public Action<IncidentEvent> OnIncidentPersist { get; set; }
+
+        private void EmitStructured(string eventType, string message, Dictionary<string, object> fields = null, string level = "INFO", string domain = null, string incidentId = null)
+        {
+            if (string.Equals(eventType, "incident_detected", StringComparison.OrdinalIgnoreCase) && LogStructured == null)
+            {
+                // #region agent log
+                AgentDebugLog.WriteB0C27E("H2", "IncidentTracker.EmitStructured", "LogStructured_null", new { });
+                // #endregion
+                return;
+            }
+            LogStructured?.Invoke(new LogEntry
+            {
+                Level = level,
+                Component = "tracker",
+                Event = eventType,
+                Message = message,
+                Fields = fields,
+                Domain = domain,
+                IncidentId = incidentId
+            });
+        }
 
         public IncidentTracker()
         {
-            _carPhysics = new CarPhysicsState[MaxCars];
-            for (int i = 0; i < MaxCars; i++)
-                _carPhysics[i] = new CarPhysicsState();
         }
 
         public List<DriverRecord> GetDriverSnapshot()
@@ -158,17 +155,45 @@ namespace SimSteward.Plugin
         public List<IncidentEvent> GetIncidentFeed() => new List<IncidentEvent>(_incidents);
 
         /// <summary>
+        /// Add a player incident from 60 Hz telemetry (PlayerCarMyIncidentCount increased). Gives exact SessionTime/ReplayFrameNum.
+        /// Call when baseline is established and count just increased. YAML may later merge Type/Delta into this event.
+        /// </summary>
+        public void AddPlayerIncidentFromTelemetry(double sessionTime, int replayFrameNum, int totalAfter,
+            int subSessionId, int sessionNum)
+        {
+            if (PlayerCarIdx < 0 || totalAfter <= 0) return;
+            if (!_drivers.TryGetValue(PlayerCarIdx, out var rec)) return;
+
+            int frameNum = replayFrameNum > 0 ? replayFrameNum : 0;
+            var ev = new IncidentEvent
+            {
+                Id = subSessionId > 0
+                    ? ComputeIncidentFingerprint(subSessionId, sessionNum, PlayerCarIdx, sessionTime, 1)
+                    : ShortId(),
+                SubSessionId = subSessionId,
+                UserId = rec.UserId,
+                SessionTime = sessionTime,
+                SessionTimeFormatted = FormatTime(sessionTime),
+                CarIdx = PlayerCarIdx,
+                DriverName = rec.UserName ?? "Player",
+                CarNumber = rec.CarNumber ?? "?",
+                Delta = 1,
+                TotalAfter = totalAfter,
+                Type = "1x",
+                Source = "telemetry",
+                ReplayFrameNum = frameNum
+            };
+            AddIncident(ev);
+        }
+
+        /// <summary>
         /// Returns a point-in-time copy of the per-layer detection counters.
         /// Safe to call from any thread; IncidentTracker fields are only mutated
         /// on the DataUpdate thread, so a shallow copy here is sufficient.
         /// </summary>
         public DetectionMetrics GetMetricsSnapshot() => new DetectionMetrics
         {
-            L1PlayerEvents        = _metrics.L1PlayerEvents,
-            L2PhysicsImpacts      = _metrics.L2PhysicsImpacts,
-            L3OffTrackEvents      = _metrics.L3OffTrackEvents,
             L4YamlEvents          = _metrics.L4YamlEvents,
-            ZeroXEvents           = _metrics.ZeroXEvents,
             TotalEvents           = _metrics.TotalEvents,
             YamlUpdates           = _metrics.YamlUpdates,
             LastDetectionSessionTime = _metrics.LastDetectionSessionTime,
@@ -188,31 +213,24 @@ namespace SimSteward.Plugin
             _drivers.Clear();
             _incidents.Clear();
             while (_pendingBroadcast.TryDequeue(out _)) { }
-            _prevPlayerIncidentCount = -1;
             _lastSessionInfoUpdate = -1;
             _baselineEstablished = false;
             _lastSessionTime = -1;
             _lastReplayFrameNum = -1;
+            _lastReplayPositionFrame = -1;
             _lastKnownSessionNum = -1;
             _sessionInfoNullLogged = false;
             _baselineJustEstablished = false;
+            _yamlAllZeroLogged = false;
             PlayerCarIdx = -1;
-            PlayerIncidentCount = 0;
-            _prevPhysicsTime = -1;
+            _subSessionId = 0;
             _trackMetadataRead = false;
-            for (int i = 0; i < MaxCars; i++)
-                _carPhysics[i].Clear();
-
             ResetMetrics();
         }
 
         private void ResetMetrics()
         {
-            _metrics.L1PlayerEvents = 0;
-            _metrics.L2PhysicsImpacts = 0;
-            _metrics.L3OffTrackEvents = 0;
             _metrics.L4YamlEvents = 0;
-            _metrics.ZeroXEvents = 0;
             _metrics.TotalEvents = 0;
             _metrics.YamlUpdates = 0;
             _metrics.LastDetectionSessionTime = -1;
@@ -229,30 +247,70 @@ namespace SimSteward.Plugin
 
             _baselineJustEstablished = false; // clear so plugin only sees it for one tick after establishment
 
-            // ── Seek-backward detection ─────────────────────────────
+            // ── Focused / selected driver (for incident count and "player" display) ──
+            // In replay or spectator, the user may be watching another car; we want that car's incidents.
+            // CamCarIdx = camera-focused car (who we're watching); DriverCarIdx = car we're driving (YAML).
+            // Prefer CamCarIdx when valid so replay "follow car" shows the correct driver's data.
+            int camCarIdx = GetInt(irsdk, "CamCarIdx");
+            int driverCarIdx = irsdk.Data?.SessionInfo?.DriverInfo?.DriverCarIdx ?? -1;
+            int prevPlayerCarIdx = PlayerCarIdx;
+            if (camCarIdx >= 0 && camCarIdx < MaxCars)
+                PlayerCarIdx = camCarIdx;
+            else if (driverCarIdx >= 0)
+                PlayerCarIdx = driverCarIdx;
+            // #region agent log
+            if (PlayerCarIdx != prevPlayerCarIdx)
+                AgentDebugLog.WriteB0C27E("H4", "IncidentTracker.Update", "focused_driver_set", new { prevPlayerCarIdx, PlayerCarIdx, camCarIdx, driverCarIdx, source = (camCarIdx >= 0 && camCarIdx < MaxCars) ? "CamCarIdx" : "DriverCarIdx" });
+            // #endregion
+
+            // ── Seek-backward detection (diagnostic only; we do not reset incident counts) ──
+            // Use ReplayFrameNum as current playback position (per END-OF-SESSION-DATAPOINTS: "Replay position").
+            // ReplayFrameNumEnd is session end frame and can cause false backward detection if used here.
+            // Threshold: decrease of 10+ frames (≈0.17s at 60 Hz). When ReplayPlaySpeed > 1, ignore backward blips.
             int replayFrame = GetInt(irsdk, "ReplayFrameNum");
             double prevSessionTime = _lastSessionTime;
             int prevReplayFrame = _lastReplayFrameNum;
+            int replayPlaySpeed = GetInt(irsdk, "ReplayPlaySpeed");
             bool seekedBackward = false;
-            if (prevSessionTime >= 0 && sessionTime < prevSessionTime - 5.0)
-                seekedBackward = true;
-            else if (prevReplayFrame >= 0 && replayFrame < prevReplayFrame - 60)
-                seekedBackward = true;
+            bool frameGuard = false;
+            bool sessionTimeGuard = false;
+            bool inFastForward = replayPlaySpeed > 1;
+            if (!inFastForward)
+            {
+                frameGuard = prevReplayFrame >= 0 && replayFrame < prevReplayFrame - 10;
+                sessionTimeGuard = prevSessionTime >= 0 && sessionTime < prevSessionTime - 1.0;
+                if (frameGuard)
+                    seekedBackward = true;
+                else if (sessionTimeGuard)
+                    seekedBackward = true;
+            }
             _lastSessionTime = sessionTime;
             _lastReplayFrameNum = replayFrame;
 
             if (seekedBackward)
             {
-                LogInfo?.Invoke($"Seek-backward detected (sessionTime {prevSessionTime:F1}->{sessionTime:F1}): clearing incident baselines and metrics.");
-                _prevYamlIncidents.Clear();
-                _baselineEstablished = false;
-                _incidents.Clear();
-                while (_pendingBroadcast.TryDequeue(out _)) { }
-                _prevPlayerIncidentCount = GetInt(irsdk, "PlayerCarMyIncidentCount"); // raw; baseline re-set
-                _prevPhysicsTime = -1;
-                for (int i = 0; i < MaxCars; i++)
-                    _carPhysics[i].Clear();
-                ResetMetrics();
+                // Log only; do not reset incident baselines or counts (per user requirement and STATE_AND_ROADMAP).
+                int frameDelta = prevReplayFrame >= 0 ? prevReplayFrame - replayFrame : 0;
+                double sessionTimeDelta = prevSessionTime >= 0 ? sessionTime - prevSessionTime : 0;
+                AgentDebugLog.Write740824("H1", "IncidentTracker.Update", "seek_backward_detected", new
+                {
+                    replayPlaySpeed,
+                    frameDelta,
+                    prevReplayFrame,
+                    replayFrame,
+                    sessionTimeDelta,
+                    frameGuard,
+                    sessionTimeGuard
+                });
+                LogStructured?.Invoke(new LogEntry
+                {
+                    Level = "INFO",
+                    Component = "tracker",
+                    Event = "seek_backward_detected",
+                    Message = $"Seek-backward detected (frame {prevReplayFrame}->{replayFrame}); incident counts not reset.",
+                    Fields = new Dictionary<string, object> { ["from_frame"] = prevReplayFrame, ["to_frame"] = replayFrame },
+                    Domain = "replay"
+                });
             }
 
             // ── Session-change detection ────────────────────────────
@@ -261,373 +319,127 @@ namespace SimSteward.Plugin
             int currentSessionNum = GetInt(irsdk, "SessionNum");
             if (_lastKnownSessionNum >= 0 && currentSessionNum != _lastKnownSessionNum)
             {
-                LogInfo?.Invoke($"Session changed ({_lastKnownSessionNum}→{currentSessionNum}): clearing incident baselines.");
+                // #region agent log
+                AgentDebugLog.WriteB0C27E("H9", "IncidentTracker.Update", "session_reset",
+                    new { oldSession = _lastKnownSessionNum, newSession = currentSessionNum, playerCarIdx = PlayerCarIdx });
+                // #endregion
+                LogStructured?.Invoke(new LogEntry
+                {
+                    Level = "INFO",
+                    Component = "tracker",
+                    Event = "session_reset",
+                    Message = $"Session changed ({_lastKnownSessionNum}→{currentSessionNum}): clearing incident baselines.",
+                    Fields = new Dictionary<string, object> { ["old_session"] = _lastKnownSessionNum, ["new_session"] = currentSessionNum },
+                    Domain = "lifecycle"
+                });
                 _incidents.Clear();
                 while (_pendingBroadcast.TryDequeue(out _)) { }
                 _prevYamlIncidents.Clear();
                 _baselineEstablished = false;
-                _prevPlayerIncidentCount = -1;
-                _prevPhysicsTime = -1;
+                _yamlAllZeroLogged = false;
                 _lastSessionInfoUpdate = -1;
-                for (int i = 0; i < MaxCars; i++)
-                    _carPhysics[i].Clear();
                 ResetMetrics();
             }
             _lastKnownSessionNum = currentSessionNum;
 
-            // ── Read telemetry arrays ───────────────────────────────
-            bool haveDistPct = TryGetFloatArray(irsdk, "CarIdxLapDistPct", _distPctBuf);
-            bool haveTrackSurf = _intArrayAvailable && TryGetIntArray(irsdk, "CarIdxTrackSurface", _trackSurfBuf);
+            // ── Read telemetry arrays (for Layer 4 cause inference / other-car identification) ─
+            TryGetFloatArray(irsdk, "CarIdxLapDistPct", _distPctBuf);
+            _lastReplayPositionFrame = replayFrame;
 
             // ── Track metadata (once per session) ───────────────────
             UpdateTrackMetadata(irsdk);
 
-            // Snapshot player's previous track surface BEFORE physics updates it
-            int playerPrevTrackSurf = -1;
-            if (haveTrackSurf && PlayerCarIdx >= 0 && PlayerCarIdx < MaxCars)
-                playerPrevTrackSurf = _carPhysics[PlayerCarIdx].PrevTrackSurface;
-
-            // ── Layer 2 & 3: Physics-based detection (all cars) ─────
-            double dt = (_prevPhysicsTime > 0) ? sessionTime - _prevPhysicsTime : 0;
-            _prevPhysicsTime = sessionTime;
-            if (haveDistPct && dt > 0.001 && dt < 2.0)
-                ProcessPhysicsFrame(irsdk, sessionTime, (float)dt, haveTrackSurf);
-
             // ── Layer 4: YAML-based tracking (all drivers) ──────────
+            // Gate on SessionInfoUpdate so we only parse YAML when iRacing has actually
+            // changed the session data. CurDriverIncidentCount is a YAML field — if SIU
+            // hasn't incremented, the data is byte-for-byte identical and there is nothing
+            // to detect. Also refresh when we have SessionInfo but no drivers yet (e.g. first
+            // time YAML is available, or SIU not yet incrementing), so the roster appears.
             int currentSIU = GetInt(irsdk, "SessionInfoUpdate");
-            if (currentSIU != _lastSessionInfoUpdate)
+            bool siuChanged = currentSIU != _lastSessionInfoUpdate;
+            var si = irsdk.Data.SessionInfo;
+            bool needRoster = _drivers.Count == 0 && si != null;
+            // #region agent log
+            if (siuChanged)
+            {
+                AgentDebugLog.Write740824("H1", "IncidentTracker.Update", "siu_changed",
+                    new { currentSIU, _lastSessionInfoUpdate, replayPlaySpeed, sessionTime, sessionNum = currentSessionNum });
+                AgentDebugLog.WriteB0C27E("H9", "IncidentTracker.Update", "siu_changed",
+                    new { currentSIU, previousSIU = _lastSessionInfoUpdate, sessionNum = currentSessionNum, playerCarIdx = PlayerCarIdx });
+            }
+            else if (inFastForward && (DateTime.UtcNow - _lastHighSpeedSiuLogAt).TotalSeconds >= 2.0)
+            {
+                _lastHighSpeedSiuLogAt = DateTime.UtcNow;
+                AgentDebugLog.Write740824("H1", "IncidentTracker.Update", "siu_unchanged_at_high_speed",
+                    new { currentSIU, _lastSessionInfoUpdate, replayPlaySpeed, sessionTime });
+            }
+            // #endregion
+            if (siuChanged)
             {
                 _lastSessionInfoUpdate = currentSIU;
-                RefreshFromYaml(irsdk, sessionTime);
-            }
-
-            // ── Layer 1: Player telemetry (60 Hz, precise) ──────────
-            int playerCount = GetInt(irsdk, "PlayerCarMyIncidentCount");
-            PlayerIncidentCount = playerCount;
-
-            if (_prevPlayerIncidentCount < 0)
-            {
-                _prevPlayerIncidentCount = playerCount;
-            }
-            else if (playerCount != _prevPlayerIncidentCount)
-            {
-                int delta = playerCount - _prevPlayerIncidentCount;
-                if (delta > 0 && IsValidIncidentValues(delta, playerCount))
-                {
-                    EmitPlayerIncident(irsdk, sessionTime, delta, playerCount);
-                    if (_drivers.TryGetValue(PlayerCarIdx, out var dr))
-                        dr.IncidentCount = ClampIncidentCount(playerCount);
-                }
-                _prevPlayerIncidentCount = playerCount; // store raw; only clamp for display
-            }
-            else if (haveDistPct)
-            {
-                // No incident count change — check for 0x events
-                Check0xContact(irsdk, sessionTime, playerCount);
-                if (haveTrackSurf && playerPrevTrackSurf == 3 &&
-                    PlayerCarIdx >= 0 && PlayerCarIdx < MaxCars &&
-                    _trackSurfBuf[PlayerCarIdx] == 0)
-                {
-                    Check0xOffTrack(sessionTime, playerCount);
-                }
-            }
-        }
-
-        // ================================================================
-        //  Layer 1 — Player incident with physics-based cause
-        // ================================================================
-
-        private void EmitPlayerIncident(IRacingSdk irsdk, double sessionTime, int delta, int totalAfter)
-        {
-            _drivers.TryGetValue(PlayerCarIdx, out var dr);
-            string cause = ClassifyPlayerCause(irsdk, delta);
-            float peakG = GetPlayerCombinedG(irsdk);
-            int lap = GetInt(irsdk, "Lap");
-            float trackPct = (PlayerCarIdx >= 0 && PlayerCarIdx < MaxCars)
-                ? _distPctBuf[PlayerCarIdx] : 0;
-
-            var ev = new IncidentEvent
-            {
-                Id = ShortId(),
-                SessionTime = sessionTime,
-                SessionTimeFormatted = FormatTime(sessionTime),
-                CarIdx = PlayerCarIdx,
-                DriverName = dr?.UserName ?? "Player",
-                CarNumber = dr?.CarNumber ?? "?",
-                Delta = ClampIncidentCount(delta),
-                TotalAfter = ClampIncidentCount(totalAfter),
-                Type = ClassifyPlayerDelta(delta),
-                Source = "player",
-                Cause = cause,
-                PeakG = peakG,
-                Lap = lap,
-                TrackPct = trackPct
-            };
-            TryIdentifyOtherCar(ev, ProximityPctNear);
-            _metrics.L1PlayerEvents++;
-            AddIncident(ev);
-        }
-
-        private string ClassifyPlayerCause(IRacingSdk irsdk, int delta)
-        {
-            float yawRate = SafeGetFloat(irsdk, "YawRate");
-            float combinedG = GetPlayerCombinedG(irsdk);
-
-            int trackSurf = -1;
-            if (PlayerCarIdx >= 0 && PlayerCarIdx < MaxCars && _intArrayAvailable)
-                trackSurf = _trackSurfBuf[PlayerCarIdx];
-
-            switch (delta)
-            {
-                case 1:
-                    return "off-track";
-                case 2:
-                    if (Math.Abs(yawRate) > YawRateSpinThreshold)
-                        return "spin";
-                    if (combinedG > 3.0f)
-                        return "wall";
-                    return "wall-or-spin";
-                case 4:
-                    return _isDirt ? "car-contact" : "heavy-contact";
-                default:
-                    if (delta >= 4) return "heavy-contact";
-                    return "impact";
-            }
-        }
-
-        private float GetPlayerCombinedG(IRacingSdk irsdk)
-        {
-            float longA = SafeGetFloat(irsdk, "LongAccel");
-            float latA = SafeGetFloat(irsdk, "LatAccel");
-            return (float)Math.Sqrt(longA * longA + latA * latA) / 9.80665f;
-        }
-
-        // ================================================================
-        //  Layer 2 & 3 — Per-frame physics for all cars
-        // ================================================================
-
-        private void ProcessPhysicsFrame(IRacingSdk irsdk, double sessionTime, float dt, bool haveTrackSurf)
-        {
-            for (int i = 0; i < MaxCars; i++)
-            {
-                var state = _carPhysics[i];
-                float distPct = _distPctBuf[i];
-
-                // Car not in world
-                if (distPct < 0)
-                {
-                    state.HasPrev = false;
-                    if (haveTrackSurf) state.PrevTrackSurface = _trackSurfBuf[i];
-                    continue;
-                }
-
-                if (!state.HasPrev)
-                {
-                    state.PrevDistPct = distPct;
-                    state.Velocity = 0;
-                    state.PrevVelocity = 0;
-                    if (haveTrackSurf) state.PrevTrackSurface = _trackSurfBuf[i];
-                    state.HasPrev = true;
-                    continue;
-                }
-
-                // ── Layer 2: Velocity / G-force from position deltas ──
-                float deltaPct = distPct - state.PrevDistPct;
-                if (deltaPct > 0.5f) deltaPct -= 1f;
-                if (deltaPct < -0.5f) deltaPct += 1f;
-
-                float velocity = (deltaPct * _trackLengthM) / dt;
-                state.Velocity = velocity;
-
-                if (Math.Abs(state.PrevVelocity) > 0.1f)
-                {
-                    float accel = (velocity - state.PrevVelocity) / dt;
-                    float gForce = Math.Abs(accel / 9.80665f);
-
-                    if (gForce > GForceImpactThreshold && i != PlayerCarIdx)
+                _metrics.YamlUpdates++;
+                RefreshFromYaml(irsdk, sessionTime, replayPlaySpeed);
+                EmitStructured("yaml_update", $"SessionInfoUpdate {currentSIU} processed",
+                    new Dictionary<string, object>
                     {
-                        if (sessionTime - state.LastImpactEventTime > PhysicsEventCooldownSec)
-                        {
-                            state.LastImpactEventTime = sessionTime;
-                            EmitPhysicsImpact(i, sessionTime, gForce, distPct);
-                        }
-                    }
-                }
-
-                state.PrevVelocity = velocity;
-                state.PrevDistPct = distPct;
-
-                // ── Layer 3: Track surface transitions ──────────────
-                if (haveTrackSurf)
-                {
-                    int curSurf = _trackSurfBuf[i];
-                    int prevSurf = state.PrevTrackSurface;
-
-                    if (prevSurf == 3 && curSurf == 0 && i != PlayerCarIdx)
-                    {
-                        if (sessionTime - state.LastOffTrackEventTime > PhysicsEventCooldownSec)
-                        {
-                            state.LastOffTrackEventTime = sessionTime;
-                            EmitPhysicsOffTrack(i, sessionTime, distPct);
-                        }
-                    }
-                    state.PrevTrackSurface = curSurf;
-                }
+                        ["session_info_update"] = currentSIU,
+                        ["session_num"] = currentSessionNum,
+                        ["session_time"] = sessionTime
+                    },
+                    level: "DEBUG");
             }
-        }
-
-        private void EmitPhysicsImpact(int carIdx, double sessionTime, float gForce, float trackPct)
-        {
-            _drivers.TryGetValue(carIdx, out var dr);
-            int nearbyIdx = FindNearestCar(carIdx, trackPct, ProximityPctNear);
-            string cause = nearbyIdx >= 0 ? "car-contact" : "impact";
-
-            var ev = new IncidentEvent
+            else if (needRoster)
             {
-                Id = ShortId(),
-                SessionTime = sessionTime,
-                SessionTimeFormatted = FormatTime(sessionTime),
-                CarIdx = carIdx,
-                DriverName = dr?.UserName ?? $"Car {carIdx}",
-                CarNumber = dr?.CarNumber ?? "?",
-                Delta = 0,
-                TotalAfter = dr?.IncidentCount ?? 0,
-                Type = "detected",
-                Source = "physics",
-                Cause = cause,
-                PeakG = gForce,
-                TrackPct = trackPct
-            };
-            if (nearbyIdx >= 0 && _drivers.TryGetValue(nearbyIdx, out var other))
-            {
-                ev.OtherCarIdx = nearbyIdx;
-                ev.OtherCarNumber = other.CarNumber ?? "?";
-                ev.OtherDriverName = other.UserName ?? "Unknown";
+                RefreshFromYaml(irsdk, sessionTime, replayPlaySpeed);
             }
-            _metrics.L2PhysicsImpacts++;
-            AddIncident(ev);
-        }
-
-        private void EmitPhysicsOffTrack(int carIdx, double sessionTime, float trackPct)
-        {
-            _drivers.TryGetValue(carIdx, out var dr);
-            var ev = new IncidentEvent
-            {
-                Id = ShortId(),
-                SessionTime = sessionTime,
-                SessionTimeFormatted = FormatTime(sessionTime),
-                CarIdx = carIdx,
-                DriverName = dr?.UserName ?? $"Car {carIdx}",
-                CarNumber = dr?.CarNumber ?? "?",
-                Delta = 0,
-                TotalAfter = dr?.IncidentCount ?? 0,
-                Type = "detected",
-                Source = "physics",
-                Cause = "off-track",
-                TrackPct = trackPct
-            };
-            _metrics.L3OffTrackEvents++;
-            AddIncident(ev);
-        }
-
-        // ================================================================
-        //  0x detection — player contact/off-track without count change
-        // ================================================================
-
-        private void Check0xContact(IRacingSdk irsdk, double sessionTime, int playerCount)
-        {
-            if (PlayerCarIdx < 0 || PlayerCarIdx >= MaxCars) return;
-            float playerDist = _distPctBuf[PlayerCarIdx];
-            if (playerDist < 0) return;
-
-            float combinedG = GetPlayerCombinedG(irsdk);
-            if (combinedG < GForcePlayerContactThreshold) return;
-
-            int nearbyIdx = FindNearestCar(PlayerCarIdx, playerDist, ProximityPctClose);
-            if (nearbyIdx < 0) return;
-
-            var state = _carPhysics[PlayerCarIdx];
-            if (sessionTime - state.LastImpactEventTime < PhysicsEventCooldownSec) return;
-            state.LastImpactEventTime = sessionTime;
-
-            _drivers.TryGetValue(PlayerCarIdx, out var playerRec);
-            _drivers.TryGetValue(nearbyIdx, out var otherRec);
-
-            var ev = new IncidentEvent
-            {
-                Id = ShortId(),
-                SessionTime = sessionTime,
-                SessionTimeFormatted = FormatTime(sessionTime),
-                CarIdx = PlayerCarIdx,
-                DriverName = playerRec?.UserName ?? "Player",
-                CarNumber = playerRec?.CarNumber ?? "?",
-                Delta = 0,
-                TotalAfter = playerCount,
-                Type = "0x",
-                Source = "physics",
-                Cause = "car-contact",
-                PeakG = combinedG,
-                TrackPct = playerDist,
-                OtherCarIdx = nearbyIdx,
-                OtherCarNumber = otherRec?.CarNumber ?? "?",
-                OtherDriverName = otherRec?.UserName ?? "Unknown",
-                Lap = GetInt(irsdk, "Lap")
-            };
-            _metrics.ZeroXEvents++;
-            AddIncident(ev);
-        }
-
-        private void Check0xOffTrack(double sessionTime, int playerCount)
-        {
-            var state = _carPhysics[PlayerCarIdx];
-            if (sessionTime - state.LastOffTrackEventTime < PhysicsEventCooldownSec) return;
-            state.LastOffTrackEventTime = sessionTime;
-
-            _drivers.TryGetValue(PlayerCarIdx, out var dr);
-            float trackPct = _distPctBuf[PlayerCarIdx];
-
-            var ev = new IncidentEvent
-            {
-                Id = ShortId(),
-                SessionTime = sessionTime,
-                SessionTimeFormatted = FormatTime(sessionTime),
-                CarIdx = PlayerCarIdx,
-                DriverName = dr?.UserName ?? "Player",
-                CarNumber = dr?.CarNumber ?? "?",
-                Delta = 0,
-                TotalAfter = playerCount,
-                Type = "0x",
-                Source = "physics",
-                Cause = "off-track",
-                TrackPct = trackPct
-            };
-            _metrics.ZeroXEvents++;
-            AddIncident(ev);
         }
 
         // ================================================================
         //  Layer 4 — YAML-based tracking (all drivers)
         // ================================================================
 
-        private void RefreshFromYaml(IRacingSdk irsdk, double sessionTime)
+        private void RefreshFromYaml(IRacingSdk irsdk, double sessionTime, int replayPlaySpeed = 0)
         {
             var si = irsdk.Data.SessionInfo;
+            // #region agent log
+            int driverCount = si?.DriverInfo?.Drivers?.Count ?? 0;
+            int subSessionId = si?.WeekendInfo?.SubSessionID ?? 0;
+            AgentDebugLog.Write740824("H2", "IncidentTracker.RefreshFromYaml", "entry",
+                new { siNull = si == null, driverCount, subSessionId, replayPlaySpeed, sessionTime });
+            // #endregion
             if (si == null)
             {
                 if (!_sessionInfoNullLogged)
                 {
-                    LogInfo?.Invoke("SessionInfo is null — YAML not yet available. Incident totals will be delayed until iRacing populates session data.");
+                    EmitStructured("tracker_status", "SessionInfo is null — YAML not yet available. Incident totals will be delayed until iRacing populates session data.",
+                        new Dictionary<string, object> { ["reason"] = "sessioninfo_null" });
                     _sessionInfoNullLogged = true;
                 }
                 return;
             }
-            _sessionInfoNullLogged = false; // reset so we log again if null returns after being valid
-            _metrics.YamlUpdates++;
+            _sessionInfoNullLogged = false;
+            // YamlUpdates counts actual SIU increments, not every-tick polling calls.
+            // Counting happens in Update() when currentSIU != _lastSessionInfoUpdate.
 
-            PlayerCarIdx = si.DriverInfo?.DriverCarIdx ?? PlayerCarIdx;
+            _subSessionId = si.WeekendInfo?.SubSessionID ?? 0;
+            if (_subSessionId == 0)
+            {
+                // #region agent log
+                AgentDebugLog.Write740824("H5", "IncidentTracker.RefreshFromYaml", "early_return_subsession_zero", new { replayPlaySpeed });
+                AgentDebugLog.WriteB0C27E("H1", "IncidentTracker.RefreshFromYaml", "early_return_subsession_zero", new { replayPlaySpeed });
+                // #endregion
+                return; // YAML not fully loaded yet; skip roster and incident processing to avoid Hash(0:...) collisions
+            }
 
-            // ── Rebuild driver roster ─────────────────────────────
+            // PlayerCarIdx is set in Update() from CamCarIdx (camera-focused car) or DriverCarIdx; do not overwrite here.
+
+            // ── Rebuild driver roster and Layer 4: CurDriverIncidentCount (all drivers) ─
+            // CurDriverIncidentCount is populated from first YAML update; no session-match needed.
+            // Same admin restriction as ResultsPositions: live non-admin = 0 for other drivers.
             var driverList = si.DriverInfo?.Drivers;
+            int driversBaselined = 0;
+            int driversWithNonZeroIncidents = 0;
+            bool allNonSpectatorZero = true;
             if (driverList != null)
             {
                 foreach (var d in driverList)
@@ -638,112 +450,158 @@ namespace SimSteward.Plugin
                         rec = new DriverRecord { CarIdx = d.CarIdx };
                         _drivers[d.CarIdx] = rec;
                     }
+                    rec.UserId = d.UserID;
                     rec.UserName = string.IsNullOrEmpty(d.UserName) ? rec.UserName ?? "Unknown" : d.UserName;
                     rec.CarNumber = string.IsNullOrEmpty(d.CarNumber) ? rec.CarNumber ?? "?" : d.CarNumber;
                     rec.IsPlayer = (d.CarIdx == PlayerCarIdx);
                     rec.IsSpectator = (d.IsSpectator != 0);
-                    rec.IncidentCount = ClampIncidentCount(d.CurDriverIncidentCount);
-                }
-            }
 
-            // ── Per-driver deltas from ResultsPositions ──────────
-            var sessions = si.SessionInfo?.Sessions;
-            if (sessions != null)
-            {
-                int sessionNum = GetInt(irsdk, "ReplaySessionNum");
-                if (sessionNum < 0) sessionNum = GetInt(irsdk, "SessionNum");
-                var session = sessions.FirstOrDefault(s => s.SessionNum == sessionNum);
-                if (session == null)
-                    session = sessions.LastOrDefault(s => s.ResultsPositions != null && s.ResultsPositions.Count > 0);
-                var positions = session?.ResultsPositions;
-                if (positions != null && positions.Count > 0)
-                {
-                    foreach (var pos in positions)
+                    int inc = ClampIncidentCount(d.CurDriverIncidentCount);
+                    if (d.CarIdx == PlayerCarIdx)
                     {
-                        int idx = pos.CarIdx;
-                        if (idx < 0) continue;
+                        _prevYamlIncidents.TryGetValue(d.CarIdx, out int prevKnown);
+                        AgentDebugLog.WriteB0C27E("H7", "IncidentTracker.RefreshFromYaml", "focused_yaml_snapshot",
+                            new { PlayerCarIdx, inc, prevKnown, baselineEstablished = _baselineEstablished, replayPlaySpeed, sessionTime });
+                    }
+                    if (inc != 0 && !rec.IsSpectator)
+                    {
+                        allNonSpectatorZero = false;
+                        driversWithNonZeroIncidents++;
+                    }
 
-                        int inc = ClampIncidentCount(pos.Incidents);
-                        if (pos.Incidents != inc) continue;
+                    if (!_baselineEstablished)
+                    {
+                        _prevYamlIncidents[d.CarIdx] = inc;
+                        if (!rec.IsSpectator)
+                            driversBaselined++;
+                        // #region agent log
+                        if (d.CarIdx == PlayerCarIdx)
+                            AgentDebugLog.WriteB0C27E("H3", "IncidentTracker.RefreshFromYaml", "baseline_set_player", new { PlayerCarIdx, inc, carNumber = rec.CarNumber });
+                        // #endregion
+                    }
+                    else
+                    {
+                        _prevYamlIncidents.TryGetValue(d.CarIdx, out int prev);
+                        int delta = inc - prev;
+                        rec.IncidentCount = ClampIncidentCount(inc); // absolute total from YAML; shows correct cumulative count in replay and live
 
-                        if (_drivers.TryGetValue(idx, out var dr))
-                            dr.IncidentCount = inc;
+                        if (d.CarIdx == PlayerCarIdx && (delta != 0 || inc > 0))
+                            AgentDebugLog.WriteB0C27E("H1", "IncidentTracker.RefreshFromYaml", "player_yaml_delta", new { PlayerCarIdx, prev, inc, delta, willEmit = (delta > 0 && IsValidIncidentValues(delta, inc)), sessionTime });
 
-                        if (!_baselineEstablished)
+                        if (delta > 0 && IsValidIncidentValues(delta, inc))
                         {
-                            _prevYamlIncidents[idx] = inc;
-                        }
-                        else
-                        {
-                            _prevYamlIncidents.TryGetValue(idx, out int prev);
-                            int delta = inc - prev;
-
-                            if (delta > 0 && idx != PlayerCarIdx && IsValidIncidentValues(delta, inc))
+                            // #region agent log
+                            AgentDebugLog.Write740824("H3", "IncidentTracker.RefreshFromYaml", "delta_positive",
+                                new { carIdx = d.CarIdx, delta, inc, prev, sessionTime, replayPlaySpeed, carNumber = rec.CarNumber });
+                            // #endregion
+                            _drivers.TryGetValue(d.CarIdx, out var driverRec);
+                            string cause = InferYamlCause(d.CarIdx, sessionTime, delta);
+                            float trackPct = (d.CarIdx >= 0 && d.CarIdx < MaxCars) ? _distPctBuf[d.CarIdx] : 0;
+                            int frameNum = _lastReplayPositionFrame > 0 ? _lastReplayPositionFrame : 0;
+                            var ev = new IncidentEvent
                             {
-                                _drivers.TryGetValue(idx, out var driverRec);
-
-                                string cause = InferYamlCause(idx, sessionTime, delta);
-                                float trackPct = (idx >= 0 && idx < MaxCars) ? _distPctBuf[idx] : 0;
-
-                                var ev = new IncidentEvent
-                                {
-                                    Id = ShortId(),
-                                    SessionTime = sessionTime,
-                                    SessionTimeFormatted = FormatTime(sessionTime),
-                                    CarIdx = idx,
-                                    DriverName = driverRec?.UserName ?? $"Car {idx}",
-                                    CarNumber = driverRec?.CarNumber ?? "?",
-                                    Delta = delta,
-                                    TotalAfter = inc,
-                                    Type = ClassifyYamlDelta(delta),
-                                    Source = "yaml",
-                                    Cause = cause,
-                                    TrackPct = trackPct
-                                };
-                                TryIdentifyOtherCar(ev, ProximityPctNear);
-                                _metrics.L4YamlEvents++;
-                                AddIncident(ev);
-                            }
-                            _prevYamlIncidents[idx] = inc;
+                                Id = ComputeIncidentFingerprint(_subSessionId, _lastKnownSessionNum, d.CarIdx, sessionTime, delta),
+                                SubSessionId = _subSessionId,
+                                UserId = driverRec?.UserId ?? 0,
+                                SessionTime = sessionTime,
+                                SessionTimeFormatted = FormatTime(sessionTime),
+                                CarIdx = d.CarIdx,
+                                DriverName = driverRec?.UserName ?? $"Car {d.CarIdx}",
+                                CarNumber = driverRec?.CarNumber ?? "?",
+                                Delta = delta,
+                                TotalAfter = inc,
+                                Type = ClassifyYamlDelta(delta),
+                                Source = "yaml",
+                                Cause = cause,
+                                TrackPct = trackPct,
+                                ReplayFrameNum = frameNum
+                            };
+                            TryIdentifyOtherCar(ev, ProximityPctNear);
+                            _metrics.L4YamlEvents++;
+                            AddIncident(ev);
                         }
+                        else if (delta > 0 && !IsValidIncidentValues(delta, inc))
+                        {
+                            AgentDebugLog.Write740824("H4", "IncidentTracker.RefreshFromYaml", "delta_rejected_invalid",
+                                new { carIdx = d.CarIdx, delta, inc });
+                        }
+                        _prevYamlIncidents[d.CarIdx] = inc;
                     }
                 }
             }
 
-            if (!_baselineEstablished)
+            // #region agent log
+            if (driverList != null && (driversWithNonZeroIncidents > 0 || replayPlaySpeed > 2))
+                AgentDebugLog.Write740824("H3", "IncidentTracker.RefreshFromYaml", "after_loop",
+                    new { driversWithNonZeroIncidents, baselineEstablished = _baselineEstablished, driverCount = driverList?.Count ?? 0, replayPlaySpeed });
+            // #endregion
+
+            if (!_baselineEstablished && driversBaselined > 0)
             {
                 _baselineEstablished = true;
                 _baselineJustEstablished = true;
-                LogInfo?.Invoke($"Incident baseline established. Tracking deltas from this point. YAML updates: {_metrics.YamlUpdates}.");
+                LogStructured?.Invoke(new LogEntry
+                {
+                    Level = "INFO",
+                    Component = "tracker",
+                    Event = "baseline_established",
+                    Message = $"Incident baseline established ({driversBaselined} drivers).",
+                    Fields = new Dictionary<string, object> { ["driver_count"] = driversBaselined },
+                    Domain = "lifecycle"
+                });
             }
 
-            if (PlayerCarIdx >= 0 && _drivers.TryGetValue(PlayerCarIdx, out var playerRec))
-                playerRec.IncidentCount = ClampIncidentCount(PlayerIncidentCount);
+            int sessionState = GetInt(irsdk, "SessionState");
+            bool isPostRace = sessionState >= 5; // irsdk_StateCheckered = 5, StateCoolDown = 6
+            if (allNonSpectatorZero && _baselineEstablished && !isPostRace && driverList != null && driverList.Count > 0)
+            {
+                if (!_yamlAllZeroLogged)
+                {
+                    EmitStructured("tracker_status", "CurDriverIncidentCount is 0 for all non-spectator drivers. Likely non-admin in a live session — all-driver YAML incident data is restricted by iRacing until checkered or in replay.",
+                        new Dictionary<string, object> { ["reason"] = "admin_restriction" });
+                    _yamlAllZeroLogged = true;
+                }
+            }
+            else if (!allNonSpectatorZero || isPostRace)
+                _yamlAllZeroLogged = false;
+
         }
 
         /// <summary>
-        /// Infer likely cause for a YAML-reported incident using recent physics data.
+        /// Infer likely cause for a YAML-reported incident delta.
+        /// Uses car proximity at the moment YAML fires.
         /// </summary>
         private string InferYamlCause(int carIdx, double sessionTime, int delta)
         {
             if (carIdx < 0 || carIdx >= MaxCars) return null;
-            var state = _carPhysics[carIdx];
+            float distPct = carIdx < _distPctBuf.Length ? _distPctBuf[carIdx] : -1f;
 
-            bool recentImpact = sessionTime - state.LastImpactEventTime < 5.0;
-            bool recentOffTrack = sessionTime - state.LastOffTrackEventTime < 5.0;
-            int curSurf = _intArrayAvailable && carIdx < _trackSurfBuf.Length ? _trackSurfBuf[carIdx] : -1;
-
-            if (delta == 1 || curSurf == 0 || recentOffTrack)
+            if (delta == 1)
                 return "off-track";
-            if (delta == 4 || (delta >= 4 && !_isDirt))
-                return "heavy-contact";
-            if (recentImpact)
+
+            // 4x on paved = heavy contact; on dirt check proximity to distinguish car-contact
+            if (delta >= 4)
             {
-                int nearbyIdx = FindNearestCar(carIdx, _distPctBuf[carIdx], ProximityPctNear);
-                return nearbyIdx >= 0 ? "car-contact" : "wall";
+                if (!_isDirt) return "heavy-contact";
+                int nearbyForHeavy = distPct >= 0 ? FindNearestCar(carIdx, distPct, ProximityPctNear) : -1;
+                return nearbyForHeavy >= 0 ? "car-contact" : "heavy-contact";
             }
+
+            // 2x: prefer car-contact if another car is close at YAML-fire time, else wall-or-spin
             if (delta == 2)
-                return "wall-or-spin";
+            {
+                int nearbyIdx = distPct >= 0 ? FindNearestCar(carIdx, distPct, ProximityPctClose) : -1;
+                if (nearbyIdx >= 0) return "car-contact";
+                int nearbyWide = distPct >= 0 ? FindNearestCar(carIdx, distPct, ProximityPctNear) : -1;
+                return nearbyWide >= 0 ? "car-contact" : "wall-or-spin";
+            }
+
+            // Batched or unusual delta — check proximity
+            if (distPct >= 0)
+            {
+                int nearbyIdx = FindNearestCar(carIdx, distPct, ProximityPctNear);
+                if (nearbyIdx >= 0) return "car-contact";
+            }
             return null;
         }
 
@@ -761,23 +619,6 @@ namespace SimSteward.Plugin
                 return true;
             }
             catch { return false; }
-        }
-
-        private bool TryGetIntArray(IRacingSdk irsdk, string name, int[] buf)
-        {
-            if (!_intArrayAvailable) return false;
-            try
-            {
-                var props = irsdk.Data.TelemetryDataProperties;
-                if (props == null || !props.ContainsKey(name)) return false;
-                irsdk.Data.GetIntArray(props[name], buf, 0, buf.Length);
-                return true;
-            }
-            catch
-            {
-                _intArrayAvailable = false;
-                return false;
-            }
         }
 
         private void UpdateTrackMetadata(IRacingSdk irsdk)
@@ -833,12 +674,6 @@ namespace SimSteward.Plugin
             try { return irsdk.Data.GetInt(name); }
             catch { return 0; }
         }
-
-        private static float SafeGetFloat(IRacingSdk irsdk, string name)
-        {
-            try { return irsdk.Data.GetFloat(name); }
-            catch { return 0f; }
-        }
 #endif
 
         // ================================================================
@@ -881,13 +716,88 @@ namespace SimSteward.Plugin
 
         private void AddIncident(IncidentEvent ev)
         {
+            if (ev == null) return;
+            // #region agent log
+            AgentDebugLog.WriteB0C27E("H1", "IncidentTracker.AddIncident", "AddIncident_called", new { evId = ev.Id, carIdx = ev.CarIdx, carNumber = ev.CarNumber });
+            // #endregion
+
+            // When YAML adds a player incident, merge into a recent telemetry-added player event if present (exact time from 60 Hz, type from YAML).
+            if (string.Equals(ev.Source, "yaml", StringComparison.OrdinalIgnoreCase) && ev.CarIdx == PlayerCarIdx)
+            {
+                for (int i = 0; i < _incidents.Count; i++)
+                {
+                    var existing = _incidents[i];
+                    if (existing.CarIdx != PlayerCarIdx || !string.Equals(existing.Source, "telemetry", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    double dt = ev.SessionTime - existing.SessionTime;
+                    if (dt >= 0 && dt <= 10.0)
+                    {
+                        // #region agent log
+                        AgentDebugLog.Write740824("H4", "IncidentTracker.AddIncident", "merged_into_telemetry", new { evId = ev.Id, existingSessionTime = existing.SessionTime });
+                        AgentDebugLog.WriteB0C27E("H1", "IncidentTracker.AddIncident", "AddIncident_merged", new { evId = ev.Id, existingSessionTime = existing.SessionTime });
+                        // #endregion
+                        existing.Type = ev.Type;
+                        existing.Delta = ev.Delta;
+                        existing.TotalAfter = ev.TotalAfter;
+                        if (!string.IsNullOrEmpty(ev.Cause)) existing.Cause = ev.Cause;
+                        existing.Source = "yaml";
+                        return;
+                    }
+                }
+            }
+
+            // Deduplicate by fingerprint (session + driver + quantized time + delta).
+            for (int i = 0; i < _incidents.Count; i++)
+            {
+                if (_incidents[i].Id == ev.Id)
+                {
+                    // #region agent log
+                    AgentDebugLog.Write740824("H4", "IncidentTracker.AddIncident", "deduped", new { evId = ev.Id, carNumber = ev.CarNumber, sessionTime = ev.SessionTime });
+                    AgentDebugLog.WriteB0C27E("H1", "IncidentTracker.AddIncident", "AddIncident_deduped", new { evId = ev.Id, carNumber = ev.CarNumber, sessionTime = ev.SessionTime });
+                    // #endregion
+                    return;
+                }
+            }
+
+            // #region agent log
+            AgentDebugLog.Write740824("H4", "IncidentTracker.AddIncident", "emitting", new { evId = ev.Id, carNumber = ev.CarNumber, delta = ev.Delta, sessionTime = ev.SessionTime });
+            if (ev.CarIdx == PlayerCarIdx)
+                AgentDebugLog.WriteB0C27E("H2", "IncidentTracker.AddIncident", "emitting_player", new { evId = ev.Id, carNumber = ev.CarNumber, delta = ev.Delta, sessionTime = ev.SessionTime, source = ev.Source });
+            AgentDebugLog.WriteB0C27E("H1", "IncidentTracker.AddIncident", "incident_about_to_emit", new { evId = ev.Id, carNumber = ev.CarNumber, carIdx = ev.CarIdx, delta = ev.Delta, eventType = ev.Type });
+            // #endregion
             _metrics.TotalEvents++;
             _metrics.LastDetectionSessionTime = ev.SessionTime;
+            var incidentFields = new Dictionary<string, object>
+            {
+                ["incident_id"] = ev.Id,
+                ["sub_session_id"] = ev.SubSessionId,
+                ["user_id"] = ev.UserId,
+                ["incident_type"] = ev.Type,
+                ["car_number"] = ev.CarNumber,
+                ["driver_name"] = ev.DriverName,
+                ["delta"] = ev.Delta,
+                ["session_time"] = ev.SessionTime,
+                ["session_num"] = _lastKnownSessionNum,
+                ["replay_frame"] = ev.ReplayFrameNum,
+                ["lap"] = ev.Lap
+            };
+            if (!string.IsNullOrEmpty(ev.Cause))
+                incidentFields["cause"] = ev.Cause;
+            if (!string.IsNullOrEmpty(ev.OtherDriverName))
+            {
+                incidentFields["other_car_number"] = ev.OtherCarNumber;
+                incidentFields["other_driver_name"] = ev.OtherDriverName;
+            }
+            // #region agent log — confirm what we capture for incident_detected (file/Grafana)
+            var fieldKeys = new List<string>(incidentFields.Keys);
+            AgentDebugLog.WriteB0C27E("ID", "IncidentTracker.AddIncident", "incident_captured_fields", new { incident_id = ev.Id, fieldCount = incidentFields.Count, fieldKeys });
+            // #endregion
+            EmitStructured("incident_detected", $"Incident detected: {ev.Type} #{ev.CarNumber} {ev.DriverName}", incidentFields, "INFO", "incident", ev.Id);
             _incidents.Insert(0, ev);
             if (_incidents.Count > MaxIncidents)
                 _incidents.RemoveAt(_incidents.Count - 1);
-            if (_pendingBroadcast.Count < MaxPendingBroadcast)
-                _pendingBroadcast.Enqueue(ev);
+            _pendingBroadcast.Enqueue(ev);
+            OnIncidentPersist?.Invoke(ev);
         }
 
         private static int ClampIncidentCount(int value)
@@ -912,17 +822,6 @@ namespace SimSteward.Plugin
             return d;
         }
 
-        private static string ClassifyPlayerDelta(int delta)
-        {
-            switch (delta)
-            {
-                case 1: return "1x";
-                case 2: return "2x";
-                case 4: return "4x";
-                default: return delta > 0 ? $"{delta}x" : "?";
-            }
-        }
-
         private static string ClassifyYamlDelta(int delta)
         {
             // Standard iRacing incident point values are 1, 2, or 4.
@@ -945,6 +844,23 @@ namespace SimSteward.Plugin
         private static string ShortId()
         {
             return Guid.NewGuid().ToString("N").Substring(0, 8);
+        }
+
+        /// <summary>
+        /// Deterministic incident fingerprint from intrinsic session/incident properties.
+        /// Same incident always produces the same ID regardless of camera view or when it's detected.
+        /// Uses quantized session time (grace window) so YAML lag at high replay speed still dedupes.
+        /// </summary>
+        private static string ComputeIncidentFingerprint(
+            int subSessionId, int sessionNum, int carIdx, double sessionTime, int delta)
+        {
+            int timeKey = (int)(sessionTime / GraceWindowSeconds);
+            var input = $"{subSessionId}:{sessionNum}:{carIdx}:{timeKey}:{delta}";
+            using (var sha = SHA256.Create())
+            {
+                var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(input));
+                return BitConverter.ToString(hash, 0, 8).Replace("-", "").ToLowerInvariant();
+            }
         }
     }
 }

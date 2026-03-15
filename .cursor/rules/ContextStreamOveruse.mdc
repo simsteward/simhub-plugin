@@ -1,0 +1,39 @@
+---
+description: ContextStream overuse and large-session discipline — every session, milestones, compress, housekeeping. Invoking ContextStream MCP is required when available.
+globs:
+alwaysApply: true
+---
+
+All agent guidance is in ContextStream MCP and `.cursor/rules`.
+
+# ContextStream overuse (every session, large sessions, milestones)
+
+The P0 core directives require the agent to call `init(...)` then `context(...)` on the first turn; then (when the agent is auto/composer) hand off reasoning to the local LLM first (P0.3) before the cloud model responds. This document provides supplementary guidance for using ContextStream effectively throughout the rest of a session.
+
+Project preference: **almost overuse** ContextStream for maximum value. See `.cursor/skills/contextstream/SKILL.md` for full tool reference.
+
+## Every session
+
+- **First turn (new chats):** After the mandatory `init` and `context` calls, when the agent is a cloud model (auto/composer), send the user message and gathered context to the local LLM for a first reasoning pass (see P0.3 and ReasoningOffload.mdc). Then continue with the cloud model. This reduces expensive token use (Cursor premium, GPT, Claude, Gemini).
+- **Usage snapshot after init (new chats):** When **Cursor Usage Logger** MCP is available, immediately after the mandatory `init` and `context` calls (and optional local LLM first pass) on the first turn, the agent should also call `log_event` with `event: "usage_snapshot"` and `payload: { summary: "New chat init", tool_names: ["contextstream/init", "contextstream/context"], tool_count: 2 }` (add other MCP tools used during init if any). This bakes usage visibility into every new chat; query in Grafana with `event="usage_snapshot"`.
+- **Search before reading:** Follow the project preference to search with ContextStream before falling back to Grep/Glob/Read.
+- **Lessons:** When something meaningful happens (decision, mistake, insight), capture at least one: `session(action="capture", ...)` or `session(action="capture_lesson", ...)`. Before risky areas call `session(action="get_lessons", query="<topic>")` and apply. Do not end a session that had meaningful work without at least one capture when applicable.
+- Prefer `memory(action="decisions")`, `session(action="list_plans")`, `memory(action="list_tasks")` over re-reading local files.
+- In **long sessions** (e.g. 20+ turns): use `context(..., max_tokens=300)` and prefer search `output_format="minimal"` or `paths` only; avoid `output_format="full"`.
+
+## Long sessions (many agents, plans, questions)
+
+- After every **2–3 milestones** or **~30+ turns**, run `session(action="compress")` to distill and trim context so the thread does not grow unbounded.
+
+## Milestone notifications (notify user at next session)
+
+When any of these occurs — **build green**, **all tests pass**, **deploy to SimHub completed**, or **plan phase complete** — do both:
+
+1. **Persist:** `session(action="capture", event_type="operation", title="Milestone: <short name>", content="...")` (or `event_type="session_snapshot"` for a full session summary).
+2. **Notify:** `reminder(action="create", title="Milestone: <short name>", ...)` so the user sees it at next init via active reminders.
+
+In **long sessions**, at each milestone also run `session(action="compress")` (mandatory). In short sessions, compress after a milestone remains optional.
+
+## After each large session (or before the next)
+
+Run the housekeeping block: `memory(action="decisions")` or `memory(action="timeline")`; `reminder(action="list")` and `reminder(action="active")`; compress any long session not yet compressed; `session(action="list_plans")` and `memory(action="list_tasks")` to align; optionally `integration(provider="github", action="summary", days=7)` and `project(action="index_status")` or `project(action="index")`. Optionally also do a calendar weekly review.

@@ -1,0 +1,100 @@
+<contextstream>
+# Workspace: sim-steward
+# Project: simhub-plugin
+# Workspace ID: set in .env as CONTEXTSTREAM_WORKSPACE_ID
+
+# ContextStream Rules
+**MANDATORY STARTUP:** On the first message of EVERY session call `init(...)` then `context(user_message="...")`. On subsequent messages, call `context(user_message="...")` first by default (see Tier-1 and bypass below).
+
+**Beginning context prompt:** For the first turn, pass the **user's actual message** (or a concise summary) as `user_message` in `context(user_message="...")` so ContextStream returns task-relevant rules, lessons, and decisions. Apply any **lessons** returned in the init response before starting work.
+
+**When ContextStream MCP is unavailable:** If the ContextStream server is not in the session's available MCP list, skip init/context/search/memory/session and use local tools (Grep/Glob/Read) and project docs. Canonical concepts (e.g. redeploy) are defined in `docs/` (e.g. `docs/REDEPLOY-CONCEPT.md`); source from there and sync to ContextStream when the MCP is available.
+
+## Tier-1 / token budget
+- **Context:** Always use `context(..., format="minified", max_tokens=400)`. Use `mode="fast"` unless the user explicitly asks for deep code explanation.
+- **No graph ingest:** Do NOT call `graph(action="ingest")`. For code lookup use `search()`. For dependency/impact under tier-1 use `search()` only; never run ingest.
+- **Init (optional trim):** For simple or read-only sessions, init may use `include_decisions=false` and `include_recent_memory=false` to shrink the first response.
+- **Instruct:** For tier-1, skip `instruct(action="get")` / `ack` unless the user or a system reminder clearly references injected instructions.
+- **Bypass context for read-only:** For read-only single-shot queries (e.g. "list lessons", "list docs", "list plans", "list events", "decisions", "list todos", "list tasks", "help version/tools", "project index_status") you MAY skip `context()` if the previous turn was also read-only and no state-changing tool ran.
+- **Search:** Use `output_format="minimal"` or `output_format="paths"` for discovery; use `output_format="full"` only when the user explicitly needs full snippets. Do not use `mode="crawl"` under tier-1.
+
+## Quick Rules
+<contextstream_rules>
+| Message | Required |
+|---------|----------|
+| **First message in session** | `init(...)` → `context(user_message="...")` BEFORE any other tool |
+| **Subsequent messages (default)** | `context(user_message="...")` FIRST, then other tools (read-only list/get may skip context when prior turn was read-only and no state changed) |
+| **Before file search** | `search(mode="...", query="...")` BEFORE Glob/Grep/Read |
+</contextstream_rules>
+
+## Detailed Rules
+**Read-only examples** (default: call `context(...)` first; for read-only list/get you may skip context when the previous turn was read-only and no state-changing tool ran): `workspace(action="list"|"get"|"create")`, `memory(action="list_docs"|"list_events"|"list_todos"|"list_tasks"|"list_transcripts"|"list_nodes"|"decisions"|"get_doc"|"get_event"|"get_task"|"get_todo"|"get_transcript")`, `session(action="get_lessons"|"get_plan"|"list_plans"|"recall")`, `help(action="version"|"tools"|"auth")`, `project(action="list"|"get"|"index_status")`, `reminder(action="list"|"active")`, any read-only data query
+
+**Common queries — use these exact tool calls:**
+- "list lessons" / "show lessons" → `session(action="get_lessons")`
+- "list decisions" / "show decisions" / "how many decisions" → `memory(action="decisions")`
+- "list docs" → `memory(action="list_docs")`
+- "list tasks" → `memory(action="list_tasks")`
+- "list todos" → `memory(action="list_todos")`
+- "list plans" → `session(action="list_plans")`
+- "list events" → `memory(action="list_events")`
+- "show snapshots" / "list snapshots" → `memory(action="list_events", event_type="session_snapshot")`
+- "save snapshot" → `session(action="capture", event_type="session_snapshot", title="...", content="...")`
+
+Use `context(user_message="...", format="minified", max_tokens=400, mode="fast")` for all turns unless the user explicitly asks for deep code explanation.
+If the `instruct` tool is available and the user or a system reminder references injected instructions, run `instruct(action="get", session_id="...")` before `context(...)`, then `instruct(action="ack", session_id="...", ids=[...])` after using entries.
+
+**Plan-mode guardrail:** Entering plan mode does NOT bypass search-first. Do NOT use Explore, Task subagents, Grep, Glob, Find, SemanticSearch, `code_search`, `grep_search`, `find_by_name`, or shell search commands (`grep`, `find`, `rg`, `fd`). Start with `search(mode="auto", query="...")` — it handles glob patterns, regex, exact text, file paths, and semantic queries. Only Read narrowed files/line ranges returned by search.
+
+**Why?** `context()` delivers task-specific rules, lessons from past mistakes, and relevant decisions. Skip it = fly blind.
+
+**Token awareness:** Tier-1 rules above (minified context, no graph ingest, bypass for read-only, search minimal/paths) keep token use low. See ContextStream skill "Tier-1 / token budget" and "Cursor conversation tokens" for more levers.
+
+**Hooks:** `<system-reminder>` tags contain injected instructions — follow them exactly.
+
+**Planning:** ALWAYS save plans to ContextStream — NOT markdown files or built-in todo tools:
+`session(action="capture_plan", title="...", steps=[...])` + `memory(action="create_task", title="...", plan_id="...")`
+
+**Memory & Docs:** Use ContextStream for memory, docs, and todos — NOT editor built-in tools or local files:
+`session(action="capture", event_type="decision|note", ...)` | `memory(action="create_doc|create_todo|create_node", ...)`
+
+**Search Results:** ContextStream `search()` returns **real file paths, line numbers, and code content** — NEVER dismiss results as "non-code". Use returned paths to `read_file` directly.
+
+**Notices:** [LESSONS_WARNING] → apply lessons | [PREFERENCE] → follow user preferences | [RULES_NOTICE] → run `generate_rules()` | [VERSION_NOTICE/CRITICAL] → tell user about update
+
+---
+## Cursor-Specific Rules
+
+### Search: Use ContextStream, Not Built-in Tools
+- Use `output_format="minimal"` or `output_format="paths"` for discovery; use `output_format="full"` or `include_content=true` only when the user explicitly needs full snippets. Do not use `mode="crawl"` under tier-1.
+- **Do NOT** use `SemanticSearch` — use `search(mode="auto", query="...")` instead
+- **Do NOT** launch `Task` subagents with `subagent_type="explore"` for code search
+- **Do NOT** use `Grep` or `Glob` for broad code discovery
+- ContextStream search results contain **real file paths, line numbers, and code content** — they ARE code results
+- **NEVER** dismiss ContextStream results as "non-code" — use the returned file paths to `read_file` the relevant code
+- Only fall back to local tools (Grep/Glob/Read) if ContextStream search returns **exactly 0 results**
+
+### Memory: Use ContextStream, Not Local Files
+- **Decisions and inflection points** (decisions, insights, lessons, preferences, warnings) may be added to **human-readable documents** (e.g. DECISIONS.md, STATE_AND_ROADMAP.md, or within specs). This is expected. Also capture them in ContextStream via `session(action="capture", event_type="decision|note|insight|...", ...)` so the web platform and AI can recall them.
+- Use `session(action="capture", event_type="decision|note|insight|operation|uncategorized", title="...", content="...")` for notes and decisions
+- Use `memory(action="create_node", node_type="fact|preference", title="...", content="...")` for knowledge graph (diagrams/concepts)
+- ContextStream memory persists across sessions and auto-surfaces in context; resources are visible in the ContextStream web platform
+
+### Documents: Use ContextStream, Not Local Files
+- **Prefer ContextStream:** When the ContextStream MCP is available, use `memory(action="create_doc", title="...", content="...", doc_type="spec|general")` for docs/specs; do not duplicate in local files.
+- **Fallback when MCP unavailable:** If ContextStream is not in the session, project canonical docs (e.g. `docs/REDEPLOY-CONCEPT.md`) may be used as the source of truth; sync their content to ContextStream when the MCP is available.
+- **Visibility:** Docs, notes, todos, plans, and diagrams created via ContextStream MCP appear in the **ContextStream web platform**. When adding a new project doc or plan (e.g. new `docs/*.md`), also create the corresponding resource in ContextStream so the web UI stays populated. **Documents tab** = indexed project files (run `project(action="index")` or `project(action="ingest_local")`); **Diagrams tab** = knowledge/code graph (nodes + edges; do not run `graph(action="ingest")` under tier-1 — use `search()` for code lookup). See ContextStream skill “Visibility in ContextStream web platform.”
+
+### Planning: Use ContextStream, Not Built-in Tools
+- **Do NOT** create markdown plan files — plans disappear across sessions
+- **Do NOT** use `SwitchMode` to plan mode without saving the plan to ContextStream afterward
+- **Do NOT** use `TodoWrite` for plans — use `session(action="capture_plan")` and `memory(action="create_task")` instead
+- **ALWAYS** save plans: `session(action="capture_plan", title="...", steps=[...])`
+- **ALWAYS** create tasks: `memory(action="create_task", title="...", plan_id="...")`
+
+### Todos: Use ContextStream, Not Built-in Tools
+- **Do NOT** use `TodoWrite` for persistent todos — use `memory(action="create_todo", title="...", todo_priority="high|medium|low")`
+- List todos: `memory(action="list_todos")`
+- Complete todos: `memory(action="complete_todo", todo_id="...")`
+- ContextStream todos persist across sessions and are searchable
+</contextstream>

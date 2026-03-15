@@ -1,0 +1,61 @@
+---
+description: P0-backed. When Cursor Usage Logger MCP is enabled, log ALL possible usage data (every MCP call, every model call, every turn/session event); run periodic usage review; stop or replan when inefficient. "All possible" = all fields you can observe or derive; omit tokens/duration when the runtime does not expose them.
+globs: []
+alwaysApply: true
+---
+
+# Cursor Usage Logging (P0)
+
+When the **Cursor Usage Logger** MCP server is enabled, you **MUST** log **all possible data** (P0: see `00_CoreDirectives.mdc`). Every MCP call, every model/LLM call, and every session/turn/milestone event must be sent so Grafana dashboards (including local LLM and MCP token usage) are complete.
+
+## Per-MCP-call logging (required)
+
+After **every** `CallMcpTool` execution:
+
+- **ContextStream MCP:** Call **log_contextstream_usage** with `tool`, `action`, and when available `op_cost`, `input_tokens`, `output_tokens`, `duration_ms`, `request_params`, `response_metrics`. This satisfies the per-MCP-call requirement for ContextStream and feeds dashboards that query `event="contextstream_usage"` (op cost, cs_tool, tokens). Optionally also call **log_mcp_usage** for a unified MCP view.
+- **All other MCP servers** (Ollama, GitHub, etc.): Call **log_mcp_usage** with `server`, `tool_name`, and when available `input_tokens`, `output_tokens`, `duration_ms`, `request_summary`, `response_summary`, `has_error`, `error_message`, `correlation_id`.
+
+**Exception:** Do **not** call `log_mcp_usage` for calls to the Cursor Usage Logger MCP itself (e.g. `project-0-plugin-cursor-usage-logger`); that would cause unbounded recursion.
+
+## Per–model-call logging (required)
+
+After **every** LLM/model invocation (e.g. Ollama `ollama_generate` or `chat`), call **log_model_usage** with:
+
+- **Required:** `model`, `provider` (e.g. `ollama`)
+- **Include when available:** `input_tokens`, `output_tokens`, `duration_ms`, `purpose` (e.g. `first_pass_reasoning`, `reasoning_offload`), `prompt_summary`, `response_summary`, `has_error`, `error_message`
+
+Use **log_model_usage** for LLM calls (not only log_mcp_usage). For MCP servers that are LLM endpoints (e.g. Ollama), call **both** log_mcp_usage (after the MCP call) and log_model_usage (model, provider, purpose, tokens); both event types are used by dashboards.
+
+## Logging contract (session and turn events)
+
+Each turn must produce a turn-start and turn-end event. Dashboards expect event names `user_request` and `agent_response`; use the dedicated tools when you have the payloads.
+
+- **Session start (first turn):** Call `log_event` with `event: "session_start"` and `payload: { workspace: "<repo or workspace name>" }`. If the runtime exposes `model` or `chat_id`, include them.
+- **Start of each turn:** Prefer **log_user_request** with `user_request` (full text), `current_file_info`, `selection_info`, `diagnostics` when available (emits `user_request` for dashboards). Otherwise or in addition call **log_event** with `event: "user_message"` and `payload: { summary: "<short summary>", length_chars: <number> }`.
+- **End of every turn (required):** Prefer **log_agent_response** with `message_text`, `code_chunks`, `tool_calls` when available (emits `agent_response`). Always call **log_event** with `event: "agent_response"` and `payload: { summary: "<short summary>", tool_count: <number>, tool_names: ["..."] }`. Include `input_tokens`, `output_tokens`, `duration_ms`, `mcp_server` or `mcp_tools` when available.
+- **Usage snapshot (new chat):** After init + context (and optional local LLM first pass), call `log_event` with `event: "usage_snapshot"` and `payload: { summary: "New chat init", tool_names: ["contextstream/init", "contextstream/context", ...], tool_count: <n> }` including every MCP tool used during init.
+- **On any tool failure or error:** Call `log_event` with `event: "tool_failure"` or `event: "error"` and `payload: { tool_name?: "...", message: "...", mcp_server?: "..." }`.
+- **On milestones** (build ok, tests pass, commit): Call `log_event` with `event: "milestone"` and `payload: { name: "build_ok" | "tests_ok" | "commit" }`.
+- **When the user explicitly ends the conversation** (e.g. "that's all", "done"): Call `log_event` with `event: "session_end"` and optional `payload: { reason: "user_done" }`.
+
+## Periodic usage review
+
+- **Every 10–15 turns** (or at a milestone), call `get_usage_review`.
+- If the result has `efficient: false` and `suggestion` is `"replan"` or `"stop"`:
+  - **Do not continue** the current execution loop.
+  - Present the `reason` and `suggestion` to the user and recommend replanning or a different approach.
+  - Call `log_event` with `event: "replan_signal"` and `payload: { reason: "<...>", suggestion: "<...>" }`.
+
+## User visibility: Grafana send confirmation
+
+At the **end of every response** to the user, append one short line:
+
+- **`[Grafana Logging ✅]`** when you called `log_event` or `log_mcp_usage` this turn (data sent to Grafana).
+- **`[Grafana Logging ❌]`** when the Cursor Usage Logger MCP was unavailable or you did not invoke it this turn.
+
+This gives the user immediate visibility that the pipeline is active (or not) without opening Grafana.
+
+## Alignment with other rules
+
+- If the usage logger suggests stop/replan, treat it as a **hard stop** for the current chain (same spirit as retry-once-then-stop and plan-rebase). Suggest the user revise the plan or task.
+- **Avoid constant loops:** Multiple identical failures are inefficient. After logging the second failure, the next `get_usage_review` should return replan/stop; surface it and stop.

@@ -1,54 +1,152 @@
 <UserControl x:Class="SimSteward.Plugin.PluginControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <StackPanel Margin="16">
-    <TextBlock Text="Sim Steward" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8"/>
-    <TextBlock TextWrapping="Wrap" Margin="0,0,0,12" Foreground="#333333">
-      HTML dashboard bridge via WebSocket. Bind to SimSteward.* properties in Dash Studio. Dashboard connects to ws://localhost:19847 for live state.
-    </TextBlock>
-    <Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Background="#f8f8f8" CornerRadius="4">
-      <StackPanel>
-        <TextBlock Text="WebSocket server" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" Foreground="#333333"/>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-          <TextBlock Text="Running:" Width="120" VerticalAlignment="Center" Foreground="#333333"/>
-          <TextBlock x:Name="WsRunningText" Text="—" VerticalAlignment="Center" Foreground="#333333"/>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#252526">
+  <UserControl.Resources>
+    <!-- High-contrast dark theme: readable in SimHub regardless of host theme -->
+    <SolidColorBrush x:Key="BgMain" Color="#252526"/>
+    <SolidColorBrush x:Key="BgCard" Color="#2D2D30"/>
+    <SolidColorBrush x:Key="BorderCard" Color="#404040"/>
+    <SolidColorBrush x:Key="TextPrimary" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#A0A0A0"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#808080"/>
+    <SolidColorBrush x:Key="Accent" Color="#6EB5F7"/>
+    <Style TargetType="TextBlock" x:Key="Heading">
+      <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+      <Setter Property="FontSize" Value="15"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Margin" Value="0,0,0,10"/>
+    </Style>
+    <Style TargetType="TextBlock" x:Key="Body">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style TargetType="TextBlock" x:Key="Muted">
+      <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Margin" Value="0,6,0,0"/>
+    </Style>
+    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+      <Setter Property="Background" Value="#3C3C3C"/>
+      <Setter Property="BorderBrush" Value="{StaticResource BorderCard}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style TargetType="ListBoxItem">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+      <Setter Property="Padding" Value="6,4"/>
+    </Style>
+  </UserControl.Resources>
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                Background="{StaticResource BgMain}" Padding="0">
+    <StackPanel Margin="20,18">
+      <!-- Title -->
+      <TextBlock Text="Sim Steward" FontSize="18" FontWeight="SemiBold"
+                 Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+      <TextBlock Style="{StaticResource Muted}" Margin="0,0,0,18" MaxWidth="520">
+        HTML dashboard over WebSocket. Use SimSteward.* in Dash Studio. Dashboard: ws://localhost:19847
+      </TextBlock>
+
+      <!-- WebSocket -->
+      <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderCard}"
+              BorderThickness="1" CornerRadius="6" Padding="16,14" Margin="0,0,0,14">
+        <StackPanel>
+          <TextBlock Text="WebSocket server" Style="{StaticResource Heading}"/>
+          <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+            <TextBlock Text="Running:" Width="140" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+            <TextBlock x:Name="WsRunningText" Text="—" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+            <TextBlock Text="Port:" Width="140" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+            <TextBlock x:Name="WsPortText" Text="—" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+            <TextBlock Text="Connected clients:" Width="140" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+            <TextBlock x:Name="ClientCountText" Text="0" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+          </StackPanel>
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-          <TextBlock Text="Port:" Width="120" VerticalAlignment="Center" Foreground="#333333"/>
-          <TextBlock x:Name="WsPortText" Text="—" VerticalAlignment="Center" Foreground="#333333"/>
+      </Border>
+
+      <!-- Data API (session-complete POST) -->
+      <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderCard}"
+              BorderThickness="1" CornerRadius="6" Padding="16,14" Margin="0,0,0,14">
+        <StackPanel>
+          <TextBlock Text="Data API" Style="{StaticResource Heading}"/>
+          <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6">
+            Optional. When set, session summary is POSTed to this endpoint after capture (e.g. local SQLite API at http://localhost:8080).
+          </TextBlock>
+          <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+            <TextBlock Text="Endpoint:" Width="140" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+            <TextBox x:Name="DataApiEndpointBox" Width="280" Padding="6,4" Margin="0,0,0,0"
+                     Background="#3C3C3C" Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderCard}"
+                     LostFocus="DataApiEndpoint_LostFocus"/>
+          </StackPanel>
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-          <TextBlock Text="Connected clients:" Width="120" VerticalAlignment="Center" Foreground="#333333"/>
-          <TextBlock x:Name="ClientCountText" Text="0" VerticalAlignment="Center" Foreground="#333333"/>
+      </Border>
+
+      <!-- Observability (file-tail to Alloy/Loki) -->
+      <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderCard}"
+              BorderThickness="1" CornerRadius="6" Padding="16,14" Margin="0,0,0,14">
+        <StackPanel>
+          <TextBlock Text="Observability" Style="{StaticResource Heading}"/>
+          <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6">
+            Structured log is written to plugin-structured.jsonl. Use Grafana Alloy to tail it and push to Loki (see observability/local).
+          </TextBlock>
+          <TextBlock x:Name="StructuredLogPathText" Text="Structured log: —" Style="{StaticResource Body}" TextWrapping="Wrap"/>
         </StackPanel>
-      </StackPanel>
-    </Border>
-    <Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Background="#f8f8f8" CornerRadius="4" Margin="0,12,0,0">
-      <StackPanel>
-        <TextBlock Text="iRacing" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" Foreground="#333333"/>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-          <TextBlock Text="SDK started:" Width="120" VerticalAlignment="Center" Foreground="#333333"/>
-          <TextBlock x:Name="IrsdkStartedText" Text="—" VerticalAlignment="Center" Foreground="#333333"/>
+      </Border>
+
+      <!-- Log filters -->
+      <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderCard}"
+              BorderThickness="1" CornerRadius="6" Padding="16,14" Margin="0,0,0,14">
+        <StackPanel>
+          <TextBlock Text="Log filters (omit at source)" Style="{StaticResource Heading}"/>
+          <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12">
+            Checked = omit from file, structured log, and dashboard. Same options as dashboard.
+          </TextBlock>
+          <TextBlock Text="Levels:" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,6"/>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <CheckBox x:Name="OmitDebugCheckBox" Content="DEBUG" Margin="0,0,16,0" Checked="OmitLevel_Changed" Unchecked="OmitLevel_Changed" Tag="DEBUG"/>
+            <CheckBox x:Name="OmitInfoCheckBox" Content="INFO" Margin="0,0,16,0" Checked="OmitLevel_Changed" Unchecked="OmitLevel_Changed" Tag="INFO"/>
+            <CheckBox x:Name="OmitWarnCheckBox" Content="WARN" Margin="0,0,16,0" Checked="OmitLevel_Changed" Unchecked="OmitLevel_Changed" Tag="WARN"/>
+            <CheckBox x:Name="OmitErrorCheckBox" Content="ERROR" Margin="0,0,0,0" Checked="OmitLevel_Changed" Unchecked="OmitLevel_Changed" Tag="ERROR"/>
+          </StackPanel>
+          <TextBlock Text="Events:" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,6"/>
+          <StackPanel Margin="0,0,0,0">
+            <CheckBox x:Name="OmitStateBroadcastCheckBox" Content="State broadcast summary" Tag="state_broadcast_summary" Checked="OmitEvent_Changed" Unchecked="OmitEvent_Changed"/>
+            <CheckBox x:Name="OmitTickStatsCheckBox" Content="Tick stats" Tag="tick_stats" Checked="OmitEvent_Changed" Unchecked="OmitEvent_Changed"/>
+            <CheckBox x:Name="OmitWsMessageRawCheckBox" Content="WS message raw" Tag="ws_message_raw" Checked="OmitEvent_Changed" Unchecked="OmitEvent_Changed"/>
+            <CheckBox x:Name="OmitActionReceivedCheckBox" Content="Action received" Tag="action_received" Checked="OmitEvent_Changed" Unchecked="OmitEvent_Changed"/>
+            <CheckBox x:Name="OmitActionDispatchedCheckBox" Content="Action dispatched" Tag="action_dispatched" Checked="OmitEvent_Changed" Unchecked="OmitEvent_Changed"/>
+          </StackPanel>
+          <CheckBox x:Name="LogAllActionTrafficCheckBox" Content="Log all action traffic (keep action_received and action_dispatched in logs)" Margin="0,10,0,0" Checked="LogAllActionTraffic_Changed" Unchecked="LogAllActionTraffic_Changed"/>
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-          <TextBlock Text="Status:" Width="120" VerticalAlignment="Center" Foreground="#333333"/>
-          <TextBlock x:Name="IracingStatusText" Text="Not connected" VerticalAlignment="Center" Foreground="#333333"/>
+      </Border>
+
+      <!-- iRacing -->
+      <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderCard}"
+              BorderThickness="1" CornerRadius="6" Padding="16,14" Margin="0,0,0,0">
+        <StackPanel>
+          <TextBlock Text="iRacing" Style="{StaticResource Heading}"/>
+          <StackPanel Orientation="Horizontal" Margin="0,2,0,6">
+            <TextBlock Text="SDK started:" Width="140" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+            <TextBlock x:Name="IrsdkStartedText" Text="—" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+            <TextBlock Text="Status:" Width="140" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+            <TextBlock x:Name="IracingStatusText" Text="Not connected" VerticalAlignment="Center" Style="{StaticResource Body}"/>
+          </StackPanel>
+          <TextBlock x:Name="IracingHelpText" TextWrapping="Wrap" Margin="0,10,0,0" Style="{StaticResource Muted}" Visibility="Collapsed"/>
         </StackPanel>
-        <TextBlock x:Name="IracingHelpText" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="#666666" FontSize="11" Visibility="Collapsed"/>
-      </StackPanel>
-    </Border>
-    <Border BorderBrush="#ccc" BorderThickness="1" Padding="10" Background="#f8f8f8" CornerRadius="4" Margin="0,12,0,0">
-      <StackPanel>
-        <TextBlock Text="Memory Bank" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6" Foreground="#333333"/>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-          <TextBlock Text="Status:" Width="120" VerticalAlignment="Center" Foreground="#333333"/>
-          <TextBlock x:Name="MemoryBankStatusText" Text="—" VerticalAlignment="Center" Foreground="#333333"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-          <TextBlock Text="Path:" Width="120" VerticalAlignment="Center" Foreground="#333333"/>
-          <TextBlock x:Name="MemoryBankPathText" Text="—" VerticalAlignment="Center" Foreground="#666666" FontSize="10" TextWrapping="Wrap"/>
-        </StackPanel>
-      </StackPanel>
-    </Border>
-  </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
 </UserControl>

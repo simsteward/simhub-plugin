@@ -1,0 +1,20 @@
+# DeepSeek Reasoner Delegation Policy
+
+## Mandate
+
+When a task requires deep reasoning, complex analysis, or multi-step planning, the main agent MUST delegate the core reasoning work to the `deepseek-reasoner` sub-agent. This offloads expensive token computation to a local model and leverages its specialized capabilities.
+
+## Delegation Triggers
+
+The main agent will invoke the `deepseek-reasoner` sub-agent under the following conditions:
+
+1.  **Explicit Command**: When the user explicitly requests it (e.g., "use the deepseek agent to think about this...").
+2.  **Proactive Initiative**: When the main agent encounters a task that meets the criteria for deep reasoning. This is especially important when the main agent is a less capable reasoning model.
+
+## Context Passing
+
+The prompt sent to the `deepseek-reasoner` MUST include all relevant context from ContextStream, such as lessons, decisions, and current tasks, to ensure its reasoning is grounded in the project's history and goals.
+
+## Write-Back Operations
+
+The sub-agent is authorized to perform write operations to ContextStream, including capturing new lessons, recording decisions, and creating new tasks. The main agent is responsible for reviewing and integrating these outputs.

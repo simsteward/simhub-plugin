@@ -1,0 +1,68 @@
+{
+  "title": "SimSteward Plugin Health",
+  "uid": "simsteward-plugin-health",
+  "description": "Track plugin health via error rate, lifecycle events, and recent ERROR logs.",
+  "tags": ["simsteward", "health", "plugin"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "ERROR rate",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"sim-steward\", level=\"ERROR\"} [$__interval]))",
+          "refId": "A",
+          "legendFormat": "errors"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "WARN rate",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"sim-steward\", level=\"WARN\"} [$__interval]))",
+          "refId": "A",
+          "legendFormat": "warns"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "All ERROR logs",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "expr": "{app=\"sim-steward\", level=\"ERROR\"}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "Lifecycle",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Ascending" },
+      "targets": [
+        {
+          "expr": "{app=\"sim-steward\", component=\"simhub-plugin\"} | json | event =~ \"plugin_started|plugin_ready|iracing_connected|iracing_disconnected|plugin_stopped\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-1h", "to": "now" }
+}

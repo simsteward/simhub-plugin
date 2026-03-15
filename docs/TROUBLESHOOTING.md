@@ -35,6 +35,19 @@ If the dashboard or plugin "does not work", use this checklist to find the cause
 
 ---
 
+## 4b. Dashboard log stream empty (no entries when clicking Play or other buttons)
+
+If the in-dashboard log stream stays empty when you click Play, capture, or other actions:
+
+1. **Dashboard connected** — The status indicator must be green ("Connected"). If it is red, the WebSocket is not connected and log events are not sent to the dashboard.
+2. **broadcast-errors.log** — When the plugin fails to send log events to the dashboard (e.g. WebSocket closed or Send threw), it writes a line to **`%LocalAppData%\SimHubWpf\PluginsData\SimSteward\broadcast-errors.log`**. This file is **not** written through the main logger (to avoid recursion). Check it if the log stream is empty but the dashboard shows connected:
+   - **"Send:logEvents"** + exception message — Sending the log payload to the client failed (e.g. connection closed).
+   - **"Broadcast skipped: 0 clients"** — No dashboard client was connected when the plugin tried to broadcast (throttled to at most once per 10 seconds).
+   - **"OnLogWritten"** + exception — Serialization or broadcast failed in the log pipeline.
+3. **Browser console** — Open DevTools (F12) → Console. If the dashboard receives `logEvents` but fails to render them, you will see `[SimSteward] logEvents display error` and the exception.
+
+---
+
 ## 5. iRacing (optional for connection)
 
 - Telemetry comes from iRacing via IRSDKSharper (shared memory). The dashboard can connect to the plugin even when iRacing is not running; mode will show "Unknown" and session time 0:00.
@@ -51,7 +64,7 @@ If you run a replay and incidents are not captured or signaled:
 1. **iRacing shared memory enabled** — Edit `%USERPROFILE%\Documents\iRacing\app.ini` and ensure `irsdkEnableMem=1`. (Some iRacing versions expose this under Options > Graphics.) Without this, the plugin cannot connect.
 2. **Sim Steward connected** — In the plugin settings, "iRacing connection status" should show "Connected" when a replay is loaded and playing. If it shows "Not connected", start the replay first, then ensure SimHub is running.
 3. **Dashboard connected** — The status dot should be green ("Connected"). If it is red, the WebSocket is not connected and you will not see real-time feedback (although incidents are still stored; reconnect to see them).
-4. **Focused car in replay** — `PlayerCarMyIncidentCount` (used for the driver you control/spectate) tracks the **currently focused car** in the replay. If you are in an external camera view and no car is "focused", incidents for other cars come from the session YAML (ResultsPositions), which updates in batches. Switch to a car's cockpit view if you want per-incident detection for that driver.
+4. **Focused car in replay** — The plugin uses **CamCarIdx** (camera-focused car) when valid, otherwise **DriverCarIdx** (your car). So when you "follow" another driver in replay, the incident count and feed show **that driver's** data, not the car you drove. `PlayerCarMyIncidentCount` from iRacing tracks the currently focused car in replay. If you are in an external camera view and no car is focused, CamCarIdx may be invalid and we fall back to DriverCarIdx; switch to a car's cockpit/view to get that driver's incidents.
 
 5. **Seeking to an earlier point** — When you seek the replay backward (e.g. to lap 2), the plugin detects this and re-baselines. The incident feed clears and only incidents from that point forward are shown. Ensure the replay is **playing** (not paused) when you expect incidents; telemetry updates as the replay advances. If you seek and then hit Play, incidents should appear as they occur. If nothing appears, check that you're focused on a car that had incidents in that segment (see #4).
 
@@ -79,6 +92,8 @@ If you run a replay and incidents are not captured or signaled:
 | Incidents not detected in replay | Section 6: shared memory, connection, focused car, plugin.log |
 | Blank or 404 in Web Page | URL = `http://localhost:8888/Web/sim-steward-dash/index.html`; run deploy |
 | Mode always "Unknown" | iRacing running and shared memory enabled |
+| No logs in Grafana / Loki | Section 8: SIMSTEWARD_LOKI_URL, local stack, auth, data source |
+| Log stream empty when clicking buttons | Section 4b: connection, broadcast-errors.log, browser console |
 
 ---
 
@@ -92,81 +107,33 @@ The dashboard includes a collapsible **Diagnostics & Metrics** panel just below 
 |-----|---------------|-------------|------------------|
 | iRacing SDK | IRSDKSharper started | SDK loaded OK | Plugin failed to start SDK (check plugin.log) |
 | WebSocket | Fleck server running on port | Server is listening | Bridge failed to start — port in use or firewall |
-| Memory Bank | File-based state sync available | Files are writable | Path inaccessible — check permissions |
 | Player Car | iRacing player car identified | Car index known | No focused car — switch to cockpit/TV camera |
 
-**"Player car: Unknown"** means `PlayerCarMyIncidentCount` has no target. Incident Layer 1 will not fire until a car is focused. In replay, click a car's cockpit camera.
+**"Player car: Unknown"** means the player car index is not yet known from session YAML. Incident counts and feed still work for other drivers once the YAML baseline is established.
 
-### Layer counters (L1–L4 and 0x)
+### Layer counter (L4)
 
-These accumulate from the moment iRacing connects and reset when iRacing disconnects, when you seek the replay backward, or when the session changes.
+Incident detection uses **Layer 4 only** (session YAML `CurDriverIncidentCount`). The L4 count accumulates from the moment iRacing connects and resets when iRacing disconnects, when you seek the replay backward, or when the session changes.
 
-- **L1 = 0 and iRacing connected**: no incident has been detected on the focused car yet — or the car has not had any.
-- **L4 = 0 and YAML updates > 0**: the session YAML is being parsed but no other-driver incidents have been found (may be correct early in a session).
-- **All = 0**: iRacing is not connected or the replay has not advanced past an incident.
-
----
-
-## 8. Memory Bank
-
-The plugin writes four files to the memory bank directory on every state tick (throttled to ~1 s when unchanged):
-
-| File | Content |
-|------|---------|
-| `snapshot.json` | Full telemetry + incidents + metrics + diagnostics |
-| `metrics.json` | Compact per-layer counts and infrastructure status |
-| `HEALTH.md` | Human-readable health report with diagnostic notes |
-| `activeContext.md` / `tasks.md` / `progress.md` | Project task context |
-
-**Default path (Windows):** `%LocalAppData%\SimHubWpf\PluginsData\SimSteward\memory-bank\`
-
-Override with the `MEMORY_BANK_PATH` environment variable before launching SimHub.
-
-### Troubleshooting memory bank issues
-
-- **Memory Bank dot is yellow/red in the dashboard**: the plugin could not create or write to the path. Check that `%LocalAppData%\SimHubWpf\PluginsData\SimSteward\` is writable (not on a read-only drive, not blocked by antivirus).
-- **Files exist but are stale**: iRacing is not connected. The plugin only updates the memory bank when a state change occurs.
-- **HEALTH.md shows "zero events detected" with iRacing connected**: see Section 6 for the incident detection checklist.
+- **L4 = 0 and YAML updates > 0**: the session YAML is being parsed but no other-driver incident deltas have been found yet (may be correct early in a session, or non-admin in live race).
+- **L4 = 0**: iRacing is not connected or the replay has not advanced past an incident.
 
 ---
 
-## 9. SimSteward MCP Server
+## 8. Logs not appearing in Grafana / Loki
 
-The SimSteward MCP server lets Cursor AI actively query the plugin's live state without opening files manually.
+For a step-by-step to get plugin data into **local** Grafana, see **docs/LOCAL-OBSERVABILITY-QUICKSTART.md**.
 
-### Setup
+If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 
-The server is registered in `C:\Users\winth\.cursor\mcp.json` as:
-```json
-"SimSteward": {
-  "command": "node",
-  "args": ["c:\\Users\\winth\\dev\\sim-steward\\mcp-server\\index.mjs"],
-  "env": {}
-}
-```
+1. **Loki URL** — The plugin only pushes when `SIMSTEWARD_LOKI_URL` is set. Copy `.env.example` to `.env` and set `SIMSTEWARD_LOKI_URL` (e.g. `http://localhost:3100` for local Docker, or your Grafana Cloud Loki URL). Restart SimHub after changing `.env`.
+2. **Local stack** — For local dev, start the stack from `observability/local/`: run `docker compose up -d` so Loki is listening on port 3100. Ensure the host path for Loki storage (e.g. `S:\sim-steward-grafana-storage`) exists before starting.
+3. **Auth (Grafana Cloud)** — For Grafana Cloud, set `SIMSTEWARD_LOKI_USER` and `SIMSTEWARD_LOKI_TOKEN` in `.env` to your instance user ID and log-write token. Wrong or missing credentials cause push failures (check plugin.log for LokiSink warnings).
+4. **Data source in Grafana** — In Grafana, add a Loki data source pointing at the same URL the plugin uses (e.g. `http://localhost:3100` for local). Use Explore and query `{app="sim-steward"}` to see streams.
+5. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `state_broadcast_summary`, `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
 
-Restart Cursor after editing `mcp.json`. The server reads from the same memory bank directory as the plugin.
+See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL examples.
 
-### Verifying the server started
+---
 
-Open Cursor Settings → MCP → look for "SimSteward" in the server list. It should show as connected. If it shows an error, run `node c:\Users\winth\dev\sim-steward\mcp-server\index.mjs` in a terminal to see the startup error.
-
-### Available tools
-
-| Tool | What it returns |
-|------|-----------------|
-| `simsteward_health` | Full HEALTH.md report — start here |
-| `simsteward_metrics` | Parsed metrics.json with layer counts and infra status |
-| `simsteward_incidents` | Recent incidents (supports limit, source, minDelta filters) |
-| `simsteward_drivers` | Driver standings sorted by incident count |
-| `simsteward_context` | activeContext.md + tasks.md + progress.md combined |
-| `simsteward_replay` | Replay state (frame position, speed, playing status) |
-| `simsteward_track` | Track name, category, length |
-| `simsteward_markers` | Project markers (current task, last action, notes) |
-
-The server also exposes three resources: `simsteward://health`, `simsteward://metrics`, `simsteward://snapshot`.
-
-### Common issues
-
-- **"Memory bank not available"**: SimHub with the SimSteward plugin has not run yet, or `MEMORY_BANK_PATH` is set to a non-existent path.
-- **Stale data**: the snapshot age (shown in every tool result as `snapshotAgeSeconds`) tells you how old the last plugin write was. If it is more than 5 seconds, the plugin may not be running.
+**Note:** "Memory bank" (file-based state sync, MCP server, `memory-bank/` directory) is **not** a project feature. It is only for the developer's personal Cursor/vibe coding. Do not treat it as a feature, task, or reference. It is expected to be missing.

@@ -1,0 +1,20 @@
+---
+description: On new chats run ContextStream init and context; log all MCP usage with token/request KPIs for cost and rate-limit visibility.
+globs: []
+alwaysApply: true
+---
+
+# Usage Logging Guidance
+
+This document provides supplementary guidance for logging events. The core, non-negotiable requirements for initialization and MCP usage logging are defined in `00_CoreDirectives.mdc`.
+
+### Other useful events
+
+- **Turn boundaries:** Use **log_user_request** at turn start when you have the full request (emits `user_request`); otherwise/in addition `log_event("user_message", { summary, length_chars })`. Use **log_agent_response** at turn end when you have message_text and tool_calls; always `log_event("agent_response", { summary, tool_count, tool_names })` and token totals when available.
+- **Session start:** `log_event("session_start", { workspace: "..." })` on first turn.
+- **Usage snapshot:** After init + context on a new chat, `log_event("usage_snapshot", { summary: "New chat init", tool_names: ["contextstream/init", "contextstream/context"], tool_count: 2 })` so new chats are visible in Grafana.
+
+## Alignment
+
+- **ContextStream:** This rule reinforces the init → context sequence required by the P0 directive; both apply on new chats.
+- **Cursor Usage Logging (P0):** All possible data must be logged: **log_mcp_usage** after every MCP tool call (server, tool_name, tokens, duration when available), **log_model_usage** after every LLM call (model, provider, purpose, tokens, duration when available), and **log_event** for session/turn/milestone/error events. See `00_CoreDirectives.mdc` P0.2 and `CursorUsageLogging.mdc`.

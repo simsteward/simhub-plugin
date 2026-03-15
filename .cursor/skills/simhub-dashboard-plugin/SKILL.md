@@ -11,7 +11,9 @@ SimHub is a WPF .NET Framework 4.8 application for sim racing. It aggregates gam
 
 - **Web server**: port 8888 (configurable). Serves dashboard list and static files.
 - **No live telemetry API on 8888**: SimHub does not expose a WebSocket or REST API for live property values. The only documented data endpoint is `http://localhost:8888/DashTemplates/List` (JSON). Live data to an HTML page requires a **plugin-hosted server**.
-- Custom HTML: place files under SimHub installation root in `Web\` (e.g. `Web\sim-steward-dash\` for SimSteward). Access at `http://localhost:8888/Web/sim-steward-dash/index.html`. Plugin DLLs deploy to the **SimHub root** (no subfolder); SimHub discovers them automatically.
+- Custom HTML: place files under SimHub installation root in `Web\` (e.g. `Web\sim-steward-dash\` for SimSteward). Access at `http://<host>:8888/Web/sim-steward-dash/index.html`. Plugin DLLs deploy to the **SimHub root** (no subfolder); SimHub discovers them automatically.
+- **SimHub root `/` is owned by SimHub** and cannot be overridden by files on disk. The dashboard must live under `/Web/`. A meta-refresh at `Web\index.html` (→ `/Web/`) can redirect to the dashboard for convenience.
+- **LAN access**: SimHub's web server binds on all interfaces, so `http://192.168.x.x:8888/Web/sim-steward-dash/index.html` works from any device on the LAN. The plugin's Fleck WebSocket server must also bind to `0.0.0.0` (not `127.0.0.1`) to accept connections from non-localhost clients. The dashboard uses `window.location.hostname` to connect to the WebSocket, so it correctly targets the SimHub machine when opened via a LAN IP.
 
 ## Two JavaScript Contexts — Never Confuse Them
 
@@ -453,3 +455,68 @@ For worked examples (speed gauge, pit request button, gear indicator), see [exam
 - [Dash Studio Overlays](https://github.com/SHWotever/SimHub/wiki/Dash-Studio-Overlays)
 - [Troubleshoot web access](https://github.com/SHWotever/SimHub/wiki/Troubleshoot-Dashstudio-Web-access)
 - [Fleck WebSocket library](https://github.com/statianzo/Fleck)
+
+## Loki Logging Conventions
+
+1. **Structured log pattern** — call `_logger.Structured(level, component, eventType, message, fields)`:
+
+   ```csharp
+   _logger.Structured("INFO", "plugin", "action_result",
+       $"{action} -> {(success ? "ok" : error)}",
+       new Dictionary<string, object> {
+           ["action"] = action,
+           ["correlation_id"] = correlationId,
+           ["session_id"] = _state?.SessionId,
+           ["duration_ms"] = sw.ElapsedMilliseconds
+       });
+   ```
+
+   `fields` must omit unused data (`NullValueHandling.Ignore`). Keep each line under ~800 bytes; never exceed 8 KB.
+
+2. **Debug-friendly `Debug()` helper** — use `_logger.Debug(message, component, eventType, fields)` when `SIMSTEWARD_LOG_DEBUG=1`. It no-ops in production, but flows to `LokiSink` and the file log when debugging locally. Filter with `level != "DEBUG"` in AI/production queries.
+
+3. **Correlation IDs** — generate in `DashboardBridge.HandleMessage()` (`Guid.NewGuid().ToString("N").Substring(0, 8)`), pass through `DispatchAction(correlationId)` and include in `action_dispatched`/`action_result`. Use the same ID across the entire action for easy chaining.
+
+4. **Event taxonomy** — each event has a fixed `component` + `event` name and a known field set. Never invent new event names. Captured fields feed dashboards, AI digests, and Loki filters.
+
+   | Event | Component | Required fields |
+   |-------|-----------|-----------------|
+   | `plugin_started` | `plugin` | — |
+   | `plugin_ready` | `plugin` | `ws_port`, `env` |
+   | `plugin_stopped` | `plugin` | — |
+   | `iracing_connected` / `iracing_disconnected` | `plugin` | — |
+   | `ws_client_connected` / `ws_client_disconnected` | `bridge` | `client_ip`, `client_count` |
+   | `ws_client_rejected` | `bridge` | `client_ip`, `reason` |
+   | `action_received` | `bridge` | `action`, `arg`, `client_ip`, `correlation_id` |
+   | `action_dispatched` | `plugin` | `action`, `arg`, `correlation_id`, `session_id`, `session_num` |
+   | `action_result` | `plugin` | `action`, `arg`, `correlation_id`, `success`, `duration_ms`, `result`/`error` |
+   | `replay_control` | `plugin` | `mode` (seek, play, pause, etc.) |
+   | `session_snapshot_recorded` | `plugin` | `path` |
+   | `session_summary_captured` | `plugin` | `trigger`, `session_num`, `driver_count` |
+   | `finalize_capture_started` / `finalize_capture_complete` / `finalize_capture_timeout` | `plugin` | `target_frame`, `end_frame`, `duration_ms` as applicable |
+   | `incident_detected` | `tracker` | `incident_type`, `car_number`, `driver_name`, `delta`, `session_time`, `session_num`, `replay_frame` |
+   | `baseline_established` | `tracker` | `driver_count` |
+   | `session_reset` | `tracker` | `old_session`, `new_session` |
+   | `seek_backward_detected` | `tracker` | `from_frame`, `to_frame` |
+   | `session_digest` | `plugin` | `session_id`, `session_num`, `track`, `duration_minutes`, `total_incidents`, `incident_summary`, `actions_dispatched`, `action_failures`, `p50_action_latency_ms`, `p95_action_latency_ms`, `ws_peak_clients`, `plugin_errors`, `plugin_warns` |
+
+   Refer to `session_digest` entries when you need a single AI-friendly summary; drill into `correlation_id` chains for individual actions.
+
+5. **Label schema** — every Loki stream uses `app="sim-steward"`, `env=production|local`, `component=simhub-plugin|bridge|tracker|dashboard`, `level=INFO|WARN|ERROR|DEBUG`. Never promote high-cardinality values (`session_id`, `car_number`, `action`, `correlation_id`) to labels.
+
+6. **No-tick rule** — the only acceptable logs inside `DataUpdate()` are guarded by `WaitingLogThrottleMs` (10 s minimum). Tick-level telemetry must not trigger new entries.
+
+7. **LokiSink behavior** — 5 s or 50-entry flush (production), 2 s / 500-entry / 5000-queue (debug). Flush uses 3 retries (2s/4s/8s) with Basic/Bearer/no auth detection. `End()` calls `FlushAndDrain(deadline=10s)`.
+
+8. **LogQL patterns** for dashboards (also reproduced in `docs/GRAFANA-LOGGING.md`):
+
+   - **Command audit** (table): `{app="sim-steward", component="simhub-plugin"} | json | event = "action_result"`
+   - **Incident timeline** (logs + table): `{app="sim-steward", component="tracker"} | json | event = "incident_detected"`
+   - **Plugin health** (error rate, lifecycle): `{app="sim-steward", component="simhub-plugin"} | json | event =~ "plugin_started|iracing_connected|plugin_stopped|iracing_disconnected"`
+   - **Session overview** (digests + lifecycle): `{app="sim-steward"} | json | event = "session_digest"`
+   - **Failed command trace**: `{app="sim-steward", component="simhub-plugin"} | json | success = "false"`
+   - **AI drill-down**: `{app="sim-steward"} | json | correlation_id = "<id>"` (start from `session_digest`, then follow `correlation_id` across the other events).
+
+9. **Local vs. cloud** — switch targets via `.env`: `SIMSTEWARD_LOKI_URL=http://localhost:3100`, empty auth, `SIMSTEWARD_LOG_ENV=local`, `SIMSTEWARD_LOG_DEBUG=1` for docker stack; production points at Grafana Cloud URL, Basic auth, `SIMSTEWARD_LOG_ENV=production`, no debug.
+
+10. **AI filter rule** — all AI/assistant prompts (Grafana Assistant, Sift, natural-language LogQL) must include `level != "DEBUG"` (the doc explains why) to avoid overwhelming debug noise.

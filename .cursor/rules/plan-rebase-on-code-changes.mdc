@@ -1,0 +1,40 @@
+---
+description: Require plan review and update when code changes relevant to the active plan are detected, before any execution.
+alwaysApply: true
+---
+
+# Plan Rebase on Code Changes
+
+## Active plan and scope
+
+- **Active plan**: An approved or in-scope plan (e.g. from CreatePlan, or a plan file in `.cursor/plans/`). When there is no explicit plan (ad-hoc "fix this"), infer scope from the user request and run the check if execution would touch files.
+- **Plan mode**: When the system indicates plan mode (e.g. a system reminder that execution is deferred). In plan mode, replan via CreatePlan when relevant changes are found; do not execute without a replan.
+
+## Pre-execution check (mandatory)
+
+Before the **first** execution step and before **each subsequent** step, check whether code changes related to the plan exist:
+
+- Use `git status` / `git diff` or inspect open-file context. If the workspace is not a git repo, use open-file context or last-known state only.
+- **Related** = files the plan will read, write, or that affect its goal. Example: a config file change is related if the plan touches that config or a feature that depends on it.
+- When searching for code to assess relevance, follow project search rules (e.g. ContextStream search if applicable).
+
+## If relevant changes are found
+
+1. **Do not execute the stale plan.**
+2. Read the changed files (or diffs) to understand what changed.
+3. Treat the changes as **informative context** — not automatically "the truth" or "the most recent correct version". Reason: intentional? Conflicting? Superseded?
+4. Update the plan (revise steps, add caveats, or flag conflicts).
+5. **Present before proceeding**: In plan mode, re-call `CreatePlan` with the revised steps. Outside plan mode, summarize the changes and revised next steps in chat before proceeding.
+6. **Sync revised plan to ContextStream** — Call `session(action="capture_plan", ...)` and `memory(action="create_task", ...)` per [ContextStreamSync.mdc](.cursor/rules/ContextStreamSync.mdc) so the updated plan is visible to other sessions and the web app.
+
+## Re-check after your own edits
+
+After making edits as part of the plan, re-run the relevance check before the next execution step so you do not continue on a stale plan.
+
+## Post-execution: commit
+
+After executing plan steps that modified files, the agent must **commit** those changes (see [commit-after-execution](.cursor/rules/commit-after-execution.mdc)). Code detection for the next run relies on git; uncommitted work is indistinguishable from external edits and can trigger unnecessary rebases.
+
+## Changes are context, not commands
+
+Code changes are signals to investigate. Reason about whether a change aligns with, conflicts with, or is orthogonal to the plan's goal. They do not automatically override the plan.

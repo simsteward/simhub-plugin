@@ -100,6 +100,22 @@
         }
         .btn.primary:hover { background: linear-gradient(135deg, #4db2ff, #1f9cff); }
         .btn.active-speed { border-color: var(--accent); background: rgba(31,156,255,0.15); }
+        .btn.unsupported {
+            border-color: rgba(255,95,95,0.45);
+            background: rgba(255,95,95,0.08);
+            color: rgba(255,95,95,0.9);
+        }
+
+        .replay-state-legend {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            text-align: center;
+            padding: 4px 0 2px 0;
+        }
+        .replay-state-legend .state-dir { color: var(--text); }
+        .replay-state-legend .state-rewind { color: var(--cyan); }
 
         .progress-row { display: flex; flex-direction: column; gap: 6px; }
         .frame-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
@@ -149,6 +165,52 @@
         }
         .filter-chip:hover { border-color: var(--accent); }
 
+        /* ── Player incident hero ─────────────────────────────────── */
+        .player-hero-card {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px 14px;
+            background: rgba(31,156,255,0.08);
+            border: 1px solid rgba(31,156,255,0.35);
+            border-radius: 12px;
+        }
+        .player-hero-card.visible { display: flex; }
+        .player-hero-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .player-hero-count {
+            font-family: "Courier New", monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .player-hero-count.severity-1x { color: var(--green); }
+        .player-hero-count.severity-2x { color: var(--yellow); }
+        .player-hero-count.severity-4x { color: var(--red); }
+        .player-hero-summary {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+        .player-hero-btn {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 8px;
+            border: 1px solid var(--accent);
+            background: rgba(31,156,255,0.15);
+            color: var(--accent);
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .player-hero-btn:hover {
+            background: rgba(31,156,255,0.25);
+            border-color: var(--accent);
+        }
+
         /* ── Driver standings ─────────────────────────────────────── */
         .drivers-panel {
             display: flex; flex-direction: column; gap: 6px;
@@ -157,6 +219,16 @@
             border: 1px solid var(--border);
             border-radius: 12px;
         }
+        .drivers-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; user-select: none;
+        }
+        .drivers-panel-header:hover .drivers-panel-chev { color: var(--text); }
+        .drivers-panel-chev { font-size: 0.7rem; color: var(--muted); transition: color 0.15s; }
+        .drivers-panel.collapsed .drivers-panel-chev { transform: rotate(-90deg); }
+        .drivers-panel-body { overflow: hidden; }
+        .drivers-panel.collapsed .drivers-panel-body { display: none; }
+        .drivers-summary-pts { font-size: 0.72rem; color: var(--muted); margin-left: 6px; }
         #driver-list { display: flex; flex-direction: column; gap: 4px; }
         .driver-row {
             display: grid;
@@ -210,10 +282,66 @@
             border: 1px solid var(--border);
             border-radius: 12px;
         }
-        #incident-feed { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
-        #incident-feed::-webkit-scrollbar { width: 4px; }
-        #incident-feed::-webkit-scrollbar-track { background: transparent; }
-        #incident-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+        .incident-accordion {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .incident-section {
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.02);
+        }
+        .incident-section-toggle {
+            width: 100%;
+            background: rgba(255,255,255,0.02);
+            border: 0;
+            color: var(--text);
+            text-align: left;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            font-size: 0.78rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .incident-section-toggle:hover { background: rgba(255,255,255,0.05); }
+        .incident-section-toggle .chev { color: var(--muted); }
+        .incident-section.open .incident-section-toggle .chev { color: var(--accent); }
+        .incident-section-feed {
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 360px;
+            overflow-y: auto;
+            padding: 6px;
+        }
+        .incident-section.open .incident-section-feed { display: flex; }
+        .incident-section-feed::-webkit-scrollbar { width: 4px; }
+        .incident-section-feed::-webkit-scrollbar-track { background: transparent; }
+        .incident-section-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+        .incident-view-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .view-toggle-btn { flex: 1 1 auto; min-width: 0; }
+        .view-toggle-btn.active-view { border-color: var(--accent); background: rgba(31,156,255,0.15); }
+        .incident-feed-unified {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 360px;
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+        .incident-feed-unified::-webkit-scrollbar { width: 4px; }
+        .incident-feed-unified::-webkit-scrollbar-track { background: transparent; }
+        .incident-feed-unified::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
 
         .incident-card {
             display: grid;
@@ -224,20 +352,29 @@
             border-radius: 8px;
             background: rgba(255,255,255,0.025);
             border: 1px solid rgba(255,255,255,0.06);
-            animation: slideIn 0.2s ease;
             cursor: pointer;
             transition: background 0.15s;
         }
+        .incident-card.card-new { animation: slideIn 0.25s ease forwards; }
         .incident-card:hover {
             background: rgba(255,255,255,0.07);
         }
         @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-4px); }
+            from { opacity: 0; transform: translateY(-6px); }
             to   { opacity: 1; transform: translateY(0); }
         }
-        .incident-card.player-incident { border-color: rgba(31,156,255,0.25); }
-        .incident-card.detected-incident { border-color: rgba(13,216,255,0.18); border-style: dashed; }
-        .incident-card.zero-x-incident { border-color: rgba(255,255,255,0.12); }
+        .incident-card.player-incident {
+            border-color: rgba(31,156,255,0.25);
+            border-left: 3px solid var(--accent);
+        }
+        .incident-card .incident-badge-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .incident-card .seek-hint {
+            font-size: 0.68rem;
+            color: var(--accent);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .incident-card:hover .seek-hint { opacity: 1; }
         .incident-time {
             font-family: "Courier New", monospace;
             font-size: 0.78rem;
@@ -275,9 +412,8 @@
         .badge-2x { background: rgba(255,200,64,0.15); color: var(--yellow); border: 1px solid rgba(255,200,64,0.3); }
         .badge-4x { background: rgba(255,95,95,0.15); color: var(--red); border: 1px solid rgba(255,95,95,0.35); }
         .badge-Nx { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
-        .badge-detected { background: rgba(13,216,255,0.1); color: var(--cyan); border: 1px dashed rgba(13,216,255,0.35); font-size: 0.7rem; }
 
-        /* ── Event stream ─────────────────────────────────────────── */
+        /* ── Debug log ─────────────────────────────────────────────── */
         .stream-panel {
             display: flex; flex-direction: column; gap: 6px;
             padding: 12px 14px;
@@ -285,6 +421,22 @@
             border: 1px solid var(--border);
             border-radius: 12px;
         }
+        .stream-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; user-select: none;
+        }
+        .stream-panel-header:hover .stream-panel-chev { color: var(--text); }
+        .stream-panel-chev { font-size: 0.7rem; color: var(--muted); transition: color 0.15s; }
+        .stream-panel.collapsed .stream-panel-chev { transform: rotate(-90deg); }
+        .stream-panel-body { overflow: hidden; }
+        .stream-panel.collapsed .stream-panel-body { display: none; }
+        .stream-alert-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--yellow); margin-right: 6px;
+            flex-shrink: 0; display: none;
+        }
+        .stream-alert-dot.visible { display: block; }
+        .stream-alert-dot.error { background: var(--red); }
         .stream-header {
             display: flex; align-items: center; justify-content: space-between;
         }
@@ -321,6 +473,11 @@
         .stream-lvl.DETECT { color: var(--cyan); }
         .stream-lvl.ZEROX { color: var(--muted); }
         .stream-msg { color: var(--text); word-break: break-all; }
+
+        .log-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; font-size: 0.72rem; color: var(--muted); }
+        .log-filter-row label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+        .log-filter-row input[type="checkbox"] { margin: 0; cursor: pointer; }
+        .log-activity-summary { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 6px; line-height: 1.4; max-height: 60px; overflow-y: auto; }
 
         /* ── Diagnostics / metrics panel ─────────────────────────── */
         .diag-panel {
@@ -363,7 +520,7 @@
         /* Layer metrics bar */
         .layers-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 5px;
         }
         .layer-cell {
@@ -404,6 +561,66 @@
         }
         .feedback.error   { border-color: rgba(255,95,95,0.5); background: rgba(255,95,95,0.08); color: var(--red); }
         .feedback.success { border-color: rgba(14,242,114,0.4); background: rgba(14,242,114,0.08); color: var(--green); }
+
+        /* ── Session complete banner & results drawer ────────────────── */
+        .session-complete-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 14px;
+            background: rgba(14,242,114,0.1);
+            border: 1px solid rgba(14,242,114,0.3);
+            border-radius: 12px;
+        }
+        .session-complete-banner.visible { display: flex; }
+        .session-complete-banner span { font-size: 0.85rem; color: var(--text); }
+        .session-complete-banner-actions { display: flex; gap: 8px; align-items: center; }
+        .session-complete-banner .btn { min-width: 0; }
+        .results-drawer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .results-drawer-overlay.visible { display: flex; }
+        .results-drawer {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-width: 100%;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .results-drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+        .results-drawer-header h3 { font-size: 0.9rem; font-weight: 600; }
+        .results-drawer-body {
+            overflow: auto;
+            padding: 12px;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        .results-table th, .results-table td {
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .results-table th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
     </style>
 </head>
 <body>
@@ -418,58 +635,14 @@
         <span id="session-time">—</span>
     </header>
 
-    <!-- Diagnostics & Metrics -->
-    <section class="diag-panel" id="diag-panel">
-        <div class="diag-header" id="diag-toggle-btn" title="Toggle diagnostics">
-            <div class="diag-header-left">
-                <span class="diag-title">Diagnostics &amp; Metrics</span>
-            </div>
-            <span class="diag-toggle" id="diag-toggle-icon">▼</span>
+    <!-- Session complete banner -->
+    <div class="session-complete-banner" id="session-complete-banner">
+        <span id="session-complete-text">Session complete</span>
+        <div class="session-complete-banner-actions">
+            <button type="button" class="btn" id="session-complete-results-btn">View results</button>
+            <button type="button" class="btn" id="session-complete-dismiss-btn">Dismiss</button>
         </div>
-        <div class="diag-body" id="diag-body">
-            <!-- Infrastructure indicators -->
-            <div class="infra-grid" id="infra-grid">
-                <div class="infra-item"><span class="infra-dot" id="di-irsdk"></span><span id="di-irsdk-lbl">iRacing SDK</span></div>
-                <div class="infra-item"><span class="infra-dot" id="di-ws"></span><span id="di-ws-lbl">WebSocket</span></div>
-                <div class="infra-item"><span class="infra-dot" id="di-mb"></span><span id="di-mb-lbl" title="">Memory Bank</span></div>
-                <div class="infra-item"><span class="infra-dot" id="di-car"></span><span id="di-car-lbl">Player Car</span></div>
-            </div>
-            <!-- Per-layer detection counts -->
-            <div class="layers-grid">
-                <div class="layer-cell" id="lc-l1" title="Layer 1 — PlayerCarMyIncidentCount (player/focused car, 60 Hz, exact type)">
-                    <span class="layer-label">L1</span>
-                    <span class="layer-count zero" id="lc-l1-count">0</span>
-                    <span class="layer-desc">Player telemetry</span>
-                </div>
-                <div class="layer-cell" id="lc-l2" title="Layer 2 — G-force impact (all cars)">
-                    <span class="layer-label">L2</span>
-                    <span class="layer-count zero" id="lc-l2-count">0</span>
-                    <span class="layer-desc">Physics impact</span>
-                </div>
-                <div class="layer-cell" id="lc-l3" title="Layer 3 — Track surface off-track (all cars)">
-                    <span class="layer-label">L3</span>
-                    <span class="layer-count zero" id="lc-l3-count">0</span>
-                    <span class="layer-desc">Off-track</span>
-                </div>
-                <div class="layer-cell" id="lc-l4" title="Layer 4 — Session YAML deltas (all drivers, batched)">
-                    <span class="layer-label">L4</span>
-                    <span class="layer-count zero" id="lc-l4-count">0</span>
-                    <span class="layer-desc">YAML session</span>
-                </div>
-                <div class="layer-cell" id="lc-0x" title="0x — Player contact/off-track without official count change">
-                    <span class="layer-label">0x</span>
-                    <span class="layer-count zero" id="lc-0x-count">0</span>
-                    <span class="layer-desc">Contact (no pts)</span>
-                </div>
-            </div>
-            <!-- Summary pills -->
-            <div class="diag-footer">
-                <span class="diag-pill" id="dp-total">Total: 0 events</span>
-                <span class="diag-pill" id="dp-yaml">YAML updates: 0</span>
-                <span class="diag-pill" id="dp-last">Last: —</span>
-            </div>
-        </div>
-    </section>
+    </div>
 
     <!-- Replay controls -->
     <section class="replay-panel">
@@ -482,12 +655,14 @@
             <button id="nextIncident" class="btn" style="flex:1 1 80px;">Inc ▶</button>
         </div>
         <div class="btn-row" id="speed-row">
+            <button class="btn" data-speed="-1">⏪ -1×</button>
             <button class="btn" data-speed="1">1×</button>
             <button class="btn" data-speed="2">2×</button>
             <button class="btn" data-speed="4">4×</button>
             <button class="btn" data-speed="8">8×</button>
             <button class="btn" data-speed="16">16×</button>
         </div>
+        <div class="replay-state-legend" id="replay-state-legend" title="Current replay direction and speed">Paused</div>
         <div class="progress-row">
             <div class="frame-label">
                 <span id="frame-cur">0</span>
@@ -498,12 +673,17 @@
     </section>
 
     <!-- Driver standings -->
-    <section class="drivers-panel">
-        <div class="section-header">
-            <span>Drivers</span>
-            <span class="badge" id="driver-count">0</span>
+    <section class="drivers-panel collapsed" id="drivers-panel">
+        <div class="section-header drivers-panel-header" id="drivers-panel-toggle" title="Expand/collapse">
+            <span>
+                <span>Drivers (<span class="badge" id="driver-count">0</span>)</span>
+                <span class="drivers-summary-pts" id="drivers-field-pts"></span>
+            </span>
+            <span class="drivers-panel-chev" id="drivers-panel-chev">▼</span>
         </div>
-        <div id="driver-list"><div class="empty-state">Waiting for iRacing…</div></div>
+        <div class="drivers-panel-body">
+            <div id="driver-list"><div class="empty-state">Waiting for iRacing…</div></div>
+        </div>
     </section>
 
     <!-- Incident feed -->
@@ -514,23 +694,25 @@
         </div>
         <div class="filter-bar" id="filter-bar">
             <span class="filter-chip active" data-filter="all">All</span>
-            <span class="filter-chip" data-filter="0x">0x</span>
             <span class="filter-chip" data-filter="1x">1x</span>
             <span class="filter-chip" data-filter="2x">2x</span>
             <span class="filter-chip" data-filter="4x">4x+</span>
-            <span class="filter-chip" data-filter="detected">Detected</span>
-            <span class="filter-chip" data-filter="player">Player</span>
+            <span class="filter-chip" data-filter="mine">Mine</span>
         </div>
-        <div id="incident-feed"><div class="empty-state">No incidents detected yet.</div></div>
-    </section>
-
-    <!-- Live event stream -->
-    <section class="stream-panel">
-        <div class="section-header stream-header">
-            <span>Live Event Stream</span>
-            <button class="stream-clear-btn" id="stream-clear-btn">clear</button>
+        <div class="player-hero-card" id="player-hero-card">
+            <div class="player-hero-row">
+                <span class="player-hero-count" id="player-hero-count">0x</span>
+                <span class="player-hero-summary" id="player-hero-summary">—</span>
+                <button type="button" class="player-hero-btn" id="player-hero-jump-btn">&#9654; Jump to Last</button>
+            </div>
         </div>
-        <div id="event-stream"><div class="empty-state">Waiting for events…</div></div>
+        <div class="incident-view-toggle">
+            <button type="button" class="btn view-toggle-btn" id="view-at-playhead-btn" data-view="live">At playhead</button>
+            <button type="button" class="btn view-toggle-btn" id="view-full-session-btn" data-view="entire">Full session</button>
+        </div>
+        <div id="incident-feed-unified" class="incident-feed-unified">
+            <div class="empty-state">No incidents at or before current position.</div>
+        </div>
     </section>
 
     <!-- Feedback -->
@@ -538,6 +720,80 @@
         If the dot stays grey, the Sim Steward plugin is not running.
     </div>
 
+    <!-- Diagnostics & Metrics (bottom) -->
+    <section class="diag-panel" id="diag-panel">
+        <div class="diag-header" id="diag-toggle-btn" title="Toggle diagnostics">
+            <div class="diag-header-left">
+                <span class="diag-title">Diagnostics &amp; Metrics</span>
+            </div>
+            <span class="diag-toggle" id="diag-toggle-icon">▼</span>
+        </div>
+        <div class="diag-body" id="diag-body">
+            <div class="infra-grid" id="infra-grid">
+                <div class="infra-item"><span class="infra-dot" id="di-irsdk"></span><span id="di-irsdk-lbl">iRacing SDK</span></div>
+                <div class="infra-item"><span class="infra-dot" id="di-ws"></span><span id="di-ws-lbl">WebSocket</span></div>
+                <div class="infra-item"><span class="infra-dot" id="di-car" title="In replay: car currently being watched (switch with V/Shift+V in iRacing). In live: your car."></span><span id="di-car-lbl">Player Car</span></div>
+            </div>
+            <div class="diag-footer" style="justify-content:space-between; gap:10px;">
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" class="btn" id="capture-summary-btn" title="Capture session results/incident totals if available at current state">Capture summary</button>
+                    <button type="button" class="btn" id="finalize-capture-summary-btn" title="Replay only: temporarily seek to replay end to force final results, capture, then restore position">Finalize + capture</button>
+                    <button type="button" class="btn" id="record-session-snapshot-btn" title="Append a JSON snapshot line to session-discovery.jsonl for later analysis">Record snapshot</button>
+                </div>
+            </div>
+            <div class="diag-footer">
+                <span class="diag-pill" id="dp-last">Last detection: —</span>
+                <span class="diag-pill" id="dp-captured">Incidents captured: 0</span>
+            </div>
+            <div class="diag-footer" style="gap:8px; flex-wrap:wrap;">
+                <span class="diag-pill" id="sd-core">Session: —</span>
+                <span class="diag-pill" id="sd-results">Results: —</span>
+                <span class="diag-pill" id="sd-incidents">YAML incidents: —</span>
+                <span class="diag-pill" id="sd-lastcap">Last capture: —</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Debug Log (very bottom) -->
+    <section class="stream-panel" id="stream-panel">
+        <div class="section-header stream-panel-header" id="stream-panel-toggle" title="Expand/collapse">
+            <span style="display:flex;align-items:center;">
+                <span class="stream-alert-dot" id="stream-alert-dot"></span>
+                <span>Debug Log</span>
+            </span>
+            <span class="stream-panel-chev" id="stream-panel-chev">▼</span>
+        </div>
+        <div class="stream-panel-body">
+            <div class="stream-header">
+                <span></span>
+                <button class="stream-clear-btn" id="stream-clear-btn">clear</button>
+            </div>
+            <div class="log-filter-row" id="log-filter-row">
+                <span class="log-filter-label">Hide level:</span>
+                <label><input type="checkbox" id="log-hide-debug" /> DEBUG</label>
+                <span class="log-filter-label" style="margin-left:8px">Hide events:</span>
+                <label><input type="checkbox" id="log-hide-state-broadcast" /> state_broadcast_summary</label>
+                <label><input type="checkbox" id="log-hide-tick-stats" /> tick_stats</label>
+                <label><input type="checkbox" id="log-hide-ws-raw" /> ws_message_raw</label>
+                <label><input type="checkbox" id="log-hide-action-received" /> action_received</label>
+                <label><input type="checkbox" id="log-hide-action-dispatched" /> action_dispatched</label>
+            </div>
+            <div class="log-activity-summary" id="log-activity-summary" title="Summary of recent log activity">—</div>
+            <div id="event-stream"><div class="empty-state">Waiting for events…</div></div>
+        </div>
+    </section>
+
+</div>
+
+<!-- Results drawer overlay -->
+<div class="results-drawer-overlay" id="results-drawer-overlay">
+    <div class="results-drawer">
+        <div class="results-drawer-header">
+            <h3 id="results-drawer-title">Session results</h3>
+            <button type="button" class="btn" id="results-drawer-close">Close</button>
+        </div>
+        <div class="results-drawer-body" id="results-drawer-body"></div>
+    </div>
 </div>
 <script>
 (function () {
@@ -554,19 +810,90 @@
     const fill        = document.getElementById("progress-fill");
     const driverList  = document.getElementById("driver-list");
     const driverCount = document.getElementById("driver-count");
-    const incidentFeed  = document.getElementById("incident-feed");
+    const incidentFeedUnified = document.getElementById("incident-feed-unified");
     const incidentCount = document.getElementById("incident-count");
     const eventStream = document.getElementById("event-stream");
     const filterBar   = document.getElementById("filter-bar");
     const feedback    = document.getElementById("action-feedback");
+    const rewindBtn = speedRow.querySelector('[data-speed="-1"]');
     const MAX_STREAM_ENTRIES = 200;
-    const DATA_UPDATE_THROTTLE_MS = 400;
-    let lastDataUpdateAt = 0;
     let lastIncidentKey = "";
     let lastDriverKey = "";
     let activeFilter = "all";
     let allIncidents = [];
+    const STORAGE_KEY_INCIDENT_VIEW = "simsteward_incident_view";
+    const STORAGE_KEY_LOG_FILTER = "simsteward_log_filter";
+    const LOG_FILTER_DEFAULTS = {
+        hiddenLevels: ["DEBUG"],
+        hiddenEvents: ["state_broadcast_summary", "tick_stats", "ws_message_raw"]
+    };
+    const KNOWN_LOG_EVENTS = [
+        "state_broadcast_summary", "tick_stats", "ws_message_raw",
+        "action_received", "action_dispatched", "action_result", "replay_control",
+        "seek_backward_detected", "session_summary_captured", "incident_detected",
+        "plugin_started", "plugin_ready", "plugin_stopped", "loki_status",
+        "iracing_connected", "iracing_disconnected", "ws_client_connected", "ws_client_disconnected",
+        "dashboard_opened", "baseline_established", "session_reset", "yaml_update", "session_digest"
+    ];
+    let logFilter = (function () {
+        let hiddenLevels, hiddenEvents;
+        try {
+            const s = localStorage.getItem(STORAGE_KEY_LOG_FILTER);
+            if (s) {
+                const p = JSON.parse(s);
+                hiddenLevels = new Set(Array.isArray(p.hiddenLevels) ? p.hiddenLevels : LOG_FILTER_DEFAULTS.hiddenLevels);
+                hiddenEvents = new Set(Array.isArray(p.hiddenEvents) ? p.hiddenEvents : LOG_FILTER_DEFAULTS.hiddenEvents);
+            } else {
+                hiddenLevels = new Set(LOG_FILTER_DEFAULTS.hiddenLevels);
+                hiddenEvents = new Set(LOG_FILTER_DEFAULTS.hiddenEvents);
+            }
+        } catch (_) {
+            hiddenLevels = new Set(LOG_FILTER_DEFAULTS.hiddenLevels);
+            hiddenEvents = new Set(LOG_FILTER_DEFAULTS.hiddenEvents);
+        }
+        // Reset poisoned filter: if INFO/WARN/ERROR were hidden, nothing would show
+        const wouldHideAll = ["INFO", "WARN", "ERROR"].some(l => hiddenLevels.has(l));
+        if (wouldHideAll) {
+            hiddenLevels = new Set(LOG_FILTER_DEFAULTS.hiddenLevels);
+            hiddenEvents = new Set(LOG_FILTER_DEFAULTS.hiddenEvents);
+            try {
+                localStorage.setItem(STORAGE_KEY_LOG_FILTER, JSON.stringify({
+                    hiddenLevels: LOG_FILTER_DEFAULTS.hiddenLevels,
+                    hiddenEvents: LOG_FILTER_DEFAULTS.hiddenEvents
+                }));
+            } catch (_) {}
+        }
+        // Never hide action_result or incident_detected so button clicks and incident points always show
+        hiddenEvents.delete("action_result");
+        hiddenEvents.delete("incident_detected");
+        return { hiddenLevels, hiddenEvents };
+    })();
+    let recentLogEntries = [];
+    const RECENT_LOG_MAX = 1000;
+    /** Full log buffer (including hidden entries) so we can re-render when filter changes. Newest at index 0. */
+    let fullLogEntries = [];
+    const FULL_LOG_MAX = 2000;
+    let activeIncidentView = (function () {
+        try {
+            const s = localStorage.getItem(STORAGE_KEY_INCIDENT_VIEW);
+            if (s === "entire" || s === "live") return s;
+        } catch (_) {}
+        return "live";
+    })();
+    let currentReplayFrame = 0;
+    let currentSessionTime = 0;
+    let lastLiveRenderFrame = -9999;
+    const LIVE_RENDER_FRAME_DEADZONE = 30;
+    let incidentDataDirty = false;
+    let rewindProbeStartedAt = 0;
+    let rewindProbeActive = false;
+    let rewindUnsupported = false;
     let lastIncidentContext = { hasLiveIncidentData: false, irsdkConnected: false };
+    let playerCarIdxRef = -1;
+    let debugLogHasAlert = false;
+    let debugLogHasError = false;
+    let lastSessionSummary = null;
+    const DEBUG_STATE_LOG = false; // set true in browser console to debug state/drivers/incidents
 
     const urlParams = new URLSearchParams(window.location.search);
     const wsToken = urlParams.get("token") || urlParams.get("wsToken");
@@ -603,13 +930,14 @@
         flash("error", msg + " – retrying…");
         clearDiagnostics();
         lastIncidentContext = { hasLiveIncidentData: false, irsdkConnected: false };
-        renderIncidents(filterIncidents(allIncidents));
-        if (!useFallback && ev.code === 1006) { useFallback = true; setTimeout(connect, 600); }
+        renderIncidentViews();
+        const isLocal = wsHost === 'localhost' || wsHost === '127.0.0.1';
+        if (!useFallback && isLocal && ev.code === 1006) { useFallback = true; setTimeout(connect, 600); }
         else scheduleReconnect();
     }
 
     function clearDiagnostics() {
-        ["di-irsdk", "di-ws", "di-mb", "di-car"].forEach(id => {
+        ["di-irsdk", "di-ws", "di-car"].forEach(id => {
             const dot = document.getElementById(id);
             if (dot) dot.className = "infra-dot";
         });
@@ -621,17 +949,25 @@
         const labels = {
             "di-irsdk-lbl": "iRacing SDK",
             "di-ws-lbl":    "WebSocket",
-            "di-mb-lbl":    "Memory Bank",
             "di-car-lbl":   "Player Car"
         };
         Object.entries(labels).forEach(([id, text]) => {
             const el = document.getElementById(id);
             if (el) el.textContent = text;
         });
-        ["lc-l1", "lc-l2", "lc-l3", "lc-l4", "lc-0x"].forEach(id => setLayerCount(id, 0));
-        document.getElementById("dp-total").textContent = "Total: 0 events";
-        document.getElementById("dp-yaml").textContent  = "YAML updates: 0";
-        document.getElementById("dp-last").textContent  = "Last: —";
+        const dpLast = document.getElementById("dp-last");
+        const dpCaptured = document.getElementById("dp-captured");
+        if (dpLast) dpLast.textContent = "Last detection: —";
+        if (dpCaptured) dpCaptured.textContent = "Incidents captured: 0";
+
+        const sdCore = document.getElementById("sd-core");
+        const sdResults = document.getElementById("sd-results");
+        const sdInc = document.getElementById("sd-incidents");
+        const sdLastCap = document.getElementById("sd-lastcap");
+        if (sdCore) sdCore.textContent = "Session: —";
+        if (sdResults) sdResults.textContent = "Results: —";
+        if (sdInc) sdInc.textContent = "YAML incidents: —";
+        if (sdLastCap) sdLastCap.textContent = "Last capture: —";
     }
     function scheduleReconnect() {
         if (reconnectTimer) return;
@@ -642,28 +978,174 @@
     function handleMessage(raw) {
         let p;
         try { p = JSON.parse(raw); } catch { return; }
+        if (!p || typeof p !== "object") return;
+        if (DEBUG_STATE_LOG && p && p.type === "state") {
+            console.debug("[SimSteward] state message", {
+                drivers: Array.isArray(p.drivers) ? p.drivers.length : -1,
+                incidents: Array.isArray(p.incidents) ? p.incidents.length : -1,
+                mode: p.pluginMode
+            });
+        }
         if (p.type === "state")             applyState(p);
-        else if (p.type === "actionResult") flash(p.success ? "success" : "error", p.success ? `${p.action} ok` : `${p.action}: ${p.error || "failed"}`);
+        else if (p.type === "actionResult") {
+            if (!p.success && p.error === "incident_not_found")
+                flash("error", "Incident not found — it may have been pruned from the feed. Seek manually.");
+            else if (!p.success && p.action === "CaptureSessionSummaryNow" && p.error === "results_not_ready")
+                flash("error", "Results not ready yet — try “Finalize + capture” (replay), or seek/play to checkered/end.");
+            else if (!p.success && p.action === "FinalizeThenCaptureSessionSummary" && p.error === "not_in_replay")
+                flash("error", "Finalize + capture is replay-only (SimMode must be replay).");
+            else
+                flash(p.success ? "success" : "error", p.success ? `${p.action} ok` : `${p.action}: ${p.error || "failed"}`);
+        }
         else if (p.type === "pong")         flash("success", "pong");
         else if (p.type === "error")        flash("error", p.error || "error");
-        else if (p.type === "logEvents")    appendLogEntries(p.entries ?? []);
-        else if (p.type === "incidentEvents") { appendIncidentEntries(p.events ?? []); flashIncidentsCaptured(p.events ?? []); }
+        else if (p.type === "logEvents") {
+            const entries = Array.isArray(p.entries) ? p.entries : [];
+            const incidentEntries = entries.filter(e => (e && (e.event === "incident_detected" || e.Event === "incident_detected")));
+            if (incidentEntries.length) console.info("[SimSteward] logEvents received", incidentEntries.length, "incident_detected entry/entries");
+            try { appendLogEntries(entries); }
+            catch (err) { console.error("[SimSteward] logEvents display error", err); }
+        }
+        else if (p.type === "incidentEvents") { const ev = Array.isArray(p.events) ? p.events : []; appendIncidentEntries(ev); flashIncidentsCaptured(ev); }
+        else if (p.type === "sessionComplete") showSessionCompleteBanner(p.summary);
     }
 
     // ── Event stream rendering ─────────────────────────────────────
+    function updateStreamAlertDot() {
+        const dot = document.getElementById("stream-alert-dot");
+        if (!dot) return;
+        dot.classList.toggle("visible", debugLogHasAlert);
+        dot.classList.toggle("error", debugLogHasError);
+    }
+
+    function saveLogFilter() {
+        try {
+            localStorage.setItem(STORAGE_KEY_LOG_FILTER, JSON.stringify({
+                hiddenLevels: Array.from(logFilter.hiddenLevels),
+                hiddenEvents: Array.from(logFilter.hiddenEvents)
+            }));
+        } catch (_) {}
+    }
+
+    function isLogEntryHidden(e) {
+        const lvl = (e.level || e.Level || "INFO").toUpperCase();
+        const ev = e.event || e.Event || "";
+        if (logFilter.hiddenLevels.has(lvl)) return true;
+        if (ev && logFilter.hiddenEvents.has(ev)) return true;
+        return false;
+    }
+
+    function updateActivitySummary() {
+        const el = document.getElementById("log-activity-summary");
+        if (!el || !recentLogEntries.length) {
+            if (el) el.textContent = "—";
+            return;
+        }
+        const byEvent = {};
+        const recentActions = [];
+        for (const x of recentLogEntries) {
+            byEvent[x.event || "unknown"] = (byEvent[x.event || "unknown"] || 0) + 1;
+            if ((x.event === "action_result" || x.event === "session_summary_captured") && x.message)
+                recentActions.push(x.message.substring(0, 50));
+        }
+        const parts = [];
+        if (byEvent.action_result) parts.push(`${byEvent.action_result} action(s)`);
+        if (byEvent.session_summary_captured) parts.push(`${byEvent.session_summary_captured} capture(s)`);
+        if (byEvent.seek_backward_detected) parts.push(`${byEvent.seek_backward_detected} seek reset(s)`);
+        if (byEvent.incident_detected) parts.push(`${byEvent.incident_detected} incident(s)`);
+        if (byEvent.replay_control) parts.push(`${byEvent.replay_control} replay control(s)`);
+        const summary = parts.length ? parts.join(" · ") : `${recentLogEntries.length} log entries`;
+        const last = recentActions.slice(-3).reverse();
+        el.textContent = last.length ? summary + " — Recent: " + last.join(" | ") : summary;
+    }
+
     function appendLogEntries(entries) {
-        if (!entries.length) return;
-        clearStreamPlaceholder();
-        const atBottom = isStreamAtBottom();
+        if (!Array.isArray(entries) || !entries.length) return;
         for (const e of entries) {
+            if (e == null) continue;
+            const lvl = (e.level || e.Level || "INFO").toUpperCase();
+            if (lvl === "ERROR") debugLogHasError = true;
+            if (lvl === "WARN" || lvl === "ERROR") debugLogHasAlert = true;
+            fullLogEntries.unshift({ level: e.level || e.Level || "INFO", event: e.event || e.Event || "", message: e.message || e.Message || "", timestamp: e.timestamp || e.Timestamp || "" });
+            if (fullLogEntries.length > FULL_LOG_MAX) fullLogEntries.pop();
+        }
+        updateStreamAlertDot();
+        clearStreamPlaceholder();
+        const atTop = isStreamAtTop();
+        let added = 0;
+        for (const e of entries) {
+            if (e == null) continue;
+            if (isLogEntryHidden(e)) {
+                continue;
+            }
+            added++;
+            const row = document.createElement("div");
+            row.className = "stream-entry";
+            const ts = (e.timestamp || e.Timestamp || "").replace("T", " ").replace("Z", "").substring(11, 23);
+            const lvl = e.level || e.Level || "INFO";
+            const ev = e.event || e.Event || "";
+            const msg = e.message || e.Message || "";
+            row.dataset.level = lvl;
+            row.dataset.event = ev;
+            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${esc(lvl)}">${esc(lvl)}</span><span class="stream-msg">${esc(msg)}</span>`;
+            eventStream.insertBefore(row, eventStream.firstChild);
+            recentLogEntries.push({ event: ev, level: lvl, message: msg, ts });
+            if (recentLogEntries.length > RECENT_LOG_MAX) recentLogEntries.shift();
+        }
+        if (added === 0 && eventStream.children.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "empty-state";
+            empty.textContent = "All entries hidden by filter or waiting for events…";
+            eventStream.appendChild(empty);
+        }
+        if (recentLogEntries.length > 0) updateActivitySummary();
+        trimStream();
+        if (atTop) eventStream.scrollTop = 0;
+        if (added > 0) {
+            const panel = document.getElementById("stream-panel");
+            if (panel && panel.classList.contains("collapsed")) panel.classList.remove("collapsed");
+        }
+    }
+
+    function rerenderLogStream() {
+        const stream = document.getElementById("event-stream");
+        if (!stream) return;
+        stream.innerHTML = "";
+        recentLogEntries = [];
+        let shown = 0;
+        let hiddenSample = null;
+        for (const e of fullLogEntries) {
+            if (isLogEntryHidden(e)) {
+                if (!hiddenSample) hiddenSample = { level: e.level, event: e.event };
+                continue;
+            }
+            shown++;
             const row = document.createElement("div");
             row.className = "stream-entry";
             const ts = (e.timestamp || "").replace("T", " ").replace("Z", "").substring(11, 23);
-            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${esc(e.level || "INFO")}">${esc(e.level || "INFO")}</span><span class="stream-msg">${esc(e.message || "")}</span>`;
-            eventStream.appendChild(row);
+            const lvl = e.level || "INFO";
+            const ev = e.event || "";
+            const msg = e.message || "";
+            row.dataset.level = lvl;
+            row.dataset.event = ev;
+            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${esc(lvl)}">${esc(lvl)}</span><span class="stream-msg">${esc(msg)}</span>`;
+            stream.insertBefore(row, stream.firstChild);
+            recentLogEntries.push({ event: ev, level: lvl, message: msg, ts });
+        }
+        if (recentLogEntries.length > RECENT_LOG_MAX) recentLogEntries = recentLogEntries.slice(-RECENT_LOG_MAX);
+        if (shown === 0 && fullLogEntries.length > 0) {
+            const empty = document.createElement("div");
+            empty.className = "empty-state";
+            empty.textContent = "All entries hidden by filter or waiting for events…";
+            stream.appendChild(empty);
+        } else if (shown === 0) {
+            const empty = document.createElement("div");
+            empty.className = "empty-state";
+            empty.textContent = "Waiting for events…";
+            stream.appendChild(empty);
         }
         trimStream();
-        if (atBottom) eventStream.scrollTop = eventStream.scrollHeight;
+        updateActivitySummary();
     }
 
     function flashIncidentsCaptured(events) {
@@ -671,9 +1153,8 @@
         const first = events[0];
         const typeLabel = first.type || "?";
         const causeLabel = first.cause ? ` (${first.cause})` : "";
-        const gLabel = first.peakG > 0 ? ` ${first.peakG.toFixed(1)}g` : "";
         const label = events.length === 1
-            ? `Captured: ${typeLabel} #${first.carNumber ?? "?"} ${first.driverName ?? "Unknown"}${causeLabel}${gLabel}`
+            ? `Captured: ${typeLabel} #${first.carNumber ?? "?"} ${first.driverName ?? "Unknown"}${causeLabel}`
             : `Captured ${events.length} incidents (latest: ${typeLabel} #${first.carNumber ?? "?"})`;
         flash("success", label);
     }
@@ -681,27 +1162,27 @@
     function appendIncidentEntries(events) {
         if (!events.length) return;
         clearStreamPlaceholder();
-        const atBottom = isStreamAtBottom();
+        const atTop = isStreamAtTop();
+        // Newest first: prepend in chronological order (oldest then newer) so each insertBefore goes above the previous → newest ends up at top
         for (const ev of events) {
             const row = document.createElement("div");
             row.className = "stream-entry";
             const ts = ev.sessionTimeFormatted || "—";
             const typeStr = ev.type || "?";
             const causeStr = ev.cause ? ` [${ev.cause}]` : "";
-            const gStr = ev.peakG > 0 ? ` ${ev.peakG.toFixed(1)}g` : "";
             const otherStr = ev.otherDriverName ? ` vs #${ev.otherCarNumber} ${ev.otherDriverName}` : "";
-            const label = `${typeStr} — #${ev.carNumber ?? "?"} ${ev.driverName ?? "Unknown"}${causeStr}${gStr}${otherStr} (${ev.totalAfter ?? "?"} total)`;
+            const label = `${typeStr} — #${ev.carNumber ?? "?"} ${ev.driverName ?? "Unknown"}${causeStr}${otherStr} (${ev.totalAfter ?? "?"} total)`;
 
             let lvlClass = "INCIDENT";
-            let lvlText = "INC";
+            let lvlText = ev.type === "off-track" ? "+1x" : "INC";
             if (ev.type === "detected") { lvlClass = "DETECT"; lvlText = "DET"; }
             else if (ev.type === "0x") { lvlClass = "ZEROX"; lvlText = "0x"; }
 
             row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${lvlClass}">${lvlText}</span><span class="stream-msg">${esc(label)}</span>`;
-            eventStream.appendChild(row);
+            eventStream.insertBefore(row, eventStream.firstChild);
         }
         trimStream();
-        if (atBottom) eventStream.scrollTop = eventStream.scrollHeight;
+        if (atTop) eventStream.scrollTop = 0;
     }
 
     function clearStreamPlaceholder() {
@@ -711,11 +1192,111 @@
 
     function trimStream() {
         while (eventStream.children.length > MAX_STREAM_ENTRIES)
-            eventStream.removeChild(eventStream.firstChild);
+            eventStream.removeChild(eventStream.lastChild);
+    }
+
+    function isStreamAtTop() {
+        return eventStream.scrollTop < 32;
     }
 
     function isStreamAtBottom() {
         return eventStream.scrollHeight - eventStream.scrollTop - eventStream.clientHeight < 32;
+    }
+
+    // ── Session complete banner & results drawer ───────────────────
+    function showSessionCompleteBanner(summary) {
+        lastSessionSummary = summary || null;
+        const banner = document.getElementById("session-complete-banner");
+        const textEl = document.getElementById("session-complete-text");
+        if (!banner || !textEl) return;
+        // Prefer authoritative incident total from results table (iRacing ResultsPositions), then event count
+        const resultsIncidentSum = summary?.results?.reduce((s, r) => s + (r.incidents ?? 0), 0) ?? 0;
+        const incidentCount = resultsIncidentSum > 0 ? resultsIncidentSum : (summary?.incidentFeed?.length ?? allIncidents.length);
+        textEl.textContent = `Session complete · ${incidentCount} incident${incidentCount !== 1 ? "s" : ""} captured · Results available`;
+        banner.classList.add("visible");
+        // Populate the incidents panel from the captured feed so it's visible there as well as in "View results"
+        if (summary?.incidentFeed?.length > 0) {
+            allIncidents = summary.incidentFeed.slice();
+            lastIncidentKey = allIncidents.map(ev => ev.id ?? "").join(",");
+            incidentDataDirty = true;
+            const dpCaptured = document.getElementById("dp-captured");
+            if (dpCaptured) dpCaptured.textContent = `Incidents captured: ${allIncidents.length}`;
+            renderIncidentViews();
+        }
+    }
+
+    function openResultsDrawer() {
+        if (!lastSessionSummary) return;
+        const overlay = document.getElementById("results-drawer-overlay");
+        const titleEl = document.getElementById("results-drawer-title");
+        const bodyEl = document.getElementById("results-drawer-body");
+        if (!overlay || !bodyEl) return;
+        const s = lastSessionSummary;
+        titleEl.textContent = (s.trackName || "Session") + " — Results";
+        const parts = [];
+        parts.push(renderResultsMeta(s));
+        parts.push(renderResultsTable(s.results || []));
+        if (s.incidentFeed && s.incidentFeed.length > 0)
+            parts.push(renderResultsIncidentTimeline(s.incidentFeed));
+        bodyEl.innerHTML = parts.join("");
+        overlay.classList.add("visible");
+    }
+
+    function renderResultsMeta(s) {
+        const items = [];
+        if (s.sessionType) items.push(`Session: ${esc(s.sessionType)}`);
+        if (s.simMode) items.push(`Mode: ${esc(s.simMode)}`);
+        if (s.capturedAt) items.push(`Captured: ${esc(s.capturedAt)}`);
+        if (s.totalLapsComplete != null) items.push(`Total laps: ${s.totalLapsComplete}`);
+        if (s.numCautionFlags != null && s.numCautionFlags > 0) items.push(`Cautions: ${s.numCautionFlags}`);
+        if (s.numLeadChanges != null) items.push(`Lead changes: ${s.numLeadChanges}`);
+        if (!items.length) return "";
+        return `<div class="results-meta" style="margin-bottom:12px; font-size:0.8rem; color:var(--muted);">${items.join(" · ")}</div>`;
+    }
+
+    function renderResultsIncidentTimeline(feed) {
+        if (!feed.length) return "";
+        const rows = feed.slice(0, 200).map(ev => `<tr>
+            <td>${esc(ev.type ?? "")}</td>
+            <td>#${esc(ev.carNumber ?? "?")}</td>
+            <td>${esc(ev.driverName ?? "")}</td>
+            <td>${ev.delta ?? ""}</td>
+            <td>${ev.sessionTimeFormatted ?? formatSessionTime(ev.sessionTime ?? 0)}</td>
+            <td>${esc(ev.cause ?? "")}</td>
+            <td>${ev.otherCarNumber ? "#" + esc(ev.otherCarNumber) : ""}</td>
+        </tr>`).join("");
+        return `<h4 class="results-section-title" style="margin:16px 0 8px; font-size:0.85rem;">Incident timeline (${feed.length} events)</h4>
+            <table class="results-table incident-timeline-table">
+                <thead><tr><th>Type</th><th>Car</th><th>Driver</th><th>Δ</th><th>Time</th><th>Cause</th><th>Other</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+    }
+
+    function closeResultsDrawer() {
+        document.getElementById("results-drawer-overlay")?.classList.remove("visible");
+    }
+
+    function renderResultsTable(results) {
+        if (!results.length) return "<p class=\"empty-state\">No results data.</p>";
+        const rows = results.map(r => `<tr>
+            <td>${esc(String(r.position ?? ""))}</td>
+            <td>#${esc(r.carNumber ?? "?")}</td>
+            <td>${esc(r.driverName ?? "Unknown")}</td>
+            <td>${esc(r.carClass ?? "")}</td>
+            <td>${r.lapsComplete ?? ""}</td>
+            <td>${r.lapsLed ?? ""}</td>
+            <td>${r.fastestTime != null ? r.fastestTime.toFixed(2) : ""}</td>
+            <td>${r.fastestLap ?? ""}</td>
+            <td>${r.lastTime != null ? r.lastTime.toFixed(2) : ""}</td>
+            <td>${r.incidents ?? ""}</td>
+            <td>${esc(r.reasonOut ?? "")}</td>
+        </tr>`).join("");
+        return `<table class="results-table">
+            <thead><tr>
+                <th>Pos</th><th>Car</th><th>Driver</th><th>Class</th><th>Laps</th><th>Led</th><th>Fastest</th><th>FL</th><th>Last</th><th>Inc</th><th>Out</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
     }
 
     // ── Diagnostics panel ─────────────────────────────────────────
@@ -727,6 +1308,7 @@
         diagOpen = !diagOpen;
         document.getElementById("diag-body").style.display = diagOpen ? "" : "none";
         document.getElementById("diag-toggle-icon").textContent = diagOpen ? "▼" : "▶";
+        logUiEvent("diag-toggle-btn", "click", diagOpen ? "expanded" : "collapsed");
     });
 
     function setInfraDot(id, status, label) {
@@ -734,15 +1316,6 @@
         const lbl = document.getElementById(id + "-lbl");
         dot.className = "infra-dot " + status;
         if (lbl && label) lbl.textContent = label;
-    }
-
-    function setLayerCount(id, count) {
-        const el = document.getElementById(id + "-count");
-        const cell = document.getElementById(id);
-        if (!el) return;
-        el.textContent = count;
-        el.className = "layer-count" + (count > 0 ? "" : " zero");
-        if (cell) cell.classList.toggle("active", count > 0);
     }
 
     function applyDiagnostics(diag, metrics) {
@@ -764,34 +1337,51 @@
                 diag.wsRunning ? "ok" : "err",
                 diag.wsRunning ? `WS :${diag.wsPort} (${diag.wsClients} client${diag.wsClients === 1 ? "" : "s"})` : "WS: Not running");
 
-            setInfraDot("di-mb",
-                diag.memoryBankAvailable ? "ok" : "warn",
-                null);
-            const mbLbl = document.getElementById("di-mb-lbl");
-            if (mbLbl) {
-                mbLbl.textContent = diag.memoryBankAvailable ? "Memory Bank: Active" : "Memory Bank: Unavailable";
-                mbLbl.title = diag.memoryBankPath || "";
-            }
-
             const carKnown = (diag.playerCarIdx ?? -1) >= 0;
-            setInfraDot("di-car",
-                carKnown ? "ok" : "warn",
-                carKnown ? `Player car: #${diag.playerCarIdx}` : "Player car: Unknown");
+            setInfraDot("di-car", carKnown ? "ok" : "warn", "—");
         }
-
         if (metrics) {
-            setLayerCount("lc-l1", metrics.l1PlayerEvents ?? 0);
-            setLayerCount("lc-l2", metrics.l2PhysicsImpacts ?? 0);
-            setLayerCount("lc-l3", metrics.l3OffTrackEvents ?? 0);
-            setLayerCount("lc-l4", metrics.l4YamlEvents ?? 0);
-            setLayerCount("lc-0x", metrics.zeroXEvents ?? 0);
-
-            document.getElementById("dp-total").textContent = `Total: ${metrics.totalEvents ?? 0} events`;
-            document.getElementById("dp-yaml").textContent  = `YAML updates: ${metrics.yamlUpdates ?? 0}`;
             const lastT = (metrics.lastDetectionSessionTime ?? -1) >= 0
-                ? `Last: t=${formatSessionTime(metrics.lastDetectionSessionTime)}`
-                : "Last: —";
-            document.getElementById("dp-last").textContent = lastT;
+                ? `Last detection: ${formatSessionTime(metrics.lastDetectionSessionTime)}`
+                : "Last detection: —";
+            const dpLast = document.getElementById("dp-last");
+            if (dpLast) dpLast.textContent = lastT;
+        }
+    }
+
+    function applySessionDiagnostics(sd, pluginMode) {
+        if (!sd) return;
+        const coreEl = document.getElementById("sd-core");
+        const resultsEl = document.getElementById("sd-results");
+        const incEl = document.getElementById("sd-incidents");
+        const lastCapEl = document.getElementById("sd-lastcap");
+
+        const simMode = sd.simMode || pluginMode || "Unknown";
+        const flagsHex = (sd.sessionFlags ?? 0).toString(16).toUpperCase().padStart(8, "0");
+        const irSid = sd.irSessionId ?? 0;
+        const irSub = sd.irSubSessionId ?? 0;
+        if (coreEl) coreEl.textContent = `Session: ${simMode} · state ${sd.sessionState ?? 0} · sess ${sd.sessionNum ?? 0} · sub ${irSub} · sid ${irSid} · SIU ${sd.sessionInfoUpdate ?? 0} · flags 0x${flagsHex}`;
+
+        const posCount = sd.resultsPositionsCount ?? 0;
+        const ready = !!sd.resultsReady;
+        const sel = (sd.selectedResultsSessionNum ?? -1) >= 0 ? ` (sel ${sd.selectedResultsSessionNum}${sd.selectedResultsSessionType ? " " + sd.selectedResultsSessionType : ""})` : "";
+        if (resultsEl) resultsEl.textContent = `Results: ${posCount} pos · ${ready ? "READY" : "not ready"}${sel}`;
+
+        const active = sd.activeDriverCount ?? 0;
+        const nonZero = sd.driversWithNonZeroIncidents ?? 0;
+        const max = sd.maxDriverIncidents ?? 0;
+        const allZero = sd.allNonSpectatorIncidentsZero ? " (all zero)" : "";
+        if (incEl) incEl.textContent = `YAML incidents: ${nonZero}/${active} non-zero · max ${max}${allZero}`;
+
+        const lc = sd.lastSummaryCapture ?? null;
+        if (lastCapEl) {
+            if (lc && lc.attemptedAtUtc) {
+                const ok = !!lc.success;
+                const why = ok ? "ok" : (lc.error || "failed");
+                lastCapEl.textContent = `Last capture: ${why} · ${lc.trigger || "?"} · ${String(lc.attemptedAtUtc).replace("T", " ").replace("Z", "").substring(11, 19)}`;
+            } else {
+                lastCapEl.textContent = "Last capture: —";
+            }
         }
     }
 
@@ -802,12 +1392,35 @@
         return `${m}:${s.toString().padStart(2, "0")}`;
     }
 
+    // Resolve playerCarIdx to car number and set label (Viewing: #10 in replay, Player car: #10 in live).
+    function updatePlayerCarLabel(drivers, playerCarIdx, pluginMode) {
+        const idx = playerCarIdx ?? -1;
+        const dotEl = document.getElementById("di-car");
+        const lblEl = document.getElementById("di-car-lbl");
+        if (!dotEl || !lblEl) return;
+        if (idx < 0) {
+            dotEl.className = "infra-dot warn";
+            lblEl.textContent = "Viewing: Unknown";
+            lblEl.title = "No focused car — in replay switch to a car view (V/Shift+V).";
+            return;
+        }
+        const driver = (drivers || []).find(d => d.carIdx === idx);
+        const carNum = driver?.carNumber ?? "?";
+        const isReplay = (pluginMode || "").toLowerCase() === "replay";
+        lblEl.textContent = isReplay ? `Viewing: #${carNum}` : `Player car: #${carNum}`;
+        lblEl.title = isReplay ? `Replay: watching #${carNum}. Switch car with V/Shift+V in iRacing.` : `Your car #${carNum}.`;
+        dotEl.className = "infra-dot ok";
+    }
+
     // ── State rendering ────────────────────────────────────────────
     function applyState(s) {
         applyDiagnostics(s.diagnostics ?? null, s.metrics ?? null);
+        updatePlayerCarLabel(s.drivers ?? [], s.playerCarIdx, s.pluginMode);
 
         const mode = s.pluginMode ?? "Unknown";
         modeEl.textContent = mode;
+
+        applySessionDiagnostics(s.sessionDiagnostics ?? null, mode);
 
         if (ws && ws.readyState === WebSocket.OPEN) {
             if (mode === "Replay")     statusDot.className = "dot replay";
@@ -817,36 +1430,113 @@
 
         timeEl.textContent = s.currentSessionTimeFormatted ?? "—";
 
-        const frameNum = s.replayFrameNum ?? 0;
-        const frameMax = s.replayFrameNumEnd ?? 0;
+        const a = s.replayFrameNum ?? 0;
+        const b = s.replayFrameNumEnd ?? 0;
+        const frameNum = Math.min(a, b);
+        const frameMax = Math.max(a, b);
+        currentReplayFrame = frameNum;
+        currentSessionTime = s.currentSessionTime ?? 0;
         frameCur.textContent = frameNum.toLocaleString();
         frameEnd.textContent = frameMax.toLocaleString();
         fill.style.width = frameMax > 0 ? `${Math.max(0, Math.min(1, frameNum / frameMax)) * 100}%` : "0%";
 
         const playing = s.replayIsPlaying ?? (s.replayPlaySpeed ?? 0) !== 0;
-        playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
-
         const curSpeed = s.replayPlaySpeed ?? 0;
+        if (playing && curSpeed < 0) playBtn.textContent = "⏸ Pause (Rewind)";
+        else playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
+
+        const legendEl = document.getElementById("replay-state-legend");
+        if (legendEl) {
+            let dir = "Paused";
+            let speedStr = "—";
+            if (curSpeed !== 0) {
+                speedStr = curSpeed < 0 ? `${curSpeed}×` : `${curSpeed}×`;
+                dir = curSpeed < 0 ? "Rewind" : "Forward";
+            }
+            const dirCls = dir === "Rewind" ? "state-dir state-rewind" : "state-dir";
+            legendEl.innerHTML = `<span class="${dirCls}">${dir}</span> · ${speedStr}`;
+        }
+
         speedRow.querySelectorAll("[data-speed]").forEach(btn => {
             btn.classList.toggle("active-speed", parseInt(btn.dataset.speed) === curSpeed && playing);
         });
+        if (rewindProbeActive) {
+            if (curSpeed === -1) {
+                rewindProbeActive = false;
+                rewindProbeStartedAt = 0;
+                rewindUnsupported = false;
+                if (rewindBtn) {
+                    rewindBtn.classList.remove("unsupported");
+                    rewindBtn.removeAttribute("title");
+                }
+            } else if (Date.now() - rewindProbeStartedAt > 1500) {
+                rewindProbeActive = false;
+                rewindProbeStartedAt = 0;
+                rewindUnsupported = true;
+                if (rewindBtn) {
+                    rewindBtn.classList.add("unsupported");
+                    rewindBtn.title = "Current replay state does not support -1× rewind";
+                }
+                flash("error", "Rewind (-1×) not supported by current replay state.");
+            }
+        }
 
+        playerCarIdxRef = s.playerCarIdx ?? -1;
         const drivers = s.drivers ?? [];
         const incidents = s.incidents ?? [];
-        const incidentKey = `${incidents.length}|${(incidents[0]?.id ?? "")}|${(incidents[incidents.length-1]?.id ?? "")}`;
+        if (DEBUG_STATE_LOG) {
+            console.debug("[SimSteward] applyState payload", {
+                drivers: drivers.length,
+                incidents: incidents.length,
+                hasLiveIncidentData: !!s.hasLiveIncidentData
+            });
+        }
+        // Keep captured session incidents in the panel if state has none (e.g. baseline reset during replay)
+        if (incidents.length > 0 || !lastSessionSummary?.incidentFeed?.length)
+            allIncidents = incidents;
+        const dpCaptured = document.getElementById("dp-captured");
+        if (dpCaptured) dpCaptured.textContent = `Incidents captured: ${incidents.length}`;
+        const incidentKey = incidents.map(ev => ev.id ?? "").join(",");
         const driverKey = drivers.map(d=>`${d.carIdx}:${d.incidents}`).join("|");
-        const now = Date.now();
         const dataChanged = incidentKey !== lastIncidentKey || driverKey !== lastDriverKey;
-        const throttleElapsed = now - lastDataUpdateAt >= DATA_UPDATE_THROTTLE_MS;
-        if (dataChanged || throttleElapsed) {
+        if (dataChanged) {
             lastIncidentKey = incidentKey;
             lastDriverKey = driverKey;
-            lastDataUpdateAt = now;
+            incidentDataDirty = true;
             lastIncidentContext = { hasLiveIncidentData: !!s.hasLiveIncidentData, irsdkConnected: !!s.diagnostics?.irsdkConnected };
             renderDrivers(drivers, s.playerCarIdx ?? -1);
-            allIncidents = incidents;
-            renderIncidents(filterIncidents(incidents));
         }
+        const frameDelta = Math.abs(currentReplayFrame - lastLiveRenderFrame);
+        const shouldRenderIncidents = incidentDataDirty || frameDelta > LIVE_RENDER_FRAME_DEADZONE;
+        if (shouldRenderIncidents) {
+            lastLiveRenderFrame = currentReplayFrame;
+            incidentDataDirty = false;
+            renderIncidentViews();
+        }
+    }
+
+    function buildDriverRowData(d, playerCarIdx) {
+        const raw = d.incidents ?? 0;
+        const pts = Math.max(0, Math.min(99, raw));
+        const ptsLabel = raw > 99 ? "99+" : pts;
+        const cls = pts === 0 ? "zero" : pts <= 4 ? "low" : pts <= 8 ? "mid" : "high";
+        const isPlayer = d.carIdx === playerCarIdx;
+        return {
+            carIdx: d.carIdx,
+            rowClass: "driver-row" + (isPlayer ? " player" : ""),
+            carNum: "#" + (d.carNumber ?? "?"),
+            name: esc(d.userName ?? "Unknown") + (isPlayer ? " ★" : ""),
+            ptsLabel,
+            incClass: "driver-incidents " + cls
+        };
+    }
+
+    function buildDriverRowHtml(data) {
+        return `<div class="${data.rowClass}" data-car-idx="${data.carIdx}">
+                    <span class="car-num">${data.carNum}</span>
+                    <span class="driver-name">${data.name}</span>
+                    <span class="${data.incClass}">${data.ptsLabel}x</span>
+                </div>`;
     }
 
     function renderDrivers(drivers, playerCarIdx) {
@@ -854,25 +1544,49 @@
         active.sort((a, b) => (b.incidents ?? 0) - (a.incidents ?? 0) || (a.userName || "").localeCompare(b.userName || ""));
 
         driverCount.textContent = active.length;
+        const totalPts = active.reduce((sum, d) => sum + (d.incidents ?? 0), 0);
+        const ptsEl = document.getElementById("drivers-field-pts");
+        if (ptsEl) ptsEl.textContent = active.length > 0 ? `· ${totalPts} field pts` : "";
 
         if (active.length === 0) {
             driverList.innerHTML = '<div class="empty-state">Waiting for session info…</div>';
             return;
         }
 
-        driverList.innerHTML = active.map(d => {
-            const raw = d.incidents ?? 0;
-            const pts = Math.max(0, Math.min(99, raw));
-            const ptsLabel = raw > 99 ? "99+" : pts;
-            const cls = pts === 0 ? "zero" : pts <= 4 ? "low" : pts <= 8 ? "mid" : "high";
-            const isPlayer = d.carIdx === playerCarIdx;
-            return `
-                <div class="driver-row${isPlayer ? " player" : ""}">
-                    <span class="car-num">#${d.carNumber ?? "?"}</span>
-                    <span class="driver-name">${esc(d.userName ?? "Unknown")}${isPlayer ? " ★" : ""}</span>
-                    <span class="driver-incidents ${cls}">${ptsLabel}x</span>
-                </div>`;
-        }).join("");
+        const newCarIdxs = new Set(active.map(d => d.carIdx));
+        const existingRows = Array.from(driverList.querySelectorAll(".driver-row[data-car-idx]"));
+        const existingByCarIdx = new Map(existingRows.map(el => [parseInt(el.dataset.carIdx, 10), el]));
+
+        existingByCarIdx.forEach((el, carIdx) => {
+            if (!newCarIdxs.has(carIdx)) el.remove();
+        });
+
+        const driverOrder = active.map(d => buildDriverRowData(d, playerCarIdx));
+        let nextInsertBefore = driverList.firstChild;
+
+        driverOrder.forEach(data => {
+            const existing = existingByCarIdx.get(data.carIdx);
+            if (existing) {
+                const carNumEl = existing.querySelector(".car-num");
+                const nameEl = existing.querySelector(".driver-name");
+                const incEl = existing.querySelector(".driver-incidents");
+                if (carNumEl && carNumEl.textContent !== data.carNum) carNumEl.textContent = data.carNum;
+                if (nameEl && nameEl.innerHTML !== data.name) nameEl.innerHTML = data.name;
+                if (incEl) {
+                    if (incEl.textContent !== data.ptsLabel + "x") incEl.textContent = data.ptsLabel + "x";
+                    if (incEl.className !== data.incClass) incEl.className = data.incClass;
+                }
+                existing.className = data.rowClass;
+                driverList.insertBefore(existing, nextInsertBefore);
+                nextInsertBefore = existing.nextSibling;
+            } else {
+                const wrap = document.createElement("div");
+                wrap.innerHTML = buildDriverRowHtml(data);
+                const row = wrap.firstElementChild;
+                driverList.insertBefore(row, nextInsertBefore);
+                nextInsertBefore = row.nextSibling;
+            }
+        });
     }
 
     // ── Incident filtering ─────────────────────────────────────────
@@ -880,26 +1594,88 @@
         if (activeFilter === "all") return incidents;
         return incidents.filter(ev => {
             switch (activeFilter) {
-                case "0x": return ev.type === "0x";
-                case "1x": return ev.type === "1x";
+                case "1x": return ev.type === "1x" || ev.type === "off-track";
                 case "2x": return ev.type === "2x";
-                case "4x": return ev.delta >= 4 && ev.type !== "0x" && ev.type !== "detected";
-                case "detected": return ev.type === "detected";
-                case "player": return ev.source === "player" || ev.source === "physics" && ev.carIdx !== undefined;
+                case "4x": return ev.delta >= 4 && ev.type !== "detected";
+                case "mine": return ev.isPlayer === true || ev.carIdx === playerCarIdxRef;
                 default: return true;
             }
         });
     }
 
-    function renderIncidents(incidents) {
-        const totalAll = allIncidents.length;
+    function buildIncidentCardData(ev) {
+        const badgeCls = ev.type === "off-track" || ev.type === "1x" ? "badge-1x"
+                       : ev.type === "2x" ? "badge-2x"
+                       : ev.type === "4x" ? "badge-4x"
+                       : "badge-Nx";
+        const isPlayer = ev.isPlayer === true || ev.carIdx === playerCarIdxRef;
+        const cardClass = isPlayer ? "player-incident" : "";
+        const badgeLabel = ev.type === "off-track" ? "+1x" : (ev.delta != null && ev.delta > 0 ? `+${ev.delta}x` : "+?x");
+        const causeTag = formatCauseTag(ev.cause);
+        const otherLabel = ev.otherDriverName ? `vs #${esc(ev.otherCarNumber || "?")} ${esc(ev.otherDriverName)}` : "";
+        const lapLabel = ev.lap > 0 ? `Lap ${ev.lap}` : "";
+        const pctLabel = ev.trackPct > 0 ? `T${(ev.trackPct * 100).toFixed(1)}%` : "";
+        const detailParts = [
+            ev.totalAfter != null && ev.delta > 0 ? `${Math.min(999, Math.max(0, ev.totalAfter))} pts total` : "",
+            causeTag,
+            otherLabel,
+            lapLabel,
+            pctLabel
+        ].filter(Boolean);
+        const driverLabel = isPlayer
+            ? `YOU · #${esc(ev.carNumber ?? "?")} ${esc(ev.driverName ?? "Unknown")}`
+            : `#${esc(ev.carNumber ?? "?")} ${esc(ev.driverName ?? "Unknown")}`;
+        return {
+            id: ev.id ?? "",
+            cardClass,
+            badgeCls,
+            badgeLabel,
+            time: ev.sessionTimeFormatted ?? "—",
+            driver: driverLabel,
+            detailHtml: detailParts.join(" · ")
+        };
+    }
+
+    function buildIncidentCardHtml(data, isNew) {
+        const extraCls = [data.cardClass, isNew ? "card-new" : ""].filter(Boolean).join(" ");
+        const cls = extraCls ? "incident-card " + extraCls : "incident-card";
+        return `<div class="${cls}" data-incident-id="${esc(data.id)}" title="Click to seek replay">
+                    <span class="incident-time">${esc(data.time)}</span>
+                    <div class="incident-body">
+                        <span class="incident-driver">${data.driver}</span>
+                        <span class="incident-detail">${data.detailHtml}</span>
+                    </div>
+                    <div class="incident-badge-cell">
+                        <span class="incident-badge ${data.badgeCls}">${data.badgeLabel}</span>
+                        <span class="seek-hint">&#9654; Seek</span>
+                    </div>
+                </div>`;
+    }
+
+    function getLiveIncidents() {
+        return allIncidents.filter(ev => {
+            if ((ev.replayFrameNum ?? 0) > 0)
+                return ev.replayFrameNum <= currentReplayFrame;
+            return (ev.sessionTime ?? 0) <= currentSessionTime;
+        });
+    }
+
+    function getIncidentsForActiveView() {
+        const base = activeIncidentView === "live" ? getLiveIncidents() : allIncidents;
+        return filterIncidents(base);
+    }
+
+    function renderIncidents(targetFeed, incidents, isLiveView, updateMainBadge) {
+        const totalAll = (isLiveView ? getLiveIncidents() : allIncidents).length;
         const countLabel = activeFilter === "all" ? totalAll : `${incidents.length}/${totalAll}`;
-        incidentCount.textContent = countLabel;
+        if (updateMainBadge) incidentCount.textContent = countLabel;
 
         if (incidents.length === 0) {
             let msg;
-            if (allIncidents.length > 0) {
+            if (totalAll > 0) {
                 msg = "No incidents match this filter.";
+            } else if (isLiveView && allIncidents.length > 0) {
+                msg = "No incidents at or before current position.";
             } else if (!lastIncidentContext.irsdkConnected) {
                 msg = "Waiting for iRacing to connect…";
             } else if (!lastIncidentContext.hasLiveIncidentData) {
@@ -907,58 +1683,143 @@
             } else {
                 msg = "No incidents detected yet.";
             }
-            incidentFeed.innerHTML = `<div class="empty-state">${msg}</div>`;
+            // Only update if not already showing the same empty state
+            const existing = targetFeed.querySelector(".empty-state");
+            if (!existing || existing.textContent !== msg) {
+                targetFeed.innerHTML = `<div class="empty-state">${msg}</div>`;
+            }
             return;
         }
 
-        incidentFeed.innerHTML = incidents.map(ev => {
-            const badgeCls = ev.type === "0x" ? "badge-0x"
-                           : ev.type === "1x" ? "badge-1x"
-                           : ev.type === "2x" ? "badge-2x"
-                           : ev.type === "4x" ? "badge-4x"
-                           : ev.type === "detected" ? "badge-detected"
-                           : "badge-Nx";
+        // Remove any empty-state placeholder
+        const placeholder = targetFeed.querySelector(".empty-state");
+        if (placeholder) placeholder.remove();
 
-            const isPlayer = ev.source === "player";
-            const isDetected = ev.type === "detected";
-            const is0x = ev.type === "0x";
-            const cardClass = isPlayer ? "player-incident" : isDetected ? "detected-incident" : is0x ? "zero-x-incident" : "";
+        const newIds = new Set(incidents.map(ev => ev.id ?? ""));
+        const existingCards = Array.from(targetFeed.querySelectorAll(".incident-card[data-incident-id]"));
+        const existingById = new Map(existingCards.map(el => [el.dataset.incidentId, el]));
 
-            const badgeLabel = ev.type === "detected" ? "DET" : `+${ev.delta ?? 0}x`;
+        // Remove cards no longer in the list
+        existingById.forEach((el, id) => {
+            if (!newIds.has(id)) el.remove();
+        });
 
-            const causeTag = formatCauseTag(ev.cause);
-            const gLabel = ev.peakG > 0 ? `${ev.peakG.toFixed(1)}g` : "";
-            const srcLabel = ev.source === "player" ? "player" : ev.source === "yaml" ? "session" : "physics";
-            const otherLabel = ev.otherDriverName ? `vs #${esc(ev.otherCarNumber || "?")} ${esc(ev.otherDriverName)}` : "";
-            const lapLabel = ev.lap > 0 ? `Lap ${ev.lap}` : "";
-            const pctLabel = ev.trackPct > 0 ? `T${(ev.trackPct * 100).toFixed(1)}%` : "";
+        // Build the ordered card list, patching existing and creating new ones
+        const orderedCards = incidents.map(ev => {
+            const data = buildIncidentCardData(ev);
+            const id = data.id;
+            const existing = existingById.get(id);
+            if (existing) {
+                // Patch only changed fields — never reassign className to avoid transition flicker
+                const timeEl = existing.querySelector(".incident-time");
+                const driverEl = existing.querySelector(".incident-driver");
+                const detailEl = existing.querySelector(".incident-detail");
+                const badgeEl = existing.querySelector(".incident-badge");
+                if (timeEl && timeEl.textContent !== data.time) timeEl.textContent = data.time;
+                if (driverEl && driverEl.innerHTML !== data.driver) driverEl.innerHTML = data.driver;
+                if (detailEl && detailEl.innerHTML !== data.detailHtml) detailEl.innerHTML = data.detailHtml;
+                if (badgeEl) {
+                    if (badgeEl.textContent !== data.badgeLabel) badgeEl.textContent = data.badgeLabel;
+                    const wantCls = "incident-badge " + data.badgeCls;
+                    if (badgeEl.className !== wantCls) badgeEl.className = wantCls;
+                }
+                const wantCardCls = "incident-card" + (data.cardClass ? " " + data.cardClass : "");
+                // Preserve card-new during its animation; strip other extra classes
+                const hasCardNew = existing.classList.contains("card-new");
+                const wantFull = hasCardNew ? wantCardCls + " card-new" : wantCardCls;
+                if (existing.className !== wantFull) existing.className = wantFull;
+                return existing;
+            } else {
+                const wrap = document.createElement("div");
+                wrap.innerHTML = buildIncidentCardHtml(data, true);
+                const card = wrap.firstElementChild;
+                // Auto-remove card-new after animation so it never re-triggers
+                card.addEventListener("animationend", () => card.classList.remove("card-new"), { once: true });
+                return card;
+            }
+        });
 
-            const detailParts = [
-                ev.totalAfter != null && ev.delta > 0 ? `${Math.min(999, Math.max(0, ev.totalAfter))} pts` : "",
-                causeTag,
-                gLabel,
-                otherLabel,
-                lapLabel,
-                pctLabel,
-                srcLabel
-            ].filter(Boolean);
+        // Re-order the DOM only where positions differ (avoids triggering transitions)
+        let refNode = targetFeed.firstChild;
+        for (const card of orderedCards) {
+            if (card !== refNode) {
+                targetFeed.insertBefore(card, refNode);
+            } else {
+                refNode = refNode.nextSibling;
+            }
+        }
+    }
 
-            return `
-                <div class="incident-card ${cardClass}" data-incident-id="${esc(ev.id ?? "")}" title="Click to seek replay">
-                    <span class="incident-time">${esc(ev.sessionTimeFormatted ?? "—")}</span>
-                    <div class="incident-body">
-                        <span class="incident-driver">#${esc(ev.carNumber ?? "?")} ${esc(ev.driverName ?? "Unknown")}</span>
-                        <span class="incident-detail">${detailParts.join(" · ")}</span>
-                    </div>
-                    <span class="incident-badge ${badgeCls}">${badgeLabel}</span>
-                </div>`;
-        }).join("");
+    function setIncidentView(view) {
+        activeIncidentView = view === "entire" ? "entire" : "live";
+        document.querySelectorAll(".view-toggle-btn").forEach(btn => {
+            btn.classList.toggle("active-view", btn.dataset.view === activeIncidentView);
+        });
+        try { localStorage.setItem(STORAGE_KEY_INCIDENT_VIEW, activeIncidentView); } catch (_) {}
+        renderIncidentViews();
+    }
 
-        incidentFeed.querySelectorAll("[data-incident-id]").forEach(card => {
-            card.addEventListener("click", () => {
-                const id = card.dataset.incidentId;
-                if (id) send("SelectIncidentAndSeek", id);
-            });
+    function getPlayerIncidents() {
+        return allIncidents.filter(ev => ev.isPlayer === true || ev.carIdx === playerCarIdxRef);
+    }
+
+    function updatePlayerHeroCard() {
+        const heroEl = document.getElementById("player-hero-card");
+        const countEl = document.getElementById("player-hero-count");
+        const summaryEl = document.getElementById("player-hero-summary");
+        const playerIncidents = getPlayerIncidents();
+        if (!playerIncidents.length) {
+            heroEl.classList.remove("visible");
+            return;
+        }
+        heroEl.classList.add("visible");
+        countEl.textContent = playerIncidents.length === 1 ? "1 incident" : `${playerIncidents.length} incidents`;
+        const last = playerIncidents[0];
+        const delta = last.type === "off-track" ? 1 : (last.delta ?? 0);
+        countEl.className = "player-hero-count" + (delta >= 4 ? " severity-4x" : delta === 2 ? " severity-2x" : delta === 1 ? " severity-1x" : "");
+        const typeStr = last.type === "off-track" ? "+1x" : `+${last.delta ?? 0}x`;
+        const causeStr = last.cause ? formatCauseLabel(last.cause) : "";
+        const pctStr = last.trackPct > 0 ? `T${(last.trackPct * 100).toFixed(1)}%` : "";
+        const lapStr = last.lap > 0 ? `Lap ${last.lap}` : "";
+        const parts = [typeStr, causeStr, pctStr, lapStr].filter(Boolean);
+        summaryEl.textContent = parts.join(" · ") || "—";
+        const btn = document.getElementById("player-hero-jump-btn");
+        btn.dataset.incidentId = last.id ?? "";
+    }
+
+    function formatCauseLabel(cause) {
+        const labels = { "off-track": "OFF-TRACK", "wall": "WALL", "spin": "SPIN", "wall-or-spin": "WALL/SPIN", "car-contact": "CONTACT", "heavy-contact": "HEAVY CONTACT", "impact": "IMPACT" };
+        return (labels[cause] || cause).toUpperCase().replace(/-/g, " ");
+    }
+
+    function updateFilterChipCounts(baseList) {
+        const nAll = baseList.length;
+        const n1x = baseList.filter(ev => ev.type === "1x" || ev.type === "off-track").length;
+        const n2x = baseList.filter(ev => ev.type === "2x").length;
+        const n4x = baseList.filter(ev => ev.delta >= 4 && ev.type !== "detected").length;
+        const nMine = baseList.filter(ev => ev.isPlayer === true || ev.carIdx === playerCarIdxRef).length;
+        const chips = [
+            { filter: "all", label: "All", count: nAll },
+            { filter: "1x", label: "1x", count: n1x },
+            { filter: "2x", label: "2x", count: n2x },
+            { filter: "4x", label: "4x+", count: n4x },
+            { filter: "mine", label: "Mine", count: nMine }
+        ];
+        chips.forEach(({ filter, label, count }) => {
+            const el = filterBar.querySelector(`[data-filter="${filter}"]`);
+            if (el) el.textContent = count > 0 ? `${label} (${count})` : label;
+        });
+    }
+
+    function renderIncidentViews() {
+        const baseList = activeIncidentView === "live" ? getLiveIncidents() : allIncidents;
+        const filtered = filterIncidents(baseList);
+
+        updateFilterChipCounts(baseList);
+        updatePlayerHeroCard();
+        renderIncidents(incidentFeedUnified, filtered, activeIncidentView === "live", true);
+        document.querySelectorAll(".view-toggle-btn").forEach(btn => {
+            btn.classList.toggle("active-view", btn.dataset.view === activeIncidentView);
         });
     }
 
@@ -984,9 +1845,39 @@
 
     // ── Actions ────────────────────────────────────────────────────
     function send(action, arg) {
-        if (!ws || ws.readyState !== WebSocket.OPEN) { flash("error", "Not connected"); return; }
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            flash("error", "Not connected");
+            const ts = new Date().toISOString().replace("T", " ").replace("Z", "").substring(11, 23);
+            const row = document.createElement("div");
+            row.className = "stream-entry";
+            row.dataset.level = "WARN";
+            row.dataset.event = "";
+            row.innerHTML = `<span class="stream-ts">${ts}</span><span class="stream-lvl WARN">WARN</span><span class="stream-msg">${esc(action)} — not connected, action not sent</span>`;
+            clearStreamPlaceholder();
+            eventStream.insertBefore(row, eventStream.firstChild);
+            fullLogEntries.unshift({ level: "WARN", event: "", message: `${action} — not connected, action not sent`, timestamp: ts });
+            if (fullLogEntries.length > FULL_LOG_MAX) fullLogEntries.pop();
+            return;
+        }
         const p = { action };
         if (arg !== undefined) p.arg = arg;
+        ws.send(JSON.stringify(p));
+    }
+
+    /** Send a dashboard UI event to the plugin for structured logging (dashboard_ui_event). No-op if not connected. */
+    function logUiEvent(elementId, eventType, value) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const message = [elementId, eventType, value].filter(Boolean).join(" ");
+        const p = {
+            action: "log",
+            level: "INFO",
+            source: "dashboard",
+            event: "dashboard_ui_event",
+            message: message || elementId,
+            element_id: elementId,
+            event_type: eventType
+        };
+        if (value !== undefined && value !== "") p.value = String(value);
         ws.send(JSON.stringify(p));
     }
 
@@ -1004,15 +1895,76 @@
     // ── Event listeners ────────────────────────────────────────────
     statusText.addEventListener("click", () => { if (!ws || ws.readyState > WebSocket.OPEN) { useFallback = false; connect(); } });
     document.getElementById("stream-clear-btn").addEventListener("click", () => {
-        eventStream.innerHTML = '<div class="empty-state">Stream cleared.</div>';
+        logUiEvent("stream-clear-btn", "click", "");
+        fullLogEntries = [];
+        recentLogEntries = [];
+        debugLogHasAlert = false;
+        debugLogHasError = false;
+        eventStream.innerHTML = '<div class="empty-state">Logs cleared.</div>';
+        updateStreamAlertDot();
+        updateActivitySummary();
     });
-    document.getElementById("sessionStartBtn").addEventListener("click", () => send("ReplaySeekSessionStart"));
-    playBtn.addEventListener("click", () => send("ReplayPlayPause"));
-    document.getElementById("stepBack").addEventListener("click", () => send("ReplayStepFrame", "-1"));
-    document.getElementById("stepFwd").addEventListener("click", () => send("ReplayStepFrame", "1"));
-    prevBtn.addEventListener("click", () => send("PrevIncident"));
-    nextBtn.addEventListener("click", () => send("NextIncident"));
-    speedRow.querySelectorAll("[data-speed]").forEach(btn => btn.addEventListener("click", () => send("ReplaySetSpeed", btn.dataset.speed)));
+    (function initLogFilterCheckboxes() {
+        const map = [
+            ["log-hide-debug", "hiddenLevels", "DEBUG"],
+            ["log-hide-state-broadcast", "hiddenEvents", "state_broadcast_summary"],
+            ["log-hide-tick-stats", "hiddenEvents", "tick_stats"],
+            ["log-hide-ws-raw", "hiddenEvents", "ws_message_raw"],
+            ["log-hide-action-received", "hiddenEvents", "action_received"],
+            ["log-hide-action-dispatched", "hiddenEvents", "action_dispatched"]
+        ];
+        map.forEach(([id, key, value]) => {
+            const cb = document.getElementById(id);
+            if (!cb) return;
+            cb.checked = key === "hiddenLevels" ? logFilter.hiddenLevels.has(value) : logFilter.hiddenEvents.has(value);
+            cb.addEventListener("change", () => {
+                if (key === "hiddenLevels") {
+                    if (cb.checked) logFilter.hiddenLevels.add(value); else logFilter.hiddenLevels.delete(value);
+                } else {
+                    if (cb.checked) logFilter.hiddenEvents.add(value); else logFilter.hiddenEvents.delete(value);
+                }
+                logUiEvent(id, "change", value + "=" + cb.checked);
+                saveLogFilter();
+                rerenderLogStream();
+            });
+        });
+    })();
+    document.getElementById("capture-summary-btn")?.addEventListener("click", () => {
+        logUiEvent("capture-summary-btn", "click", "Capture summary");
+        send("CaptureSessionSummaryNow");
+    });
+    document.getElementById("finalize-capture-summary-btn")?.addEventListener("click", () => {
+        logUiEvent("finalize-capture-summary-btn", "click", "Finalize + capture");
+        send("FinalizeThenCaptureSessionSummary");
+    });
+    document.getElementById("record-session-snapshot-btn")?.addEventListener("click", () => {
+        const label = prompt("Snapshot label (optional)", "");
+        const trimmed = (label || "").trim();
+        logUiEvent("record-session-snapshot-btn", "click", trimmed.length ? trimmed : "no-label");
+        send("RecordSessionSnapshot", trimmed.length ? trimmed : undefined);
+    });
+    document.getElementById("sessionStartBtn").addEventListener("click", () => { logUiEvent("sessionStartBtn", "click", "ReplaySeekSessionStart"); send("ReplaySeekSessionStart"); });
+    playBtn.addEventListener("click", () => { logUiEvent("playPauseBtn", "click", "ReplayPlayPause"); send("ReplayPlayPause"); });
+    document.getElementById("stepBack").addEventListener("click", () => { logUiEvent("stepBack", "click", "-1"); send("ReplayStepFrame", "-1"); });
+    document.getElementById("stepFwd").addEventListener("click", () => { logUiEvent("stepFwd", "click", "1"); send("ReplayStepFrame", "1"); });
+    prevBtn.addEventListener("click", () => { logUiEvent("prevIncident", "click", ""); send("PrevIncident"); });
+    nextBtn.addEventListener("click", () => { logUiEvent("nextIncident", "click", ""); send("NextIncident"); });
+    speedRow.querySelectorAll("[data-speed]").forEach(btn => btn.addEventListener("click", () => {
+        const requestedSpeed = parseInt(btn.dataset.speed, 10);
+        if (requestedSpeed === -1) {
+            if (rewindUnsupported) {
+                flash("error", "Rewind is currently unsupported in this replay state.");
+                return;
+            }
+            rewindProbeActive = true;
+            rewindProbeStartedAt = Date.now();
+        } else {
+            rewindProbeActive = false;
+            rewindProbeStartedAt = 0;
+        }
+        logUiEvent("speed-row", "click", String(btn.dataset.speed));
+        send("ReplaySetSpeed", btn.dataset.speed);
+    }));
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (!ws || ws.readyState > WebSocket.OPEN)) connect(); });
 
     filterBar.querySelectorAll(".filter-chip").forEach(chip => {
@@ -1020,8 +1972,56 @@
             filterBar.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
             chip.classList.add("active");
             activeFilter = chip.dataset.filter;
-            renderIncidents(filterIncidents(allIncidents));
+            logUiEvent("filter-chip", "click", activeFilter);
+            renderIncidentViews();
         });
+    });
+
+    document.getElementById("view-at-playhead-btn").addEventListener("click", () => { logUiEvent("view-at-playhead-btn", "click", "live"); setIncidentView("live"); });
+    document.getElementById("view-full-session-btn").addEventListener("click", () => { logUiEvent("view-full-session-btn", "click", "entire"); setIncidentView("entire"); });
+
+    document.getElementById("drivers-panel-toggle").addEventListener("click", () => {
+        const panel = document.getElementById("drivers-panel");
+        panel.classList.toggle("collapsed");
+        logUiEvent("drivers-panel-toggle", "click", panel.classList.contains("collapsed") ? "collapsed" : "expanded");
+    });
+
+    document.getElementById("stream-panel-toggle").addEventListener("click", (e) => {
+        if (e.target.closest(".stream-clear-btn")) return;
+        const panel = document.getElementById("stream-panel");
+        panel.classList.toggle("collapsed");
+        logUiEvent("stream-panel-toggle", "click", panel.classList.contains("collapsed") ? "collapsed" : "expanded");
+        if (!panel.classList.contains("collapsed")) {
+            debugLogHasAlert = false;
+            debugLogHasError = false;
+            updateStreamAlertDot();
+        }
+    });
+
+    document.getElementById("session-complete-dismiss-btn").addEventListener("click", () => {
+        logUiEvent("session-complete-dismiss-btn", "click", "Dismiss");
+        document.getElementById("session-complete-banner")?.classList.remove("visible");
+    });
+    document.getElementById("session-complete-results-btn").addEventListener("click", () => { logUiEvent("session-complete-results-btn", "click", "View results"); openResultsDrawer(); });
+    document.getElementById("results-drawer-close").addEventListener("click", () => { logUiEvent("results-drawer-close", "click", "Close drawer"); closeResultsDrawer(); });
+    document.getElementById("results-drawer-overlay").addEventListener("click", (e) => {
+        if (e.target.id === "results-drawer-overlay") { logUiEvent("results-drawer-overlay", "click", "Backdrop"); closeResultsDrawer(); }
+    });
+
+    // Apply saved incident view so accordion matches localStorage
+    setIncidentView(activeIncidentView);
+
+    document.querySelector(".incidents-panel").addEventListener("click", (e) => {
+        const card = e.target.closest("[data-incident-id]");
+        if (card && card.dataset.incidentId) {
+            logUiEvent("incident-card", "click", card.dataset.incidentId);
+            send("SelectIncidentAndSeek", card.dataset.incidentId);
+        }
+        const heroBtn = e.target.closest("#player-hero-jump-btn");
+        if (heroBtn && heroBtn.dataset.incidentId) {
+            logUiEvent("player-hero-jump-btn", "click", heroBtn.dataset.incidentId);
+            send("SelectIncidentAndSeek", heroBtn.dataset.incidentId);
+        }
     });
 
     connect();

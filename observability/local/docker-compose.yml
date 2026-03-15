@@ -1,0 +1,83 @@
+services:
+  loki:
+    image: grafana/loki:3.1.1
+    command: -config.file=/etc/loki/local-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yml:ro
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/loki:/loki
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  loki-gateway:
+    image: nginx:1.27-alpine
+    depends_on:
+      loki:
+        condition: service_healthy
+    ports:
+      - "3500:3500"
+    env_file:
+      - .env.observability.local
+    environment:
+      - LOKI_PUSH_TOKEN=${LOKI_PUSH_TOKEN:-}
+    volumes:
+      - ./nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3500/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    depends_on:
+      loki:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+
+  data-api:
+    build: ./data-api
+    ports:
+      - "8080:8080"
+    environment:
+      - SIMSTEWARD_DB_PATH=/data/simsteward.db
+    volumes:
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/data-api:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  alloy:
+    image: grafana/alloy:latest
+    depends_on:
+      loki-gateway:
+        condition: service_healthy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+    env_file:
+      - .env.observability.local
+    environment:
+      - LOKI_PUSH_TOKEN=${LOKI_PUSH_TOKEN:-}
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Mount plugin data dir so Alloy can tail plugin-structured.jsonl. On Windows set SIMSTEWARD_DATA_PATH (e.g. %LOCALAPPDATA%\SimHubWpf\PluginsData\SimSteward). Fallback: ./sample-logs for testing.
+      - ${SIMSTEWARD_DATA_PATH:-./sample-logs}:/var/log/simsteward:ro
+      # Cursor usage MCP logger: mount dir containing cursor-usage.jsonl. Set CURSOR_USAGE_LOG_PATH on the host to this path (e.g. S:/sim-steward-grafana-storage/cursor-usage/cursor-usage.jsonl).
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/cursor-usage:/var/log/cursor-usage:ro
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/alloy:/var/lib/alloy/data

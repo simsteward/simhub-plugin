@@ -1,0 +1,54 @@
+{
+  "title": "SimSteward Replay & Tracker",
+  "uid": "simsteward-replay-tracker",
+  "description": "Replay control events (play/pause/speed/seek) and tracker state (baseline, session reset, seek backward).",
+  "tags": ["simsteward", "replay", "tracker"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "logs",
+      "title": "Replay control",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "expr": "{app=\"sim-steward\", component=\"simhub-plugin\"} | json | event = \"replay_control\"",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Tracker state (baseline, session reset, seek backward)",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "expr": "{app=\"sim-steward\", component=\"tracker\"} | json | event =~ \"baseline_established|session_reset|seek_backward_detected\"",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Replay control count",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"sim-steward\", component=\"simhub-plugin\"} | json | event = \"replay_control\" [$__interval]))",
+          "refId": "A",
+          "legendFormat": "replay_control"
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-7d", "to": "now" }
+}

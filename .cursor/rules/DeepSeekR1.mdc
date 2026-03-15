@@ -1,0 +1,12 @@
+---
+description: When using local DeepSeek-R1 as the Cursor model, put critical instructions in the user-facing prompt if the model ignores system content.
+globs: []
+alwaysApply: true
+---
+
+# Local DeepSeek-R1
+
+When the selected model is **local DeepSeek-R1** (via Override OpenAI Base URL), the model may follow **user prompt** instructions more reliably than system content. If it ignores rules or skills:
+
+- Put critical instructions in the **user message** or in a rule that is clearly user-visible (e.g. "When answering, treat the following as mandatory: …").
+- See [docs/DEEPSEEK-R1-CURSOR-SETUP.md](../docs/DEEPSEEK-R1-CURSOR-SETUP.md) for full setup and workarounds.

@@ -1,0 +1,120 @@
+// Plain-text plugin.log (optional; uncomment to also ship to Loki)
+// local.file_match "simsteward_logs" {
+//   path_targets = [{ __path__ = "/var/log/simsteward/*.log", app = "sim-steward", env = "local", host = "dev-machine" }]
+// }
+// loki.source.file "simsteward_logs" {
+//   targets = local.file_match.simsteward_logs.targets
+//   forward_to = [loki.write.local.receiver]
+// }
+
+local.file_match "simsteward_structured" {
+  path_targets = [
+    {
+      __path__ = "/var/log/simsteward/plugin-structured.jsonl",
+      app      = "sim-steward",
+      env      = "local",
+      host     = "dev-machine",
+    },
+  ]
+  sync_period = "10s"
+}
+
+loki.process "parse_json" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.json {
+    expressions = {
+      level       = "level",
+      component   = "component",
+      event       = "event",
+      message     = "message",
+      session_id  = "session_id",
+      session_seq = "session_seq",
+      domain      = "domain",
+      replay_frame = "replay_frame",
+      incident_id = "incident_id",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level     = "level",
+      component = "component",
+      event     = "event",
+    }
+  }
+
+  stage.output {
+    source = "message"
+  }
+}
+
+loki.source.file "simsteward_structured" {
+  targets    = local.file_match.simsteward_structured.targets
+  forward_to = [loki.process.parse_json.receiver]
+}
+
+// Cursor usage MCP logger: tail cursor-usage.jsonl (written by cursor-usage-logger MCP server)
+local.file_match "cursor_usage" {
+  path_targets = [
+    {
+      __path__   = "/var/log/cursor-usage/cursor-usage.jsonl",
+      app        = "cursor-usage",
+      env        = "local",
+      component  = "mcp-logger",
+      host       = "dev-machine",
+    },
+  ]
+  sync_period = "10s"
+}
+
+loki.process "cursor_usage_parse" {
+  forward_to = [loki.write.local.receiver]
+
+  stage.json {
+    expressions = {
+      level           = "level",
+      component       = "component",
+      event           = "event",
+      message         = "message",
+      session_id      = "session_id",
+      event_id        = "event_id",
+      workspace_path  = "workspace_path",
+      git_branch      = "git_branch",
+      os_platform     = "os_platform",
+      os_hostname     = "os_hostname",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level       = "level",
+      component   = "component",
+      event       = "event",
+      git_branch  = "git_branch",
+      os_platform = "os_platform",
+    }
+  }
+
+  stage.output {
+    source = "message"
+  }
+}
+
+loki.source.file "cursor_usage" {
+  targets    = local.file_match.cursor_usage.targets
+  forward_to = [loki.process.cursor_usage_parse.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki-gateway:3500/loki/api/v1/push"
+    headers = {
+      Authorization = "Bearer " + sys.env("LOKI_PUSH_TOKEN"),
+    }
+  }
+
+  external_labels = {
+    stack = "sim-steward-local",
+  }
+}

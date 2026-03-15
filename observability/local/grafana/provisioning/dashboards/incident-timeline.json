@@ -1,0 +1,56 @@
+{
+  "title": "SimSteward Incident Timeline",
+  "uid": "simsteward-incident-timeline",
+  "description": "Track incidents detected by the tracker.",
+  "tags": ["simsteward", "incident", "tracker"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "logs",
+      "title": "Incidents",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "expr": "{app=\"sim-steward\", component=\"tracker\"} | json | event = \"incident_detected\"",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Incidents (type, driver, car, lap, session_time)",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "expr": "{app=\"sim-steward\", component=\"tracker\"} | json | event = \"incident_detected\"",
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        { "id": "extractFields", "options": { "source": "Line", "format": "json" } }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Incident rate",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"sim-steward\", component=\"tracker\"} | json | event = \"incident_detected\" [$__interval]))",
+          "refId": "A",
+          "legendFormat": "incidents"
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-1h", "to": "now" }
+}

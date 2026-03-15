@@ -1,0 +1,86 @@
+{
+  "title": "Cursor Usage (MCP Logger)",
+  "uid": "cursor-usage",
+  "tags": ["cursor", "usage", "mcp"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 0,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Event rate by type",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 5 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "expr": "sum by (event) (count_over_time({app=\"cursor-usage\", env=\"local\"} [$__interval]))",
+          "refId": "A",
+          "legendFormat": "{{event}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Errors and replan signals",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 5 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({app=\"cursor-usage\", env=\"local\", level=\"ERROR\"} [$__interval]))",
+          "refId": "A",
+          "legendFormat": "errors"
+        },
+        {
+          "expr": "sum(count_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"replan_signal\" [$__interval]))",
+          "refId": "B",
+          "legendFormat": "replan_signal"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Usage review requests",
+      "gridPos": { "x": 0, "y": 5, "w": 12, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "expr": "{app=\"cursor-usage\", env=\"local\"} | json | event=\"usage_review_request\"",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "All cursor-usage logs",
+      "gridPos": { "x": 12, "y": 5, "w": 12, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "expr": "{app=\"cursor-usage\", env=\"local\"}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Errors and replan_signal",
+      "gridPos": { "x": 0, "y": 11, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "options": { "showTime": true, "showLabels": false, "sortOrder": "Descending" },
+      "targets": [
+        {
+          "expr": "{app=\"cursor-usage\", env=\"local\"} | json | level=\"ERROR\" or event=\"replan_signal\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-1h", "to": "now" }
+}

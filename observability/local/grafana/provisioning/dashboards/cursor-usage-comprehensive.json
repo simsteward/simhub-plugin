@@ -1,0 +1,331 @@
+{
+  "title": "Cursor Usage (Comprehensive & Token-Centric)",
+  "uid": "cursor-usage-comprehensive",
+  "tags": ["cursor", "usage", "tokens", "mcp", "ollama"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "editable": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "panels": [],
+      "title": "Row 1 — Token & Content Volume (The #1 Priority)",
+      "type": "row"
+    },
+    {
+      "id": 2,
+      "title": "Global Input vs Output Tokens",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | input_tokens != \"\" | unwrap input_tokens [$__interval]))",
+          "legendFormat": "Input Tokens"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | output_tokens != \"\" | unwrap output_tokens [$__interval]))",
+          "legendFormat": "Output Tokens"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10 },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Total Tokens Consumed",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | total_tokens != \"\" | unwrap total_tokens [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["last"], "fields": "" },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "id": 4,
+      "title": "User Request Content Length (Chars)",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(max_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"user_message\" | length_chars != \"\" | unwrap length_chars [$__interval]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Tokens by Provider",
+      "type": "bargauge",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider) (sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"model_usage\" | total_tokens != \"\" | unwrap total_tokens [$__range]))"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["last"], "fields": "" },
+        "orientation": "horizontal",
+        "displayMode": "basic"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 6,
+      "panels": [],
+      "title": "Row 2 — Local LLM / Reasoning Deep Dive (Ollama)",
+      "type": "row"
+    },
+    {
+      "id": 7,
+      "title": "Model Token Burn by Purpose",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (purpose) (sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"model_usage\" | total_tokens != \"\" | unwrap total_tokens [$__interval]))",
+          "legendFormat": "{{purpose}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 30 },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "I/O Breakdown by Model",
+      "type": "table",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 8, "x": 12, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model) (sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"model_usage\" | input_tokens != \"\" | unwrap input_tokens [$__range]))",
+          "legendFormat": "Input"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (model) (sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"model_usage\" | output_tokens != \"\" | unwrap output_tokens [$__range]))",
+          "legendFormat": "Output"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Avg Generation Latency",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"model_usage\" | duration_ms != \"\" | unwrap duration_ms [$__interval])"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "id": 10,
+      "panels": [],
+      "title": "Row 3 — MCP & ContextStream Data Volume",
+      "type": "row"
+    },
+    {
+      "id": 11,
+      "title": "MCP Token Usage by Tool",
+      "type": "table",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (mcp_server, mcp_tool) (sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"mcp_usage\" | input_tokens != \"\" | unwrap input_tokens [$__range]))",
+          "legendFormat": "Input"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (mcp_server, mcp_tool) (sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"mcp_usage\" | output_tokens != \"\" | unwrap output_tokens [$__range]))",
+          "legendFormat": "Output"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "ContextStream Op Cost",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 19 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"contextstream_usage\" | op_cost != \"\" | unwrap op_cost [$__interval]))"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "MCP Response Payload Size",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 19 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sum_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"contextstream_usage\" | response_bytes != \"\" | unwrap response_bytes [$__interval]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "decbytes" }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "id": 14,
+      "panels": [],
+      "title": "Row 4 — Session & Event Overview (Secondary)",
+      "type": "row"
+    },
+    {
+      "id": 15,
+      "title": "Event Rate by Type",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (event) (count_over_time({app=\"cursor-usage\", env=\"local\"} | json [$__interval]))",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "stacking": { "mode": "normal" } }
+        }
+      }
+    },
+    {
+      "id": 16,
+      "title": "Errors & Replan Signals",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 8, "x": 12, "y": 28 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({app=\"cursor-usage\", env=\"local\", level=\"ERROR\"} [$__interval]))",
+          "legendFormat": "Errors"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(count_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"replan_signal\" [$__interval]))",
+          "legendFormat": "Replan Signals"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "Session Tracking",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 28 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"session_start\" [$__range]))",
+          "legendFormat": "Starts"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(count_over_time({app=\"cursor-usage\", env=\"local\"} | json | event=\"usage_snapshot\" [$__range]))",
+          "legendFormat": "Snapshots"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": true, "calcs": ["last"] }
+      }
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 18,
+      "panels": [
+        {
+          "id": 19,
+          "title": "All Logs",
+          "type": "logs",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 37 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{app=\"cursor-usage\", env=\"local\"}"
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "title": "Errors/Replans",
+          "type": "logs",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 49 },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{app=\"cursor-usage\", env=\"local\"} | json | level=\"ERROR\" or event=\"replan_signal\""
+            }
+          ]
+        }
+      ],
+      "title": "Logs (Drill-down)",
+      "type": "row"
+    }
+  ],
+  "time": { "from": "now-1h", "to": "now" }
+}

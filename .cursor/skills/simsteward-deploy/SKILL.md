@@ -16,10 +16,24 @@ SimHub uses a **single installation root** (default `C:\Program Files (x86)\SimH
 | What | Deploy path (under SimHub root) | Purpose |
 |------|----------------------------------|--------|
 | **Plugin** | Root folder (no subfolder) | DLLs sit next to SimHub's own DLLs; SimHub discovers and loads them automatically. No config file. |
-| **Dashboard (HTML)** | `Web\sim-steward-dash\` | SimHub's built-in server (port 8888) serves static files from `Web/`. Opened via a Web Page / Web View component with URL `http://localhost:8888/Web/sim-steward-dash/index.html`. |
+| **Dashboard (HTML)** | `Web\sim-steward-dash\` | SimHub's built-in server (port 8888) serves static files from `Web/`. Access at `http://<host>:8888/Web/sim-steward-dash/index.html`. |
 
 - **Plugin path**: e.g. `C:\Program Files (x86)\SimHub\` (or `$env:SIMHUB_PATH`). Files: `SimSteward.Plugin.dll`, `Fleck.dll`, `Newtonsoft.Json.dll`, `IRSDKSharper.dll`, `YamlDotNet.dll`.
 - **Dashboard path**: `SimHub\Web\sim-steward-dash\` — contains `index.html`, `README.txt`, and any other static assets. Do **not** use `DashTemplates` for this HTML UI; `DashTemplates` is for SimHub's dashboard catalog (`.djson` layouts), not standalone HTML served via Web Page URL.
+- **SimHub root `/` and `/Web/` are not overridable**: SimHub's own C# router intercepts both routes before the filesystem is checked — static files placed at `Web\index.html` are never served. The only reachable URL for the dashboard is the full path.
+
+### Dashboard access URLs
+
+| URL | Behaviour |
+|-----|-----------|
+| `http://192.168.1.29:8888/Web/sim-steward-dash/index.html` | Direct dashboard (LAN) — **bookmark this** |
+| `http://localhost:8888/Web/sim-steward-dash/index.html` | Direct dashboard (local) |
+| `http://192.168.1.29:8888/` | SimHub's own UI — cannot be replaced |
+| `http://192.168.1.29:8888/Web/` | SimHub's own router — redirect file ignored |
+
+### WebSocket (Fleck) bind address
+
+The plugin binds Fleck on `0.0.0.0:19847` by default — all network interfaces. This is required for the dashboard to reach the plugin when opened via a LAN IP. Override with `SIMSTEWARD_WS_BIND` (e.g. `127.0.0.1` to restrict to localhost only).
 
 ## Testing gate — hard requirement
 
@@ -62,7 +76,7 @@ When the deploy skill is invoked (manually or by the watcher):
 
 ## Cursor tab hygiene
 - Before running a deploy (manual or from the watcher), close any open SimSteward tabs in Cursor so the IDE picks up the fresh dashboard files. Closing both the plugin/dashboard files and the Web view avoids stale previews.
-- After deployment, relaunch the dashboard in the browser the usual way (for example, `browser_navigate http://localhost:8888/Web/sim-steward-dash/index.html` followed by `browser_unlock` if you had it locked) so Cursor loads the updated assets.
+- After deployment, relaunch the dashboard in the browser the usual way (for example, `browser_navigate http://localhost:8888/Web/sim-steward-dash/index.html` or via the LAN IP followed by `browser_unlock` if you had it locked) so Cursor loads the updated assets.
 
 ## Manual deploy steps
 1. Ensure the SimHub SDK DLLs live or are copied into `lib\SimHub\` (the script will copy them from the detected SimHub install if needed).
@@ -85,7 +99,8 @@ When the deploy skill is invoked (manually or by the watcher):
 - `SIMHUB_PATH`: override the auto-detected SimHub location (used by both manual and watch modes).
 - `SIMHUB_SKIP_LAUNCH=1`: prevent the deploy script from relaunching SimHub (recommended during watch mode or if you prefer managing SimHub outside the script).
 - `SIMSTEWARD_SKIP_TESTS=1`: skip the test phase (escape hatch for emergencies only — never use in normal workflow).
-- `SIMSTEWARD_WS_BIND` / `SIMSTEWARD_WS_PORT`: document existing WebSocket defaults if the skill needs to mention them.
+- `SIMSTEWARD_WS_BIND`: override the WebSocket bind address. Default is `0.0.0.0` (all interfaces, LAN-accessible). Set to `127.0.0.1` to restrict to localhost only.
+- `SIMSTEWARD_WS_PORT`: override the WebSocket port. Default is `19847`.
 
 ## Troubleshooting
 - If `deploy.ps1` cannot find `SimHubWPF.exe`, ensure SimHub is installed or point `SIMHUB_PATH` to the correct folder.

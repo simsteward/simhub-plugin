@@ -5,7 +5,13 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimSteward.Plugin", "src\SimSteward.Plugin\SimSteward.Plugin.csproj", "{A1B2C3D4-0002-0002-0002-000000000002}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimSteward.Plugin.Tests", "src\SimSteward.Plugin.Tests\SimSteward.Plugin.Tests.csproj", "{B2C3D4E5-0003-0003-0003-000000000003}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimSteward.GrafanaTestHarness", "harness\SimSteward.GrafanaTestHarness\SimSteward.GrafanaTestHarness.csproj", "{C3D4E5F6-0004-0004-0004-000000000004}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E1E2E3E4-0001-0001-0001-000000000001}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "harness", "harness", "{F4E5F6A7-0005-0005-0005-000000000005}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,8 +23,18 @@ Global
 		{A1B2C3D4-0002-0002-0002-000000000002}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1B2C3D4-0002-0002-0002-000000000002}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1B2C3D4-0002-0002-0002-000000000002}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2C3D4E5-0003-0003-0003-000000000003}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2C3D4E5-0003-0003-0003-000000000003}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2C3D4E5-0003-0003-0003-000000000003}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2C3D4E5-0003-0003-0003-000000000003}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3D4E5F6-0004-0004-0004-000000000004}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3D4E5F6-0004-0004-0004-000000000004}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3D4E5F6-0004-0004-0004-000000000004}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3D4E5F6-0004-0004-0004-000000000004}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{A1B2C3D4-0002-0002-0002-000000000002} = {E1E2E3E4-0001-0001-0001-000000000001}
+		{B2C3D4E5-0003-0003-0003-000000000003} = {E1E2E3E4-0001-0001-0001-000000000001}
+		{C3D4E5F6-0004-0004-0004-000000000004} = {F4E5F6A7-0005-0005-0005-000000000005}
 	EndGlobalSection
 EndGlobal

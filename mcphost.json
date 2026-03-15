@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "cursor-usage-logger": {
+      "command": "node",
+      "args": ["c:/Users/winth/dev/sim-steward/simhub-plugin/mcp/cursor-usage-logger/dist/index.js"],
+      "env": {
+        "CURSOR_USAGE_LOG_PATH": "S:/sim-steward-grafana-storage/cursor-usage/cursor-usage.jsonl"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "c:/Users/winth/dev/sim-steward/simhub-plugin"
+      ]
+    }
+  }
+}

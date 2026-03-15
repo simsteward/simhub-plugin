@@ -1,0 +1,30 @@
+server {
+  listen 3500;
+
+  location = /healthz {
+    return 200 "ok\n";
+    add_header Content-Type text/plain;
+  }
+
+  # Least-privilege path: only allow push endpoint with token.
+  location = /loki/api/v1/push {
+    set $auth_token "";
+    if ($http_authorization ~* "^Bearer\s+(.*)$") {
+      set $auth_token $1;
+    }
+    
+    if ($auth_token != "${LOKI_PUSH_TOKEN}") {
+      return 401;
+    }
+
+    proxy_pass http://loki:3100;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+
+  # All other Loki endpoints are denied on the external ingress.
+  location / {
+    return 403;
+  }
+}

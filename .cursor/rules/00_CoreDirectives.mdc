@@ -1,0 +1,28 @@
+# P0: Core Agent Directives
+
+These are the highest-priority (P0) rules that the agent MUST follow without exception. They supersede any other conflicting instructions from other rules, skills, or session context.
+
+## P0.1: Mandatory Session Initialization
+
+On the **absolute first turn** of any new chat session, regardless of the user's input (be it a question, a greeting, or a command), the agent's very first action **MUST** be to run the ContextStream `init` and `context` sequence, if the ContextStream MCP is available.
+
+This is a non-negotiable startup procedure. No other response shall be given or tool used until this sequence is complete.
+
+**Lesson (session start):** At the start of any ContextStream init session, hand off reasoning to the local LLM first. The local model processes the user's intent and gathered context before the cloud model responds. This reduces consumption of more expensive tokens (Cursor premium agents, GPT, Claude, Gemini, etc.).
+
+## P0.2: Mandatory Usage Logging (all possible data)
+
+When the **Cursor Usage Logger** MCP is available, you **MUST** log **all possible data** to it. This is P0 and non-negotiable. "All possible data" means every field the logger accepts that you can **observe, derive, or measure**; when the runtime does not expose tokens or duration (e.g. for Cursor's own LLM or default_api tools), omit those fields—do not invent values. See `docs/RUNTIME-ENHANCEMENT-RECOMMENDATION.md` for the current limitation.
+
+- **After every MCP tool call** (any server except the logger itself): For **ContextStream** MCP, call **log_contextstream_usage** with `tool`, `action`, and when available `op_cost`, `input_tokens`, `output_tokens`, `duration_ms` (this satisfies the per-MCP-call requirement for ContextStream and feeds ContextStream op-cost/token panels). For all other MCP servers, call **log_mcp_usage** with at least `server`, `tool_name`; include `input_tokens`, `output_tokens`, `duration_ms`, `request_summary`, `response_summary`, `has_error`, `error_message` whenever you can derive or measure them. One log per CallMcpTool. **Exception:** Do **not** call `log_mcp_usage` for calls whose server is the Cursor Usage Logger MCP (e.g. `project-0-plugin-cursor-usage-logger`); that would require logging that call too and cause unbounded recursion.
+- **After every LLM/model invocation** (Ollama, or any model you invoke): Call `log_model_usage` with at least `model` and `provider`; include `input_tokens`, `output_tokens`, `duration_ms`, `purpose` (e.g. `first_pass_reasoning`, `reasoning_offload`, `chat`), `prompt_summary`, `response_summary`, `has_error`, `error_message` whenever available. For MCP servers that are LLM endpoints (e.g. Ollama), you will call both **log_mcp_usage** (server, tool_name, duration, etc.) and **log_model_usage** (model, provider, purpose, tokens, etc.)—both are required; dashboards use both event types.
+- **Session and turn events:** Use **log_user_request** at turn start when you have the full user message (emits `user_request` for dashboards); otherwise or in addition use **log_event** with event `user_message` and payload `{ summary, length_chars }`. Use **log_agent_response** at turn end when you have message_text and tool_calls (emits `agent_response`); always use **log_event** with event `agent_response` and payload `{ summary, tool_count, tool_names }` and token totals when available. Also call **log_event** for `session_start` (first turn), `usage_snapshot` (after init+context on new chat), `milestone` (build/tests/commit), `tool_failure`/`error`, `replan_signal`, and `session_end` when applicable.
+
+If the cursor-usage-logger MCP is unavailable, you cannot log; otherwise, log everything the logger accepts. This ensures Grafana dashboards (including local LLM and MCP token usage) have full data.
+
+## P0.3: First-Pass Reasoning to Local LLM (auto/composer)
+
+When the active agent is **auto** or **composer** (a cloud model), the **first pass** at any reasoning task **MUST** be sent to the local LLM (DeepSeek-R1 via Ollama MCP) before the cloud model responds. The local LLM **MUST** be given up to **128k tokens** of context (conversation history, ContextStream, relevant code, current query). All agents and subagents MUST follow this.
+
+- **At session start:** Immediately after the ContextStream `init` and `context` sequence (P0.1), send the user's message and the context just gathered to the local LLM for a first reasoning pass. Use the local model's output to inform the rest of the turn. This reduces expensive cloud token use (Cursor premium, GPT, Claude, Gemini).
+- Full procedure: see `.cursor/rules/ReasoningOffload.mdc`.

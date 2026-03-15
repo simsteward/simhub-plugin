@@ -1,0 +1,14 @@
+# Cloudflare Worker for SimSteward session-complete ingest (Phase 3).
+# Before first deploy: create D1 DB and apply schema:
+#   npx wrangler d1 create simsteward-db
+#   (paste the database_id into [[d1_databases]] below)
+#   npx wrangler d1 execute simsteward-db --remote --file=./schema.sql
+
+name = "simsteward-data"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "simsteward-db"
+database_id = "REPLACE_AFTER_D1_CREATE"

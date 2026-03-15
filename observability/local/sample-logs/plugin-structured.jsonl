@@ -1,0 +1,2 @@
+{"level":"INFO","message":"Pipeline test line — if you see this in Grafana, Alloy tail and push work.","timestamp":"2025-01-01T12:00:00.000Z","component":"simhub-plugin","event":"pipeline_test","domain":"lifecycle"}
+{"level":"INFO","message":"Seed line at 2026-03-13T03:23:00.767Z — pipeline check","timestamp":"2026-03-13T03:23:00.767Z","component":"simhub-plugin","event":"pipeline_test","domain":"lifecycle"}

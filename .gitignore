@@ -1,0 +1,45 @@
+# Build
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.cache
+.vs/
+*.dll
+*.pdb
+*.exe
+packages/
+
+# IDE / OS
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+scripts/obs-bridge/node_modules/
+mcp/cursor-usage-logger/node_modules/
+mcp/cursor-usage-logger/dist/
+
+# Cloudflare Worker
+worker/.wrangler/
+worker/node_modules/
+
+# Temp dirs
+temp-mcp-client/
+temp-rpc-docs/
+
+# Debug logs
+debug-*.log
+.cursor/debug-*.log
+
+# ContextStream local
+.contextstream/
