@@ -16,7 +16,7 @@ Before the **first** execution step and before **each subsequent** step, check w
 
 - Use `git status` / `git diff` or inspect open-file context. If the workspace is not a git repo, use open-file context or last-known state only.
 - **Related** = files the plan will read, write, or that affect its goal. Example: a config file change is related if the plan touches that config or a feature that depends on it.
-- When searching for code to assess relevance, follow project search rules (e.g. ContextStream search if applicable).
+- When searching for code to assess relevance, use normal repo search tools (or ContextStream `search` if you use that MCP).
 
 ## If relevant changes are found
 
@@ -25,7 +25,7 @@ Before the **first** execution step and before **each subsequent** step, check w
 3. Treat the changes as **informative context** — not automatically "the truth" or "the most recent correct version". Reason: intentional? Conflicting? Superseded?
 4. Update the plan (revise steps, add caveats, or flag conflicts).
 5. **Present before proceeding**: In plan mode, re-call `CreatePlan` with the revised steps. Outside plan mode, summarize the changes and revised next steps in chat before proceeding.
-6. **Sync revised plan to ContextStream** — Call `session(action="capture_plan", ...)` and `memory(action="create_task", ...)` per [ContextStreamSync.mdc](.cursor/rules/ContextStreamSync.mdc) so the updated plan is visible to other sessions and the web app.
+6. **Optional — ContextStream:** If you use the ContextStream MCP, sync the revised plan with `session(action="capture_plan", ...)` and `memory(action="create_task", ...)` per `.cursor/skills/contextstream/SKILL.md`. If you do not use ContextStream, skip.
 
 ## Re-check after your own edits
 

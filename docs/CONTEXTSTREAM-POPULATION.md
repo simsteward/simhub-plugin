@@ -39,7 +39,7 @@ To reuse diagrams from the repo, extract Mermaid from markdown (e.g. from `docs/
 
 ## 4. Ongoing: keep Plans in sync
 
-The rule `.cursor/rules/ContextStreamSync.mdc` requires that whenever a plan is created or revised (including via the built-in CreatePlan tool), the agent must also call `session(action="capture_plan", ...)` and `memory(action="create_task", ...)`. No extra manual step is needed if the agent follows the rule.
+When using the ContextStream MCP, `.cursor/skills/contextstream/SKILL.md` and `.cursor/rules/plan-rebase-on-code-changes.mdc` describe syncing revised plans via `session(action="capture_plan", ...)` and `memory(action="create_task", ...)` where applicable.
 
 ## Optional: Capture implementation scrutiny (when MCP available)
 

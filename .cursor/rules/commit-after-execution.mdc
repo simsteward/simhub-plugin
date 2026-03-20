@@ -3,33 +3,12 @@ description: Require a git commit after any plan execution or agent command that
 alwaysApply: true
 ---
 
-# Commit After Execution
+# Commit after execution
 
-## Requirement
+Tracked changes from a plan step, agent command, or edit must end in a **git commit** before the work is considered done (unless the user asked not to commit or there are no tracked changes).
 
-Any execution that modifies tracked files — from a plan step, an agent command, or an edit — must be **established in a git commit** before the session/turn is considered done for that work.
+- Commit on the branch the user named, else **current branch**; suggest a feature branch when appropriate for risky work.
+- Commit only when **build + lints** meet project rules (see SimHub rule / globs for plugin work).
+- Message: one line reflecting what shipped.
 
-## Scope
-
-- Applies to **all plan executions** and **all agent commands** that result in file changes (edits, creates, deletes under the repo).
-- Code detection (e.g. plan-rebase checks, CI, tooling) **relies on git commits** as the source of truth. Uncommitted changes break that contract and can trigger unnecessary rebases or confusion.
-
-## When to commit
-
-- **Only when there are tracked changes**: If `git status` shows modified, added, or deleted tracked files from the agent’s work, commit them.
-- **Not required** when the agent only ran read-only tools or when the user explicitly asks not to commit.
-
-## Branch
-
-- **Target branch**: Commit to the branch the user asked for (e.g. "commit to `feature/xyz`"); if no branch is specified, commit on the **current branch** (e.g. from `git branch --show-current`). Do not create or switch branches unless the user asked for one or agreed to a suggestion.
-- **Suggesting a branch**: The agent may (and when appropriate should) stop and say that the work is best done on a new branch, or ask which branch to use—e.g. when the change is large, risky, or when the current branch is a protected/main branch and the change is clearly feature work. If the user agrees, create/checkout that branch then commit there; if they decline, commit on the current branch as above.
-
-## Quality bar
-
-- Commit only when the change is in a **committable state**: build passes and linter is clean where required by project rules (e.g. SimHub.mdc). Otherwise fix first, then commit.
-- **Commit message**: Clearly reflect what was done (e.g. plan title or a one-line summary of the command/task).
-
-## Cross-references
-
-- **SimHub.mdc** (Development Cadence): defines *when* and *how* to commit (milestones, one per commit, green build).
-- **plan-rebase-on-code-changes.mdc**: post-execution, commit so the next run’s pre-execution check sees a clean committed state.
+Cross-ref: [plan-rebase-on-code-changes](.cursor/rules/plan-rebase-on-code-changes.mdc); SimHub **Development cadence** for milestone commits.

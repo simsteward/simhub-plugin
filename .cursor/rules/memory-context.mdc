@@ -1,11 +1,6 @@
 ---
-description: Clarifies that memory bank is not a project feature.
-globs: []
+description: Memory bank is not a project feature.
 alwaysApply: true
 ---
 
-# Memory bank — out of scope
-
-**Memory bank** (file-based state sync, Docker MCP server, `memory-bank/` directory, `simsteward_context` / `simsteward_health` tools) is **not** a project feature.
-
-It is only for the developer's personal Cursor/vibe coding and must **not** be considered a feature, task, or item of reference. It has nothing to do with the Sim Steward project. It is expected to be missing from the codebase. Do not implement, document, or reference it as part of the project.
+**Memory bank** (`memory-bank/`, Docker MCP, `simsteward_context` / `simsteward_health`) is personal tooling only — not a Sim Steward product feature. Do not implement or document it as part of the project.

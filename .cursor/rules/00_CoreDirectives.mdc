@@ -1,14 +1,8 @@
 ---
 alwaysApply: true
 ---
-# P0: Core Agent Directives
+# P0: Minimal output
 
-These are the highest-priority rules. They supersede any conflicting instructions.
+These rules supersede conflicting instructions.
 
-## P0.1: Mandatory Session Initialization
-- On the **absolute first turn** of any session, run ContextStream `init(include_decisions=false, include_recent_memory=false)` and `context(format="minified", max_tokens=100)`.
-- See `02_ContextStream.mdc` for details.
-
-## P0.2: Minimal Output Enforcement
-- Output must be strictly minimal and token-efficient.
-- See `00_MinimalOutput.mdc` for details.
+- Output must be strictly minimal and token-efficient. See `00_MinimalOutput.mdc`.

@@ -46,8 +46,8 @@ When the Cursor agent is **auto** or **composer** (cloud model), the **first pas
 
 1. Ensure the Ollama MCP server is configured in `.cursor/mcp.json` with `OLLAMA_NUM_CTX=131072` (see [MCP: Ollama](#6-mcp-ollama--context-stream)).
 2. The agent uses `ollama_generate` or `chat` to send a prompt and assembled context to the local Ollama instance.
-3. **Context assembly:** The agent assembles up to ~120k tokens from: conversation history, ContextStream (`context`, `search`), relevant file contents, and the current query. Follow `.cursor/rules/02_ContextStream.mdc` for ContextStream usage.
-4. Prefer local offload when the sub-task is self-contained reasoning; use `.cursor/rules/00_CoreDirectives.mdc` for mandatory session initialization.
+3. **Context assembly:** The agent assembles up to ~120k tokens from: conversation history, ContextStream (`context`, `search`) when that MCP is enabled, relevant file contents, and the current query. Follow `.cursor/skills/contextstream/SKILL.md` for ContextStream usage.
+4. Prefer local offload when the sub-task is self-contained reasoning; use `.cursor/rules/00_CoreDirectives.mdc` for minimal-output rules.
 
 ---
 

@@ -1,7 +1,17 @@
 ---
 description: SimHub dashboard and plugin development conventions for the sim-steward project.
 globs:
-alwaysApply: true
+  - "src/**/*.cs"
+  - "src/**/*.xaml"
+  - "src/**/*.html"
+  - "src/**/*.csproj"
+  - "src/**/*.sln"
+  - "harness/**/*.cs"
+  - "tests/**/*.ps1"
+  - "scripts/**/*.ps1"
+  - "deploy.ps1"
+  - "docs/**/*.md"
+alwaysApply: false
 ---
 
 # SimHub Development Rules
@@ -33,11 +43,11 @@ alwaysApply: true
 
 - Access iRacing data directly via **IRSDKSharper** (NuGet), NOT through SimHub's limited `GameRawData` (which only exposes `drivers01` / `session01`).
 - **Primary use case**: Catching incidents and unfair events that happen to the **driving user**. In replay mode, capture the full telemetry stack.
-- **ADMIN LIMITATION**: Both `ResultsPositions[].Incidents` and `DriverInfo.Drivers[].CurDriverIncidentCount` in session YAML stay 0 for other drivers during a **live race** unless the user is **session admin**. This is iRacing server policy. During **replay** (`SimMode == "replay"`) or after **checkered** (`SessionState >= 5`), all-driver data is available. Layer 4 uses `CurDriverIncidentCount` (populated from first YAML update; no session-match needed).
+- **ADMIN LIMITATION**: Both `ResultsPositions[].Incidents` and `DriverInfo.Drivers[].CurDriverIncidentCount` in session YAML stay 0 for other drivers during a **live race** unless the user is **session admin**. During **replay** (`SimMode == "replay"`) or after **checkered** (`SessionState >= 5`), all-driver data is available.
 - **Incident point type = delta value**: delta 1 = 1x off-track, delta 2 = 2x wall/spin, delta 4 = 4x heavy contact (paved). Dirt racing: heavy contact = 2x. Check `WeekendInfo.Category`.
-- **Quick-succession rule**: iRacing promotes lower→higher (2x spin then 4x contact = delta 4 only, not 6). Physics layers still see both events.
-- **Incident detection is Layer 4 only**: `DriverInfo.Drivers[].CurDriverIncidentCount` from session YAML (batched, fires on each `SessionInfoUpdate`). No session-match required; populated from first YAML update. Admin restriction applies: live non-admin sees 0 for other drivers until checkered or replay.
-- At **16x replay speed**: TickRate stays 60 Hz (real-clock). Layer 4 YAML batches incidents.
+- **Quick-succession rule**: iRacing promotes lower→higher (2x spin then 4x contact = delta 4 only, not 6).
+- **Incident detection**: `DriverInfo.Drivers[].CurDriverIncidentCount` from session YAML (fires on each `SessionInfoUpdate`). Replay scan uses `RpySrch_NextIncident` to seek to each incident frame and read YAML deltas + telemetry arrays.
+- At **16x replay speed**: TickRate stays 60 Hz (real-clock). YAML batches incidents at high speed.
 - Use `IRacingSdk.UpdateInterval = 1` for maximum polling fidelity.
 - The SDK broadcast API supports `RpySrch_NextIncident` / `RpySrch_PrevIncident` — expose as "Jump to Incident" buttons.
 - Always call `_irsdk.Stop()` in `End()` to clean up background threads.
@@ -57,56 +67,15 @@ alwaysApply: true
 - [IRSDKSharper](https://github.com/mherbold/IRSDKSharper) — high-performance C# iRacing SDK wrapper (session info + telemetry threads, YAML parsing, replay event system).
 - [RaceAdmin](https://github.com/GameDotPlay/RaceAdmin) — reference for all-driver incident tracking from iRacing SDK with delta detection and caution logic.
 
-## Memory bank (out of scope)
+## Detailed skill
 
-**Memory bank** (file-based state sync, MCP tools, `memory-bank/` directory) is **not** a project feature. It is only for the developer's personal Cursor/vibe coding and must not be considered a feature, task, or item of reference. It is expected to be missing. Do not implement or document it as part of the project.
+For a compact technical reference, see `.cursor/skills/simhub-dashboard-plugin/SKILL.md`.
 
-## Detailed Skill
+## Loki logging
 
-For full technical reference, see the project skill at `.cursor/skills/simhub-dashboard-plugin/SKILL.md`.
+New code that handles external input or produces output must emit structured logs (`action_dispatched` / `action_result`, lifecycle, incidents — never per-tick logs in `DataUpdate()` without a throttle, never full snapshot blobs). Full taxonomy and limits: [docs/GRAFANA-LOGGING.md](docs/GRAFANA-LOGGING.md) and `.cursor/skills/grafana-loki-observability/SKILL.md`.
 
-## Loki Logging Standards
-
-Every new piece of code that handles an external input or produces an output MUST emit
-at least one structured log entry. This is a hard requirement — not optional.
-
-### Coverage requirements (mandatory for any new code)
-
-- **Every new action handler**: call `_logger.Structured()` for `action_dispatched` on entry
-  and `action_result` on exit with `success`, `duration_ms`, `correlation_id`. Plain `_logger.Info()`
-  at action boundaries is not acceptable.
-- **Every new WebSocket message type in DashboardBridge**: log `action_received` on entry
-  with a freshly generated `correlation_id`.
-- **Every new iRacing broadcast or SDK call path**: log the dispatch event and its outcome.
-- **Every new incident detection path**: emit `incident_detected` with full identifying fields.
-- **Every new lifecycle hook** (Init, End, SDK callbacks): log a named lifecycle event.
-
-### What must NEVER be logged
-
-- **Per-tick state**: never call `_logger` (or `Structured`) inside `DataUpdate()` except via
-  an explicit throttle guard (minimum 10 s between identical messages — see `WaitingLogThrottleMs`).
-  Any new tick-level log call without a throttle guard will be rejected.
-- **Full state blobs**: never serialize `PluginSnapshot`, `SessionSummary`, or raw YAML into
-  a log line. Log identifiers and counts only.
-- **Loki sink errors into Loki**: `LokiSink` failures write to the local file log only —
-  never re-enqueue to avoid a feedback loop.
-
-### Line size budget
-
-Self-imposed ceiling: **8 KB per log line** (Grafana Cloud hard limit is 256 KB, non-modifiable).
-Typical lines should be under 800 bytes. Trim fields if a line would exceed 8 KB.
-
-### Volume guard
-
-Even 1 log per DataUpdate tick = 86 MB/hour. Target: < 1 MB per race session.
-Any new log path that could fire more than once per second MUST have a documented
-throttle guard in the PR/commit description.
-
-### Event and label reference
-
-See `docs/GRAFANA-LOGGING.md` for the full event taxonomy, label schema, and LogQL query patterns.
-
-## Development Cadence
+## Development cadence
 
 - **Small changes only.** Each task should touch the minimum number of files needed.
   Prefer one logical change per editing session — one new class, one modified method,
