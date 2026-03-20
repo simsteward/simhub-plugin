@@ -127,8 +127,8 @@ public void Broadcast(string json)
 
 ## Existing Planning Documents
 
-- **Full log + event plan**: `docs/PLAN-log-event-stream.md`
-- **Event stream UI + physics**: `docs/PLAN-event-stream-ui.md`
+- **Full log + event plan**: `docs/plans/PLAN-log-event-stream.md`
+- **Event stream UI + physics**: `docs/plans/PLAN-event-stream-ui.md`
 
 ---
 

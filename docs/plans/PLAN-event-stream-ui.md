@@ -211,6 +211,6 @@ Recommendation: **Option A** — stream builds from live events only. New client
 ## 8. Future Enhancements (Out of Scope)
 
 - **Physics correlation**: For player incidents, cross-reference with physics events at same session time; set `physicsCause` on `IncidentEvent` (e.g. "LatAccelSpike +2.8g").
-- **All-car physics**: Layer 2/3 (CarIdxLapDistPct velocity/G-force, CarIdxTrackSurface) for non-player cars in replay — requires additional detector logic.
+- **All-car physics**: CarIdxLapDistPct velocity/G-force, CarIdxTrackSurface for non-player cars in replay — requires additional detector logic.
 - **incidentType refinement**: Use physics to distinguish 2x WallContact vs Spin.
 - **Filter controls**: Toggle incident-only, physics-only, or both in the UI.

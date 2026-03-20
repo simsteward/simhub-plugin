@@ -35,7 +35,7 @@ The **Diagrams** tab at [https://contextstream.io/dashboard/diagrams](https://co
 - Use `memory(action="create_diagram", title="...", content="<mermaid or diagram spec>", diagram_type="...")` to create diagrams. **content** should be the diagram specification only (e.g. raw Mermaid, without fence markers). **diagram_type** must be one of: `flowchart`, `sequence`, `class`, `er`, `gantt`, `mindmap`, `pie`, `other`.
 - **Verify:** Call `memory(action="list_diagrams")` and refresh the ContextStream web app **Dashboard → Diagrams** to confirm diagrams appear.
 
-To reuse diagrams from the repo, extract Mermaid from markdown (e.g. from `docs/SESSION-DATA-AVAILABILITY.md` or `docs/INTERFACE.md`) and pass that string as `content` with the appropriate `diagram_type` (e.g. `flowchart` or `sequence`).
+To reuse diagrams from the repo, extract Mermaid from markdown (e.g. from `docs/reference/SESSION-DATA-AVAILABILITY.md` or `docs/INTERFACE.md`) and pass that string as `content` with the appropriate `diagram_type` (e.g. `flowchart` or `sequence`).
 
 ## 4. Ongoing: keep Plans in sync
 

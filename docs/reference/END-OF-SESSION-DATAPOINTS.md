@@ -193,4 +193,4 @@ We join to ResultsPositions by `CarIdx`. For each result row we currently take: 
 - iRacing SDK telemetry: [sajax.github.io/irsdkdocs](https://sajax.github.io/irsdkdocs/) (SessionState, telemetry variables).
 - iRacing YAML: same site, WeekendInfo, SessionInfo, DriverInfo.
 - IRSDKSharper: [IRacingSdkSessionInfo.cs](https://github.com/mherbold/IRSDKSharper/blob/main/IRacingSdkSessionInfo.cs) — `WeekendInfoModel`, `SessionInfoModel`, `SessionModel`, `PositionModel`, `DriverModel`, `WeekendOptionsModel`.
-- Project: `docs/GRAFANA-LOGGING.md` (event taxonomy), `docs/SESSION-DATA-AVAILABILITY.md` (when results are ready), `.cursor/rules/SimHub.mdc` (no per-tick logging, 8 KB line budget).
+- Project: `docs/GRAFANA-LOGGING.md` (event taxonomy), `docs/reference/SESSION-DATA-AVAILABILITY.md` (when results are ready), `.cursor/rules/SimHub.mdc` (no per-tick logging, 8 KB line budget).

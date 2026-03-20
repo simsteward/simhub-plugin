@@ -111,18 +111,18 @@ The dashboard includes a collapsible **Diagnostics & Metrics** panel just below 
 
 **"Player car: Unknown"** means the player car index is not yet known from session YAML. Incident counts and feed still work for other drivers once the YAML baseline is established.
 
-### Layer counter (L4)
+### YAML incident counter
 
-Incident detection uses **Layer 4 only** (session YAML `CurDriverIncidentCount`). The L4 count accumulates from the moment iRacing connects and resets when iRacing disconnects, when you seek the replay backward, or when the session changes.
+Incident detection uses session YAML `CurDriverIncidentCount` (`yamlIncidentEvents`). The count accumulates from the moment iRacing connects and resets when iRacing disconnects, when you seek the replay backward, or when the session changes.
 
-- **L4 = 0 and YAML updates > 0**: the session YAML is being parsed but no other-driver incident deltas have been found yet (may be correct early in a session, or non-admin in live race).
-- **L4 = 0**: iRacing is not connected or the replay has not advanced past an incident.
+- **`yamlIncidentEvents` = 0 and YAML updates > 0**: the session YAML is being parsed but no other-driver incident deltas have been found yet (may be correct early in a session, or non-admin in live race).
+- **`yamlIncidentEvents` = 0**: iRacing is not connected or the replay has not advanced past an incident.
 
 ---
 
 ## 8. Logs not appearing in Grafana / Loki
 
-For a step-by-step to get plugin data into **local** Grafana, see **docs/LOCAL-OBSERVABILITY-QUICKSTART.md**.
+For a step-by-step to get plugin data into **local** Grafana, see **docs/observability-local.md**.
 
 If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 

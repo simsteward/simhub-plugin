@@ -9,7 +9,7 @@ This plan adds a **unified log/event stream** to Sim Steward: PluginLogger event
 ### Goal
 - **PluginLogger**: Raise an event when each log entry is written, so the plugin can broadcast it to the dashboard.
 - **DashboardBridge**: Add generic `Broadcast(string json)` for ad-hoc message types (`logEvents`, `incidentEvents`, `physicsEvents`).
-- **Plugin**: Wire log events into a broadcast pipeline; optionally drain incident/physics events (per existing PLAN-event-stream-ui.md).
+- **Plugin**: Wire log events into a broadcast pipeline; optionally drain incident/physics events (per **docs/plans/PLAN-event-stream-ui.md**).
 - **Dashboard**: Add a "Live Event Stream" panel displaying a unified chronological feed (newest first):
   - Plugin log entries (Info, Warn, Error)
   - Official incidents (1x/2x/4x)
@@ -131,7 +131,7 @@ Log event schema for dashboard:
 
 **File**: `src/SimSteward.Plugin/PhysicsIncidentDetector.cs` (new)
 
-- Per PLAN-event-stream-ui.md; can be Phase 2 if focusing first on logs + incidents.
+- Per **docs/plans/PLAN-event-stream-ui.md**; can be Phase 2 if focusing first on logs + incidents.
 
 ### 3.6 SimStewardPlugin — Wire Incident Broadcast
 
@@ -229,7 +229,7 @@ Add to §3 (Plugin → Dashboard message types):
   2. Verify log entries (e.g. "iRacing connected", "DashboardBridge: client connected") appear in event stream.
   3. Trigger Warn/Error (e.g. disconnect iRacing) — confirm styling.
   4. Reconnect dashboard — stream rebuilds from live events.
-- **Incident stream**: Per PLAN-event-stream-ui.md §7.
+- **Incident stream**: Per **docs/plans/PLAN-event-stream-ui.md** §7.
 - **Performance**: Ensure draining logs/incidents doesn't stall DataUpdate; cap queue and per-tick drain.
 
 ---

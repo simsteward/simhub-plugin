@@ -3,7 +3,7 @@ description: When editing Grafana/Loki observability, use the grafana-loki-obser
 globs:
   - observability/**
   - "**/GRAFANA*.md"
-  - "**/LOCAL-LOKI*.md"
+  - "**/observability*.md"
   - "**/loki*.yml"
   - "**/*dashboard*.json"
 alwaysApply: false

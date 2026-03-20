@@ -1,6 +1,6 @@
 # Start SimHub with env vars set for local Loki (plugin pushes to local Grafana stack).
 # Run from plugin repo root:  .\scripts\run-simhub-local-observability.ps1
-# See docs/LOCAL-OBSERVABILITY-QUICKSTART.md and docs/GRAFANA-LOGGING.md.
+# See docs/observability-local.md and docs/GRAFANA-LOGGING.md.
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot

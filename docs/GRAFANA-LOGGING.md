@@ -1,6 +1,6 @@
 # Grafana Loki Structured Logging
 
-Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk); **Grafana Alloy** (or another tailer) tails that file and pushes to Loki. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Dashboards and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling to many users (e.g. 120) without a heavy local stack per machine, see **docs/SCALING-LOG-COLLECTION.md**. For how storage and LogQL scale (hundreds of drivers per session, many users, label rules, when to use metrics instead of logs), see **docs/SCALING-LOKI-QUERIES.md**.
+Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk); **Grafana Alloy** (or another tailer) tails that file and pushes to Loki. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Dashboards and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
 
 **Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; Alloy (or any forwarder) tails that file and pushes to Loki with no filter. Loki retains the full stream.
 
@@ -25,7 +25,7 @@ Volume allowance: free tier ~50 GB/month; our budget is &lt; 1 GB/month.
 
 ### Scale: hundreds of drivers / many users
 
-Stream count and labels stay bounded (four labels only; no `session_id` or `driver_id` as labels). Session-end results with 100–200+ drivers use chunked `session_end_datapoints_results` (35 drivers per line); merge chunks in Grafana. For many SimSteward users (e.g. 120) sending to one Loki, use a lightweight forwarder per user and optional bounded `instance_id` label. Do not log per-driver per-tick in Loki; use metrics (OTel) for high-frequency telemetry. Full stream/volume math, label rules, and query patterns: **docs/SCALING-LOKI-QUERIES.md**.
+Stream count and labels stay bounded (four labels only; no `session_id` or `driver_id` as labels). Session-end results with 100–200+ drivers use chunked `session_end_datapoints_results` (35 drivers per line); merge chunks in Grafana. For many SimSteward users (e.g. 120) sending to one Loki, use a lightweight forwarder per user and optional bounded `instance_id` label. Do not log per-driver per-tick in Loki; use metrics (OTel) for high-frequency telemetry. Full stream/volume math, label rules, and query patterns: **docs/observability-scaling.md**.
 
 ### Volume budget (per session, ~2 h)
 
@@ -86,7 +86,7 @@ Every log line has an `event` field. Key events:
 | `session_capture_incident_mismatch` | simhub-plugin | `results_incidents`, `tracker_incidents`, `player_car_idx` | WARN when player's ResultsPositions incident count ≠ IncidentTracker count (wrong session or SDK mapping). |
 | `session_summary_captured` | simhub-plugin | `trigger`, `session_num`, `driver_count`, `wanted_session_num`, `selected_session_num`, `session_match_exact`, `results_incident_sample` | When `TryCaptureAndEmitSessionSummary` succeeds. Use `session_match_exact` to see when fallback session was used; `results_incident_sample` = first 3 drivers' car_idx, position, incidents for SDK verification. |
 | `session_end_datapoints_session` | simhub-plugin | `trigger`, `session_id`, `session_num`, session-level fields (track, series_id, session_name, incident_limit, …), `telemetry_*` at capture, `results_driver_count` | Emitted once per successful session summary capture. Session metadata and telemetry snapshot only; no results array. Use with `session_end_datapoints_results` chunks to get full data. Scales to hundreds of drivers. |
-| `session_end_datapoints_results` | simhub-plugin | `session_id`, `session_num`, `chunk_index`, `chunk_total`, `results_driver_count`, `results` (array of up to 35 driver rows: pos, car_idx, driver, abbrev, car, class, laps, incidents, reason_out, user_id, team, irating, etc.) | One log line per chunk (35 drivers per chunk). Merge chunks by `session_id` and sort by `chunk_index` for full results table. See **docs/SCALING-LOG-COLLECTION.md** and query patterns in **docs/GRAFANA-LOGGING.md** (§ LogQL reference). |
+| `session_end_datapoints_results` | simhub-plugin | `session_id`, `session_num`, `chunk_index`, `chunk_total`, `results_driver_count`, `results` (array of up to 35 driver rows: pos, car_idx, driver, abbrev, car, class, laps, incidents, reason_out, user_id, team, irating, etc.) | One log line per chunk (35 drivers per chunk). Merge chunks by `session_id` and sort by `chunk_index` for full results table. See **docs/observability-scaling.md** and § LogQL reference below. |
 | `finalize_capture_started` / `complete` / `timeout` | simhub-plugin | `target_frame`, `duration_ms` | Debug / automation. |
 | `incident_detected` | tracker | `incident_type`, `car_number`, `driver_name`, `delta`, `session_time`, `session_num`, `replay_frame`, `cause`, `other_car_number` | Each YAML delta. |
 | `baseline_established` | tracker | `driver_count` | When tracker baseline is ready. |
@@ -200,7 +200,7 @@ Grafana can load dashboards from `observability/local/grafana/provisioning/dashb
 | `errors-warnings.json` | Errors & Warnings | ERROR/WARN rate (timeseries), ERROR logs, WARN logs. |
 | `session-end-results.json` | Session End Results | session_end_datapoints_results (all chunks), chunks over time; merge by session_id and chunk_index for full table. |
 
-To validate which events appear in your data (e.g. last 7 days) and confirm the datasource, see **docs/GRAFANA-DASHBOARD-VALIDATION.md**.
+To validate which events appear in your data (e.g. last 7 days) and confirm the datasource, see **docs/observability-testing.md** (dashboard validation).
 
 See **Local quickstart** below to run Grafana and Loki so these dashboards load.
 
@@ -243,7 +243,7 @@ docker compose up -d
 # docker compose --profile file-tail up -d
 ```
 
-See **LOCAL-LOKI-LOGGING.md** for the file-tail/gateway/alloy setup and token-protected push.
+See **docs/observability-local.md** for the file-tail/gateway/alloy setup and token-protected push.
 
 ## LogQL reference
 

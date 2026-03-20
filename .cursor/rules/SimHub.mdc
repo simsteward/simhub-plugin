@@ -10,7 +10,10 @@ globs:
   - "tests/**/*.ps1"
   - "scripts/**/*.ps1"
   - "deploy.ps1"
-  - "docs/**/*.md"
+  - "docs/INTERFACE.md"
+  - "docs/GRAFANA-LOGGING.md"
+  - "docs/TROUBLESHOOTING.md"
+  - "docs/STATE_AND_ROADMAP.md"
 alwaysApply: false
 ---
 

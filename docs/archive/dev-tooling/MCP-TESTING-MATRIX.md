@@ -42,7 +42,7 @@ This document defines the test matrix for all testing features that can be drive
 | **Query** | Call `simsteward_loki_query` with `query={app="sim-steward",env="local"}` (or test_tag filter). | Parsed log entries (event, action, correlation_id, etc.) within time window. | Same: depends on MCP Loki config. Local stack (e.g. localhost:3100) vs Cloud changes URL/token. |
 | **Correlate** | Call `simsteward_loki_correlate` with correlationId or sessionId or event. | Log lines for that correlation/session/event. | Same as query; convenience wrapper over LogQL. |
 
-**Document:** Where SimSteward MCP gets its Loki URL/datasource (env, config file, or Cursor MCP env). Align with GRAFANA-TESTING.md and LOCAL-LOKI-LOGGING.md. After run_grafana_tests.ps1 harness run, simsteward_loki_query with `testing="true" | test_tag="grafana-harness"` should return the same events AssertLokiQueries asserts — use for optional "MCP assertion" path.
+**Document:** Where SimSteward MCP gets its Loki URL/datasource (env, config file, or Cursor MCP env). Align with **docs/observability-testing.md** and **docs/observability-local.md**. After run_grafana_tests.ps1 harness run, simsteward_loki_query with `testing="true" | test_tag="grafana-harness"` should return the same events AssertLokiQueries asserts — use for optional "MCP assertion" path.
 
 ---
 
@@ -78,7 +78,7 @@ This document defines the test matrix for all testing features that can be drive
 | Harness emits logs | run_grafana_tests.ps1 runs harness (dotnet) to Loki | No change (harness is dotnet). | Logs with testing=true, test_tag=grafana-harness. | Unchanged. |
 | Assertions | AssertLokiQueries (dotnet) queries Loki HTTP API | Use simsteward_loki_query or Docker MCP query_loki_logs with same LogQL; agent or script asserts counts and fields. | ≥2 action_result, ≥1 incident_detected, ≥1 session_digest; action_result has correlation_id, success, action. | MCP path works if (1) Loki URL/datasource is configured for the MCP, (2) time range includes harness run. Retry/backoff (AssertLokiQueries uses 30s) can be done by agent loop or script. |
 
-**Document:** After running the harness, call simsteward_loki_query (or Docker MCP query_loki_logs) with `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"` and assert event counts and required fields per GRAFANA-TESTING.md. See [assert_via_mcp.md](assert_via_mcp.md) for step-by-step procedure (in `tests/observability/`).
+**Document:** After running the harness, call simsteward_loki_query (or Docker MCP query_loki_logs) with `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"` and assert event counts and required fields per **docs/observability-testing.md**. See [assert_via_mcp.md](../../../tests/observability/assert_via_mcp.md) for step-by-step procedure.
 
 ---
 
@@ -100,7 +100,7 @@ This document defines the test matrix for all testing features that can be drive
 
 ## References
 
-- [REPLAY-WORKFLOW-TEST-CHECKLIST.md](REPLAY-WORKFLOW-TEST-CHECKLIST.md) — replay test cases and MCP path
-- [GRAFANA-TESTING.md](GRAFANA-TESTING.md) — harness, AssertLokiQueries, asserting via MCP
-- [LOCAL-LOKI-LOGGING.md](LOCAL-LOKI-LOGGING.md) — local stack and Grafana/Loki MCP validation
+- [docs/replay-workflow.md](../../replay-workflow.md) — replay test cases and MCP path
+- [docs/observability-testing.md](../../observability-testing.md) — harness, AssertLokiQueries, asserting via MCP
+- [docs/observability-local.md](../../observability-local.md) — local stack and Grafana/Loki MCP validation
 - [tests/observability/assert_via_mcp.md](../tests/observability/assert_via_mcp.md) — step-by-step MCP assertion procedure

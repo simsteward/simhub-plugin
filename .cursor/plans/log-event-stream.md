@@ -1,7 +1,7 @@
 # Log/Event Stream Plan
 
 > Consolidated plan for implementing the unified log + incident event stream with Live Event Stream UI.  
-> Source docs: `docs/PLAN-log-event-stream.md`, `docs/PLAN-log-event-stream-SUMMARY.md`, `docs/PLAN-event-stream-ui.md`
+> Source docs: `docs/plans/PLAN-log-event-stream.md`, `docs/plans/PLAN-log-event-stream-SUMMARY.md`, `docs/plans/PLAN-event-stream-ui.md`
 
 ---
 
@@ -38,9 +38,9 @@ Add a **Live Event Stream** panel to Sim Steward that displays in real time:
 
 | Doc | Purpose |
 |-----|---------|
-| `docs/PLAN-log-event-stream.md` | Full implementation plan (PluginLogger, Bridge, IncidentTracker, dashboard) |
-| `docs/PLAN-log-event-stream-SUMMARY.md` | Concise summary with file references |
-| `docs/PLAN-event-stream-ui.md` | Event stream UI panel + PhysicsIncidentDetector |
+| `docs/plans/PLAN-log-event-stream.md` | Full implementation plan (PluginLogger, Bridge, IncidentTracker, dashboard) |
+| `docs/plans/PLAN-log-event-stream-SUMMARY.md` | Concise summary with file references |
+| `docs/plans/PLAN-event-stream-ui.md` | Event stream UI panel + PhysicsIncidentDetector |
 | `docs/INTERFACE.md` | WebSocket message contract (§3, §4.1) |
 | `.cursor/skills/simhub-dashboard-plugin/examples.md` | Example 8: Live Event Stream, Example 7: Physics detector |
 | `.cursor/skills/simhub-dashboard-plugin/reference.md` | IncidentEvent, DrainEvents pattern |

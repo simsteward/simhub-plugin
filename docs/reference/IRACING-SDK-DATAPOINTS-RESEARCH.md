@@ -24,7 +24,7 @@ All emissions that go to **every connected client** or to **Loki / log stream** 
 
 - **diagnostics:** `irsdkStarted`, `irsdkConnected`, `wsRunning`, `wsPort`, `wsClients`, `playerCarIdx`
 - **sessionDiagnostics:** `simMode`, `irSessionId`, `irSubSessionId`, `sessionState`, `sessionNum`, `sessionInfoUpdate`, `sessionFlags`, `hasSessionInfo`, `selectedResultsSessionNum`, `selectedResultsSessionType`, `resultsPositionsCount`, `resultsLapsComplete`, `resultsOfficial`, `resultsReady`, `activeDriverCount`, `driversWithNonZeroIncidents`, `maxDriverIncidents`, `allNonSpectatorIncidentsZero`, `lastSummaryCapture`
-- **metrics:** `l4YamlEvents`, `totalEvents`, `yamlUpdates`, `lastDetectionSessionTime`
+- **metrics:** `yamlIncidentEvents`, `totalEvents`, `yamlUpdates`, `lastDetectionSessionTime`
 
 ### 0.3 Structured log events (to Loki + dashboard log stream)
 
@@ -60,7 +60,7 @@ Same as in **docs/GRAFANA-LOGGING.md** event taxonomy: `logging_ready`, `loki_co
 | Section / field | Where used | Purpose |
 |------------------|------------|---------|
 | **WeekendInfo** | Track name, category, SimMode, track length, config | Session summary, incident cause (dirt vs paved), session_digest |
-| **DriverInfo** | DriverCarIdx, Drivers[] (UserName, CarNumber, CarIdx, CurDriverIncidentCount, IsSpectator, CarClassShortName) | Player car; incident deltas (Layer 4); results table names/classes |
+| **DriverInfo** | DriverCarIdx, Drivers[] (UserName, CarNumber, CarIdx, CurDriverIncidentCount, IsSpectator, CarClassShortName) | Player car; incident deltas; results table names/classes |
 | **SessionInfo.Sessions[]** | SessionNum, ResultsPositions, ResultsLapsComplete, ResultsNumCautionLaps, ResultsAverageLapTime, ResultsOfficial, etc. | Session summary capture at checkered; session_digest |
 | **ResultsPositions[]** | Position, CarIdx, LapsComplete, LapsLed, FastestTime, FastestLap, LastTime, Incidents, ReasonOutStr, ClassPosition | Authoritative results table in session_summary_captured / session_digest |
 
