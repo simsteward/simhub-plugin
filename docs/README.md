@@ -32,8 +32,6 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 | [DATA-API-DEPLOY.md](DATA-API-DEPLOY.md) | Data API env (local vs prod) |
 | [REDEPLOY-CONCEPT.md](REDEPLOY-CONCEPT.md) | Redeploy mental model |
 
-**Legacy redirects:** Some `# Moved` one-liners may still exist under `docs/`; **canonical** content is the Tier B table above, not those filenames.
-
 ---
 
 ## Archive / maintainer (skip unless task says so)
