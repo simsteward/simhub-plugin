@@ -13,7 +13,7 @@ globs:
   - "docs/INTERFACE.md"
   - "docs/GRAFANA-LOGGING.md"
   - "docs/TROUBLESHOOTING.md"
-  - "docs/STATE_AND_ROADMAP.md"
+  - "docs/STATUS.md"
 alwaysApply: false
 ---
 

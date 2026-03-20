@@ -318,7 +318,7 @@ namespace SimSteward.Plugin
 
             if (seekedBackward)
             {
-                // Log only; do not reset incident baselines or counts (per user requirement and STATE_AND_ROADMAP).
+                // Log only; do not reset incident baselines or counts (per user requirement; see docs/STATUS.md).
                 int frameDelta = prevReplayFrame >= 0 ? prevReplayFrame - replayFrame : 0;
                 double sessionTimeDelta = prevSessionTime >= 0 ? sessionTime - prevSessionTime : 0;
                 AgentDebugLog.Write740824("H1", "IncidentTracker.Update", "seek_backward_detected", new

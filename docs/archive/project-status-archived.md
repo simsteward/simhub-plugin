@@ -1,6 +1,6 @@
 # Sim Steward — Project Status (archived copy)
 
-> Snapshot as of 2026-03-04. **Current** snapshot: **docs/STATE_AND_ROADMAP.md**. Do not treat this file as up to date.
+> Snapshot as of 2026-03-04. **Current** snapshot: **docs/STATUS.md**. Do not treat this file as up to date.
 
 ---
 

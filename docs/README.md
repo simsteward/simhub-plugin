@@ -13,9 +13,9 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 | [INTERFACE.md](INTERFACE.md) | WebSocket contract, message types, actions |
 | [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) | Loki labels, events, LogQL, dashboards |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Runtime issues, logs, deploy |
-| [STATE_AND_ROADMAP.md](STATE_AND_ROADMAP.md) | Roadmap, current state, tech debt |
+| [STATUS.md](STATUS.md) | Roadmap, current state, tech debt |
 
-[STATUS.md](STATUS.md) redirects here + [archive/project-status-archived.md](archive/project-status-archived.md).
+**Older status narrative:** [archive/project-status-archived.md](archive/project-status-archived.md).
 
 ---
 
