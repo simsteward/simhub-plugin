@@ -32,7 +32,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 | [DATA-API-DEPLOY.md](DATA-API-DEPLOY.md) | Data API env (local vs prod) |
 | [REDEPLOY-CONCEPT.md](REDEPLOY-CONCEPT.md) | Redeploy mental model |
 
-**Stubs:** Short filenames like `LOCAL-OBSERVABILITY-QUICKSTART.md` → one-line pointers to Tier B merged docs.
+**Legacy redirects:** Some `# Moved` one-liners may still exist under `docs/`; **canonical** content is the Tier B table above, not those filenames.
 
 ---
 
