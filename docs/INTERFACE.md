@@ -112,70 +112,17 @@ Pushed immediately when `IncidentTracker` detects a new incident. May contain mu
 | `carIdx` | number | iRacing car index. |
 | `driverName` | string | Driver's display name. |
 | `carNumber` | string | Car number string. |
-| `delta` | number | Incident points added this event. Standard values: 1, 2, or 4. 0 = physics-detected, no official count change (0x). |
+| `delta` | number | Incident points added this event. Standard values: 1, 2, or 4. |
 | `totalAfter` | number | Driver's running total after this event. |
-| `type` | string | `"1x"` \| `"2x"` \| `"4x"` \| `"batched"` \| `"detected"` \| `"0x"` — `"batched"` means YAML flushed multiple incidents together; `"detected"` means physics saw an event before YAML confirmed it. |
-| `source` | string | `"player"` (60 Hz telemetry, exact) \| `"yaml"` (session YAML, all-driver, may batch) \| `"physics"` (Layer 2/3 detected, no official count change yet) |
-| `cause` | string or null | Physics-inferred cause: `"off-track"` \| `"wall"` \| `"wall-or-spin"` \| `"spin"` \| `"car-contact"` \| `"heavy-contact"` \| `"impact"` \| `null` |
-| `peakG` | number | Peak combined G-force (m/s² / 9.81) at the incident frame. 0 if not available. |
-| `lap` | number | Lap number at incident time (player incidents only; 0 for others). |
+| `type` | string | `"1x"` \| `"2x"` \| `"4x"` \| `"batched"` — `"batched"` means YAML flushed multiple incidents together. |
+| `source` | string | `"yaml"` (session YAML, all-driver) \| `"replay_scan"` (replay scan enumeration) |
+| `cause` | string or null | Inferred cause: `"off-track"` \| `"wall-or-spin"` \| `"car-contact"` \| `"heavy-contact"` \| `null` |
+| `lap` | number | Lap number at incident time. |
 | `trackPct` | number | Track position as fraction of lap (0–1) at incident time. |
 | `otherCarIdx` | number | CarIdx of the other car involved in contact (-1 if none or unknown). |
 | `otherCarNumber` | string or null | Car number of the other car (-1 → omit display). |
 | `otherDriverName` | string or null | Driver name of the other car. |
 | `replayFrameNum` | number | iRacing replay frame at incident time. OBS uses this to seek to the exact frame before starting a clip. 0 if unavailable. |
-| `physicsCause` | string or null | Cause mapped from the best-matching `physicsEvents` signal within 2 s of the incident (null if no match). |
-| `physicsEventId` | string or null | `id` of the correlated `PhysicsEvent` (null if no match). |
-| `causeConfidence` | string | `"high"` — physics correlation matched; `"medium"` — telemetry threshold only; `"low"` — YAML-only, no physics data. |
-
-**Notes on `source: "yaml"` events:** At high replay speeds, iRacing batches multiple incidents into a single YAML flush. When the total delta does not match a standard 1/2/4 value, `type` is `"batched"` and `delta` is the total points added in the batch. The `cause` field reflects the best available physics inference for the batch window.
-
----
-
-### 3.3 `physicsEvents` Schema
-
-Sent when player-car physics signals exceed thresholds. These are observation-only events — they do not increment any incident count. Each event has a per-signal cooldown (2 s) to prevent spamming.
-
-```json
-{
-  "type": "physicsEvents",
-  "events": [
-    {
-      "id":                   "a1b2c3d4",
-      "sessionTime":          3723.5,
-      "sessionTimeFormatted": "62:03",
-      "signal":               "LatAccelSpike",
-      "value":                3.74,
-      "threshold":            3.0,
-      "lap":                  12,
-      "trackPct":             0.437
-    }
-  ]
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Short unique ID (8 hex chars). |
-| `sessionTime` | number | Session clock seconds when the signal fired. |
-| `sessionTimeFormatted` | string | `M:SS` formatted time. |
-| `signal` | string | Signal name — see table below. |
-| `value` | number | Measured value at firing (units per-signal). |
-| `threshold` | number | Threshold that was exceeded. |
-| `lap` | number | Current lap number at signal time. |
-| `trackPct` | number | Track position (0–1) at signal time. |
-
-**Signal names:**
-
-| Signal | Unit | Typical cause |
-|--------|------|---------------|
-| `LongAccelSpike` | g | Frontal impact (braking, wall/car ahead) |
-| `LatAccelSpike` | g | Side impact (T-bone, barrier contact) |
-| `VertAccelSpike` | g | Vertical shock (kerb, ramp, airborne landing) |
-| `YawRateSpike` | rad/s | Spin onset (snap oversteer, loss of control) |
-| `SuspensionImpact` | m/s | Hard suspension hit (max shock velocity across all four corners) |
-| `TireLockup` | m/s | Brake lockup (wheel hub speed vs vehicle speed delta) |
-| `TireSpinout` | m/s | Wheelspin (drive wheel speed vs vehicle speed delta) |
 
 ---
 
@@ -242,11 +189,11 @@ Every state message has `"type": "state"` and the following fields. All fields a
 | `hasLiveIncidentData` | boolean | True once the YAML baseline has been established and incident deltas are being tracked. False until the first session YAML parse completes. |
 | `trackName` | string | Track name from `WeekendInfo.TrackName` (empty string until YAML available). |
 | `trackCategory` | string | Track category from `WeekendInfo.Category` (e.g. `"Road"`, `"Oval"`, `"DirtOval"`, `"DirtRoad"`). Defaults to `"Road"` until YAML available. |
-| `trackLengthM` | number | Track length in metres derived from `WeekendInfo.TrackLength`. Used for G-force calculations. |
+| `trackLengthM` | number | Track length in metres derived from `WeekendInfo.TrackLength`. |
 | `sessionId` | string | Stable session identifier: `"{trackName}_{yyyyMMdd}"`. OBS uses this to name clip files unambiguously. Empty string until YAML is available. |
 | `drivers` | array | Driver roster. Each element: `{ carIdx, userName, carNumber, incidents, isPlayer, isSpectator }`. |
 | `incidents` | array | Incident feed (newest first, max 200). See §3.2 for full field list. |
-| `metrics` | object | Detection counters since last iRacing connection (Layer 4 YAML only). Fields: `l4YamlEvents`, `totalEvents`, `yamlUpdates`, `lastDetectionSessionTime`. |
+| `metrics` | object | Detection counters since last iRacing connection. Fields: `yamlIncidentEvents`, `totalEvents`, `yamlUpdates`, `lastDetectionSessionTime`. |
 | `diagnostics` | object | Plugin subsystem health. Fields: `irsdkStarted`, `irsdkConnected`, `wsRunning`, `wsPort`, `wsClients`, `playerCarIdx`. |
 | `sessionDiagnostics` | object | Session/YAML readiness + last capture status (discovery instrumentation). Fields include: `simMode`, `irSessionId`, `irSubSessionId`, `sessionState`, `sessionNum`, `sessionInfoUpdate`, `sessionFlags`, `resultsPositionsCount`, `resultsReady`, incident non-zero stats, and `lastSummaryCapture`. |
 

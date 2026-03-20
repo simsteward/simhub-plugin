@@ -45,6 +45,7 @@ namespace SimSteward.Plugin
         private int _lastLoggedPlayerCarIdx = -2;
         private DateTime _lastWaitingLogAt = DateTime.MinValue;
         private string _pluginDataPath;
+        private string _webApiPath;   // SimHub\Web\sim-steward-dash\api\ — served at /Web/sim-steward-dash/api/
         private string _settingsPath;
         private PluginUiSettings _settings = new PluginUiSettings();
 
@@ -118,6 +119,7 @@ namespace SimSteward.Plugin
         private bool _replayIsPlaying;
         private int _replaySessionNum;
         private readonly IncidentTracker _tracker = new IncidentTracker();
+        private int _scanBroadcastCounter;
         private bool _wasPostRace;
         private bool _wasReplay;
         private SessionSummaryCaptureStatus _lastSummaryCapture = new SessionSummaryCaptureStatus();
@@ -286,6 +288,199 @@ namespace SimSteward.Plugin
                 catch { }
             }
         }
+
+        /// <summary>Write full scan result to a JSON file. Thread-safe.</summary>
+        private void PersistScanResult(ReplayScanProgress progress)
+        {
+            if (progress == null || string.IsNullOrEmpty(_pluginDataPath)) return;
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            var fileName = $"replay_scan_{_tracker.SubSessionId}_{timestamp}.json";
+            var path = System.IO.Path.Combine(_pluginDataPath, fileName);
+            lock (_incidentPersistLock)
+            {
+                try
+                {
+                    var dir = System.IO.Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                        System.IO.Directory.CreateDirectory(dir);
+                    var json = JsonConvert.SerializeObject(progress, Formatting.Indented);
+                    System.IO.File.WriteAllText(path, json, System.Text.Encoding.UTF8);
+                }
+                catch { }
+            }
+            _logger?.Structured("INFO", "simhub-plugin", "replay_scan_persisted",
+                $"Scan result written to {fileName}",
+                new Dictionary<string, object> { ["file"] = fileName, ["incidents"] = progress.IncidentsFound },
+                "replay_scan", null);
+            PersistScanSummary(progress);
+        }
+
+        /// <summary>
+        /// Write session_meta_{subSessionId}.json once per session at baseline capture.
+        /// Only includes WeekendInfo/WeekendOptions/DriverInfo — all available in replay
+        /// without a completed session (no checkered flag dependency).
+        /// </summary>
+        private void PersistSessionMeta()
+        {
+            if (_tracker.SubSessionId == 0 || string.IsNullOrEmpty(_pluginDataPath)) return;
+            var fileName = $"session_meta_{_tracker.SubSessionId}.json";
+            var path = System.IO.Path.Combine(_pluginDataPath, fileName);
+            if (System.IO.File.Exists(path)) return; // already written for this session
+
+            try
+            {
+                var si = _irsdk?.Data?.SessionInfo;
+                var w = si?.WeekendInfo;
+                var opts = w?.WeekendOptions;
+                var sessionPrefix = _tracker.GetSessionPrefix();
+                var meta = new
+                {
+                    sessionPrefix    = sessionPrefix,
+                    subSessionId     = _tracker.SubSessionId,
+                    sessionId        = w?.SessionID ?? 0,
+                    trackName        = _tracker.TrackName,
+                    trackCategory    = _tracker.TrackCategory,
+                    trackLength      = w?.TrackLength ?? "",
+                    trackCity        = w?.TrackCity ?? "",
+                    trackCountry     = w?.TrackCountry ?? "",
+                    simMode          = w?.SimMode ?? "",
+                    seriesId         = w?.SeriesID ?? 0,
+                    seasonId         = w?.SeasonID ?? 0,
+                    leagueId         = w?.LeagueID ?? 0,
+                    incidentLimit    = opts?.IncidentLimit ?? "",
+                    fastRepairsLimit = opts?.FastRepairsLimit ?? "",
+                    sessions         = si?.SessionInfo?.Sessions?.Select(s => new {
+                                           s.SessionNum, s.SessionType, s.SessionName
+                                       }).ToList(),
+                    drivers          = _tracker.GetDriverSnapshot(),
+                    capturedAtUtc    = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                };
+                var dir = System.IO.Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllText(path, JsonConvert.SerializeObject(meta, Formatting.Indented), System.Text.Encoding.UTF8);
+                _logger?.Structured("INFO", "simhub-plugin", "session_meta_persisted",
+                    $"Session metadata written: {fileName}",
+                    new Dictionary<string, object> { ["file"] = fileName, ["session_prefix"] = sessionPrefix },
+                    "replay_scan", null);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Write session_summary_{subSessionId}_{ts}.json after scan completes.
+        /// Contains sessionPrefix, drivers, and full incidentFeed with fingerprints.
+        /// No ResultsPositions — replay may not have a checkered flag.
+        /// </summary>
+        private void PersistScanSummary(ReplayScanProgress progress)
+        {
+            if (progress == null || string.IsNullOrEmpty(_pluginDataPath)) return;
+            try
+            {
+                var fileName = $"session_summary_{_tracker.SubSessionId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.json";
+                var path = System.IO.Path.Combine(_pluginDataPath, fileName);
+                var sessionPrefix = _tracker.GetSessionPrefix();
+                var summary = new
+                {
+                    sessionPrefix  = sessionPrefix,
+                    subSessionId   = _tracker.SubSessionId,
+                    trackName      = _tracker.TrackName,
+                    capturedAtUtc  = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                    drivers        = _tracker.GetDriverSnapshot(),
+                    incidentFeed   = _tracker.GetIncidentFeed(),
+                    incidentsFound = progress.IncidentsFound,
+                };
+                var dir = System.IO.Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllText(path, JsonConvert.SerializeObject(summary, Formatting.Indented), System.Text.Encoding.UTF8);
+                _logger?.Structured("INFO", "simhub-plugin", "session_summary_persisted",
+                    $"Session summary written: {fileName}",
+                    new Dictionary<string, object> { ["file"] = fileName, ["incidents"] = progress.IncidentsFound, ["session_prefix"] = sessionPrefix },
+                    "replay_scan", null);
+            }
+            catch { }
+        }
+
+        // ── Web API file writes ───────────────────────────────────────────────
+        // SimHub's HTTP server (port 8888) serves Web\ as static files.
+        // We write JSON here so the dashboard (and external tools) can GET them:
+        //   /Web/sim-steward-dash/api/incidents.json
+        //   /Web/sim-steward-dash/api/session.json
+        //   /Web/sim-steward-dash/api/snapshots/{incidentId}.json
+
+        /// <summary>Rewrite incidents.json with the full current feed. Called after each AddIncident.</summary>
+        private void WriteWebApiIncidentFeed()
+        {
+            if (string.IsNullOrEmpty(_webApiPath)) return;
+            try
+            {
+                var feed = _tracker.GetIncidentFeed();
+                var payload = new
+                {
+                    sessionPrefix = _tracker.GetSessionPrefix(),
+                    subSessionId  = _tracker.SubSessionId,
+                    updatedAtUtc  = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                    incidents     = feed,
+                };
+                Directory.CreateDirectory(_webApiPath);
+                File.WriteAllText(
+                    Path.Combine(_webApiPath, "incidents.json"),
+                    JsonConvert.SerializeObject(payload),
+                    System.Text.Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        /// <summary>Write session.json with meta + driver roster. Written once per session after baseline capture.</summary>
+        private void WriteWebApiSession()
+        {
+            if (string.IsNullOrEmpty(_webApiPath) || _tracker.SubSessionId == 0) return;
+            try
+            {
+                var si = _irsdk?.Data?.SessionInfo;
+                var w  = si?.WeekendInfo;
+                var payload = new
+                {
+                    sessionPrefix = _tracker.GetSessionPrefix(),
+                    subSessionId  = _tracker.SubSessionId,
+                    trackName     = _tracker.TrackName,
+                    trackLength   = w?.TrackLength ?? "",
+                    seriesId      = w?.SeriesID ?? 0,
+                    simMode       = w?.SimMode ?? "",
+                    drivers       = _tracker.GetDriverSnapshot(),
+                    capturedAtUtc = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                };
+                Directory.CreateDirectory(_webApiPath);
+                File.WriteAllText(
+                    Path.Combine(_webApiPath, "session.json"),
+                    JsonConvert.SerializeObject(payload),
+                    System.Text.Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        /// <summary>Write one file per snapshot: snapshots/{incidentId}.json. Called after scan completes.</summary>
+        private void WriteWebApiSnapshotFiles(ReplayScanProgress progress)
+        {
+            if (string.IsNullOrEmpty(_webApiPath) || progress?.Snapshots == null) return;
+            try
+            {
+                var snapshotsDir = Path.Combine(_webApiPath, "snapshots");
+                Directory.CreateDirectory(snapshotsDir);
+                foreach (var snap in progress.Snapshots)
+                {
+                    if (snap?.IncidentId == null) continue;
+                    // Sanitize incidentId for use as filename (replace chars not safe on Windows)
+                    var safeName = snap.IncidentId.Replace(':', '_').Replace('/', '_') + ".json";
+                    File.WriteAllText(
+                        Path.Combine(snapshotsDir, safeName),
+                        JsonConvert.SerializeObject(snap),
+                        System.Text.Encoding.UTF8);
+                }
+            }
+            catch { }
+        }
 #endif
 
 #if SIMHUB_SDK
@@ -379,7 +574,8 @@ namespace SimSteward.Plugin
                     PlayerCarIdx   = _tracker.PlayerCarIdx,
                 },
                 SessionDiagnostics = BuildSessionDataDiagnostics(),
-                ProjectMarkers = BuildProjectMarkers()
+                ProjectMarkers = BuildProjectMarkers(),
+                ReplayScan = _tracker.CurrentScanState != IncidentTracker.ScanState.Idle ? _tracker.ScanProgress : null
             };
         }
 
@@ -580,6 +776,15 @@ namespace SimSteward.Plugin
                 case "ReplaySeekToSessionEnd":
                     result = HandleReplaySeekToSessionEnd(arg);
                     return true;
+                case "StartReplayScan":
+                    result = HandleStartReplayScan(arg);
+                    return true;
+                case "StopReplayScan":
+                    result = HandleStopReplayScan();
+                    return true;
+                case "GetReplayScanProgress":
+                    result = HandleGetReplayScanProgress();
+                    return true;
                 default:
                     result = default;
                     return false;
@@ -715,6 +920,41 @@ namespace SimSteward.Plugin
             _logger?.Structured("INFO", "simhub-plugin", "replay_control", "Replay seek to session start", new Dictionary<string, object> { ["mode"] = "seek_session_start", ["session_num"] = sessionNum }, "replay", GetIncidentIdForSpine());
             _irsdk.ReplaySearchSessionTime(sessionNum, 0);
             return (true, "ok", null);
+        }
+
+        private (bool success, string result, string error) HandleStartReplayScan(string arg)
+        {
+            if (!EnsureIrsdkConnected(out var error))
+                return (false, null, error);
+
+            int sessionNum = _replaySessionNum >= 0 ? _replaySessionNum : 0;
+            if (!string.IsNullOrWhiteSpace(arg) && int.TryParse(arg.Trim(), out int parsed))
+                sessionNum = parsed;
+
+            bool started = _tracker.StartReplayScan(_irsdk, sessionNum);
+            if (!started)
+                return (false, null, "scan_already_running_or_failed");
+
+            _logger?.Structured("INFO", "simhub-plugin", "replay_scan_started",
+                $"Replay incident scan started for session {sessionNum}",
+                new Dictionary<string, object> { ["session_num"] = sessionNum },
+                "replay_scan", GetIncidentIdForSpine());
+            return (true, "scan_started", null);
+        }
+
+        private (bool success, string result, string error) HandleStopReplayScan()
+        {
+            _tracker.StopReplayScan();
+            _logger?.Structured("INFO", "simhub-plugin", "replay_scan_stopped", "Replay scan stopped.",
+                null, "replay_scan", GetIncidentIdForSpine());
+            return (true, "scan_stopped", null);
+        }
+
+        private (bool success, string result, string error) HandleGetReplayScanProgress()
+        {
+            var progress = _tracker.ScanProgress;
+            var json = JsonConvert.SerializeObject(progress);
+            return (true, json, null);
         }
 
         private bool EnsureIrsdkConnected(out string error)
@@ -1230,6 +1470,8 @@ namespace SimSteward.Plugin
             {
                 if (!string.IsNullOrEmpty(_pluginDataPath) && !Directory.Exists(_pluginDataPath))
                     Directory.CreateDirectory(_pluginDataPath);
+                if (!string.IsNullOrEmpty(_webApiPath) && !Directory.Exists(_webApiPath))
+                    Directory.CreateDirectory(_webApiPath);
 
 #if SIMHUB_SDK
                 object replayMetadata = BuildReplayMetadata();
@@ -1480,6 +1722,8 @@ namespace SimSteward.Plugin
             _pluginDataPath = System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "SimHubWpf", "PluginsData", "SimSteward");
+            _webApiPath = System.IO.Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "Web", "sim-steward-dash", "api");
             _settingsPath = Path.Combine(_pluginDataPath, "ui-settings.json");
             _settings = LoadUiSettings();
             var omitList = _settings.OmitLogLevels;
@@ -1560,6 +1804,7 @@ namespace SimSteward.Plugin
             _tracker.OnIncidentPersist = ev =>
             {
                 PersistIncident(ev);
+                WriteWebApiIncidentFeed();
                 if (ev != null && _logger != null)
                     _logger.Structured("INFO", "simhub-plugin", "incident_persisted", "Incident persisted to file.",
                         new Dictionary<string, object>
@@ -1571,6 +1816,13 @@ namespace SimSteward.Plugin
                             ["type"] = ev.Type ?? "?",
                             ["source"] = ev.Source ?? "?"
                         }, "incident", ev?.Id);
+            };
+            _tracker.OnBaselineCaptured = () => { PersistSessionMeta(); WriteWebApiSession(); };
+            _tracker.OnScanComplete = progress =>
+            {
+                PersistScanResult(progress);
+                WriteWebApiSnapshotFiles(progress);
+                WriteWebApiIncidentFeed(); // final feed after all scan incidents merged
             };
             _logger.Structured("INFO", "simhub-plugin", "plugin_started", "SimSteward plugin starting.", null, "lifecycle", null);
 
@@ -1768,7 +2020,50 @@ namespace SimSteward.Plugin
                 _currentSessionSeq = BuildSessionSeq(trackName);
                 _currentSessionId = subId > 0 ? subId.ToString() : _currentSessionSeq;
 
-                _tracker.Update(_irsdk, _lastSessionTime);
+                bool scanActive = _tracker.CurrentScanState != IncidentTracker.ScanState.Idle &&
+                                  _tracker.CurrentScanState != IncidentTracker.ScanState.Complete &&
+                                  _tracker.CurrentScanState != IncidentTracker.ScanState.Error;
+
+                // Skip live YAML tracking while scan is running — scan owns YAML reads during its seek loop.
+                // Prevents _prevYamlIncidents from being corrupted by historical frame values seen during scan.
+                if (!scanActive)
+                    _tracker.Update(_irsdk, _lastSessionTime);
+
+                // Advance replay scan state machine (no-op when idle)
+                if (scanActive)
+                {
+                    _tracker.TickReplayScan(_irsdk);
+
+                    // Broadcast scan progress periodically (every ~30 ticks = ~0.5s)
+                    if (_scanBroadcastCounter++ % 30 == 0 && _bridge != null)
+                    {
+                        try
+                        {
+                            var progressJson = JsonConvert.SerializeObject(new { type = "replayScanProgress", data = _tracker.ScanProgress });
+                            _bridge.Broadcast(progressJson);
+                        }
+                        catch { }
+                    }
+
+                    // On completion, broadcast final result and reset live tracking baseline
+                    if (_tracker.CurrentScanState == IncidentTracker.ScanState.Complete ||
+                        _tracker.CurrentScanState == IncidentTracker.ScanState.Error)
+                    {
+                        if (_bridge != null)
+                        {
+                            try
+                            {
+                                var resultJson = JsonConvert.SerializeObject(new { type = "replayScanComplete", data = _tracker.ScanProgress });
+                                _bridge.Broadcast(resultJson);
+                            }
+                            catch { }
+                        }
+                        _scanBroadcastCounter = 0;
+                        // Reset live tracker baseline so _prevYamlIncidents reflects current YAML state
+                        // after scan, not stale mid-scan values.
+                        _tracker.ResetLiveBaseline(_irsdk);
+                    }
+                }
 
                 int rawPlayerIncidentCount = SafeGetInt("PlayerCarMyIncidentCount");
                 // iRacing incident count is 0-999; SDK can return garbage if shared memory not ready or var missing — reject out-of-range to avoid bogus incidents and corrupted prev state

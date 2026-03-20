@@ -124,11 +124,7 @@ namespace SimSteward.Plugin.MemoryBank
                 },
                 detection = new
                 {
-                    l1PlayerEvents         = m.L1PlayerEvents,
-                    l2PhysicsImpacts       = m.L2PhysicsImpacts,
-                    l3OffTrackEvents       = m.L3OffTrackEvents,
-                    l4YamlEvents           = m.L4YamlEvents,
-                    zeroXEvents            = m.ZeroXEvents,
+                    yamlIncidentEvents     = m.YamlIncidentEvents,
                     totalEvents            = m.TotalEvents,
                     yamlUpdates            = m.YamlUpdates,
                     lastDetectionSessionTime = m.LastDetectionSessionTime >= 0
@@ -160,7 +156,7 @@ namespace SimSteward.Plugin.MemoryBank
 
         /// <summary>
         /// Human-readable operational health report — gives the AI (and developer) an
-        /// at-a-glance status of every subsystem and detection layer without opening JSON.
+        /// at-a-glance status of every subsystem without opening JSON.
         /// </summary>
         private string BuildHealthMarkdown(MemoryBankSnapshot snapshot)
         {
@@ -203,17 +199,13 @@ namespace SimSteward.Plugin.MemoryBank
             }
             sb.AppendLine();
 
-            sb.AppendLine("## Detection Layer Counts");
+            sb.AppendLine("## Detection Counts");
             sb.AppendLine();
             sb.AppendLine("Counts accumulate from iRacing connection until disconnect.");
             sb.AppendLine();
-            sb.AppendLine($"| Layer | Description | Events |");
-            sb.AppendLine($"|-------|-------------|--------|");
-            sb.AppendLine($"| L1    | PlayerCarMyIncidentCount (player/focused car, 60 Hz, exact type) | {na(m.L1PlayerEvents)} |");
-            sb.AppendLine($"| L2    | Physics G-force impact (all cars) | {na(m.L2PhysicsImpacts)} |");
-            sb.AppendLine($"| L3    | Track surface off-track (all cars) | {na(m.L3OffTrackEvents)} |");
-            sb.AppendLine($"| L4    | Session YAML deltas (all drivers, batched) | {na(m.L4YamlEvents)} |");
-            sb.AppendLine($"| 0x    | Player contact/off-track without count change | {na(m.ZeroXEvents)} |");
+            sb.AppendLine($"| Source | Description | Events |");
+            sb.AppendLine($"|--------|-------------|--------|");
+            sb.AppendLine($"| YAML   | CurDriverIncidentCount deltas (all drivers) | {na(m.YamlIncidentEvents)} |");
             sb.AppendLine($"| **Total** | | **{m.TotalEvents}** |");
             sb.AppendLine();
             sb.AppendLine($"**YAML session updates**: {m.YamlUpdates}");

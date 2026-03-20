@@ -15,8 +15,8 @@
 | `BuildStateJson(snapshot)` | Dashboard `handleMessage` → `applyState(p)` | State includes `hasLiveIncidentData`, `diagnostics`, `metrics`. |
 | `applyState()` | `lastIncidentContext` (only when `dataChanged \|\| throttleElapsed`) | `lastIncidentContext = { hasLiveIncidentData: !!s.hasLiveIncidentData, irsdkConnected: !!s.diagnostics?.irsdkConnected }`. |
 | `lastIncidentContext` | `renderIncidents()` empty-state branch | Used to choose: "Waiting for iRacing…", "Connected — establishing baseline…", "No incidents detected yet.", "No incidents match this filter." |
-| `applyDiagnostics(diag, metrics)` | Status bar `#ir-status`, infra dots, layer counts | Sets pill text/class from `diag.irsdkConnected`. |
-| `clearDiagnostics()` | Called from `onClose` | Clears infra dots, pill, labels, layer counts. **Does not** reset `lastIncidentContext` or re-render incident feed. |
+| `applyDiagnostics(diag, metrics)` | Status bar `#ir-status`, infra dots, detection counts | Sets pill text/class from `diag.irsdkConnected`. |
+| `clearDiagnostics()` | Called from `onClose` | Clears infra dots, pill, labels, detection counts. **Does not** reset `lastIncidentContext` or re-render incident feed. |
 | `_tracker.BaselineJustEstablished` | Plugin after `_tracker.Update()` | One-time `logEvents` broadcast when true. Cleared at start of next `Update()`. |
 | Memory bank | `MemoryBankClient` builds JSON/markdown | Uses `snapshot.Diagnostics`, `HasLiveIncidentData`; consistent with plugin state. |
 
@@ -28,7 +28,7 @@
 
 **Location:** Dashboard `onClose` → `clearDiagnostics()`.
 
-**Issue:** On WebSocket disconnect we clear the diagnostics UI (infra dots, iRacing pill, layer counts) but we do **not** reset `lastIncidentContext` or re-render the incident feed. So with 0 incidents the feed can still show "Connected — establishing baseline…" or "No incidents detected yet." while the status bar and diagnostics show disconnected state.
+**Issue:** On WebSocket disconnect we clear the diagnostics UI (infra dots, iRacing pill, detection counts) but we do **not** reset `lastIncidentContext` or re-render the incident feed. So with 0 incidents the feed can still show "Connected — establishing baseline…" or "No incidents detected yet." while the status bar and diagnostics show disconnected state.
 
 **Downstream:** `renderIncidents()` uses `lastIncidentContext` only when rendering the empty state; it is not re-run on disconnect, so the message stays stale until the next `applyState` (i.e. after reconnect).
 

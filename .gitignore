@@ -41,3 +41,6 @@ debug-*.log
 
 # ContextStream local
 .contextstream/
+
+# Local observability stack host data (Docker bind mounts)
+observability/local/.storage/

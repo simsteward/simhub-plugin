@@ -6,33 +6,16 @@ using SimSteward.Plugin;
 namespace SimSteward.Plugin.MemoryBank
 {
     /// <summary>
-    /// Per-layer incident detection counters for the current plugin session.
-    /// Resets when iRacing disconnects. Lets you see exactly which layers are
-    /// firing and how many events each has produced.
+    /// Incident detection counters for the current plugin session.
+    /// Resets when iRacing disconnects.
     /// </summary>
     public class DetectionMetrics
     {
-        /// <summary>Layer 1 — PlayerCarMyIncidentCount telemetry (player/focused car, 60 Hz, exact type).</summary>
-        [JsonProperty("l1PlayerEvents")]
-        public int L1PlayerEvents { get; set; }
+        /// <summary>YAML CurDriverIncidentCount deltas (all drivers).</summary>
+        [JsonProperty("yamlIncidentEvents")]
+        public int YamlIncidentEvents { get; set; }
 
-        /// <summary>Layer 2 — CarIdxLapDistPct velocity → G-force (all cars, physics impact).</summary>
-        [JsonProperty("l2PhysicsImpacts")]
-        public int L2PhysicsImpacts { get; set; }
-
-        /// <summary>Layer 3 — CarIdxTrackSurface OnTrack→OffTrack transitions (all cars).</summary>
-        [JsonProperty("l3OffTrackEvents")]
-        public int L3OffTrackEvents { get; set; }
-
-        /// <summary>Layer 4 — Session YAML ResultsPositions.Incidents deltas (all drivers, batched).</summary>
-        [JsonProperty("l4YamlEvents")]
-        public int L4YamlEvents { get; set; }
-
-        /// <summary>0x — Player contact or off-track detected by physics but no official count change.</summary>
-        [JsonProperty("zeroXEvents")]
-        public int ZeroXEvents { get; set; }
-
-        /// <summary>All incidents added to the feed across all layers.</summary>
+        /// <summary>All incidents added to the feed.</summary>
         [JsonProperty("totalEvents")]
         public int TotalEvents { get; set; }
 

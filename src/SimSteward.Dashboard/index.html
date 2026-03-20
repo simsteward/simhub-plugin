@@ -130,6 +130,33 @@
             transition: width 0.2s ease;
         }
 
+        /* ── Scan section ─────────────────────────────────────────── */
+        .scan-section { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
+        .scan-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .scan-controls .btn { flex: 0 1 auto; }
+        .scan-state-label { font-size: 0.78rem; color: var(--muted); margin-left: auto; }
+        .scan-state-idle    { color: var(--muted); }
+        .scan-state-scanning { color: var(--accent); }
+        .scan-state-complete { color: #4ddf87; }
+        .scan-state-error    { color: #ff5f5f; }
+        #scan-progress-row { display: flex; flex-direction: column; gap: 6px; }
+        #scan-progress-fill {
+            height: 100%; width: 0;
+            border-radius: 6px;
+            background: linear-gradient(90deg, var(--accent), #0dd8ff);
+            transition: width 0.3s ease;
+        }
+        #scan-incidents-label { font-size: 0.78rem; color: var(--muted); text-align: right; }
+        #scan-result { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border-left: 3px solid var(--border); font-size: 0.82rem; }
+        #scan-result.valid   { border-left-color: #4ddf87; }
+        #scan-result.invalid { border-left-color: #ff5f5f; }
+        .scan-result-header { font-weight: 600; margin-bottom: 6px; }
+        .scan-result-counts { color: var(--muted); margin-bottom: 6px; }
+        .scan-mismatch-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-family: monospace; }
+        .scan-mismatch-table th { text-align: left; color: var(--muted); font-weight: normal; padding: 2px 6px 2px 0; }
+        .scan-mismatch-table td { padding: 2px 6px 2px 0; }
+        .scan-result-error { color: #ff5f5f; }
+
         /* ── Section header ───────────────────────────────────────── */
         .section-header {
             display: flex; align-items: center; justify-content: space-between;
@@ -375,6 +402,25 @@
             transition: opacity 0.15s;
         }
         .incident-card:hover .seek-hint { opacity: 1; }
+        .incident-card.expanded { background: rgba(255,255,255,0.05); }
+        .snapshot-detail {
+            grid-column: 1 / -1;
+            display: none;
+            padding: 8px 4px 2px;
+            border-top: 1px solid rgba(255,255,255,0.07);
+            margin-top: 4px;
+        }
+        .incident-card.expanded .snapshot-detail { display: block; }
+        .snapshot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 4px 12px;
+        }
+        .snapshot-item { display: flex; flex-direction: column; gap: 1px; }
+        .snapshot-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .snapshot-value { font-size: 0.82rem; font-family: "Courier New", monospace; color: var(--text); }
+        .snapshot-involved { margin-top: 6px; font-size: 0.75rem; color: var(--muted); }
+        .snapshot-tag { font-size: 0.68rem; background: rgba(255,255,255,0.07); border-radius: 4px; padding: 1px 5px; color: var(--cyan); }
         .incident-time {
             font-family: "Courier New", monospace;
             font-size: 0.78rem;
@@ -407,7 +453,6 @@
             border-radius: 6px;
             white-space: nowrap;
         }
-        .badge-0x { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid rgba(255,255,255,0.12); }
         .badge-1x { background: rgba(14,242,114,0.15); color: var(--green); border: 1px solid rgba(14,242,114,0.3); }
         .badge-2x { background: rgba(255,200,64,0.15); color: var(--yellow); border: 1px solid rgba(255,200,64,0.3); }
         .badge-4x { background: rgba(255,95,95,0.15); color: var(--red); border: 1px solid rgba(255,95,95,0.35); }
@@ -517,26 +562,6 @@
         .infra-dot.warn { background: var(--yellow); box-shadow: 0 0 4px rgba(255,200,64,0.4); }
         .infra-dot.err  { background: var(--red);    box-shadow: 0 0 4px rgba(255,95,95,0.4); }
 
-        /* Layer metrics bar */
-        .layers-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 5px;
-        }
-        .layer-cell {
-            display: flex; flex-direction: column; align-items: center;
-            gap: 2px;
-            padding: 5px 4px;
-            border-radius: 7px;
-            background: rgba(255,255,255,0.025);
-            border: 1px solid rgba(255,255,255,0.06);
-            cursor: default;
-        }
-        .layer-cell.active { border-color: rgba(31,156,255,0.3); background: rgba(31,156,255,0.06); }
-        .layer-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-        .layer-count { font-family: "Courier New", monospace; font-size: 0.92rem; font-weight: 700; color: var(--text); }
-        .layer-count.zero { color: rgba(245,245,245,0.25); }
-        .layer-desc { font-size: 0.62rem; color: rgba(245,245,245,0.3); text-align: center; line-height: 1.2; }
 
         /* yaml updates pill */
         .diag-footer { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -670,6 +695,18 @@
             </div>
             <div class="progress-track"><div id="progress-fill"></div></div>
         </div>
+        <div class="scan-section">
+            <div class="scan-controls">
+                <button id="btn-start-scan" class="btn">&#128269; Scan Session</button>
+                <button id="btn-stop-scan" class="btn" style="display:none">&#9646;&#9646; Stop</button>
+                <span id="scan-state-label" class="scan-state-label scan-state-idle">Idle</span>
+            </div>
+            <div id="scan-progress-row" style="display:none">
+                <div class="progress-track"><div id="scan-progress-fill"></div></div>
+                <span id="scan-incidents-label">0 incidents</span>
+            </div>
+            <div id="scan-result" style="display:none"></div>
+        </div>
     </section>
 
     <!-- Driver standings -->
@@ -766,7 +803,8 @@
         <div class="stream-panel-body">
             <div class="stream-header">
                 <span></span>
-                <button class="stream-clear-btn" id="stream-clear-btn">clear</button>
+                <button class="stream-clear-btn" id="stream-clear-btn">clear logs</button>
+                <button class="stream-clear-btn" id="stream-clear-all-btn" style="margin-left:6px">clear all</button>
             </div>
             <div class="log-filter-row" id="log-filter-row">
                 <span class="log-filter-label">Hide level:</span>
@@ -821,6 +859,7 @@
     let lastDriverKey = "";
     let activeFilter = "all";
     let allIncidents = [];
+    let clearedIncidentIds = new Set(); // IDs hidden by a user-initiated clear; filtered from state pushes
     const STORAGE_KEY_INCIDENT_VIEW = "simsteward_incident_view";
     const STORAGE_KEY_LOG_FILTER = "simsteward_log_filter";
     const LOG_FILTER_DEFAULTS = {
@@ -893,7 +932,9 @@
     let debugLogHasAlert = false;
     let debugLogHasError = false;
     let lastSessionSummary = null;
-    const DEBUG_STATE_LOG = false; // set true in browser console to debug state/drivers/incidents
+    const DEBUG_STATE_LOG = false;
+    /** Map of snapshotId → IncidentSnapshot, populated from state.replayScan.snapshots. */
+    const scanSnapshotsById = new Map();
 
     const urlParams = new URLSearchParams(window.location.search);
     const wsToken = urlParams.get("token") || urlParams.get("wsToken");
@@ -959,6 +1000,8 @@
         const dpCaptured = document.getElementById("dp-captured");
         if (dpLast) dpLast.textContent = "Last detection: —";
         if (dpCaptured) dpCaptured.textContent = "Incidents captured: 0";
+
+        applyScanState(null);
 
         const sdCore = document.getElementById("sd-core");
         const sdResults = document.getElementById("sd-results");
@@ -1175,8 +1218,6 @@
 
             let lvlClass = "INCIDENT";
             let lvlText = ev.type === "off-track" ? "+1x" : "INC";
-            if (ev.type === "detected") { lvlClass = "DETECT"; lvlText = "DET"; }
-            else if (ev.type === "0x") { lvlClass = "ZEROX"; lvlText = "0x"; }
 
             row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${lvlClass}">${lvlText}</span><span class="stream-msg">${esc(label)}</span>`;
             eventStream.insertBefore(row, eventStream.firstChild);
@@ -1412,6 +1453,93 @@
         dotEl.className = "infra-dot ok";
     }
 
+    // ── Scan UI ────────────────────────────────────────────────────
+    const SCAN_STATE_LABELS = {
+        SeekingStart:    "Seeking to start\u2026",
+        WaitForSettle:   "Settling\u2026",
+        WaitForYaml:     "Waiting for YAML\u2026",
+        CaptureBaseline: "Capturing baseline\u2026",
+        SeekNext:        "Seeking next\u2026",
+        ReadIncident:    "Reading incident\u2026",
+        Validating:      "Validating\u2026",
+        Complete:        "Complete",
+        Error:           "Error"
+    };
+    const SCAN_TERMINAL = new Set(["Complete", "Error"]);
+    const SCAN_IN_PROGRESS = new Set(["SeekingStart","WaitForSettle","WaitForYaml","CaptureBaseline","SeekNext","ReadIncident","Validating"]);
+
+    function scanCssClass(state) {
+        if (state === "Complete") return "complete";
+        if (state === "Error")    return "error";
+        if (SCAN_IN_PROGRESS.has(state)) return "scanning";
+        return "idle";
+    }
+
+    function buildScanResultHtml(scan) {
+        const v = scan.validation;
+        if (scan.state === "Error") {
+            return `<div class="scan-result-header scan-result-error">Scan failed</div>` +
+                   `<div class="scan-result-error">${esc(scan.error ?? "Unknown error")}</div>`;
+        }
+        const validLabel = v?.valid ? "\u2713 Validated" : "\u26A0 Validation mismatch";
+        const validColor = v?.valid ? "#4ddf87" : "#ff5f5f";
+        let html = `<div class="scan-result-header" style="color:${validColor}">${validLabel}</div>`;
+        if (v) {
+            html += `<div class="scan-result-counts">Captured: ${v.totalCaptured} &nbsp;/&nbsp; Expected: ${v.totalExpected} &nbsp;&middot;&nbsp; ${scan.incidentsFound} incident${scan.incidentsFound !== 1 ? "s" : ""}</div>`;
+            if (v.driverMismatches && v.driverMismatches.length > 0) {
+                html += `<table class="scan-mismatch-table"><thead><tr><th>Car</th><th>Driver</th><th>Captured</th><th>Expected</th></tr></thead><tbody>`;
+                v.driverMismatches.forEach(m => {
+                    html += `<tr><td>${esc(m.car ?? "?")}</td><td>${esc(m.driver ?? "?")}</td><td>${m.captured}</td><td>${m.expected}</td></tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+        } else {
+            html += `<div class="scan-result-counts">${scan.incidentsFound} incident${scan.incidentsFound !== 1 ? "s" : ""} found</div>`;
+        }
+        return html;
+    }
+
+    function applyScanState(scan) {
+        // Keep snapshot lookup map current
+        if (scan && Array.isArray(scan.snapshots)) {
+            for (const s of scan.snapshots) {
+                if (s && s.incidentId) scanSnapshotsById.set(s.incidentId, s);
+            }
+        }
+        const startBtn  = document.getElementById("btn-start-scan");
+        const stopBtn   = document.getElementById("btn-stop-scan");
+        const label     = document.getElementById("scan-state-label");
+        const progressRow = document.getElementById("scan-progress-row");
+        const progFill  = document.getElementById("scan-progress-fill");
+        const incLabel  = document.getElementById("scan-incidents-label");
+        const resultEl  = document.getElementById("scan-result");
+        if (!startBtn) return;
+
+        const inProgress = scan && SCAN_IN_PROGRESS.has(scan.state);
+        startBtn.style.display = inProgress ? "none" : "";
+        stopBtn.style.display  = inProgress ? "" : "none";
+
+        label.textContent = scan ? (SCAN_STATE_LABELS[scan.state] ?? scan.state) : "Idle";
+        label.className = "scan-state-label scan-state-" + (scan ? scanCssClass(scan.state) : "idle");
+
+        if (scan && scan.totalFrames > 0) {
+            progressRow.style.display = "";
+            const pct = Math.max(0, Math.min(1, scan.currentFrameNum / scan.totalFrames));
+            progFill.style.width = Math.round(pct * 100) + "%";
+            incLabel.textContent = scan.incidentsFound + " incident" + (scan.incidentsFound !== 1 ? "s" : "");
+        } else {
+            progressRow.style.display = "none";
+        }
+
+        if (scan && SCAN_TERMINAL.has(scan.state)) {
+            resultEl.style.display = "";
+            resultEl.innerHTML = buildScanResultHtml(scan);
+            resultEl.className = (scan.state === "Complete" && scan.validation?.valid) ? "valid" : "invalid";
+        } else {
+            resultEl.style.display = "none";
+        }
+    }
+
     // ── State rendering ────────────────────────────────────────────
     function applyState(s) {
         applyDiagnostics(s.diagnostics ?? null, s.metrics ?? null);
@@ -1491,9 +1619,13 @@
                 hasLiveIncidentData: !!s.hasLiveIncidentData
             });
         }
-        // Keep captured session incidents in the panel if state has none (e.g. baseline reset during replay)
-        if (incidents.length > 0 || !lastSessionSummary?.incidentFeed?.length)
-            allIncidents = incidents;
+        // Keep captured session incidents in the panel if state has none (e.g. baseline reset during replay).
+        // Filter out any IDs the user explicitly cleared — they should not reappear from state pushes.
+        const visible = clearedIncidentIds.size
+            ? incidents.filter(ev => !clearedIncidentIds.has(ev.id))
+            : incidents;
+        if (visible.length > 0 || !lastSessionSummary?.incidentFeed?.length)
+            allIncidents = visible;
         const dpCaptured = document.getElementById("dp-captured");
         if (dpCaptured) dpCaptured.textContent = `Incidents captured: ${incidents.length}`;
         const incidentKey = incidents.map(ev => ev.id ?? "").join(",");
@@ -1513,6 +1645,8 @@
             incidentDataDirty = false;
             renderIncidentViews();
         }
+
+        applyScanState(s.replayScan ?? null);
     }
 
     function buildDriverRowData(d, playerCarIdx) {
@@ -1615,6 +1749,8 @@
         const otherLabel = ev.otherDriverName ? `vs #${esc(ev.otherCarNumber || "?")} ${esc(ev.otherDriverName)}` : "";
         const lapLabel = ev.lap > 0 ? `Lap ${ev.lap}` : "";
         const pctLabel = ev.trackPct > 0 ? `T${(ev.trackPct * 100).toFixed(1)}%` : "";
+        const hasSnapshot = !!(ev.snapshotRef && scanSnapshotsById.has(ev.snapshotRef));
+        const snapTag = hasSnapshot ? `<span class="snapshot-tag" title="Scan telemetry available">&#128202; data</span>` : "";
         const detailParts = [
             ev.totalAfter != null && ev.delta > 0 ? `${Math.min(999, Math.max(0, ev.totalAfter))} pts total` : "",
             causeTag,
@@ -1627,19 +1763,49 @@
             : `#${esc(ev.carNumber ?? "?")} ${esc(ev.driverName ?? "Unknown")}`;
         return {
             id: ev.id ?? "",
+            snapshotRef: ev.snapshotRef ?? "",
             cardClass,
             badgeCls,
             badgeLabel,
             time: ev.sessionTimeFormatted ?? "—",
             driver: driverLabel,
-            detailHtml: detailParts.join(" · ")
+            detailHtml: (snapTag ? snapTag + " " : "") + detailParts.join(" · ")
         };
+    }
+
+    function buildSnapshotDetailHtml(snap) {
+        if (!snap) return `<div class="snapshot-detail"></div>`;
+        const speedKph = (snap.camSpeed * 3.6).toFixed(1);
+        const latG = snap.camLatAccel != null ? (snap.camLatAccel / 9.81).toFixed(2) : "—";
+        const longG = snap.camLongAccel != null ? (snap.camLongAccel / 9.81).toFixed(2) : "—";
+        const throttle = snap.camThrottle != null ? Math.round(snap.camThrottle * 100) + "%" : "—";
+        const brake = snap.camBrake != null ? Math.round(snap.camBrake * 100) + "%" : "—";
+        const frame = snap.replayFrameNum > 0 ? snap.replayFrameNum.toLocaleString() : "—";
+        const items = [
+            ["Speed", speedKph + " km/h"],
+            ["Lat G", latG + " g"],
+            ["Long G", longG + " g"],
+            ["Throttle", throttle],
+            ["Brake", brake],
+            ["Frame", frame],
+        ];
+        const gridHtml = items.map(([label, val]) =>
+            `<div class="snapshot-item"><span class="snapshot-label">${label}</span><span class="snapshot-value">${val}</span></div>`
+        ).join("");
+        const involved = Array.isArray(snap.driversInvolved) && snap.driversInvolved.length > 0
+            ? "Involved: " + snap.driversInvolved.map(d => `#${esc(d.carNumber ?? "?")} ${esc(d.driverName ?? "?")}${d.incidentDelta > 0 ? " +" + d.incidentDelta + "x" : ""}`).join(", ")
+            : "";
+        return `<div class="snapshot-detail"><div class="snapshot-grid">${gridHtml}</div>${involved ? `<div class="snapshot-involved">${involved}</div>` : ""}</div>`;
     }
 
     function buildIncidentCardHtml(data, isNew) {
         const extraCls = [data.cardClass, isNew ? "card-new" : ""].filter(Boolean).join(" ");
         const cls = extraCls ? "incident-card " + extraCls : "incident-card";
-        return `<div class="${cls}" data-incident-id="${esc(data.id)}" title="Click to seek replay">
+        const snapRef = data.snapshotRef ? ` data-snapshot-ref="${esc(data.snapshotRef)}"` : "";
+        const snap = data.snapshotRef ? scanSnapshotsById.get(data.snapshotRef) : null;
+        // Always include snapshot-detail div (may be empty); content injected/patched when snapshot arrives
+        const snapDetailHtml = buildSnapshotDetailHtml(snap);
+        return `<div class="${cls}" data-incident-id="${esc(data.id)}"${snapRef} title="Click to seek replay${snap ? " · expand for telemetry" : ""}">
                     <span class="incident-time">${esc(data.time)}</span>
                     <div class="incident-body">
                         <span class="incident-driver">${data.driver}</span>
@@ -1649,6 +1815,7 @@
                         <span class="incident-badge ${data.badgeCls}">${data.badgeLabel}</span>
                         <span class="seek-hint">&#9654; Seek</span>
                     </div>
+                    ${snapDetailHtml}
                 </div>`;
     }
 
@@ -1724,10 +1891,29 @@
                     if (badgeEl.className !== wantCls) badgeEl.className = wantCls;
                 }
                 const wantCardCls = "incident-card" + (data.cardClass ? " " + data.cardClass : "");
-                // Preserve card-new during its animation; strip other extra classes
-                const hasCardNew = existing.classList.contains("card-new");
-                const wantFull = hasCardNew ? wantCardCls + " card-new" : wantCardCls;
+                // Preserve transient classes during patch to avoid flickering/collapsing mid-interaction
+                const hasCardNew  = existing.classList.contains("card-new");
+                const hasExpanded = existing.classList.contains("expanded");
+                const extras = [hasCardNew ? "card-new" : "", hasExpanded ? "expanded" : ""].filter(Boolean).join(" ");
+                const wantFull = extras ? wantCardCls + " " + extras : wantCardCls;
                 if (existing.className !== wantFull) existing.className = wantFull;
+                // Patch snapshot ref attribute and detail content when scan data arrives post-creation
+                const curRef = existing.dataset.snapshotRef ?? "";
+                if (curRef !== (data.snapshotRef ?? "")) {
+                    if (data.snapshotRef) existing.dataset.snapshotRef = data.snapshotRef;
+                    else delete existing.dataset.snapshotRef;
+                }
+                // Populate snapshot-detail once snapshot data arrives (div exists but was empty at creation)
+                const snapDetailEl = existing.querySelector(".snapshot-detail");
+                if (snapDetailEl && !snapDetailEl.hasChildNodes() && data.snapshotRef) {
+                    const snap = scanSnapshotsById.get(data.snapshotRef);
+                    if (snap) {
+                        const tmp = document.createElement("div");
+                        tmp.innerHTML = buildSnapshotDetailHtml(snap);
+                        const newDetail = tmp.firstElementChild;
+                        if (newDetail) snapDetailEl.replaceWith(newDetail);
+                    }
+                }
                 return existing;
             } else {
                 const wrap = document.createElement("div");
@@ -1894,8 +2080,7 @@
 
     // ── Event listeners ────────────────────────────────────────────
     statusText.addEventListener("click", () => { if (!ws || ws.readyState > WebSocket.OPEN) { useFallback = false; connect(); } });
-    document.getElementById("stream-clear-btn").addEventListener("click", () => {
-        logUiEvent("stream-clear-btn", "click", "");
+    function clearLogs() {
         fullLogEntries = [];
         recentLogEntries = [];
         debugLogHasAlert = false;
@@ -1903,6 +2088,21 @@
         eventStream.innerHTML = '<div class="empty-state">Logs cleared.</div>';
         updateStreamAlertDot();
         updateActivitySummary();
+    }
+    function clearIncidents() {
+        allIncidents.forEach(ev => { if (ev.id) clearedIncidentIds.add(ev.id); });
+        allIncidents = [];
+        lastIncidentKey = "";
+        renderIncidentViews();
+    }
+    document.getElementById("stream-clear-btn").addEventListener("click", () => {
+        logUiEvent("stream-clear-btn", "click", "");
+        clearLogs();
+    });
+    document.getElementById("stream-clear-all-btn").addEventListener("click", () => {
+        logUiEvent("stream-clear-all-btn", "click", "");
+        clearLogs();
+        clearIncidents();
     });
     (function initLogFilterCheckboxes() {
         const map = [
@@ -1943,6 +2143,8 @@
         logUiEvent("record-session-snapshot-btn", "click", trimmed.length ? trimmed : "no-label");
         send("RecordSessionSnapshot", trimmed.length ? trimmed : undefined);
     });
+    document.getElementById("btn-start-scan").addEventListener("click", () => { logUiEvent("btn-start-scan", "click", "StartReplayScan"); send("StartReplayScan"); });
+    document.getElementById("btn-stop-scan").addEventListener("click",  () => { logUiEvent("btn-stop-scan",  "click", "StopReplayScan");  send("StopReplayScan");  });
     document.getElementById("sessionStartBtn").addEventListener("click", () => { logUiEvent("sessionStartBtn", "click", "ReplaySeekSessionStart"); send("ReplaySeekSessionStart"); });
     playBtn.addEventListener("click", () => { logUiEvent("playPauseBtn", "click", "ReplayPlayPause"); send("ReplayPlayPause"); });
     document.getElementById("stepBack").addEventListener("click", () => { logUiEvent("stepBack", "click", "-1"); send("ReplayStepFrame", "-1"); });
@@ -2015,6 +2217,12 @@
         const card = e.target.closest("[data-incident-id]");
         if (card && card.dataset.incidentId) {
             logUiEvent("incident-card", "click", card.dataset.incidentId);
+            const ref = card.dataset.snapshotRef;
+            if (ref && scanSnapshotsById.has(ref)) {
+                const wasExpanded = card.classList.contains("expanded");
+                document.querySelectorAll(".incident-card.expanded").forEach(c => c.classList.remove("expanded"));
+                if (!wasExpanded) card.classList.add("expanded");
+            }
             send("SelectIncidentAndSeek", card.dataset.incidentId);
         }
         const heroBtn = e.target.closest("#player-hero-jump-btn");

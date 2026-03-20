@@ -4,7 +4,7 @@
 library
 C#
 .cs
-C:\Users\winth\dev\sim-steward\plugin\src\SimSteward.Plugin\obj\Debug\net48\
+C:\Users\winth\dev\sim-steward\simhub-plugin\src\SimSteward.Plugin\obj\Debug\net48\
 SimSteward.Plugin
 none
 false
@@ -12,8 +12,8 @@ TRACE;SIMHUB_SDK;DEBUG;NETFRAMEWORK;NET48;NET30_OR_GREATER;NET35_OR_GREATER;NET4
 
 1-137941499
 
-7-975309990
-25984136213
+11389464465
+1312002158878
 PluginControl.xaml;
 
 False
