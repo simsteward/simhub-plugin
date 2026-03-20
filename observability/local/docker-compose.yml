@@ -78,6 +78,4 @@ services:
       - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
       # Mount plugin data dir so Alloy can tail plugin-structured.jsonl. On Windows set SIMSTEWARD_DATA_PATH (e.g. %LOCALAPPDATA%\SimHubWpf\PluginsData\SimSteward). Fallback: ./sample-logs for testing.
       - ${SIMSTEWARD_DATA_PATH:-./sample-logs}:/var/log/simsteward:ro
-      # Cursor usage MCP logger: mount dir containing cursor-usage.jsonl. Set CURSOR_USAGE_LOG_PATH on the host to this path (e.g. S:/sim-steward-grafana-storage/cursor-usage/cursor-usage.jsonl).
-      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/cursor-usage:/var/log/cursor-usage:ro
       - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/alloy:/var/lib/alloy/data

@@ -8,20 +8,13 @@
         "OLLAMA_NUM_CTX": "131072"
       }
     },
-    "cursor-usage-logger": {
-      "command": "node",
-      "args": ["mcp/cursor-usage-logger/dist/index.js"],
-      "env": {
-        "CURSOR_USAGE_LOG_PATH": "S:/sim-steward-grafana-storage/cursor-usage/cursor-usage.jsonl"
-      }
-    },
     "contextstream": {
       "command": "npx",
       "args": [
         "-y",
         "envmcp",
         "--env-file",
-        ".env",
+        "C:\\Users\\winth\\dev\\sim-steward\\simhub-plugin\\.env",
         "cmd",
         "/c",
         "C:\\Users\\winth\\AppData\\Local\\ContextStream\\contextstream-mcp.exe"

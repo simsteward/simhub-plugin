@@ -26,8 +26,6 @@ Thumbs.db
 # Node
 node_modules/
 scripts/obs-bridge/node_modules/
-mcp/cursor-usage-logger/node_modules/
-mcp/cursor-usage-logger/dist/
 
 # Cloudflare Worker
 worker/.wrangler/

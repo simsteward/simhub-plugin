@@ -111,11 +111,7 @@ These tools are provided by the Grafana/Loki MCP (e.g. user-MCP_DOCKER). Ensure 
 ### Logs not reaching Grafana?
 
 - **Plugin / iRacing logs:** Alloy must tail the **same directory** where the plugin writes `plugin-structured.jsonl`. Set `SIMSTEWARD_DATA_PATH` in `.env.observability.local` (or in the environment when starting Docker) to the **exact** SimHub plugin data directory, e.g. `C:\Users\<you>\AppData\Local\SimHubWpf\PluginsData\SimSteward` on Windows (or `%LOCALAPPDATA%\SimHubWpf\PluginsData\SimSteward`). Then restart Alloy so the new mount is used: `docker compose -f observability/local/docker-compose.yml restart alloy` (run from the directory that has your env file). If this is not set, Alloy tails only the default `./sample-logs` and will not see plugin or iRacing logs.
-- **Cursor usage logs:**
-  - Ensure `CURSOR_USAGE_LOG_PATH` in `.cursor/mcp.json` is set to `$GRAFANA_STORAGE_PATH/cursor-usage/cursor-usage.jsonl`.
-  - Verify that the `$GRAFANA_STORAGE_PATH/cursor-usage` directory exists on your host.
-  - Confirm that the `GRAFANA_STORAGE_PATH` used when starting Docker (`docker compose up`) matches the one specified in `CURSOR_USAGE_LOG_PATH` and the host directory.
-- **Alloy container logs:** After bringing up the stack, check the Alloy container logs for messages about "targets" or any errors related to `/var/log/simsteward` or `/var/log/cursor-usage` to confirm it is actively tailing the correct files.
+- **Alloy container logs:** After bringing up the stack, check the Alloy container logs for messages about "targets" or any errors related to `/var/log/simsteward` to confirm it is actively tailing the plugin structured log.
 
 ### ContextStream / Session Start Note
 

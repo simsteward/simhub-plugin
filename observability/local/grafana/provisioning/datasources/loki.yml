@@ -39,14 +39,3 @@ datasources:
           datasourceUid: loki_local
           url: '{app="sim-steward"} | json | incident_id = "$${__value.raw}"'
           urlDisplayLabel: All events this incident
-        # Cursor usage (app=cursor-usage)
-        - matcherRegex: '"event"\s*:\s*"([^"]+)"'
-          name: Event (cursor-usage)
-          datasourceUid: loki_local
-          url: '{app="cursor-usage", env="local"} | json | event = "$${__value.raw}"'
-          urlDisplayLabel: Filter by event
-        - matcherRegex: '"session_id"\s*:\s*"([^"]+)"'
-          name: Session ID (cursor-usage)
-          datasourceUid: loki_local
-          url: '{app="cursor-usage", env="local"} | json | session_id = "$${__value.raw}"'
-          urlDisplayLabel: All events this session

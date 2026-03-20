@@ -46,8 +46,8 @@ When the Cursor agent is **auto** or **composer** (cloud model), the **first pas
 
 1. Ensure the Ollama MCP server is configured in `.cursor/mcp.json` with `OLLAMA_NUM_CTX=131072` (see [MCP: Ollama](#6-mcp-ollama--context-stream)).
 2. The agent uses `ollama_generate` or `chat` to send a prompt and assembled context to the local Ollama instance.
-3. **Context assembly:** The agent assembles up to ~120k tokens from: conversation history, ContextStream (`context`, `search`), relevant file contents, and the current query. See `.cursor/rules/ReasoningOffload.mdc` for the exact procedure.
-4. See `.cursor/rules/ReasoningOffload.mdc` for when to offload and how to log usage.
+3. **Context assembly:** The agent assembles up to ~120k tokens from: conversation history, ContextStream (`context`, `search`), relevant file contents, and the current query. Follow `.cursor/rules/02_ContextStream.mdc` for ContextStream usage.
+4. Prefer local offload when the sub-task is self-contained reasoning; use `.cursor/rules/00_CoreDirectives.mdc` for mandatory session initialization.
 
 ---
 
@@ -80,7 +80,6 @@ The Cursor agent:
 | `project-0-plugin-contextstream` | `search` | Codebase search | `query`, `mode`, `limit` |
 | `project-0-plugin-contextstream` | `session` | Memory, lessons, plans | `action`, `title`, `content` |
 | `user-MCP_DOCKER` | `webpage-to-markdown` | Fetch webpages | `url` |
-| `project-0-plugin-cursor-usage-logger` | `log_model_usage` | Log LLM usage | `model`, `provider`, `purpose` |
 
 ### System Prompt Template
 
@@ -97,62 +96,6 @@ Available tools:
 - user-MCP_DOCKER.webpage-to-markdown: Fetch webpage (url)
 
 When you have enough information, provide your final answer without DATA_REQUEST.
-```
-
-### Usage Logging
-
-After each Ollama call completes, log usage via `log_model_usage`.
-
-#### Option A: Estimated Tokens (via Ollama MCP)
-
-When using the Ollama MCP (`project-0-plugin-ollama.chat`), token counts are estimated (~chars/4):
-
-```json
-{
-  "model": "deepseek-r1:8b",
-  "provider": "ollama",
-  "purpose": "reasoning_offload",
-  "input_tokens": 150,
-  "output_tokens": 800,
-  "duration_ms": 5200,
-  "prompt_summary": "Analyze WebSocket patterns...",
-  "response_summary": "Recommend thread-safe client management..."
-}
-```
-
-#### Option B: Real Token Counts (Direct API)
-
-For accurate token counts, use the helper script that calls Ollama's HTTP API directly:
-
-```powershell
-# Call Ollama directly and get real token counts
-$response = & scripts/ollama-call.ps1 -Prompt "Your prompt" -System "System prompt" -Raw | ConvertFrom-Json
-
-# Response includes:
-# - input_tokens: 12 (real prompt_eval_count)
-# - output_tokens: 226 (real eval_count)
-# - duration_ms: 2480 (real total_duration in ms)
-```
-
-Then log with real metrics:
-
-```json
-{
-  "model": "deepseek-r1:8b",
-  "provider": "ollama",
-  "purpose": "reasoning_offload",
-  "input_tokens": 12,
-  "output_tokens": 226,
-  "duration_ms": 2480,
-  "prompt_summary": "...",
-  "response_summary": "..."
-}
-```
-
-#### Grafana Query
-
-```logql
-{app="cursor-usage"} | json | event="model_usage" | provider="ollama"
 ```
 
 ---
@@ -216,7 +159,7 @@ Context Stream is already configured in `.cursor/mcp.json`. Use it as usual: `in
 ### MCP vs script fallback
 
 - **When to use MCP:** Prefer Ollama MCP when it is in the session and `generate` succeeds. Gives integrated tool use and avoids spawning a script.
-- **When to use script fallback:** Use `scripts/ollama-call.ps1` when: (1) Ollama MCP is not in the session, or (2) `generate` has failed after up to 3 retries with exponential backoff (per [ReasoningOffload.mdc](../.cursor/rules/ReasoningOffload.mdc)). The script returns real token counts and duration for accurate **log_model_usage**.
+- **When to use script fallback:** Use `scripts/ollama-call.ps1` when: (1) Ollama MCP is not in the session, or (2) `generate` has failed after up to 3 retries with exponential backoff. The script returns real token counts and duration from Ollama's HTTP API response.
 - **Required config:**
   - **.cursor/mcp.json:** Ollama server entry with `command`, `args`, and `env` containing `OLLAMA_BASE_URL` and `OLLAMA_NUM_CTX` (see Ollama MCP above).
   - **Script:** From repo root, `scripts/ollama-call.ps1` must be runnable (PowerShell); parameters: `-Model`, `-Prompt`, `-Think`, `-Raw`.
