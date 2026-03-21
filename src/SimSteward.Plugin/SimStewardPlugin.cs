@@ -29,6 +29,7 @@ namespace SimSteward.Plugin
 #endif
     {
         private const int DefaultPort = 19847;
+        private const int CapturePreRollFrames = 180;
         private const double BroadcastThrottleMs = 200;
         private const int DependencyCheckIntervalTicks = 60;
         private const double DashboardPingIntervalSec = 5;
@@ -91,6 +92,8 @@ namespace SimSteward.Plugin
                 replaySessionCount = snapshot.ReplaySessionCount,
                 replaySessionNum = snapshot.ReplaySessionNum,
                 replaySessionName = snapshot.ReplaySessionName,
+                drivers = BuildDriverList(),
+                cameraGroups = GetCameraGroupNames(),
                 diagnostics = snapshot.Diagnostics
             };
             return JsonConvert.SerializeObject(state);
@@ -269,6 +272,88 @@ namespace SimSteward.Plugin
             return "—";
         }
 
+        private object[] BuildDriverList()
+        {
+            try
+            {
+                var drivers = _irsdk?.Data?.SessionInfo?.DriverInfo?.Drivers as IList;
+                if (drivers == null)
+                    return Array.Empty<object>();
+                var playerIdx = SafeGetInt("PlayerCarIdx");
+                var list = new System.Collections.Generic.List<object>();
+                foreach (var d in drivers)
+                {
+                    if (d == null) continue;
+                    var t = d.GetType();
+                    var carIdxObj = t.GetProperty("CarIdx")?.GetValue(d);
+                    var carIdx = carIdxObj is int ci ? ci : Convert.ToInt32(carIdxObj ?? -1);
+                    var carNum = t.GetProperty("CarNumber")?.GetValue(d)?.ToString() ?? "";
+                    var name = t.GetProperty("UserName")?.GetValue(d)?.ToString() ?? "";
+                    var isPlayer = carIdx == playerIdx;
+                    list.Add(new { carIdx, carNum, name, isPlayer });
+                }
+                return list.ToArray();
+            }
+            catch
+            {
+                return Array.Empty<object>();
+            }
+        }
+
+        private string[] GetCameraGroupNames()
+        {
+            try
+            {
+                var groups = _irsdk?.Data?.SessionInfo?.CameraInfo?.Groups as IList;
+                if (groups == null) return Array.Empty<string>();
+                var names = new System.Collections.Generic.List<string>();
+                foreach (var g in groups)
+                {
+                    var n = g?.GetType().GetProperty("GroupName")?.GetValue(g)?.ToString();
+                    if (!string.IsNullOrEmpty(n)) names.Add(n);
+                }
+                return names.ToArray();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        private int ResolveCameraGroupNum(string groupName)
+        {
+            try
+            {
+                var groups = _irsdk?.Data?.SessionInfo?.CameraInfo?.Groups as IList;
+                if (groups == null) return -1;
+                int idx = 0;
+                foreach (var g in groups)
+                {
+                    var t = g?.GetType();
+                    var n = t?.GetProperty("GroupName")?.GetValue(g)?.ToString();
+                    if (string.Equals(n, groupName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var numProp = t.GetProperty("GroupNum");
+                        return numProp != null ? Convert.ToInt32(numProp.GetValue(g)) : idx;
+                    }
+                    idx++;
+                }
+            }
+            catch
+            {
+                // ignored
+            }
+            return -1;
+        }
+
+        private void SwitchCameraToGroup(int groupNum)
+        {
+            if (groupNum < 0 || _irsdk == null || !_irsdk.IsConnected) return;
+            int carPos = ResolveFocusCarIdx();
+            if (carPos < 0) carPos = SafeGetInt("PlayerCarIdx");
+            _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, carPos, groupNum, 0);
+        }
+
         private void LogActionResult(string action, string arg, string correlationId, bool success, string error)
         {
             var resultFields = new System.Collections.Generic.Dictionary<string, object>
@@ -284,6 +369,12 @@ namespace SimSteward.Plugin
                 ? $"{action} -> ok"
                 : $"{action} -> {error ?? "failed"}";
             _logger?.Structured("INFO", "simhub-plugin", "action_result", summary, resultFields, "action", null);
+        }
+
+        private class CaptureIncidentArg
+        {
+            [JsonProperty("frame")] public int frame { get; set; } = -1;
+            [JsonProperty("camera")] public string camera { get; set; }
         }
 
         private (bool success, string result, string error) DispatchAction(string action, string arg, string correlationId)
@@ -481,6 +572,80 @@ namespace SimSteward.Plugin
                     var err = ex.Message ?? "seek_to_incident_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "set_camera", StringComparison.OrdinalIgnoreCase))
+            {
+                var groupName = (arg ?? "").Trim();
+                if (string.IsNullOrEmpty(groupName))
+                {
+                    LogActionResult(action, arg, correlationId, false, "bad_arg");
+                    return (false, null, "bad_arg");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                try
+                {
+                    int g = ResolveCameraGroupNum(groupName);
+                    if (g < 0)
+                    {
+                        LogActionResult(action, arg, correlationId, false, "group_not_found");
+                        return (false, null, "group_not_found");
+                    }
+                    SwitchCameraToGroup(g);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    LogActionResult(action, arg, correlationId, false, ex.Message);
+                    return (false, null, ex.Message);
+                }
+            }
+
+            if (string.Equals(action, "capture_incident", StringComparison.OrdinalIgnoreCase))
+            {
+                CaptureIncidentArg parsed;
+                try
+                {
+                    parsed = JsonConvert.DeserializeObject<CaptureIncidentArg>(arg ?? "");
+                }
+                catch
+                {
+                    LogActionResult(action, arg, correlationId, false, "bad_arg");
+                    return (false, null, "bad_arg");
+                }
+                if (parsed == null || parsed.frame < 0)
+                {
+                    LogActionResult(action, arg, correlationId, false, "bad_arg");
+                    return (false, null, "bad_arg");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                try
+                {
+                    int seekFrame = Math.Max(0, parsed.frame - CapturePreRollFrames);
+                    _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, seekFrame);
+                    if (!string.IsNullOrEmpty(parsed.camera))
+                    {
+                        int g = ResolveCameraGroupNum(parsed.camera);
+                        if (g >= 0) SwitchCameraToGroup(g);
+                    }
+                    _irsdk.ReplaySetPlaySpeed(1, false);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    LogActionResult(action, arg, correlationId, false, ex.Message);
+                    return (false, null, ex.Message);
                 }
             }
 

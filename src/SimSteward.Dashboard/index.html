@@ -523,21 +523,32 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
         </div>
       </div>
 
+      <!-- Selected Incident Panel -->
+      <div class="panel" id="selected-inc-panel" hidden>
+        <div class="panel-title">Selected Incident</div>
+        <div id="selected-inc-meta" style="font-size:0.82rem;margin-bottom:10px"></div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:4px">Incident View</label>
+          <select class="car-sel" id="camera-sel" onchange="onCameraSel()" title="Camera for capture"></select>
+          <button type="button" id="use-suggested-btn" hidden onclick="useSuggestedCamera()"
+            style="font-size:0.68rem;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0;margin-top:3px">
+            use suggested view ↗
+          </button>
+        </div>
+        <div class="btn-row" style="margin-bottom:0">
+          <button type="button" class="btn label-inc" id="selected-inc-prev" onclick="selectPrevIncident()">← Prev</button>
+          <button type="button" class="btn cap label-inc" id="capture-btn" onclick="captureSelectedIncident()">▶ Capture</button>
+          <button type="button" class="btn label-inc" id="selected-inc-next" onclick="selectNextIncident()">Next →</button>
+        </div>
+      </div>
+
       <!-- Incident navigation -->
       <div class="panel">
         <div class="panel-title">Incident navigation</div>
         <div class="panel-sub">
           <div class="panel-sub-title">Telemetry car</div>
           <select class="car-sel" id="car-sel" onchange="onCarSel()" title="Telemetry and incident list below use this car">
-            <option value="0" data-car="99">#99 J. Smith (You)</option>
-            <option value="1" data-car="12">#12 A. Jones</option>
-            <option value="2" data-car="42">#42 B. Lee</option>
-            <option value="3" data-car="7">#7 M. Wilson</option>
           </select>
-        </div>
-        <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev','replay-seek-prev')">Prev replay incident</button>
-          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next','replay-seek-next')">Next replay incident</button>
         </div>
         <div class="cap-row">
           <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
@@ -708,6 +719,8 @@ let lastReplaySpeed = '1';
 let lastLap = -1;
 /** @type {{ kind:'session', frame:number } | { kind:'capture', seq:number } | null} */
 let incidentMetaSelection = null;
+let selectedIncident = null;
+let cameraGroups = [];
 
 // ── WebSocket ────────────────────────────────────────────
 function connectWs() {
@@ -720,6 +733,9 @@ function connectWs() {
       mockPaused = true;
       incidents = [];
       drivers = [];
+      selectedIncident = null;
+      hideSelectedIncidentPanel();
+      cameraGroups = [];
       renderInc();
       renderStd();
       log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
@@ -779,7 +795,21 @@ function onState(m) {
   setDot('d-steam',  d.steamRunning);
   setDot('d-simhub', d.simHubHttpListening);
   if (m.telemetry) setTelem(m.telemetry.throttle||0, m.telemetry.brake||0, m.telemetry.steeringWheelAngle||0);
-  if (m.drivers)   { drivers = m.drivers; renderStd(); }
+  if (m.drivers && Array.isArray(m.drivers)) {
+    drivers = m.drivers.map((d, ix) => ({
+      pos: ix + 1,
+      car: d.carNum,
+      name: d.name,
+      inc: 0,
+      player: !!d.isPlayer
+    }));
+    renderStd();
+    populateCarDropdown(m.drivers);
+  }
+  if (Array.isArray(m.cameraGroups) && m.cameraGroups.length) {
+    cameraGroups = m.cameraGroups;
+    populateCameraDropdown();
+  }
   if (typeof m.lap === 'number' && !Number.isNaN(m.lap)) lastLap = m.lap;
   else lastLap = -1;
   if (m.frame !== undefined) setFrame(m.frame, m.frameEnd);
@@ -871,6 +901,113 @@ function renderDriverIncidents() {
   const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">No incidents for this car</div>';
   el.innerHTML = !forCar.length ? empty : forCar.map(incidentCardHtml).join('');
   refreshIncidentMetaHighlight();
+}
+
+function populateCarDropdown(driversArr) {
+  const sel = document.getElementById('car-sel');
+  if (!sel || !Array.isArray(driversArr)) return;
+  if (!driversArr.length) {
+    sel.innerHTML = '';
+    renderDriverIncidents();
+    return;
+  }
+  const prevCar = getSelectedCarNumber();
+  sel.innerHTML = driversArr.map(d =>
+    `<option value="${d.carIdx}" data-car="${escapeHtmlForCaptured(String(d.carNum ?? ''))}"${d.isPlayer ? ' data-player="1"' : ''}>` +
+    `#${escapeHtmlForCaptured(String(d.carNum ?? ''))} ${escapeHtmlForCaptured(String(d.name ?? ''))}${d.isPlayer ? ' (You)' : ''}</option>`
+  ).join('');
+  let restored = false;
+  for (let i = 0; i < sel.options.length; i++) {
+    const dc = sel.options[i].getAttribute('data-car');
+    if (dc !== null && +dc === +prevCar) { sel.selectedIndex = i; restored = true; break; }
+  }
+  if (!restored) {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].getAttribute('data-player') === '1') { sel.selectedIndex = i; break; }
+    }
+  }
+  renderDriverIncidents();
+}
+
+function populateCameraDropdown() {
+  const sel = document.getElementById('camera-sel');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = cameraGroups.map(n =>
+    `<option value="${escapeHtmlForCaptured(n)}">${escapeHtmlForCaptured(n)}</option>`
+  ).join('');
+  if (prev && cameraGroups.includes(prev)) sel.value = prev;
+}
+
+function showSelectedIncidentPanel(i) {
+  const panel = document.getElementById('selected-inc-panel');
+  if (!panel) return;
+  panel.hidden = false;
+  const meta = document.getElementById('selected-inc-meta');
+  if (meta) {
+    const cause = (i.cause || '').replace(/-/g, ' ');
+    meta.innerHTML =
+      `<strong>#${i.car}</strong> ${i.driver}&nbsp;` +
+      `<span class="sev-badge s${i.sev}">${i.sev}×</span>&nbsp;` +
+      `<span class="cause-tag ${i.cause}">${cause}</span>&nbsp;` +
+      `<span style="color:var(--muted)">${i.time}</span>`;
+  }
+  populateCameraDropdown();
+  const sugBtn = document.getElementById('use-suggested-btn');
+  if (sugBtn) sugBtn.hidden = !i.suggestedCamera;
+  if (i.suggestedCamera && cameraGroups.includes(i.suggestedCamera)) {
+    const sel = document.getElementById('camera-sel');
+    if (sel) sel.value = i.suggestedCamera;
+  }
+}
+
+function hideSelectedIncidentPanel() {
+  const panel = document.getElementById('selected-inc-panel');
+  if (panel) panel.hidden = true;
+  document.querySelectorAll('.inc-card-expanded').forEach(el => el.classList.remove('inc-card-expanded'));
+}
+
+function onCameraSel() {
+  const sel = document.getElementById('camera-sel');
+  const v = sel ? sel.value : '';
+  sendDashboardUiEvent({ element_id: 'camera-sel', event_type: 'change', message: 'Camera selected', value: v });
+  if (v) send('set_camera', v);
+}
+
+function useSuggestedCamera() {
+  if (!selectedIncident || !selectedIncident.suggestedCamera) return;
+  const sel = document.getElementById('camera-sel');
+  if (sel && cameraGroups.includes(selectedIncident.suggestedCamera)) {
+    sel.value = selectedIncident.suggestedCamera;
+    send('set_camera', selectedIncident.suggestedCamera);
+  }
+  sendDashboardUiEvent({ element_id: 'use-suggested-btn', event_type: 'click', message: 'Use suggested camera', value: selectedIncident.suggestedCamera });
+}
+
+function captureSelectedIncident() {
+  if (!selectedIncident) return;
+  const sel = document.getElementById('camera-sel');
+  const camera = sel ? sel.value : '';
+  const arg = JSON.stringify({ frame: selectedIncident.frame, camera });
+  sendDashboardUiEvent({ element_id: 'capture-btn', event_type: 'click', message: 'Capture incident', value: String(selectedIncident.frame) });
+  if (!send('capture_incident', arg)) toast('[PoC] capture_incident not connected');
+  log('events', 'INFO ', 'capture_incident', 'frame:' + selectedIncident.frame + '  camera:' + camera);
+}
+
+function selectPrevIncident() {
+  if (!selectedIncident) return;
+  const filtered = getFilteredIncidents();
+  const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
+  sendDashboardUiEvent({ element_id: 'selected-inc-prev', event_type: 'click', message: 'Selected incident prev' });
+  if (idx > 0) onSessionIncidentClick(filtered[idx - 1].frame);
+}
+
+function selectNextIncident() {
+  if (!selectedIncident) return;
+  const filtered = getFilteredIncidents();
+  const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
+  sendDashboardUiEvent({ element_id: 'selected-inc-next', event_type: 'click', message: 'Selected incident next' });
+  if (idx >= 0 && idx < filtered.length - 1) onSessionIncidentClick(filtered[idx + 1].frame);
 }
 
 function parseFrameFromLabel(frameText) {
@@ -1097,25 +1234,29 @@ function refreshIncidentMetaHighlight() {
 function onSessionIncidentClick(frame) {
   const i = incidents.find(x => x.frame === frame);
   if (!i) return;
-  if (incidentMetaSelection && incidentMetaSelection.kind === 'session' && incidentMetaSelection.frame === frame) {
+  if (selectedIncident && selectedIncident.frame === frame) {
+    selectedIncident = null;
     incidentMetaSelection = null;
+    hideSelectedIncidentPanel();
     collapseIncidentMetaStrip();
     sendDashboardUiEvent({
       element_id: 'incident-meta-strip',
       event_type: 'ui_interaction',
-      message: 'Session incident meta collapsed',
+      message: 'Session incident deselected',
       value: String(frame)
     });
     return;
   }
+  selectedIncident = i;
   incidentMetaSelection = { kind: 'session', frame };
   seekInc(frame);
+  showSelectedIncidentPanel(i);
   expandIncidentMetaStrip(formatIncidentMetaHtml(i));
   highlightIncidentCards(frame, null);
   sendDashboardUiEvent({
     element_id: 'incident-meta-strip',
     event_type: 'ui_interaction',
-    message: 'Session incident meta expanded',
+    message: 'Session incident selected',
     value: String(frame)
   });
 }
@@ -1621,6 +1762,12 @@ function seedLogs() {
 
 // ── Init ─────────────────────────────────────────────────
 function init() {
+  populateCarDropdown(MOCK_DRV.map((d, ix) => ({
+    carIdx: ix,
+    carNum: String(d.car),
+    name: d.name,
+    isPlayer: !!d.player
+  })));
   renderInc();
   renderCaptured();
   renderStd();
