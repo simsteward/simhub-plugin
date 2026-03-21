@@ -34,6 +34,7 @@ mcp__contextstream__memory(action="create_doc", title="<title>", content="<full 
 
 ## Notes
 
+- After you change observability or architecture docs in this repo, **re-sync ContextStream**: use `memory(action="get_doc", doc_id="…")` or title query to find the doc, then `memory(action="update_doc", doc_id="…", content="…")` with the current file body so CS matches the repo (no separate per-user log shipper; Loki push is in-process per `SIMSTEWARD_LOKI_URL` where documented).
 - `docs/ARCHITECTURE.md` contains class, ER, and sequence diagrams — create it first.
 - `docs/PRODUCT-FLOW.md`, `docs/USER-FLOWS.md`, and `docs/USER-FEATURES-PM.md` have mermaid flowcharts embedded as fenced code blocks — include them as-is.
 - Do NOT include: `docs/README.md` (index only), `CLAUDE.md`, `.claude/CLAUDE.md`, node_modules files, or `.cursor/skills/` files.
