@@ -127,10 +127,10 @@ For a step-by-step to get plugin data into **local** Grafana, see **docs/observa
 
 If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 
-1. **Plugin output** — The plugin writes **plugin-structured.jsonl** only; it does not POST to Loki. You need a **Loki ingestion** path (Grafana Cloud agent, your shipper, `POST` to **loki-gateway** with `LOKI_PUSH_TOKEN`, etc.). See **docs/observability-local.md** and **docs/GRAFANA-LOGGING.md**.
+1. **Plugin output** — The plugin writes **plugin-structured.jsonl** and **POSTs** batched lines to **`SIMSTEWARD_LOKI_URL`** (one Loki push endpoint; no separate agent on the PC). For local stacks, point that URL at `http://localhost:3100` or your **loki-gateway** push URL with `LOKI_PUSH_TOKEN` as documented in **docs/observability-local.md** and **docs/GRAFANA-LOGGING.md**.
 2. **Env metadata** — Set `SIMSTEWARD_LOKI_URL` and `SIMSTEWARD_LOG_ENV` before SimHub starts (e.g. via `.env` loaded by your launcher) so log lines include `loki_push_target` / `log_env`; this does not replace ingestion.
 3. **Local stack** — Start observability from `observability/local/` (`docker compose up -d`) so Loki (3100) and Grafana (3000) run; compose does **not** tail `plugin-structured.jsonl` for you.
-4. **Auth (Grafana Cloud)** — For Grafana Cloud direct push from *your* agent, use your stack’s credentials; wrong tokens show up in that agent’s logs, not as a built-in “LokiSink” in this plugin.
+4. **Auth (Grafana Cloud)** — Use your stack’s credentials on the **in-process** push to Grafana Cloud; wrong tokens show up as push failures in **plugin.log**, not in a separate agent’s logs.
 5. **Data source in Grafana** — Point the Loki data source at your Loki URL (e.g. `http://localhost:3100` for local). Explore: `{app="sim-steward"}`.
 6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
 

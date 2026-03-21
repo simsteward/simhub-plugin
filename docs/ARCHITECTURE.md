@@ -232,7 +232,7 @@ sequenceDiagram
       T->>P: incident_detected callback
       P->>P: Enrich with session context (MergeSessionAndRoutingFields)
       P->>JSONL: Write incident_detected NDJSON line
-      JSONL-->>Loki: Log shipper ingests (async, outside plugin)
+      JSONL-->>Loki: Plugin batches HTTPS POST to SIMSTEWARD_LOKI_URL (async)
       P->>D: Broadcast updated incidents[] via WebSocket
       D->>D: Re-render leaderboard + filter chips
     end

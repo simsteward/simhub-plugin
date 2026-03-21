@@ -38,7 +38,7 @@ SimSteward.Plugin (C# / .NET 4.8 / SimHub)
     │         served by SimHub HTTP server
     │
     └──→ Grafana Loki (optional)
-              plugin-structured.jsonl → log shipper → Loki
+              plugin → HTTPS POST to SIMSTEWARD_LOKI_URL (single endpoint)
               local Docker stack: observability/local/
 ```
 

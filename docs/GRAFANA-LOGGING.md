@@ -1,14 +1,14 @@
 # Grafana Loki Structured Logging
 
-Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk). **Loki ingestion** (reading that file or pushing lines to Loki) runs **outside the plugin**—your Grafana Cloud setup, a log shipper, `POST` to **loki-gateway** (local Docker), or another path you configure. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
+Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk for durability) → **HTTPS POST** to **one** Loki push endpoint (`SIMSTEWARD_LOKI_URL`). **No** per-user log shipper, forwarder, or Grafana agent on the user PC — ingestion is **in-process** from the plugin (see **docs/observability-scaling.md**). The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
 
-**Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; whatever forwards those lines to Loki must not filter them. Loki retains the full stream.
+**Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl** and sends the same stream to Loki; do not filter at the push path. Loki retains the full stream.
 
 **Filtering is dashboard-only.** The web dashboard receives the full stream via WebSocket and applies level/event visibility filters for display only (checkboxes and `hiddenLevels` / `hiddenEvents`). Toggling "hide DEBUG" or hiding specific event types in the dashboard shows or hides entries that are already in the stream; nothing is dropped at the plugin.
 
 ### Local vs prod (same pipeline; env label only)
 
-One pipeline for both: plugin writes all logs to **plugin-structured.jsonl**; your **Loki ingestion** path ships them to Loki. You choose the Loki endpoint (local URL or Grafana Cloud) in that ingestion config, not in the plugin. Set `SIMSTEWARD_LOG_ENV=local` for local dev (e.g. Docker stack) or `SIMSTEWARD_LOG_ENV=production` (default); this sets metadata on log lines (`log_env` / routing hints). No source-level omission: Loki and the dashboard stream are full. Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
+One pipeline for both: plugin writes all logs to **plugin-structured.jsonl** and **POSTs** them to Loki at **`SIMSTEWARD_LOKI_URL`** (single endpoint per deployment). Set `SIMSTEWARD_LOG_ENV=local` for local dev (e.g. Docker stack) or `SIMSTEWARD_LOG_ENV=production` (default); this sets metadata on log lines (`log_env` / routing hints). No source-level omission: Loki and the dashboard stream are full. Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
 
 ## Grafana Cloud free tier limits
 
@@ -25,7 +25,7 @@ Volume allowance: free tier ~50 GB/month; our budget is &lt; 1 GB/month.
 
 ### Scale: hundreds of drivers / many users
 
-Stream count and labels stay bounded (four labels only; no `session_id` or `driver_id` as labels). Session-end results with 100–200+ drivers use chunked `session_end_datapoints_results` (35 drivers per line); merge chunks in Grafana. For many SimSteward users (e.g. 120) sending to one Loki, use a lightweight forwarder per user and optional bounded `instance_id` label. Do not log per-driver per-tick in Loki; use metrics (OTel) for high-frequency telemetry. Full stream/volume math, label rules, and query patterns: **docs/observability-scaling.md**.
+Stream count and labels stay bounded (four labels only; no `session_id` or `driver_id` as labels). Session-end results with 100–200+ drivers use chunked `session_end_datapoints_results` (35 drivers per line); merge chunks in Grafana. Many SimSteward users can send to **one** central Loki (each plugin POSTs to the same endpoint); use an optional bounded `instance_id` label if you need tenancy in queries. Do not log per-driver per-tick in Loki; use metrics (OTel) for high-frequency telemetry. Full stream/volume math, label rules, and query patterns: **docs/observability-scaling.md**.
 
 ### Volume budget (per session, ~2 h)
 
@@ -198,7 +198,7 @@ Use this checklist so button presses (Play, etc.) show up in Grafana:
 Set `SIMSTEWARD_LOG_DEBUG=1` for local debugging only. When enabled:
 
 - **PluginLogger.Debug()** emits `DEBUG`-level entries (still sent to Loki; filter in Explore/AI).
-- **LokiSink** uses relaxed flush rules: 2 s timer, 500-entry batch, 5,000-entry queue, no line-size enforcement.
+- **In-process Loki push** (when enabled) uses relaxed flush rules: 2 s timer, 500-entry batch, 5,000-entry queue, no line-size enforcement.
 - Additional log events are emitted:
   - `tick_stats` every 60 ticks (≈1 s): running average `data_update_ms`, `frames_dropped`.
   - `yaml_update`: each `SessionInfoUpdate` refresh.
