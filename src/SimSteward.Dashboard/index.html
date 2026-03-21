@@ -80,6 +80,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 }
 .btn:hover  { border-color: var(--accent); background: rgba(31,156,255,0.1); }
 .btn:active { transform: scale(0.96); }
+.btn.label-inc {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 7px 6px;
+  white-space: normal;
+  text-align: center;
+}
 .speed-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .spill {
   flex: 1; padding: 4px 4px; border: 1px solid var(--border); border-radius: 6px;
@@ -374,12 +384,14 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
       <div class="panel">
         <div class="panel-title">Replay Controls</div>
         <div class="btn-row">
-          <button class="btn" title="Jump to start"    onclick="ra('replay_jump','start')">⏮</button>
-          <button class="btn" title="Rewind 4×"        onclick="ra('replay_speed','-4')">⏪</button>
-          <button class="btn" title="Prev incident"    onclick="ra('replay_seek','prev')">◀</button>
-          <button class="btn" title="Next incident"    onclick="ra('replay_seek','next')">▶</button>
-          <button class="btn" title="Forward 4×"       onclick="ra('replay_speed','4')">⏩</button>
-          <button class="btn" title="Jump to end"      onclick="ra('replay_jump','end')">⏭</button>
+          <button class="btn" title="Jump to start" onclick="ra('replay_jump','start')">⏮</button>
+          <button class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4')">⏪</button>
+          <button class="btn" title="Forward 4×"   onclick="ra('replay_speed','4')">⏩</button>
+          <button class="btn" title="Jump to end"  onclick="ra('replay_jump','end')">⏭</button>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn label-inc" title="Previous incident in replay" onclick="ra('replay_seek','prev')">Previous incident</button>
+          <button type="button" class="btn label-inc" title="Next incident in replay"     onclick="ra('replay_seek','next')">Next incident</button>
         </div>
         <div class="speed-pills" id="speed-pills">
           <button class="spill" data-s="0.25" onclick="setSpeed(this)">0.25×</button>
@@ -414,8 +426,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           </select>
         </div>
         <div class="btn-row">
-          <button class="btn" title="Previous incident in replay" onclick="ra('replay_seek','prev')">◀</button>
-          <button class="btn" title="Next incident in replay"     onclick="ra('replay_seek','next')">▶</button>
+          <button type="button" class="btn label-inc" title="Previous incident in replay" onclick="ra('replay_seek','prev')">Previous incident</button>
+          <button type="button" class="btn label-inc" title="Next incident in replay"     onclick="ra('replay_seek','next')">Next incident</button>
         </div>
         <div class="cap-row">
           <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCapture()"
@@ -983,7 +995,7 @@ function captureStep() {
   const ts   = new Date().toTimeString().slice(0,8);
 
   // Record current known state as the metadata snapshot for this incident.
-  // In live wiring, onState() will fire after the seek with the actual frame data.
+  // onState() will fire after the seek with the actual frame data.
   const frameEl = document.getElementById('frame-cur').textContent;
   const timeEl  = document.getElementById('session-time').textContent;
   log('events','EVENT','capture_incident',
