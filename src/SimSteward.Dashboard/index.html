@@ -341,15 +341,36 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   min-height: 0;
 }
 .driver-inc-panel .inc-list { flex: 1; min-height: 0; }
+.captured-group {
+  border-top: 1px solid var(--border);
+}
+.captured-group:first-child {
+  border-top: none;
+}
 .captured-group-hdr {
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--accent);
-  padding: 8px 4px 4px;
-  border-top: 1px solid var(--border);
+  padding: 8px 4px 6px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
 }
-.captured-group-hdr:first-child { border-top: none; padding-top: 0; }
+.captured-group:first-child .captured-group-hdr { padding-top: 0; }
+.captured-group-hdr:hover { background: rgba(255,255,255,0.04); }
+.captured-group-chev {
+  font-size: 0.55rem;
+  color: var(--muted);
+  width: 1em;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.captured-group-title { flex: 1; min-width: 0; }
+.captured-group.collapsed .captured-group-body { display: none; }
 .log-pane.meta-pane {
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 0.72rem;
@@ -638,6 +659,8 @@ let incidents   = [...MOCK_INC];
 let drivers     = [...MOCK_DRV];
 let capturedIncidents = [];
 let capturedGroupByDriver = false;
+/** Driver group labels (group-by-driver mode); when present, that group's rows are hidden. */
+let capturedDriverGroupsCollapsed = new Set();
 let incFilter   = 'all';
 let autoScroll  = true;
 let activeTab   = 'events';
@@ -872,19 +895,74 @@ function renderCaptured() {
     const fb = Math.min(...groups.get(kb).map(r => r.frame));
     return fa - fb;
   });
+  const keySet = new Set(keys);
+  for (const k of [...capturedDriverGroupsCollapsed]) {
+    if (!keySet.has(k)) capturedDriverGroupsCollapsed.delete(k);
+  }
   let html = '';
   for (const k of keys) {
-    html += `<div class="captured-group-hdr">${k}</div>`;
-    html += groups.get(k).map(capturedRowHtml).join('');
+    const collapsed = capturedDriverGroupsCollapsed.has(k);
+    const keyAttr = encodeURIComponent(k);
+    const body = groups.get(k).map(capturedRowHtml).join('');
+    html += `<div class="captured-group${collapsed ? ' collapsed' : ''}">`;
+    html += `<div class="captured-group-hdr" data-group-key="${keyAttr}" role="button" tabindex="0" aria-expanded="${!collapsed}" onclick="toggleCapturedDriverGroup(event)" onkeydown="capturedGroupHdrKeydown(event)">`;
+    html += `<span class="captured-group-chev" aria-hidden="true">${collapsed ? '▶' : '▼'}</span>`;
+    html += `<span class="captured-group-title">${escapeHtmlForCaptured(k)}</span>`;
+    html += '</div>';
+    html += `<div class="captured-group-body">${body}</div>`;
+    html += '</div>';
   }
   el.innerHTML = html;
   refreshIncidentMetaHighlight();
   if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
 }
 
+function escapeHtmlForCaptured(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function capturedGroupHdrKeydown(e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleCapturedDriverGroup(e);
+  }
+}
+
+function toggleCapturedDriverGroup(ev) {
+  const hdr = ev.currentTarget;
+  const raw = hdr.getAttribute('data-group-key');
+  if (raw == null) return;
+  let key;
+  try {
+    key = decodeURIComponent(raw);
+  } catch {
+    return;
+  }
+  if (!key) return;
+  if (capturedDriverGroupsCollapsed.has(key)) capturedDriverGroupsCollapsed.delete(key);
+  else capturedDriverGroupsCollapsed.add(key);
+  const collapsed = capturedDriverGroupsCollapsed.has(key);
+  const grp = hdr.closest('.captured-group');
+  if (grp) grp.classList.toggle('collapsed', collapsed);
+  hdr.setAttribute('aria-expanded', String(!collapsed));
+  const chev = hdr.querySelector('.captured-group-chev');
+  if (chev) chev.textContent = collapsed ? '▶' : '▼';
+  sendDashboardUiEvent({
+    element_id: 'captured-group-driver-accordion',
+    event_type: 'ui_interaction',
+    message: collapsed ? 'Captured driver group collapsed' : 'Captured driver group expanded',
+    value: key
+  });
+}
+
 function toggleCapturedGroup() {
   const cb = document.getElementById('captured-group-driver');
   capturedGroupByDriver = !!(cb && cb.checked);
+  if (!capturedGroupByDriver) capturedDriverGroupsCollapsed = new Set();
   renderCaptured();
   sendDashboardUiEvent({
     element_id: 'captured-group-driver',
