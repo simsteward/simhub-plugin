@@ -18,11 +18,11 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 ## Feature 2 — Replay transport controls
 
-**User story:** I can jump start/end, change speed, play/pause, step prev/next **incident** in replay, see frame + scrub bar, and when the replay file has **multiple sessions**, switch **previous / next session** via dedicated buttons.
+**User story:** I can jump start/end, change speed, play/pause, step **prev / next replay incident** (session-wide replay jump, not telemetry-car scoped), see frame + scrub bar, and when the replay file has **multiple sessions**, switch **previous / next session** via dedicated buttons.
 
 **Flow:** Use transport buttons → `replay_*` actions over WebSocket → logs in iRacing Events / App Health as implemented → frame label and scrub fill update from `state`. When `replaySessionCount > 1` in `state`, the session row appears and sends `replay_session` (`prev` / `next`) to the plugin.
 
-**Connects to:** **Incident navigation** (duplicate prev/next incident), **capture scans** (seek to frames), and **leaderboard** (seek when clicking an incident). Same replay “surface,” different entry points.
+**Connects to:** **Incident navigation** (duplicate prev/next **replay** incident), **capture scans** (seek to frames), and **leaderboard** (seek when clicking an incident). Same replay “surface,” different entry points.
 
 ---
 

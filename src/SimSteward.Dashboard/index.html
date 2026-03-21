@@ -500,8 +500,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end')">⏭</button>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Previous incident in replay" onclick="ra('replay_seek','prev')">Previous incident</button>
-          <button type="button" class="btn label-inc" title="Next incident in replay"     onclick="ra('replay_seek','next')">Next incident</button>
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
         </div>
         <div class="speed-pills" id="speed-pills">
           <button class="spill" data-s="0.25" onclick="setSpeed(this)">0.25×</button>
@@ -536,8 +536,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           </select>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Previous incident in replay" onclick="ra('replay_seek','prev')">Previous incident</button>
-          <button type="button" class="btn label-inc" title="Next incident in replay"     onclick="ra('replay_seek','next')">Next incident</button>
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
         </div>
         <div class="cap-row">
           <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
