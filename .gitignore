@@ -41,6 +41,7 @@ debug-*.log
 
 # ContextStream local
 .contextstream/
+.mcp.json
 
 # One-off MCP upload payload dumps (repo root)
 /_ctx_*.json

@@ -115,6 +115,17 @@ classDiagram
 
 ---
 
+## Observability Egress (Security & CORS)
+
+**CRITICAL RULE:** The SimHub Dashboard (client-side JS) must **NEVER** make direct HTTP/API requests to external observability platforms (e.g., Grafana Loki, Cloudflare).
+
+*   **Why?**
+    1.  **Security:** Doing so would require embedding sensitive API tokens (like `SIMSTEWARD_LOKI_TOKEN`) directly into the client-side JavaScript, where anyone could extract them.
+    2.  **CORS:** Browsers will block cross-origin requests from the local SimHub web server (`localhost:8888`) to external domains unless complex and insecure CORS policies are configured on the destination server.
+*   **The Solution:** The dashboard must route all observability intents (like capturing an incident) through the WebSocket to the C# Plugin. The C# Plugin acts as a secure backend, utilizing `PluginLogger` to batch and execute the HTTPS POST requests to `SIMSTEWARD_LOKI_URL` from a trusted server environment.
+
+---
+
 ## Data API Schema
 
 Cloudflare Worker + D1 (mirrors local Flask + SQLite). Applied from `worker/schema.sql`.
