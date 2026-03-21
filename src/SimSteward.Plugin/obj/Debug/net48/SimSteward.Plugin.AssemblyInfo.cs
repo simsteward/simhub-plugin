@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SimSteward.Plugin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+45658e44fe54367f91a51503e552fb95fe5c77e1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3006e4298d0fd11f3679f4e482f24e38220e630f")]
 [assembly: System.Reflection.AssemblyProductAttribute("SimSteward.Plugin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SimSteward.Plugin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

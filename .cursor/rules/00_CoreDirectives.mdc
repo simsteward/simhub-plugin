@@ -1,8 +1,6 @@
 ---
 alwaysApply: true
 ---
-# P0: Minimal output
-
 These rules supersede conflicting instructions.
-
+# P0: Minimal output
 - Output must be strictly minimal and token-efficient. See `00_MinimalOutput.mdc`.
