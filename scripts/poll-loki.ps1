@@ -3,7 +3,7 @@
 #   Direct Loki:  .\scripts\poll-loki.ps1
 #   Via Grafana:  .\scripts\poll-loki.ps1 -ViaGrafana   (or npm run obs:poll:grafana)
 # .env: LOKI_QUERY_URL / SIMSTEWARD_LOKI_URL + optional SIMSTEWARD_LOKI_* (cloud).
-# -ViaGrafana: GRAFANA_URL, GRAFANA_API_TOKEN (or GRAFANA_ADMIN_USER + GRAFANA_ADMIN_PASSWORD), optional GRAFANA_LOKI_DATASOURCE_UID=loki_local.
+# -ViaGrafana: GRAFANA_URL, Bearer token = GRAFANA_API_TOKEN or CURSOR_ELEVATED_GRAFANA_TOKEN (or GRAFANA_ADMIN_USER + GRAFANA_ADMIN_PASSWORD), optional GRAFANA_LOKI_DATASOURCE_UID.
 # Env SIMSTEWARD_LOKI_VIA_GRAFANA=1 enables -ViaGrafana without the switch.
 
 param(
@@ -47,6 +47,10 @@ if ($tmpUid) { $DatasourceUid = $tmpUid.Trim() }
 
 $grafanaToken = [System.Environment]::GetEnvironmentVariable("GRAFANA_API_TOKEN", "Process")
 if ($grafanaToken) { $grafanaToken = $grafanaToken.Trim() }
+if (-not $grafanaToken) {
+    $tmpElev = [System.Environment]::GetEnvironmentVariable("CURSOR_ELEVATED_GRAFANA_TOKEN", "Process")
+    if ($tmpElev) { $grafanaToken = $tmpElev.Trim() }
+}
 $grafanaAdminUser = [System.Environment]::GetEnvironmentVariable("GRAFANA_ADMIN_USER", "Process")
 if ($grafanaAdminUser) { $grafanaAdminUser = $grafanaAdminUser.Trim() }
 $grafanaAdminPass = [System.Environment]::GetEnvironmentVariable("GRAFANA_ADMIN_PASSWORD", "Process")
@@ -71,7 +75,7 @@ if ($lokiToken) { $lokiToken = $lokiToken.Trim() }
 
 if ($useGrafanaProxy) {
     if (-not $grafanaToken -and (-not $grafanaAdminUser -or -not $grafanaAdminPass)) {
-        Write-Host "FAIL: -ViaGrafana requires GRAFANA_API_TOKEN or GRAFANA_ADMIN_USER + GRAFANA_ADMIN_PASSWORD in .env." -ForegroundColor Red
+        Write-Host "FAIL: -ViaGrafana requires GRAFANA_API_TOKEN or CURSOR_ELEVATED_GRAFANA_TOKEN (Bearer), or GRAFANA_ADMIN_USER + GRAFANA_ADMIN_PASSWORD." -ForegroundColor Red
         exit 1
     }
 }

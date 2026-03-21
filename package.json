@@ -10,6 +10,7 @@
     "obs:ps": "docker compose -f observability/local/docker-compose.yml ps",
     "obs:poll": "pwsh -NoProfile -File scripts/poll-loki.ps1",
     "obs:poll:grafana": "pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana",
+    "obs:poll:grafana:env": "dotenv -e .env -- pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana",
     "obs:wipe": "pwsh -NoProfile -File scripts/obs-wipe-local-data.ps1",
     "loki:query": "dotenv -e .env -- node scripts/query-loki-once.mjs"
   },
