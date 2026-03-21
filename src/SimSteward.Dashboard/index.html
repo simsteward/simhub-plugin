@@ -630,7 +630,7 @@ function wsUrl() {
 }
 const LOG_MAX        = 500;
 const STEER_MAX_RAD = 7.0;
-/** 180° axis: 90° = straight; left end 0°, right end 180°; ±90° from center at full lock. */
+/** 180° axis: 90° = straight; left end 0°, right end 180°; +vd = CW on gauge = toward 180° (steer right). */
 const STEER_AXIS_HALF_DEG = 90;
 
 // ── Mock data ────────────────────────────────────────────
@@ -1151,12 +1151,11 @@ function formatSteerDeviation(vd) {
   const a = Math.abs(vd);
   if (a < 0.05) return '0°';
   const mag = a < 10 ? String(+a.toFixed(1)).replace(/\.0$/, '') : String(Math.round(a));
-  /* +vd = left on gauge; iRacing steeringWheelAngle is negated in updateWheel so L/R matches wheel. */
-  return vd > 0 ? mag + '° L' : mag + '° R';
+  return vd > 0 ? mag + '° R' : mag + '° L';
 }
 
 function updateWheel(sRad) {
-  const vd = -Math.max(
+  const vd = Math.max(
     -STEER_AXIS_HALF_DEG,
     Math.min(STEER_AXIS_HALF_DEG, (sRad / STEER_MAX_RAD) * STEER_AXIS_HALF_DEG)
   );
