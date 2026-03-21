@@ -1,0 +1,19 @@
+flowchart TD
+  A([Select telemetry car]) --> B[Click Find driver's incidents]
+  B --> C{Incidents for this car\nin leaderboard?}
+  C -- No --> D([Toast: No incidents for this driver\nScan aborted])
+  C -- Yes --> E[Queue unique frames for that car\nmax 200]
+  E --> F["⚠️ Queue = already-known frames from leaderboard\n(not a YAML scan — no new discovery)"]
+  F --> G[Button pulses red: Stop scan\nOther scan button disabled]
+  G --> H[Loop: for each frame in queue]
+  H --> I[send seek_to_incident frame → plugin → iRacing]
+  I --> J[Wait 600 ms]
+  J --> K["Read frame# from DOM element frame-cur\n⚠️ Timing-based: if plugin state\narrives after 600 ms, captured frame# is wrong"]
+  K --> L[Enrich record from incidents array\nsame data already in leaderboard]
+  L --> M[Append to Captured incidents · render]
+  M --> N[Update status: Driver N/total…]
+  N --> O{More frames?}
+  O -- Yes --> H
+  O -- No  --> P[Scan ends · status: Done N found]
+  B -- Stop clicked --> P
+  P --> Q([Captured tab has visited records\n⚠️ Same data as leaderboard + reviewed-at timestamp])

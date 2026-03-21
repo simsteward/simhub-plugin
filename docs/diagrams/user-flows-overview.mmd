@@ -1,0 +1,28 @@
+flowchart LR
+  WS([Plugin WebSocket]) --> Status[Status bar\nmode · time · dots · WS badge]
+  WS --> LB[Incident leaderboard]
+  WS --> Drivers[Driver standings]
+  WS --> Telem[Telemetry strip]
+
+  subgraph leftcol [Left column]
+    Replay[Replay Controls panel]
+    IncNav[Incident Navigation panel]
+    DriverInc[This driver's incidents]
+  end
+
+  subgraph bottomdock [Bottom dock]
+    LB
+    Meta[Incident meta strip]
+    Captured[Captured incidents tab]
+    Logs[Log tabs]
+    Telem
+  end
+
+  IncNav -- car selection --> DriverInc
+  LB -- click row --> Meta
+  DriverInc -- click row --> Meta
+  Captured -- click row --> Meta
+  Meta -- seek_to_incident --> iRacing([iRacing replay])
+  Replay -- replay_seek/speed/jump --> iRacing
+  IncNav -- Find driver walk --> Captured
+  IncNav -- Find session walk --> Captured

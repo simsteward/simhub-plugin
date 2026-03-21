@@ -20,6 +20,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 | Doc | Use when |
 |-----|----------|
 | [USER-FEATURES-PM.md](USER-FEATURES-PM.md) | PM-style user features (12 flows), connections, vision vs shipped vs [PRODUCT-FLOW.md](PRODUCT-FLOW.md) |
+| [USER-FLOWS.md](USER-FLOWS.md) | Step-by-step user journeys through today's UI (mermaid diagrams); PM issues and flow gaps |
 | [observability-local.md](observability-local.md) | Local Grafana/Loki stack, npm scripts, loki-gateway |
 | [observability-scaling.md](observability-scaling.md) | Many users, large grids, Loki cardinality |
 | [observability-testing.md](observability-testing.md) | Harness, AssertLokiQueries, Explore validation |

@@ -1,0 +1,16 @@
+flowchart TD
+  A([Switch to Captured incidents tab]) --> B{Any captured records?}
+  B -- No --> C([Empty: Run Find driver or session scan first])
+  B -- Yes --> D[Records sorted by frame ascending]
+  D --> E{Group by driver checkbox?}
+  E -- Off --> F[Flat list of captured cards]
+  E -- On  --> G[Accordion: one group per driver\ngroups sorted by first incident frame]
+  G --> H{Click group header}
+  H --> I[Group collapses / expands\nAccordion state persists during session]
+  F --> J[Click captured card]
+  I --> J
+  J --> K[send seek_to_incident frame]
+  J --> L[Meta strip expands with captured details\nshows: Scan step # · captured at time · frame · car · driver · sev · cause]
+  K --> M([iRacing seeks to frame])
+  L --> N{Click same card again?}
+  N --> O([Meta strip collapses])
