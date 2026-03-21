@@ -172,9 +172,9 @@ namespace SimSteward.Plugin
         private void OnLogWriteError(string eventType, Exception ex)
         {
             // Write directly to plugin.log to avoid re-entering PluginLogger
-            if (!string.IsNullOrEmpty(_pluginDataPath))
+            var logPath = _logger?.LogPath;
+            if (!string.IsNullOrEmpty(logPath))
             {
-                var logPath = Path.Combine(_pluginDataPath, "plugin.log");
                 var line = $"{DateTime.UtcNow:o} [ERROR] {eventType}: {ex?.Message}{Environment.NewLine}";
                 try { File.AppendAllText(logPath, line, System.Text.Encoding.UTF8); } catch { }
             }
