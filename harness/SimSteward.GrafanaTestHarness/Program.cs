@@ -43,57 +43,67 @@ namespace SimSteward.GrafanaTestHarness
             for (int i = 0; i < count; i++)
             {
                 var cid = Guid.NewGuid().ToString("N").Substring(0, 8);
-                entries.Add(MakeEntry("simhub-plugin", "INFO", "action_result", $"test action ok {i}",
-                    new Dictionary<string, object>
-                    {
-                        ["action"] = "approve_penalty",
-                        ["correlation_id"] = cid,
-                        ["success"] = "true",
-                        ["duration_ms"] = 10 + i,
-                        ["result"] = "ok"
-                    }, testTag));
+                var okFields = new Dictionary<string, object>
+                {
+                    ["action"] = "approve_penalty",
+                    ["correlation_id"] = cid,
+                    ["success"] = "true",
+                    ["duration_ms"] = 10 + i,
+                    ["result"] = "ok"
+                };
+                AddHarnessSessionAndRouting(okFields);
+                entries.Add(MakeEntry("simhub-plugin", "INFO", "action_result", $"test action ok {i}", okFields, testTag));
             }
             for (int i = 0; i < count; i++)
             {
                 var cid = Guid.NewGuid().ToString("N").Substring(0, 8);
-                entries.Add(MakeEntry("simhub-plugin", "INFO", "action_result", $"test action fail {i}",
-                    new Dictionary<string, object>
-                    {
-                        ["action"] = "ReplaySeekFrame",
-                        ["correlation_id"] = cid,
-                        ["success"] = "false",
-                        ["duration_ms"] = 5,
-                        ["error"] = "test harness simulated failure"
-                    }, testTag));
+                var failFields = new Dictionary<string, object>
+                {
+                    ["action"] = "ReplaySeekFrame",
+                    ["correlation_id"] = cid,
+                    ["success"] = "false",
+                    ["duration_ms"] = 5,
+                    ["error"] = "test harness simulated failure"
+                };
+                AddHarnessSessionAndRouting(failFields);
+                entries.Add(MakeEntry("simhub-plugin", "INFO", "action_result", $"test action fail {i}", failFields, testTag));
             }
 
             // incident_detected
-            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 4x #42 Test Driver",
-                new Dictionary<string, object>
-                {
-                    ["incident_type"] = "4x",
-                    ["car_number"] = "42",
-                    ["driver_name"] = "Test Driver",
-                    ["delta"] = 4,
-                    ["session_time"] = 123.45,
-                    ["session_num"] = 0,
-                    ["replay_frame"] = 1000,
-                    ["cause"] = "heavy_contact",
-                    ["lap"] = 2
-                }, testTag));
-            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 1x #7 Other",
-                new Dictionary<string, object>
-                {
-                    ["incident_type"] = "1x",
-                    ["car_number"] = "7",
-                    ["driver_name"] = "Other",
-                    ["delta"] = 1,
-                    ["session_time"] = 200.0,
-                    ["session_num"] = 0,
-                    ["replay_frame"] = 2000,
-                    ["cause"] = "off_track",
-                    ["lap"] = 3
-                }, testTag));
+            var inc1 = new Dictionary<string, object>
+            {
+                ["incident_type"] = "4x",
+                ["car_number"] = "42",
+                ["driver_name"] = "Test Driver",
+                ["unique_user_id"] = 123456,
+                ["delta"] = 4,
+                ["session_time"] = 123.45,
+                ["session_num"] = 0,
+                ["replay_frame"] = 1000,
+                ["replay_frame_end"] = 1020,
+                ["cause"] = "heavy_contact",
+                ["lap"] = 2,
+                ["cam_car_idx"] = 5
+            };
+            AddHarnessSessionAndRouting(inc1);
+            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 4x #42 Test Driver", inc1, testTag));
+            var inc2 = new Dictionary<string, object>
+            {
+                ["incident_type"] = "1x",
+                ["car_number"] = "7",
+                ["driver_name"] = "Other",
+                ["unique_user_id"] = 999888,
+                ["delta"] = 1,
+                ["session_time"] = 200.0,
+                ["session_num"] = 0,
+                ["replay_frame"] = 2000,
+                ["replay_frame_end"] = 2005,
+                ["cause"] = "off_track",
+                ["lap"] = 3,
+                ["cam_car_idx"] = 2
+            };
+            AddHarnessSessionAndRouting(inc2);
+            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 1x #7 Other", inc2, testTag));
 
             // session_digest
             var sessionId = "test-session-" + Guid.NewGuid().ToString("N").Substring(0, 8);
@@ -123,6 +133,15 @@ namespace SimSteward.GrafanaTestHarness
 
             Console.WriteLine($"Emitted {entries.Count} test log entries to {structuredPath} (testing=true, test_tag={testTag}). Alloy can tail this file to Loki.");
             return 0;
+        }
+
+        /// <summary>Sample iRacing-style IDs for Loki/Grafana harness rows (not real telemetry).</summary>
+        private static void AddHarnessSessionAndRouting(Dictionary<string, object> fields)
+        {
+            fields["subsession_id"] = "42700101";
+            fields["parent_session_id"] = "17001234";
+            fields["track_display_name"] = "Test Track";
+            SessionLogging.AppendRoutingAndDestination(fields);
         }
 
         private static LogEntry MakeEntry(string component, string level, string eventType, string message,

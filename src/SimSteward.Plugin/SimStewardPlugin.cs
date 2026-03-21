@@ -63,6 +63,11 @@ namespace SimSteward.Plugin
         private int _replayFrameNumEnd;
         private string _currentSessionId = "";
         private string _currentSessionSeq = "";
+        /// <summary>Latest iRacing session context for structured logs (WebSocket thread reads; DataUpdate writes).</summary>
+        private volatile string _logCtxSubsession = SessionLogging.NotInSession;
+        private volatile string _logCtxParent = SessionLogging.NotInSession;
+        private volatile string _logCtxSessionNum = SessionLogging.NotInSession;
+        private volatile string _logCtxTrack = SessionLogging.NotInSession;
 #endif
 
 #if SIMHUB_SDK
@@ -191,15 +196,25 @@ namespace SimSteward.Plugin
         {
             if (string.IsNullOrEmpty(action))
                 return (false, null, "missing_action");
-            _logger?.Structured("INFO", "simhub-plugin", "action_dispatched", action,
-                new System.Collections.Generic.Dictionary<string, object> { ["action"] = action, ["arg"] = arg ?? "", ["correlation_id"] = correlationId ?? "" },
-                "action", null);
-            _logger?.Structured("INFO", "simhub-plugin", "action_result", $"{action} -> not_supported",
-                new System.Collections.Generic.Dictionary<string, object>
-                {
-                    ["action"] = action, ["arg"] = arg, ["correlation_id"] = correlationId,
-                    ["success"] = false, ["error"] = "not_supported"
-                }, "action", null);
+            var dispatchFields = new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["action"] = action,
+                ["arg"] = arg ?? "",
+                ["correlation_id"] = correlationId ?? ""
+            };
+            MergeSessionAndRoutingFields(dispatchFields);
+            _logger?.Structured("INFO", "simhub-plugin", "action_dispatched", action, dispatchFields, "action", null);
+
+            var resultFields = new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["action"] = action,
+                ["arg"] = arg,
+                ["correlation_id"] = correlationId,
+                ["success"] = false,
+                ["error"] = "not_supported"
+            };
+            MergeSessionAndRoutingFields(resultFields);
+            _logger?.Structured("INFO", "simhub-plugin", "action_result", $"{action} -> not_supported", resultFields, "action", null);
             return (false, null, "not_supported");
         }
 
@@ -219,7 +234,18 @@ namespace SimSteward.Plugin
         private void OnDashboardStructuredLog(string eventType, string message, System.Collections.Generic.Dictionary<string, object> fields)
         {
             if (string.IsNullOrEmpty(eventType) || fields == null) return;
+            MergeSessionAndRoutingFields(fields);
             _logger?.Structured("INFO", "bridge", eventType, message, fields, "action", null);
+        }
+
+        private void MergeSessionAndRoutingFields(System.Collections.Generic.Dictionary<string, object> fields)
+        {
+            if (fields == null) return;
+            fields["subsession_id"] = _logCtxSubsession;
+            fields["parent_session_id"] = _logCtxParent;
+            fields["session_num"] = _logCtxSessionNum;
+            fields["track_display_name"] = _logCtxTrack;
+            SessionLogging.AppendRoutingAndDestination(fields);
         }
 
         private void RefreshDependencyChecks()
@@ -410,14 +436,26 @@ namespace SimSteward.Plugin
 
                 _replayFrameNumEnd = SafeGetInt("ReplayFrameNum");
                 int subId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+                int parentId = 0;
+                try
+                {
+                    parentId = _irsdk.Data.SessionInfo?.WeekendInfo?.SessionID ?? 0;
+                }
+                catch { }
                 string trackName = "";
                 try
                 {
                     trackName = _irsdk.Data.SessionInfo?.WeekendInfo?.TrackDisplayName ?? "";
                 }
                 catch { }
+                int sessionNum = SafeGetInt("SessionNum");
                 _currentSessionSeq = BuildSessionSeq(trackName);
                 _currentSessionId = subId > 0 ? subId.ToString() : _currentSessionSeq;
+
+                _logCtxSubsession = subId > 0 ? subId.ToString() : SessionLogging.NotInSession;
+                _logCtxParent = parentId > 0 ? parentId.ToString() : SessionLogging.NotInSession;
+                _logCtxSessionNum = sessionNum.ToString();
+                _logCtxTrack = string.IsNullOrEmpty(trackName) ? SessionLogging.NotInSession : trackName;
             }
             else
             {
@@ -426,6 +464,10 @@ namespace SimSteward.Plugin
                 _replayFrameNumEnd = 0;
                 _currentSessionId = "";
                 _currentSessionSeq = "";
+                _logCtxSubsession = SessionLogging.NotInSession;
+                _logCtxParent = SessionLogging.NotInSession;
+                _logCtxSessionNum = SessionLogging.NotInSession;
+                _logCtxTrack = SessionLogging.NotInSession;
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
