@@ -571,9 +571,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
         </div>
         <div class="cap-row">
           <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
-            title="Seek to each incident for the selected telemetry car only and capture metadata (max 200 steps, or stop)">Find selected driver’s incidents</button>
+            title="Walk frames already on the leaderboard for the selected car (does not scan YAML for new incidents). Max 200 steps.">Walk this car’s listed incidents</button>
           <button type="button" class="btn cap btn-scan btn-scan-session" id="cap-btn-session" onclick="startCaptureSessionClick()"
-            title="All drivers: seek every incident in the session and capture metadata. Asks for confirmation before starting.">Find all incidents for all drivers</button>
+            title="Walk every leaderboard frame in the session (does not discover new incidents from YAML). Confirms before start.">Walk all listed incidents (session)</button>
           <span class="cap-status" id="cap-status">—</span>
         </div>
       </div>
@@ -740,6 +740,10 @@ let lastLap = -1;
 let incidentMetaSelection = null;
 let selectedIncident = null;
 let cameraGroups = [];
+/** Latest telemetry object from plugin state (throttle, brake, steeringWheelAngle); null before first state. */
+let lastPluginTelemetry = null;
+/** Last replay frame number from plugin state (for capture walk handshake). */
+let lastPluginFrame = 0;
 
 // ── WebSocket ────────────────────────────────────────────
 function connectWs() {
@@ -755,6 +759,7 @@ function connectWs() {
       selectedIncident = null;
       hideSelectedIncidentPanel();
       cameraGroups = [];
+      lastPluginTelemetry = null;
       renderInc();
       renderStd();
       log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
@@ -791,12 +796,6 @@ function sendDashboardUiEvent({ element_id, event_type, message, value }) {
     return false;
   }
 }
-
-// #region agent log
-function __dbgAgent(hypothesisId, location, message, data) {
-  fetch('http://127.0.0.1:7495/ingest/8b54de0f-5482-4c03-853b-a275c1b55527', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1a14ab' }, body: JSON.stringify({ sessionId: '1a14ab', hypothesisId, location, message, data: data || {}, timestamp: Date.now() }) }).catch(function () {});
-}
-// #endregion
 
 function onMsg(m) {
   if (!m || !m.type) return;
@@ -844,19 +843,16 @@ function onState(m) {
   if (Array.isArray(m.cameraGroups) && m.cameraGroups.length) {
     cameraGroups = m.cameraGroups;
     populateCameraDropdown();
+  } else if (Array.isArray(m.cameraGroups) && m.cameraGroups.length === 0) {
+    cameraGroups = [];
+    const csel = document.getElementById('camera-sel');
+    if (csel) csel.innerHTML = '';
   }
+  if (m.telemetry) lastPluginTelemetry = m.telemetry;
   if (typeof m.lap === 'number' && !Number.isNaN(m.lap)) lastLap = m.lap;
   else lastLap = -1;
   if (m.frame !== undefined) setFrame(m.frame, m.frameEnd);
   updateReplaySessionRow(m);
-  // #region agent log
-  __dbgAgent('H2', 'index.html:onState', 'state_tick', {
-    driversLen: m.drivers && Array.isArray(m.drivers) ? m.drivers.length : null,
-    cgIsArray: Array.isArray(m.cameraGroups),
-    cgLen: Array.isArray(m.cameraGroups) ? m.cameraGroups.length : null,
-    emptyCgSkippedUi: !!(Array.isArray(m.cameraGroups) && m.cameraGroups.length === 0)
-  });
-  // #endregion
 }
 
 function updateReplaySessionRow(m) {
@@ -896,6 +892,28 @@ function getFilteredIncidents() {
   });
 }
 
+/** Heuristic suggested camera group from incident cause + names from plugin (client-only until server emits field). */
+function pickSuggestedCamera(inc) {
+  if (!cameraGroups.length) return undefined;
+  const names = cameraGroups.map(String);
+  const pick = function (pred) {
+    for (let i = 0; i < names.length; i++) if (pred(names[i])) return names[i];
+    return null;
+  };
+  const c = String(inc.cause || '').toLowerCase();
+  if (c.includes('contact') || c.includes('heavy')) return pick(function (n) { return /chase|tv|helicopter/i.test(n); }) || names[0];
+  if (c.includes('wall') || c.includes('spin')) return pick(function (n) { return /helicopter|tv|tower/i.test(n); }) || names[0];
+  if (c.includes('off') || c.includes('track')) return pick(function (n) { return /chase|cockpit/i.test(n); }) || names[0];
+  return names[0];
+}
+
+function applySuggestedCamerasToIncidents() {
+  if (!cameraGroups.length) return;
+  for (let i = 0; i < incidents.length; i++) {
+    if (!incidents[i].suggestedCamera) incidents[i].suggestedCamera = pickSuggestedCamera(incidents[i]);
+  }
+}
+
 function incidentCardHtml(i) {
   const lapStr = (typeof i.lap === 'number' && i.lap >= 0) ? ` · L${i.lap}` : '';
   return `
@@ -909,6 +927,7 @@ function incidentCardHtml(i) {
 }
 
 function renderInc() {
+  applySuggestedCamerasToIncidents();
   const filtered = getFilteredIncidents();
   const count = '(' + filtered.length + ')';
   const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No incidents</div>';
@@ -969,9 +988,6 @@ function populateCarDropdown(driversArr) {
       if (sel.options[i].getAttribute('data-player') === '1') { sel.selectedIndex = i; break; }
     }
   }
-  // #region agent log
-  __dbgAgent('H4', 'index.html:populateCarDropdown', 'car_restore', { prevCar: prevCar, restored: restored, optCount: sel.options.length });
-  // #endregion
   renderDriverIncidents();
 }
 
@@ -991,12 +1007,19 @@ function showSelectedIncidentPanel(i) {
   panel.hidden = false;
   const meta = document.getElementById('selected-inc-meta');
   if (meta) {
-    const cause = (i.cause || '').replace(/-/g, ' ');
+    const causeRaw = String(i.cause || '');
+    const causeDisp = causeRaw.replace(/-/g, ' ');
+    const causeClass = causeRaw.replace(/[^a-z-]/gi, '') || 'unknown';
+    const carEsc = escapeHtmlForCaptured(String(i.car != null ? i.car : ''));
+    const drvEsc = escapeHtmlForCaptured(String(i.driver || ''));
+    const causeEsc = escapeHtmlForCaptured(causeDisp);
+    const timeEsc = escapeHtmlForCaptured(String(i.time || ''));
+    const sev = [1, 2, 4].includes(+i.sev) ? +i.sev : 1;
     meta.innerHTML =
-      `<strong>#${i.car}</strong> ${i.driver}&nbsp;` +
-      `<span class="sev-badge s${i.sev}">${i.sev}×</span>&nbsp;` +
-      `<span class="cause-tag ${i.cause}">${cause}</span>&nbsp;` +
-      `<span style="color:var(--muted)">${i.time}</span>`;
+      `<strong>#${carEsc}</strong> ${drvEsc}&nbsp;` +
+      `<span class="sev-badge s${sev}">${sev}×</span>&nbsp;` +
+      `<span class="cause-tag ${causeClass}">${causeEsc}</span>&nbsp;` +
+      `<span style="color:var(--muted)">${timeEsc}</span>`;
   }
   populateCameraDropdown();
   const sugBtn = document.getElementById('use-suggested-btn');
@@ -1044,9 +1067,14 @@ function selectPrevIncident() {
   if (!selectedIncident) return;
   const filtered = getFilteredIncidents();
   const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
-  // #region agent log
-  __dbgAgent('H3', 'index.html:selectPrevIncident', 'nav', { idx: idx, filteredLen: filtered.length, selFrame: selectedIncident.frame, incFilter: incFilter });
-  // #endregion
+  if (idx < 0) {
+    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200);
+    selectedIncident = null;
+    incidentMetaSelection = null;
+    hideSelectedIncidentPanel();
+    collapseIncidentMetaStrip();
+    return;
+  }
   sendDashboardUiEvent({ element_id: 'selected-inc-prev', event_type: 'click', message: 'Selected incident prev' });
   if (idx > 0) onSessionIncidentClick(filtered[idx - 1].frame);
 }
@@ -1055,9 +1083,14 @@ function selectNextIncident() {
   if (!selectedIncident) return;
   const filtered = getFilteredIncidents();
   const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
-  // #region agent log
-  __dbgAgent('H3', 'index.html:selectNextIncident', 'nav', { idx: idx, filteredLen: filtered.length, selFrame: selectedIncident.frame, incFilter: incFilter });
-  // #endregion
+  if (idx < 0) {
+    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200);
+    selectedIncident = null;
+    incidentMetaSelection = null;
+    hideSelectedIncidentPanel();
+    collapseIncidentMetaStrip();
+    return;
+  }
   sendDashboardUiEvent({ element_id: 'selected-inc-next', event_type: 'click', message: 'Selected incident next' });
   if (idx >= 0 && idx < filtered.length - 1) onSessionIncidentClick(filtered[idx + 1].frame);
 }
@@ -1351,10 +1384,22 @@ function onCapturedIncidentClick(seq) {
   });
 }
 
+function clearSelectionIfNotInFilter() {
+  if (!selectedIncident) return;
+  const filtered = getFilteredIncidents();
+  if (filtered.some(i => i.frame === selectedIncident.frame)) return;
+  selectedIncident = null;
+  incidentMetaSelection = null;
+  hideSelectedIncidentPanel();
+  collapseIncidentMetaStrip();
+  toast('Selection cleared — not visible with this filter.', 2800);
+}
+
 function setFilter(el) {
   incFilter = el.dataset.f;
   document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.f === incFilter));
   renderInc();
+  clearSelectionIfNotInFilter();
   sendDashboardUiEvent({
     element_id: 'inc-filter-chip',
     event_type: 'click',
@@ -1427,26 +1472,28 @@ function arcPath(cx,cy,r,a0,a1) {
 
 function onCarSel() {
   const sel = document.getElementById('car-sel');
-  const idx = +sel.value;
+  const carIdx = +sel.value;
   const opt = sel.options[sel.selectedIndex];
-  const m = MOCK_CAR_TELEM[idx] || MOCK_CAR_TELEM[0];
-  // #region agent log
-  __dbgAgent('H1', 'index.html:onCarSel', 'mock_telem_lookup', {
-    selValue: sel.value,
-    idxNum: idx,
-    mockTelemLen: MOCK_CAR_TELEM.length,
-    usedFallback: !MOCK_CAR_TELEM[idx],
-    dataCar: opt ? opt.getAttribute('data-car') : null
-  });
-  // #endregion
-  mockTelem = m;
-  setTelem(m.t, m.b, m.s);
+  if (ws && ws.readyState === WebSocket.OPEN && mockPaused && lastPluginTelemetry) {
+    const t = lastPluginTelemetry;
+    mockTelem = {
+      t: t.throttle != null ? t.throttle : 0,
+      b: t.brake != null ? t.brake : 0,
+      s: t.steeringWheelAngle != null ? t.steeringWheelAngle : 0
+    };
+    setTelem(mockTelem.t, mockTelem.b, mockTelem.s);
+  } else {
+    const ix = sel.selectedIndex >= 0 ? sel.selectedIndex % MOCK_CAR_TELEM.length : 0;
+    const m = MOCK_CAR_TELEM[ix];
+    mockTelem = m;
+    setTelem(m.t, m.b, m.s);
+  }
   renderDriverIncidents();
   sendDashboardUiEvent({
     element_id: 'telemetry-car-sel',
     event_type: 'change',
     message: 'Telemetry car: ' + (opt ? opt.textContent.trim() : ''),
-    value: String(idx)
+    value: String(carIdx)
   });
 }
 
@@ -1514,6 +1561,32 @@ function seekInc(frame) {
 // Session: seek every incident frame for all drivers in the session; confirms before start.
 const CAPTURE_STEP_MS = 600;
 const CAPTURE_MAX_QUEUE = 200;
+
+/** Wait until plugin state frame is near target (from WS state / setFrame), or timeout. */
+function waitForFrameApprox(targetFrame, opts) {
+  const tol = opts && opts.tolerance != null ? opts.tolerance : 120;
+  const timeoutMs = opts && opts.timeoutMs != null ? opts.timeoutMs : 5000;
+  const pollMs = opts && opts.pollMs != null ? opts.pollMs : 50;
+  const start = Date.now();
+  return new Promise(function (resolve) {
+    function tick() {
+      if (!capturing) {
+        resolve({ ok: false, reason: 'stopped', frame: lastPluginFrame });
+        return;
+      }
+      if (Math.abs(lastPluginFrame - targetFrame) <= tol) {
+        resolve({ ok: true, frame: lastPluginFrame });
+        return;
+      }
+      if (Date.now() - start >= timeoutMs) {
+        resolve({ ok: false, reason: 'timeout', frame: lastPluginFrame });
+        return;
+      }
+      setTimeout(tick, pollMs);
+    }
+    tick();
+  });
+}
 
 let capturing = false;
 let captureKind = 'driver';
@@ -1661,25 +1734,28 @@ function captureStep() {
   if (captureKind === 'session') selectCarInDropdownForFrame(frame);
   const sent = send('seek_to_incident', String(frame));
 
-  captureTimer = setTimeout(() => {
+  waitForFrameApprox(frame, { tolerance: 120, timeoutMs: 5000, pollMs: 40 }).then(function (res) {
     if (!capturing) return;
     const frameEl = document.getElementById('frame-cur').textContent;
     const timeEl = document.getElementById('session-time').textContent;
     const lapPart = (lastLap >= 0 ? '  lap:' + lastLap : '  lap:—');
     log('events', 'EVENT', 'capture_incident',
       '#' + String(captureCount).padStart(2, '0') + '  frame:' + frameEl.replace('Frame ', '') +
-      '  session:' + timeEl + lapPart + (sent ? '' : '  [PoC-mock]'));
+      '  session:' + timeEl + lapPart + (sent ? '' : '  [PoC-mock]') +
+      (res.ok ? '' : '  handshake:' + (res.reason || 'miss')));
 
-    const frameNum = parseFrameFromLabel(frameEl);
+    const frameNum = res.ok ? res.frame : parseFrameFromLabel(frameEl);
     capturedIncidents.push(enrichCaptureRecord(frameNum, timeEl, captureCount));
     renderCaptured();
 
     const total = captureQueue.length;
     const prefix = captureKind === 'session' ? 'Session ' : 'Driver ';
-    document.getElementById('cap-status').textContent = prefix + captureCount + '/' + total + '…';
+    let status = prefix + captureCount + '/' + total + '…';
+    if (!res.ok) status += ' (sync ' + (res.reason || 'miss') + ')';
+    document.getElementById('cap-status').textContent = status;
 
     captureTimer = setTimeout(captureStep, CAPTURE_STEP_MS);
-  }, CAPTURE_STEP_MS);
+  });
 }
 
 function setCaptureUI(active) {
@@ -1691,8 +1767,8 @@ function setCaptureUI(active) {
   btnS.classList.toggle('active', active && captureKind === 'session');
   btnD.disabled = active && captureKind === 'session';
   btnS.disabled = active && captureKind === 'driver';
-  btnD.textContent = active && captureKind === 'driver' ? 'Stop scan' : 'Find selected driver’s incidents';
-  btnS.textContent = active && captureKind === 'session' ? 'Stop scan' : 'Find all incidents for all drivers';
+  btnD.textContent = active && captureKind === 'driver' ? 'Stop walk' : 'Walk this car’s listed incidents';
+  btnS.textContent = active && captureKind === 'session' ? 'Stop walk' : 'Walk all listed incidents (session)';
   lbl.className = 'cap-status' + (active ? ' running' : '');
   if (!active) {
     lbl.textContent = captureCount ? 'Done (' + captureCount + ' found)' : '—';
@@ -1712,7 +1788,10 @@ function scrubClick(e) {
   toast('[PoC] Scrub to ' + pct + '%');
 }
 function setFrame(cur, end) {
-  if (cur !== undefined) document.getElementById('frame-cur').textContent = 'Frame ' + cur.toLocaleString();
+  if (cur !== undefined) {
+    lastPluginFrame = cur;
+    document.getElementById('frame-cur').textContent = 'Frame ' + cur.toLocaleString();
+  }
   if (end !== undefined) document.getElementById('frame-end').textContent = '/ ' + end.toLocaleString();
   if (cur !== undefined && end && end > 0)
     document.getElementById('scrub-fill').style.width = (cur/end*100).toFixed(1)+'%';

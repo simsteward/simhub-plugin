@@ -159,8 +159,8 @@ flowchart TD
   F --> G[Button pulses red: Stop scan\nOther scan button disabled]
   G --> H[Loop: for each frame in queue]
   H --> I[send seek_to_incident frame → plugin → iRacing]
-  I --> J[Wait 600 ms]
-  J --> K["Read frame# from DOM element frame-cur\n⚠️ Timing-based: if plugin state\narrives after 600 ms, captured frame# is wrong"]
+  I --> J[Wait until WS state frame ≈ target\n(waitForFrameApprox) or timeout]
+  J --> K["Use matched plugin frame for record;\nif timeout fall back to DOM parse"]
   K --> L[Enrich record from incidents array\nsame data already in leaderboard]
   L --> M[Append to Captured incidents · render]
   M --> N[Update status: Driver N/total…]
@@ -173,9 +173,9 @@ flowchart TD
 
 </details>
 
-**Gap (issue 3 + 4):** The "capture" here is not a real capture — it's a timing-based DOM read that may record the wrong frame number under WS lag. The resulting Captured list contains the same metadata already in the leaderboard, plus a timestamp. Value is unclear until `capture_incident` atomic action exists (pre-roll + OBS).
+**Gap (issue 3 + 4):** Automated walk still enriches from the same leaderboard metadata; frame sync uses plugin `state.frame` when possible. Full value for editors is still `capture_incident` + OBS.
 
-**Gap (issue 7):** Button label "Find driver's incidents" implies discovery. The incidents are already found — this walks them. Consider "Walk driver incidents" or adding subtext.
+**Issue 7 (labels):** Dashboard uses “Walk … listed incidents” plus tooltips stating this does not scan YAML for new incidents.
 
 ---
 
@@ -192,7 +192,7 @@ flowchart TD
   B --> C{User confirms?}
   C -- No  --> D([Cancelled — no-op])
   C -- Yes --> E[Queue all unique frames from leaderboard\nall drivers · max 200]
-  E --> F[Same 600 ms seek loop as driver walk]
+  E --> F[Same frame handshake + step delay as driver walk]
   F --> G[Each step: rotate Telemetry car dropdown\nto match incident's car]
   G --> H[Same timing + data-quality issues as Flow 4]
   H --> I([Captured tab grows with all visited incidents])
@@ -287,7 +287,7 @@ flowchart TD
 |---|------|-------|
 | 1 | UX debt | Duplicate prev/next replay incident buttons in two panels — consolidate |
 | 2 | Missing feature | Telemetry car dropdown must be populated from plugin `drivers` state |
-| 3 | Data quality | Capture walk uses 600 ms DOM read — unreliable under WS lag; needs frame-confirmed handshake |
+| 3 | Data quality | Capture walk uses `waitForFrameApprox` on plugin `state.frame`; timeout falls back to DOM parse |
 | 4 | Value gap | Captured incidents = leaderboard subset + timestamp; value unclear until `capture_incident` exists |
 | 5 | UX gap | Meta strip expands in bottom dock; no feedback near clicked card in left column |
 | 6 | Product decision | "This driver's incidents" is NOT redundant with Mine chip — keep it (steward opponent review) |
