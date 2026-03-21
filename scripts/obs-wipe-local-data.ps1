@@ -1,11 +1,10 @@
-# Wipe persisted data for the local observability stack (Loki chunks/WAL, optional Alloy/Grafana, sample logs).
+# Wipe persisted data for the local observability stack (Loki chunks/WAL, optional Grafana, sample logs).
 # Does NOT remove Loki config, datasource provisioning, gateway tokens in .env, or compose services.
 # Usage (repo root): .\scripts\obs-wipe-local-data.ps1 -Force
-# Optional: -Alloy -Grafana -SampleLogs or -All (includes all three with -Force).
+# Optional: -Grafana -SampleLogs or -All (both optional dirs with -Force).
 param(
     [switch]$Force,
     [switch]$All,
-    [switch]$Alloy,
     [switch]$Grafana,
     [switch]$SampleLogs
 )
@@ -40,7 +39,6 @@ if (-not $Force) {
 }
 
 if ($All) {
-    $Alloy = $true
     $Grafana = $true
     $SampleLogs = $true
 }
@@ -68,10 +66,6 @@ finally {
 Write-Host "Wiping Loki data under: $(Join-Path $base 'loki')"
 Clear-DirectoryContents (Join-Path $base "loki")
 
-if ($Alloy) {
-    Write-Host "Wiping Alloy state under: $(Join-Path $base 'alloy')"
-    Clear-DirectoryContents (Join-Path $base "alloy")
-}
 if ($Grafana) {
     Write-Host "Wiping Grafana lib under: $(Join-Path $base 'grafana')"
     Clear-DirectoryContents (Join-Path $base "grafana")

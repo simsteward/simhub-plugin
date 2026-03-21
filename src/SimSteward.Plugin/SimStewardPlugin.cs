@@ -309,14 +309,13 @@ namespace SimSteward.Plugin
             _logger.Structured("INFO", "simhub-plugin", "logging_ready", "Logging pipeline ready; init continuing.", null, "lifecycle", null);
 
             var structuredPath = _logger.StructuredLogPath;
-            _logger.Structured("INFO", "simhub-plugin", "file_tail_ready", "Structured log file ready for Alloy/Loki file-tail.",
+            _logger.Structured("INFO", "simhub-plugin", "file_tail_ready", "Structured log file ready for Loki ingestion.",
                 new System.Collections.Generic.Dictionary<string, object> { ["path"] = structuredPath ?? "(none)" }, "lifecycle", null);
 
             _logger.Structured("INFO", "simhub-plugin", "plugin_started", "SimSteward plugin starting.", null, "lifecycle", null);
 
             pluginManager.AddProperty("SimSteward.PluginMode", GetType(), "Unknown");
             pluginManager.AddProperty("SimSteward.IncidentCount", GetType(), 0);
-            pluginManager.AddProperty("SimSteward.HasLiveIncidentData", GetType(), false);
             pluginManager.AddProperty("SimSteward.ClientCount", GetType(), 0);
 
             var wsPort = DefaultPort;
@@ -424,8 +423,6 @@ namespace SimSteward.Plugin
                     string simMode = _irsdk.Data.SessionInfo?.WeekendInfo?.SimMode;
                     if (string.Equals(simMode, "replay", StringComparison.OrdinalIgnoreCase))
                         _pluginMode = "Replay";
-                    else if (!string.IsNullOrEmpty(simMode))
-                        _pluginMode = "Live";
                     else
                         _pluginMode = "Unknown";
                 }
@@ -472,7 +469,6 @@ namespace SimSteward.Plugin
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
             pluginManager.SetPropertyValue("SimSteward.IncidentCount", GetType(), 0);
-            pluginManager.SetPropertyValue("SimSteward.HasLiveIncidentData", GetType(), _irsdk != null && _irsdk.IsConnected);
             pluginManager.SetPropertyValue("SimSteward.ClientCount", GetType(), clientCount);
 
             if (_bridge == null) return;

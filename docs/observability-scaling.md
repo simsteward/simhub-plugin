@@ -38,11 +38,11 @@ Per-driver per-tick telemetry is time-series data; use metrics (OTel), not Loki.
 
 ## Part B — Scaling log collection to many users
 
-Local Docker + Alloy + Loki per developer does **not** scale to ~120 users each running the full stack.
+Local Docker + Loki per developer does **not** scale to ~120 users each running the full stack.
 
 ### Current pipeline (local, single-user)
 
-Plugin → `plugin-structured.jsonl` → Alloy (Docker) → Loki. No in-plugin network I/O on the hot path.
+Plugin → `plugin-structured.jsonl` → your Loki ingestion path → Loki. No in-plugin network I/O on the hot path.
 
 
 ### Option A — Optional plugin push to central URL (recommended)

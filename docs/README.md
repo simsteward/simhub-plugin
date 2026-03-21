@@ -19,7 +19,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 
 | Doc | Use when |
 |-----|----------|
-| [observability-local.md](observability-local.md) | Local Grafana/Loki stack, npm scripts, Alloy gateway |
+| [observability-local.md](observability-local.md) | Local Grafana/Loki stack, npm scripts, loki-gateway |
 | [observability-scaling.md](observability-scaling.md) | Many users, large grids, Loki cardinality |
 | [observability-testing.md](observability-testing.md) | Harness, AssertLokiQueries, Explore validation |
 | [DATA-API-DEPLOY.md](DATA-API-DEPLOY.md) | Data API env (local vs prod) |

@@ -8,7 +8,7 @@ namespace SimSteward.GrafanaTestHarness
 {
     /// <summary>
     /// Emits representative structured log events (NDJSON) for the Grafana observability test harness.
-    /// Writes to plugin-structured.jsonl (same format as plugin) so Alloy can tail and push to Loki.
+    /// Writes to plugin-structured.jsonl (same format as plugin) for Loki ingestion outside the plugin.
     /// Env: SIMSTEWARD_DATA_PATH or SIMSTEWARD_STRUCTURED_LOG_PATH (output dir or full path); TEST_TAG (default grafana-harness).
     /// Args: --count N (number of action_result events to emit per type; default 3).
     /// </summary>
@@ -131,7 +131,7 @@ namespace SimSteward.GrafanaTestHarness
                 File.AppendAllText(structuredPath, line, System.Text.Encoding.UTF8);
             }
 
-            Console.WriteLine($"Emitted {entries.Count} test log entries to {structuredPath} (testing=true, test_tag={testTag}). Alloy can tail this file to Loki.");
+            Console.WriteLine($"Emitted {entries.Count} test log entries to {structuredPath} (testing=true, test_tag={testTag}). Ingest this file to Loki per your setup.");
             return 0;
         }
 

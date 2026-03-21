@@ -643,7 +643,7 @@ function send(action, arg) {
   return true;
 }
 
-/** Structured UI telemetry for Loki (plugin → plugin-structured.jsonl → Alloy). */
+/** Structured UI telemetry for Loki (plugin → plugin-structured.jsonl; ingestion outside plugin). */
 function sendDashboardUiEvent({ element_id, event_type, message, value }) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
   const o = { action: 'log', event: 'dashboard_ui_event', element_id, event_type, message };

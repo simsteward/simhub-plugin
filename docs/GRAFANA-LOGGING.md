@@ -1,14 +1,14 @@
 # Grafana Loki Structured Logging
 
-Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk); **Grafana Alloy** (or another tailer) tails that file and pushes to Loki. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
+Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk). **Loki ingestion** (reading that file or pushing lines to Loki) runs **outside the plugin**—your Grafana Cloud setup, a log shipper, `POST` to **loki-gateway** (local Docker), or another path you configure. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
 
-**Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; Alloy (or any forwarder) tails that file and pushes to Loki with no filter. Loki retains the full stream.
+**Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; whatever forwards those lines to Loki must not filter them. Loki retains the full stream.
 
 **Filtering is dashboard-only.** The web dashboard receives the full stream via WebSocket and applies level/event visibility filters for display only (checkboxes and `hiddenLevels` / `hiddenEvents`). Toggling "hide DEBUG" or "hide state_broadcast_summary" etc. in the dashboard shows or hides entries that are already in the stream; nothing is dropped at the plugin.
 
 ### Local vs prod (same pipeline; env label only)
 
-One pipeline for both: plugin writes all logs to **plugin-structured.jsonl**; Alloy (or any forwarder) tails it and pushes to Loki. You choose the Loki endpoint (local URL or Grafana Cloud) in the **forwarder** config, not in the plugin. Set `SIMSTEWARD_LOG_ENV=local` for local dev (e.g. Docker stack) or `SIMSTEWARD_LOG_ENV=production` (default); this sets the `env` label only. No source-level omission: Loki and the dashboard stream are full. Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
+One pipeline for both: plugin writes all logs to **plugin-structured.jsonl**; your **Loki ingestion** path ships them to Loki. You choose the Loki endpoint (local URL or Grafana Cloud) in that ingestion config, not in the plugin. Set `SIMSTEWARD_LOG_ENV=local` for local dev (e.g. Docker stack) or `SIMSTEWARD_LOG_ENV=production` (default); this sets metadata on log lines (`log_env` / routing hints). No source-level omission: Loki and the dashboard stream are full. Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
 
 ## Grafana Cloud free tier limits
 
@@ -59,7 +59,7 @@ Every log line has an `event` field. Key events:
 |-------|-----------|------------|-------|
 | `logging_ready` | simhub-plugin | — | First log after logger creation; init continues. |
 | `settings_saved` | simhub-plugin | — | UI settings persisted. |
-| `file_tail_ready` | simhub-plugin | `path` | Structured log file path ready for Alloy/Loki file-tail. |
+| `file_tail_ready` | simhub-plugin | `path` | Structured log file path ready for Loki ingestion (outside plugin). |
 | `plugin_started` | simhub-plugin | — | SimSteward plugin starting; tracker callback set. |
 | `actions_registered` | simhub-plugin | — | SimHub properties and actions registered. |
 | `bridge_starting` | simhub-plugin | `bind`, `port` | WebSocket bridge starting. |
@@ -262,11 +262,10 @@ cd observability/local
 docker compose up -d
 # Grafana: http://localhost:3000  |  Loki: http://localhost:3100 (no auth for direct push)
 
-# Optional: start Alloy (file-tail) and Loki gateway for file-based ingestion:
-# docker compose --profile file-tail up -d
+# Optional: local **loki-gateway** (token-protected push) — see observability-local.md
 ```
 
-See **docs/observability-local.md** for the file-tail/gateway/alloy setup and token-protected push.
+See **docs/observability-local.md** for Grafana + Loki + gateway setup and `LOKI_PUSH_TOKEN`.
 
 ## Housekeeping (Grafana Cloud)
 
@@ -274,7 +273,7 @@ See **docs/observability-local.md** for the file-tail/gateway/alloy setup and to
 
 **Stored logs:** Rely on plan **retention**, or use Grafana Cloud / Loki **documented deletion** flows for your tier. Clearing data must not require rotating credentials.
 
-**Local Docker:** Wipe Loki (and optionally Alloy/Grafana) bind-mount data with **docs/observability-local.md** § Housekeeping (`scripts/obs-wipe-local-data.ps1`).
+**Local Docker:** Wipe Loki (and optionally Grafana) bind-mount data with **docs/observability-local.md** § Housekeeping (`scripts/obs-wipe-local-data.ps1`).
 
 ## LogQL reference
 
