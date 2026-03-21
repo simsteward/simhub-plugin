@@ -31,7 +31,11 @@ $headers = @{
     "Content-Type" = "application/json"
 }
 
-$dashboardFiles = Get-ChildItem -Path $DashboardDir -Filter "*.json"
+$dashboardFiles = @(Get-ChildItem -Path $DashboardDir -Filter "*.json" -ErrorAction SilentlyContinue)
+if ($dashboardFiles.Count -eq 0) {
+    Write-Host "PASS: No dashboard JSON in $DashboardDir — nothing to publish."
+    exit 0
+}
 
 foreach ($file in $dashboardFiles) {
     Write-Host "Publishing $($file.Name)..."

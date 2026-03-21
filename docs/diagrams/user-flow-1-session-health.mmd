@@ -1,0 +1,13 @@
+flowchart TD
+  A([Open dashboard in browser]) --> B[Status bar renders immediately]
+  B --> C{WS connects to plugin\nport 19847?}
+  C -- Yes --> D[WS badge → green ● connected\nMock data paused\nReal state starts flowing]
+  C -- No --> E[WS badge → red ○ disconnected\nAuto-retries every 3 s]
+  E --> C
+  D --> F{Plugin state arrives}
+  F --> G[Mode pill: REPLAY or WAITING]
+  F --> H[Session time updates]
+  F --> I[Diagnostic dots: iRacing · Steam · SimHub]
+  G --> J{Mode = REPLAY?}
+  J -- Yes --> K([Ready — incidents and telemetry will flow])
+  J -- No  --> L([Waiting — iRacing not in replay yet])

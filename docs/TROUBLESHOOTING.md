@@ -94,6 +94,7 @@ If you run a replay and incidents are not captured or signaled:
 | Mode always "Unknown" | iRacing running and shared memory enabled |
 | No logs in Grafana / Loki | Section 8: SIMSTEWARD_LOKI_URL, local stack, auth, data source |
 | Log stream empty when clicking buttons | Section 4b: connection, broadcast-errors.log, browser console |
+| ContextStream 401 / index missing | Section 9: `.env` key, verify-key, ingest in interactive terminal |
 
 ---
 
@@ -115,7 +116,7 @@ The dashboard includes a collapsible **Diagnostics & Metrics** panel just below 
 
 Incident detection uses session YAML `CurDriverIncidentCount` (`yamlIncidentEvents`). The count accumulates from the moment iRacing connects and resets when iRacing disconnects, when you seek the replay backward, or when the session changes.
 
-- **`yamlIncidentEvents` = 0 and YAML updates > 0**: the session YAML is being parsed but no other-driver incident deltas have been found yet (may be correct early in a session, or non-admin in live race).
+- **`yamlIncidentEvents` = 0 and YAML updates > 0**: the session YAML is being parsed but no other-driver incident deltas have been found yet (may be correct early in a session, or non-admin in race).
 - **`yamlIncidentEvents` = 0**: iRacing is not connected or the replay has not advanced past an incident.
 
 ---
@@ -126,13 +127,24 @@ For a step-by-step to get plugin data into **local** Grafana, see **docs/observa
 
 If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 
-1. **Loki URL** — The plugin only pushes when `SIMSTEWARD_LOKI_URL` is set. Copy `.env.example` to `.env` and set `SIMSTEWARD_LOKI_URL` (e.g. `http://localhost:3100` for local Docker, or your Grafana Cloud Loki URL). Restart SimHub after changing `.env`.
-2. **Local stack** — For local dev, start the stack from `observability/local/`: run `docker compose up -d` so Loki is listening on port 3100. Ensure the host path for Loki storage (e.g. `S:\sim-steward-grafana-storage`) exists before starting.
-3. **Auth (Grafana Cloud)** — For Grafana Cloud, set `SIMSTEWARD_LOKI_USER` and `SIMSTEWARD_LOKI_TOKEN` in `.env` to your instance user ID and log-write token. Wrong or missing credentials cause push failures (check plugin.log for LokiSink warnings).
-4. **Data source in Grafana** — In Grafana, add a Loki data source pointing at the same URL the plugin uses (e.g. `http://localhost:3100` for local). Use Explore and query `{app="sim-steward"}` to see streams.
-5. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `state_broadcast_summary`, `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
+1. **Plugin output** — The plugin writes **plugin-structured.jsonl** only; it does not POST to Loki. You need a **Loki ingestion** path (Grafana Cloud agent, your shipper, `POST` to **loki-gateway** with `LOKI_PUSH_TOKEN`, etc.). See **docs/observability-local.md** and **docs/GRAFANA-LOGGING.md**.
+2. **Env metadata** — Set `SIMSTEWARD_LOKI_URL` and `SIMSTEWARD_LOG_ENV` before SimHub starts (e.g. via `.env` loaded by your launcher) so log lines include `loki_push_target` / `log_env`; this does not replace ingestion.
+3. **Local stack** — Start observability from `observability/local/` (`docker compose up -d`) so Loki (3100) and Grafana (3000) run; compose does **not** tail `plugin-structured.jsonl` for you.
+4. **Auth (Grafana Cloud)** — For Grafana Cloud direct push from *your* agent, use your stack’s credentials; wrong tokens show up in that agent’s logs, not as a built-in “LokiSink” in this plugin.
+5. **Data source in Grafana** — Point the Loki data source at your Loki URL (e.g. `http://localhost:3100` for local). Explore: `{app="sim-steward"}`.
+6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `state_broadcast_summary`, `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
 
 See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL examples.
+
+---
+
+## 9. ContextStream MCP (index / search / 401)
+
+- **401 on ingest or `verify-key`** — The ContextStream API key must be in `.env` (`CONTEXTSTREAM_API_KEY`, etc.) and loaded for CLI commands. From the repo root:  
+  `npx -y envmcp --env-file .env cmd /c "%LocalAppData%\ContextStream\contextstream-mcp.exe verify-key"`  
+  If that fails, rotate the key in the ContextStream account and update `.env` (do not commit real secrets).
+- **`ingest` fails with "not a terminal"`** — From repo root (with `.env`): `powershell -ExecutionPolicy Bypass -File scripts/contextstream-ingest.ps1` (spawns `cmd` so the CLI sees a console). Or run `contextstream-mcp.exe ingest --path <repo>` manually in Windows Terminal / `cmd`. The MCP server uses the same key via Cursor env.
+- **Search says index freshness `missing`** — After a successful ingest from step above, keyword search still works; semantic/index metadata syncs once ingestion completes.
 
 ---
 

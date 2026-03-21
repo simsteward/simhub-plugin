@@ -10,7 +10,7 @@
  *   2. Starts OBS recording. Clip naming uses sessionId and replayFrameNum when
  *      available (see README for filename format).
  *
- * Contract: docs/INTERFACE.md (§3.2 incidentEvents, §5 sessionId).
+ * Contract: WebSocket state includes incidentEvents and sessionId; see README.
  * OBS WebSocket: https://github.com/obsproject/obs-websocket (v5).
  */
 

@@ -131,14 +131,14 @@ namespace AssertLokiQueries
                 return false;
             }
 
-            // Dashboard panel queries (same LogQL as provisioned dashboards, filtered to test data)
-            var dashboardChecks = new[]
+            // LogQL smoke queries (typical panel queries, filtered to test data)
+            var logqlSmokeChecks = new[]
             {
-                ("command-audit", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"action_result\" | testing = \"true\" | test_tag = \"{testTag}\""),
-                ("incident-timeline", $"{{app=\"sim-steward\", component=\"tracker\"}} | json | event = \"incident_detected\" | testing = \"true\" | test_tag = \"{testTag}\""),
-                ("session-overview", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"session_digest\" | testing = \"true\" | test_tag = \"{testTag}\"")
+                ("action_result", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"action_result\" | testing = \"true\" | test_tag = \"{testTag}\""),
+                ("incident_detected", $"{{app=\"sim-steward\", component=\"tracker\"}} | json | event = \"incident_detected\" | testing = \"true\" | test_tag = \"{testTag}\""),
+                ("session_digest", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"session_digest\" | testing = \"true\" | test_tag = \"{testTag}\"")
             };
-            foreach (var (name, logql) in dashboardChecks)
+            foreach (var (name, logql) in logqlSmokeChecks)
             {
                 if (!QueryLoki(baseUrl, logql, client, out var panelLines, out var panelErr))
                 {
@@ -147,7 +147,7 @@ namespace AssertLokiQueries
                 }
                 if (panelLines.Count < 1)
                 {
-                    error = $"[{name}] Expected at least 1 row for dashboard query; got {panelLines.Count}.";
+                    error = $"[{name}] Expected at least 1 row for LogQL smoke query; got {panelLines.Count}.";
                     return false;
                 }
             }

@@ -1,6 +1,6 @@
-# Seed plugin-structured.jsonl (so Alloy can tail it) then poll Loki and append result to debug log.
+# Seed plugin-structured.jsonl then poll Loki and append result to debug log (ingestion is outside this script).
 # Run from repo root. Requires: Docker stack up from observability/local with default mount
-# (SIMSTEWARD_DATA_PATH unset so Alloy tails ./sample-logs = observability/local/sample-logs).
+# (Default sample path: observability/local/sample-logs when using harness defaults.)
 # Usage: .\scripts\seed-and-validate-loki.ps1 [path\to\debug-2291d4.log]
 
 param(
@@ -19,7 +19,7 @@ $line = "{`"level`":`"INFO`",`"message`":`"Seed line at $ts — pipeline check`"
 Add-Content -Path $jsonlPath -Value $line -Encoding UTF8
 Write-Host "Appended 1 line to $jsonlPath"
 
-Write-Host "Waiting ${WaitSeconds}s for Alloy to tail and push..."
+Write-Host "Waiting ${WaitSeconds}s for Loki to show lines (depends on your ingestion)..."
 Start-Sleep -Seconds $WaitSeconds
 
 $env:LOKI_QUERY_URL = "http://localhost:3100"

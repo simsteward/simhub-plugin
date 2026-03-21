@@ -10,7 +10,7 @@ How SimSteward logging scales in Grafana Loki: **many drivers per session**, **m
 
 | Dimension | Meaning | How it’s supported |
 |-----------|--------|---------------------|
-| **Many drivers per session** | 100–200+ cars in session-end results (not 64-car live telemetry cap). | Chunked `session_end_datapoints_results` (35 drivers per line). See **docs/GRAFANA-LOGGING.md** (chunked session results). Chunk format: **docs/reference/END-OF-SESSION-DATAPOINTS.md**. |
+| **Many drivers per session** | 100–200+ cars in session-end results (not 64-car live telemetry cap). | Chunked `session_end_datapoints_results` (35 drivers per line). See **docs/GRAFANA-LOGGING.md** (chunked session results). |
 | **Many SimSteward users** | 100–200+ instances → one central Loki. | Lightweight forwarder per user + central Loki (**Part B** below). |
 
 ### Labels and streams (must stay bounded)
@@ -38,21 +38,18 @@ Per-driver per-tick telemetry is time-series data; use metrics (OTel), not Loki.
 
 ## Part B — Scaling log collection to many users
 
-Local Docker + Alloy + Loki per developer does **not** scale to ~120 users each running the full stack.
+Local Docker + Loki per developer does **not** scale to ~120 users each running the full stack.
 
 ### Current pipeline (local, single-user)
 
-Plugin → `plugin-structured.jsonl` → Alloy (Docker) → Loki. No in-plugin network I/O on the hot path.
+Plugin → `plugin-structured.jsonl` → your Loki ingestion path → Loki. No in-plugin network I/O on the hot path.
 
-### Option A — Lightweight forwarder per user (recommended)
 
-Each user runs a **small agent** (Alloy or Vector binary, no Docker) tailing `plugin-structured.jsonl` and pushing to **one central** Loki / Grafana Cloud. Plugin unchanged.
-
-### Option B — Optional plugin push to central URL
+### Option A — Optional plugin push to central URL (recommended)
 
 Background thread batches to central Loki when `SIMSTEWARD_LOKI_URL` points at central; trade-off vs file-only simplicity.
 
-### Option C — Hybrid
+### Option D — Hybrid / Fallback
 
 Always write file; optionally also push when central URL configured.
 
@@ -73,6 +70,6 @@ Same as Part A: chunked `session_end_datapoints_results` lines; **docs/GRAFANA-L
 
 ## References
 
-- **docs/GRAFANA-LOGGING.md** — Schema, volume budget, LogQL, dashboards.
+- **docs/GRAFANA-LOGGING.md** — Schema, volume budget, LogQL, housekeeping.
 - **docs/observability-local.md** — Local stack quick start.
 - Grafana: [Label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Query best practices](https://grafana.com/docs/loki/latest/query/bp-query/).

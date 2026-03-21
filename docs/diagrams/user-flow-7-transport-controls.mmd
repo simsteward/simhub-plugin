@@ -1,0 +1,27 @@
+flowchart TD
+  subgraph rc [Replay Controls panel - left col]
+    R1[⏮ Jump to start]
+    R2[⏭ Jump to end]
+    R3[⏪ 4× rewind]
+    R4[⏩ 4× forward]
+    R5[⏸ / ▶ Play · Pause]
+    R6[Speed pills: 0.25× 0.5× 1× 2× 4× 8× 16×]
+    R7["Prev replay incident / Next replay incident ← ⚠️ DUPLICATE"]
+    R8["Scrub bar click → ⚠️ PoC toast only, not wired"]
+  end
+
+  subgraph in [Incident Navigation panel - left col]
+    N1["Prev replay incident / Next replay incident ← ⚠️ DUPLICATE"]
+    N2[Telemetry car dropdown]
+    N3[Find selected driver's incidents]
+    N4[Find all incidents for all drivers]
+  end
+
+  R1 & R2 --> A[send replay_jump start or end]
+  R3 & R4 --> B[send replay_speed -4 or 4]
+  R5 --> C[Toggle: speed 0 = pause or restore last speed]
+  R6 --> D[send replay_speed N · updates active pill]
+  R7 --> E["send replay_seek prev or next"]
+  N1 --> E
+  R8 --> F([Toast: PoC scrub N%])
+  A & B & C & D & E --> G([Plugin → iRacing acts on command])

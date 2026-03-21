@@ -1,7 +1,7 @@
 # Replay capture workflow test — state shape and snapshot file structure
 # Requires: SimHub running with Sim Steward plugin loaded
 # Run: .\tests\ReplayWorkflowTest.ps1
-# Expectations: see docs/replay-workflow.md (test checklist)
+# Expectations: WebSocket state shape and session-discovery.jsonl structure (see script checks below).
 
 $ErrorActionPreference = "Stop"
 $port = 19847
@@ -55,25 +55,35 @@ try {
         exit 1
     }
     $mode = $stateObj.pluginMode
-    if ($mode -notin @("Replay", "Live", "Unknown")) {
+    if ($mode -notin @("Replay", "Unknown")) {
         Write-Host "FAIL: State pluginMode unexpected: $mode"
         exit 1
     }
     Write-Host "PASS: State has pluginMode=$mode"
 
-    # Expect: sessionDiagnostics present
-    if (-not $stateObj.PSObject.Properties["sessionDiagnostics"]) {
-        Write-Host "FAIL: State missing sessionDiagnostics"
+    # Expect: diagnostics present (WebSocket state mirrors PluginSnapshot.Diagnostics)
+    if (-not $stateObj.PSObject.Properties["diagnostics"]) {
+        Write-Host "FAIL: State missing diagnostics"
         exit 1
     }
-    $diag = $stateObj.sessionDiagnostics
-    Write-Host "PASS: State has sessionDiagnostics"
+    $diag = $stateObj.diagnostics
+    Write-Host "PASS: State has diagnostics"
+
+    if ($stateObj.PSObject.Properties["lap"]) {
+        if ($stateObj.lap -isnot [int] -and $stateObj.lap -isnot [long] -and $stateObj.lap -isnot [double]) {
+            Write-Host "WARN: State lap is not numeric: $($stateObj.lap)"
+        } else {
+            Write-Host "PASS: State has lap=$($stateObj.lap)"
+        }
+    } else {
+        Write-Host "PASS: State lap absent (ok for older clients)"
+    }
 
     # When sessions array present, expect structure (Test case 2 — Sessions list)
     if ($diag.PSObject.Properties["sessions"] -and $null -ne $diag.sessions) {
         $sessions = $diag.sessions
         if ($sessions -isnot [Array]) {
-            Write-Host "FAIL: sessionDiagnostics.sessions is not an array"
+            Write-Host "FAIL: diagnostics.sessions is not an array"
             exit 1
         }
         foreach ($s in $sessions) {
@@ -81,9 +91,9 @@ try {
             if (-not $s.PSObject.Properties["sessionType"]) { Write-Host "FAIL: session entry missing sessionType"; exit 1 }
             if (-not $s.PSObject.Properties["sessionName"]) { Write-Host "FAIL: session entry missing sessionName"; exit 1 }
         }
-        Write-Host "PASS: sessionDiagnostics.sessions array has sessionNum, sessionType, sessionName (count=$($sessions.Count))"
+        Write-Host "PASS: diagnostics.sessions array has sessionNum, sessionType, sessionName (count=$($sessions.Count))"
     } else {
-        Write-Host "PASS: sessionDiagnostics.sessions absent or empty (ok when not replay or no SessionInfo)"
+        Write-Host "PASS: diagnostics.sessions absent or empty (ok when not replay or no SessionInfo)"
     }
 } catch {
     Write-Host "FAIL: $($_.Exception.Message)"
@@ -134,4 +144,4 @@ if (Test-Path -LiteralPath $snapshotPath) {
 }
 
 Write-Host ""
-Write-Host "All replay workflow checks passed. See docs/replay-workflow.md for full test cases."
+Write-Host "All replay workflow checks passed."

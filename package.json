@@ -7,6 +7,7 @@
     "obs:up:env": "docker compose --env-file observability/local/.env.observability.local -f observability/local/docker-compose.yml up -d",
     "obs:down": "docker compose -f observability/local/docker-compose.yml down",
     "obs:ps": "docker compose -f observability/local/docker-compose.yml ps",
-    "obs:poll": "pwsh -NoProfile -File scripts/poll-loki.ps1"
+    "obs:poll": "pwsh -NoProfile -File scripts/poll-loki.ps1",
+    "obs:wipe": "pwsh -NoProfile -File scripts/obs-wipe-local-data.ps1"
   }
 }

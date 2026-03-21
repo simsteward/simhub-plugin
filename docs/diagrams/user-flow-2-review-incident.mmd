@@ -1,0 +1,15 @@
+flowchart TD
+  A([Switch to Incident leaderboard tab]) --> B[All incidents shown\ncount in header]
+  B --> C{Filter?}
+  C -- Yes --> D[Click severity chip: All · 1× · 2× · 4× · Mine\nMine = player:true only]
+  C -- No  --> E
+  D --> E[Click incident card]
+  E --> F[send seek_to_incident frame → plugin → iRacing seeks]
+  E --> G[Incident meta strip expands below tab bar\nshows: frame · car · driver · sev · cause · lap]
+  F --> H([iRacing replay jumps to frame])
+  G --> I{Click same card again?}
+  I -- Yes --> J[Meta strip collapses · card highlight removed]
+  I -- No  --> K([Review details in meta strip])
+
+  note1["⚠️ Meta strip is in the bottom dock.\nClicking a card in the left-column\ndriver panel has no feedback near\nthe click point."]
+  G -.-> note1

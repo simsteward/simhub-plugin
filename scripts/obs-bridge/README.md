@@ -64,5 +64,5 @@ OBS WebSocket 5 does not allow passing a custom filename into `StartRecord`. To 
 
 ## Data contract
 
-- **Sim Steward:** [docs/INTERFACE.md](../../docs/INTERFACE.md) — `state` (§5), `incidentEvents` (§3.2), action `ReplaySeekFrame` (§4.1).
+- **Sim Steward:** WebSocket JSON — `state` includes `sessionId`, `incidentEvents`; dashboard sends action `ReplaySeekFrame` with frame number. See plugin/dashboard sources and **docs/TROUBLESHOOTING.md** for connection/setup.
 - **OBS:** [obs-websocket protocol](https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md) — `StartRecord`, `StopRecord`.

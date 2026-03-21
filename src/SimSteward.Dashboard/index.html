@@ -1,2239 +1,1638 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sim Steward</title>
-    <style>
-        :root {
-            --bg: #050505;
-            --surface: rgba(255,255,255,0.03);
-            --border: rgba(255,255,255,0.08);
-            --accent: #1f9cff;
-            --green: #0ef272;
-            --red: #ff5f5f;
-            --yellow: #ffc840;
-            --cyan: #0dd8ff;
-            --text: #f5f5f5;
-            --muted: rgba(245,245,245,0.5);
-            font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Sim Steward</title>
+<style>
+:root {
+  --bg: #080808; --bg2: #0e0e0e;
+  --surface: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.08);
+  --accent: #1f9cff; --green: #0ef272;
+  --red: #ff5f5f; --yellow: #ffc840; --cyan: #0dd8ff;
+  --text: #f0f0f0; --muted: rgba(240,240,240,0.4);
+  --r: 10px;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
 
-        body {
-            background: radial-gradient(circle at top, rgba(31,156,255,0.08), transparent 50%), var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            align-items: flex-start;
-            justify-content: center;
-            padding: 16px;
-        }
+.app { height: 100vh; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
 
-        .app {
-            width: min(600px, 100%);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            padding: 16px;
-            background: rgba(8,8,8,0.85);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: 0 24px 56px rgba(0,0,0,0.5);
-        }
+/* ── Status bar ── */
+.status-bar {
+  flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  padding: 7px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r);
+}
+.mode-pill {
+  display: flex; align-items: center; gap: 5px; padding: 3px 10px;
+  border-radius: 99px; font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em; border: 1px solid currentColor;
+}
+.mode-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.mode-pill.replay  { color: var(--accent); background: rgba(31,156,255,0.07); }
+.mode-pill.waiting { color: var(--muted); background: transparent; }
+.session-time { font-family: "Courier New", monospace; font-size: 0.95rem; }
+.sb-spacer { flex: 1; }
+.diag-row { display: flex; align-items: center; gap: 10px; font-size: 0.7rem; color: var(--muted); }
+.diag-item { display: flex; align-items: center; gap: 4px; }
+.d-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.12); }
+.d-dot.ok   { background: var(--green); box-shadow: 0 0 4px rgba(14,242,114,0.5); }
+.d-dot.err  { background: var(--red); }
+.d-dot.warn { background: var(--yellow); }
+.ws-badge {
+  font-size: 0.68rem; padding: 2px 8px; border-radius: 99px; border: 1px solid; cursor: default;
+}
+.ws-badge.connected    { color: var(--green);  border-color: rgba(14,242,114,0.3); background: rgba(14,242,114,0.07); }
+.ws-badge.disconnected { color: var(--red);    border-color: rgba(255,95,95,0.3);  background: rgba(255,95,95,0.07); }
+.ws-badge.connecting   { color: var(--yellow); border-color: rgba(255,200,64,0.3); background: rgba(255,200,64,0.07); }
 
-        /* ── Status bar ───────────────────────────────────────────── */
-        .status-bar {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-        }
-        .dot {
-            width: 9px; height: 9px;
-            border-radius: 50%;
-            background: #444;
-            border: 1px solid rgba(255,255,255,0.25);
-            flex-shrink: 0;
-            transition: background 0.2s, box-shadow 0.2s;
-        }
-        .dot.live  { background: var(--green); box-shadow: 0 0 6px rgba(14,242,114,0.6); }
-        .dot.replay { background: var(--accent); box-shadow: 0 0 6px rgba(31,156,255,0.6); }
-        #status-text { font-size: 0.85rem; color: var(--muted); flex: 1; cursor: pointer; }
-        .ir-status { font-size: 0.8rem; color: var(--muted); }
-        .ir-status.connected { color: var(--green); }
-        #plugin-mode { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-        #session-time { font-family: "Courier New", monospace; font-size: 0.95rem; color: var(--text); margin-left: auto; }
+/* ── Main grid ── */
+.main-grid {
+  flex: 1; display: grid; grid-template-columns: 300px 1fr;
+  gap: 8px; min-height: 0; overflow: hidden;
+}
+.left-col {
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.right-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+.right-col > .standings-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.right-col > .standings-panel .std-body { flex: 1; min-height: 0; overflow-y: auto; }
 
-        /* ── Replay controls ──────────────────────────────────────── */
-        .replay-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding: 12px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-        }
-        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-        .btn {
-            flex: 1 1 auto;
-            min-width: 56px;
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            border-radius: 9px;
-            background: rgba(255,255,255,0.03);
-            color: var(--text);
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: border-color 0.15s, background 0.15s, transform 0.1s;
-        }
-        .btn:hover { border-color: var(--accent); background: rgba(31,156,255,0.08); }
-        .btn:active { transform: scale(0.97); }
-        .btn.primary {
-            background: linear-gradient(135deg, #1f9cff, #1480ff);
-            border-color: transparent;
-            font-weight: 600;
-        }
-        .btn.primary:hover { background: linear-gradient(135deg, #4db2ff, #1f9cff); }
-        .btn.active-speed { border-color: var(--accent); background: rgba(31,156,255,0.15); }
-        .btn.unsupported {
-            border-color: rgba(255,95,95,0.45);
-            background: rgba(255,95,95,0.08);
-            color: rgba(255,95,95,0.9);
-        }
+/* ── Panel ── */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; flex-shrink: 0; }
+.panel-title { font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 10px; }
 
-        .replay-state-legend {
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--muted);
-            text-align: center;
-            padding: 4px 0 2px 0;
-        }
-        .replay-state-legend .state-dir { color: var(--text); }
-        .replay-state-legend .state-rewind { color: var(--cyan); }
+/* ── Replay ── */
+.btn-row { display: flex; gap: 4px; justify-content: center; margin-bottom: 10px; }
+.btn {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+  background: rgba(255,255,255,0.03); color: var(--text); font-size: 1rem;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s; line-height: 1; min-width: 36px; text-align: center;
+}
+.btn:hover  { border-color: var(--accent); background: rgba(31,156,255,0.1); }
+.btn:active { transform: scale(0.96); }
+.btn.label-inc {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 7px 6px;
+  white-space: normal;
+  text-align: center;
+}
+.speed-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+.spill {
+  flex: 1; padding: 4px 4px; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--muted); font-size: 0.7rem;
+  cursor: pointer; text-align: center; transition: all 0.15s;
+}
+.spill:hover { border-color: var(--accent); color: var(--text); }
+.spill.active { border-color: var(--accent); background: rgba(31,156,255,0.15); color: var(--accent); }
+.scrub-row { display: flex; flex-direction: column; gap: 4px; }
+.scrub-labels { display: flex; justify-content: space-between; font-size: 0.67rem; color: var(--muted); }
+.scrub-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; cursor: pointer; }
+.scrub-fill { height: 100%; width: 38%; background: linear-gradient(90deg, var(--accent), var(--cyan)); border-radius: 4px; transition: width 0.2s; }
+.replay-session-row {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.replay-session-row .replay-session-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.replay-session-lbl {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.replay-session-text {
+  font-size: 0.78rem;
+  color: var(--text);
+  line-height: 1.3;
+  word-break: break-word;
+}
+.replay-session-row .btn-row { margin-bottom: 0; }
+.panel-sub {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.panel-sub-title {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.panel-sub .car-sel { margin-bottom: 0; }
+.cap-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.btn.cap { font-size: 0.8rem; padding: 7px 14px; flex-shrink: 0; border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.07); }
+.btn.cap.btn-scan {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: normal;
+  line-height: 1.25;
+  padding: 8px 10px;
+  text-align: center;
+}
+.btn.cap:hover { background: rgba(31,156,255,0.16); }
+.btn.cap.active { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.07); animation: cap-pulse 1.2s ease-in-out infinite; }
+.btn.cap.btn-scan.btn-scan-session {
+  border-color: rgba(255, 180, 72, 0.85);
+  color: #e8b060;
+  background: rgba(255, 180, 72, 0.08);
+}
+.btn.cap:disabled { opacity: 0.45; cursor: not-allowed; }
+.cap-row .cap-status { flex: 1 1 100%; margin-top: 4px; }
+.cap-status { font-size: 0.7rem; color: var(--muted); }
+.cap-status.running { color: var(--accent); }
+@keyframes cap-pulse { 0%,100%{opacity:1} 50%{opacity:.55} }
 
-        .progress-row { display: flex; flex-direction: column; gap: 6px; }
-        .frame-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
-        .progress-track {
-            height: 8px; border-radius: 6px;
-            background: rgba(255,255,255,0.05); overflow: hidden;
-        }
-        #progress-fill {
-            height: 100%; width: 0;
-            border-radius: 6px;
-            background: linear-gradient(90deg, var(--accent), #0dd8ff);
-            transition: width 0.2s ease;
-        }
+/* ── Telemetry ── */
+.car-sel {
+  width: 100%; padding: 5px 8px; background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+  font-size: 0.82rem; margin-bottom: 10px; cursor: pointer;
+}
+.input-rows { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; }
+.input-lbl { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); margin-bottom: 3px; }
+.bar-track { height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 5px; transition: width 0.08s ease; }
+.bar-fill.thr { background: linear-gradient(90deg, #0a7a35, var(--green)); }
+.bar-fill.brk { background: linear-gradient(90deg, #7a0a0a, var(--red)); }
+.steer-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.steer-lbl { font-size: 0.67rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.steer-svg { width: 100%; max-width: 210px; }
+.g-track  { stroke: rgba(255,255,255,0.09); stroke-width: 5; fill: none; stroke-linecap: round; }
+.g-active { stroke: var(--accent); stroke-width: 5; fill: none; stroke-linecap: round; }
+.g-ctick  { stroke: rgba(255,255,255,0.35); stroke-width: 1.5; }
+.g-needle { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; }
+.g-hub    { fill: var(--accent); }
+.g-text   { fill: rgba(240,240,240,0.4); font-size: 8px; font-family: "Courier New", monospace; }
+.g-angle  { fill: rgba(240,240,240,0.6); font-size: 9px; font-family: "Courier New", monospace; }
 
-        /* ── Scan section ─────────────────────────────────────────── */
-        .scan-section { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
-        .scan-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .scan-controls .btn { flex: 0 1 auto; }
-        .scan-state-label { font-size: 0.78rem; color: var(--muted); margin-left: auto; }
-        .scan-state-idle    { color: var(--muted); }
-        .scan-state-scanning { color: var(--accent); }
-        .scan-state-complete { color: #4ddf87; }
-        .scan-state-error    { color: #ff5f5f; }
-        #scan-progress-row { display: flex; flex-direction: column; gap: 6px; }
-        #scan-progress-fill {
-            height: 100%; width: 0;
-            border-radius: 6px;
-            background: linear-gradient(90deg, var(--accent), #0dd8ff);
-            transition: width 0.3s ease;
-        }
-        #scan-incidents-label { font-size: 0.78rem; color: var(--muted); text-align: right; }
-        #scan-result { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border-left: 3px solid var(--border); font-size: 0.82rem; }
-        #scan-result.valid   { border-left-color: #4ddf87; }
-        #scan-result.invalid { border-left-color: #ff5f5f; }
-        .scan-result-header { font-weight: 600; margin-bottom: 6px; }
-        .scan-result-counts { color: var(--muted); margin-bottom: 6px; }
-        .scan-mismatch-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-family: monospace; }
-        .scan-mismatch-table th { text-align: left; color: var(--muted); font-weight: normal; padding: 2px 6px 2px 0; }
-        .scan-mismatch-table td { padding: 2px 6px 2px 0; }
-        .scan-result-error { color: #ff5f5f; }
+/* ── Incidents panel ── */
+.incidents-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.inc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-shrink: 0; }
+.chips { display: flex; gap: 4px; }
+.chip {
+  padding: 2px 9px; border: 1px solid var(--border); border-radius: 99px;
+  font-size: 0.68rem; color: var(--muted); cursor: pointer; transition: all 0.15s;
+}
+.chip:hover  { border-color: var(--accent); color: var(--text); }
+.chip.active { border-color: var(--accent); background: rgba(31,156,255,0.12); color: var(--accent); }
+.inc-list {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.inc-card {
+  display: grid; grid-template-columns: 2.4rem 1fr auto auto auto;
+  align-items: center; gap: 8px; padding: 7px 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: rgba(255,255,255,0.02); cursor: pointer; flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s;
+}
+.inc-card:hover  { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.14); }
+.inc-card.player { border-left: 3px solid var(--accent); background: rgba(31,156,255,0.04); }
+.car-num { font-family: "Courier New", monospace; font-size: 0.7rem; text-align: center; background: rgba(255,255,255,0.07); border-radius: 4px; padding: 2px 4px; color: var(--muted); }
+.inc-name { font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inc-time { font-family: "Courier New", monospace; font-size: 0.7rem; color: var(--muted); }
+.sev-badge { font-family: "Courier New", monospace; font-size: 0.7rem; font-weight: 700; padding: 2px 5px; border-radius: 4px; min-width: 26px; text-align: center; }
+.sev-badge.s1 { background: rgba(14,242,114,0.12);  color: var(--green); }
+.sev-badge.s2 { background: rgba(255,200,64,0.12);  color: var(--yellow); }
+.sev-badge.s4 { background: rgba(255,95,95,0.12);   color: var(--red); }
+.cause-tag { font-size: 0.63rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.cause-tag.off-track { background: rgba(14,242,114,0.1);  color: var(--green); }
+.cause-tag.wall      { background: rgba(255,200,64,0.1);  color: var(--yellow); }
+.cause-tag.spin      { background: rgba(255,200,64,0.1);  color: var(--yellow); }
+.cause-tag.contact   { background: rgba(255,95,95,0.1);   color: var(--red); }
+.cause-tag.unknown   { background: rgba(255,255,255,0.06); color: var(--muted); }
 
-        /* ── Section header ───────────────────────────────────────── */
-        .section-header {
-            display: flex; align-items: center; justify-content: space-between;
-            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
-            color: var(--muted); margin-bottom: 4px;
-        }
-        .badge {
-            background: rgba(255,255,255,0.08);
-            border-radius: 99px;
-            padding: 2px 8px;
-            font-size: 0.72rem;
-        }
+/* ── Standings ── */
+.std-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+.std-header:hover .chev { color: var(--text); }
+.chev { color: var(--muted); font-size: 0.7rem; transition: transform 0.15s, color 0.15s; }
+.standings-panel.open .chev { transform: rotate(180deg); }
+.std-body { margin-top: 8px; }
+.standings-panel:not(.open) .std-body { display: none; }
+.std-row { display: grid; grid-template-columns: 1.6rem 2.2rem 1fr auto; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; font-size: 0.82rem; transition: background 0.1s; }
+.std-row:hover         { background: rgba(255,255,255,0.03); }
+.std-row.player        { background: rgba(31,156,255,0.06); }
+.std-row.hdr           { color: var(--muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.std-pos               { color: var(--muted); font-size: 0.7rem; }
+.std-inc               { font-family: "Courier New", monospace; font-weight: 600; text-align: right; }
+.std-inc.zero          { color: var(--muted); }
+.std-inc.low           { color: var(--green); }
+.std-inc.mid           { color: var(--yellow); }
+.std-inc.high          { color: var(--red); }
 
-        /* ── Filter bar ───────────────────────────────────────────── */
-        .filter-bar {
-            display: flex; gap: 6px; flex-wrap: wrap;
-            padding: 0 0 4px 0;
-        }
-        .filter-chip {
-            font-size: 0.72rem;
-            padding: 3px 10px;
-            border-radius: 99px;
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,0.03);
-            color: var(--muted);
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .filter-chip.active {
-            border-color: var(--accent);
-            background: rgba(31,156,255,0.12);
-            color: var(--text);
-        }
-        .filter-chip:hover { border-color: var(--accent); }
+/* ── Log section ── */
+.log-section {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.log-tabs { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.log-tab {
+  padding: 7px 14px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); cursor: pointer; border: none; border-bottom: 2px solid transparent;
+  background: transparent; transition: color 0.15s, border-color 0.15s; user-select: none;
+}
+.log-tab:hover  { color: var(--text); }
+.log-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.log-autoscroll {
+  margin-left: auto; display: flex; align-items: center; gap: 4px;
+  padding: 0 12px; font-size: 0.67rem; color: var(--muted); cursor: pointer; user-select: none; border: none; background: transparent;
+}
+.log-autoscroll.on { color: var(--accent); }
+.log-pane {
+  flex: 1; overflow-y: auto; padding: 5px 10px; font-family: "Courier New", monospace;
+  font-size: 0.73rem; line-height: 1.55; display: none;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.log-pane.active { display: block; }
+.ll { white-space: pre; }
+.ll.info  { color: rgba(240,240,240,0.55); }
+.ll.warn  { color: var(--yellow); }
+.ll.error { color: var(--red); }
+.ll.event { color: var(--cyan); }
+.ll.debug { color: rgba(240,240,240,0.25); }
+.ll.data  { color: rgba(13,216,255,0.7); }
 
-        /* ── Player incident hero ─────────────────────────────────── */
-        .player-hero-card {
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-            padding: 12px 14px;
-            background: rgba(31,156,255,0.08);
-            border: 1px solid rgba(31,156,255,0.35);
-            border-radius: 12px;
-        }
-        .player-hero-card.visible { display: flex; }
-        .player-hero-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .player-hero-count {
-            font-family: "Courier New", monospace;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent);
-        }
-        .player-hero-count.severity-1x { color: var(--green); }
-        .player-hero-count.severity-2x { color: var(--yellow); }
-        .player-hero-count.severity-4x { color: var(--red); }
-        .player-hero-summary {
-            font-size: 0.8rem;
-            color: var(--muted);
-        }
-        .player-hero-btn {
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            border-radius: 8px;
-            border: 1px solid var(--accent);
-            background: rgba(31,156,255,0.15);
-            color: var(--accent);
-            cursor: pointer;
-            transition: background 0.15s, border-color 0.15s;
-        }
-        .player-hero-btn:hover {
-            background: rgba(31,156,255,0.25);
-            border-color: var(--accent);
-        }
+/* ── Bottom dock: telemetry + tabbed logs (leaderboard & captured are last tabs) ── */
+.bottom-dock-rows {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.bottom-dock-main {
+  display: flex;
+  gap: 8px;
+  min-height: 0;
+  height: 420px;
+}
+.log-section--telemetry {
+  width: 300px;
+  flex: none;
+  flex-shrink: 0;
+}
+.log-section-head {
+  flex-shrink: 0;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.log-section-head .panel-title { margin-bottom: 0; }
+.log-section-body--telem { flex: 1; min-height: 0; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+.log-section--streams {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.log-section--streams .log-pane { flex: 1; min-height: 0; }
+.log-section-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 8px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.log-section-toolbar label { cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
+.log-section-toolbar input { accent-color: var(--accent); }
+.leaderboard-pane-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
+}
+.leaderboard-pane-stack .inc-header { flex-shrink: 0; margin-bottom: 0; }
+.leaderboard-pane-stack .inc-list { flex: 1; min-height: 0; }
+.log-pane.incidents-pane {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.82rem;
+  padding: 8px 10px;
+  flex-direction: column;
+}
+.log-pane.incidents-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+.log-pane.incidents-pane .inc-list { flex: 1; min-height: 0; }
+.captured-pane-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.captured-pane-inner .inc-list { flex: 1; min-height: 0; }
+.driver-inc-panel {
+  max-height: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.driver-inc-panel .inc-list { flex: 1; min-height: 0; }
+.captured-group {
+  border-top: 1px solid var(--border);
+}
+.captured-group:first-child {
+  border-top: none;
+}
+.captured-group-hdr {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding: 8px 4px 6px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+}
+.captured-group:first-child .captured-group-hdr { padding-top: 0; }
+.captured-group-hdr:hover { background: rgba(255,255,255,0.04); }
+.captured-group-chev {
+  font-size: 0.55rem;
+  color: var(--muted);
+  width: 1em;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.captured-group-title { flex: 1; min-width: 0; }
+.captured-group.collapsed .captured-group-body { display: none; }
+.log-pane.meta-pane {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  padding: 8px 12px;
+}
+.im-block {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.im-block:last-child { border-bottom: none; }
+.im-meta-hdr {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.im-row { color: var(--text); margin: 2px 0; word-break: break-word; }
+.im-row code { font-family: "Courier New", monospace; font-size: 0.7rem; color: var(--cyan); }
+.im-future { font-size: 0.65rem; color: var(--muted); font-style: italic; margin-top: 6px; }
+.incident-meta-strip {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.025);
+  max-height: 132px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  transition: max-height 0.18s ease, padding 0.18s ease, border-width 0.18s ease;
+}
+.incident-meta-strip.collapsed {
+  max-height: 0;
+  min-height: 0;
+  padding: 0;
+  border-bottom-width: 0;
+  overflow: hidden;
+}
+.inc-card.inc-card-expanded {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: rgba(255,255,255,0.06);
+}
+.im-strip-placeholder { font-size: 0.72rem; color: var(--muted); }
+.im-block-single { padding: 0; border: none; margin: 0; }
+.im-row-muted { font-size: 0.65rem; color: var(--muted); }
 
-        /* ── Driver standings ─────────────────────────────────────── */
-        .drivers-panel {
-            display: flex; flex-direction: column; gap: 6px;
-            padding: 12px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-        }
-        .drivers-panel-header {
-            display: flex; align-items: center; justify-content: space-between;
-            cursor: pointer; user-select: none;
-        }
-        .drivers-panel-header:hover .drivers-panel-chev { color: var(--text); }
-        .drivers-panel-chev { font-size: 0.7rem; color: var(--muted); transition: color 0.15s; }
-        .drivers-panel.collapsed .drivers-panel-chev { transform: rotate(-90deg); }
-        .drivers-panel-body { overflow: hidden; }
-        .drivers-panel.collapsed .drivers-panel-body { display: none; }
-        .drivers-summary-pts { font-size: 0.72rem; color: var(--muted); margin-left: 6px; }
-        #driver-list { display: flex; flex-direction: column; gap: 4px; }
-        .driver-row {
-            display: grid;
-            grid-template-columns: 2.2rem 1fr auto;
-            align-items: center;
-            gap: 8px;
-            padding: 7px 10px;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.02);
-            border: 1px solid transparent;
-            transition: border-color 0.2s;
-        }
-        .driver-row.player {
-            border-color: rgba(31,156,255,0.3);
-            background: rgba(31,156,255,0.06);
-        }
-        .car-num {
-            font-family: "Courier New", monospace;
-            font-size: 0.78rem;
-            color: var(--muted);
-            text-align: center;
-            background: rgba(255,255,255,0.06);
-            border-radius: 5px;
-            padding: 2px 4px;
-        }
-        .driver-name { font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .driver-incidents {
-            font-family: "Courier New", monospace;
-            font-size: 0.88rem;
-            font-weight: 600;
-            min-width: 28px;
-            text-align: right;
-        }
-        .driver-incidents.zero { color: var(--muted); }
-        .driver-incidents.low { color: var(--green); }
-        .driver-incidents.mid { color: var(--yellow); }
-        .driver-incidents.high { color: var(--red); }
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 18px; right: 18px; padding: 9px 15px;
+  background: rgba(18,18,22,0.97); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.8rem; color: var(--text); opacity: 0; transform: translateY(6px);
+  transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 100;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
 
-        .empty-state {
-            text-align: center;
-            padding: 16px;
-            color: var(--muted);
-            font-size: 0.85rem;
-        }
-
-        /* ── Incident feed ────────────────────────────────────────── */
-        .incidents-panel {
-            display: flex; flex-direction: column; gap: 6px;
-            padding: 12px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-        }
-        .incident-accordion {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .incident-section {
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 10px;
-            overflow: hidden;
-            background: rgba(255,255,255,0.02);
-        }
-        .incident-section-toggle {
-            width: 100%;
-            background: rgba(255,255,255,0.02);
-            border: 0;
-            color: var(--text);
-            text-align: left;
-            padding: 8px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            font-size: 0.78rem;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }
-        .incident-section-toggle:hover { background: rgba(255,255,255,0.05); }
-        .incident-section-toggle .chev { color: var(--muted); }
-        .incident-section.open .incident-section-toggle .chev { color: var(--accent); }
-        .incident-section-feed {
-            display: none;
-            flex-direction: column;
-            gap: 6px;
-            max-height: 360px;
-            overflow-y: auto;
-            padding: 6px;
-        }
-        .incident-section.open .incident-section-feed { display: flex; }
-        .incident-section-feed::-webkit-scrollbar { width: 4px; }
-        .incident-section-feed::-webkit-scrollbar-track { background: transparent; }
-        .incident-section-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
-
-        .incident-view-toggle {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 6px;
-        }
-        .view-toggle-btn { flex: 1 1 auto; min-width: 0; }
-        .view-toggle-btn.active-view { border-color: var(--accent); background: rgba(31,156,255,0.15); }
-        .incident-feed-unified {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            max-height: 360px;
-            overflow-y: auto;
-            padding: 6px 0;
-        }
-        .incident-feed-unified::-webkit-scrollbar { width: 4px; }
-        .incident-feed-unified::-webkit-scrollbar-track { background: transparent; }
-        .incident-feed-unified::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
-
-        .incident-card {
-            display: grid;
-            grid-template-columns: 3.4rem 1fr auto;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.025);
-            border: 1px solid rgba(255,255,255,0.06);
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .incident-card.card-new { animation: slideIn 0.25s ease forwards; }
-        .incident-card:hover {
-            background: rgba(255,255,255,0.07);
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-6px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-        .incident-card.player-incident {
-            border-color: rgba(31,156,255,0.25);
-            border-left: 3px solid var(--accent);
-        }
-        .incident-card .incident-badge-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-        .incident-card .seek-hint {
-            font-size: 0.68rem;
-            color: var(--accent);
-            opacity: 0;
-            transition: opacity 0.15s;
-        }
-        .incident-card:hover .seek-hint { opacity: 1; }
-        .incident-card.expanded { background: rgba(255,255,255,0.05); }
-        .snapshot-detail {
-            grid-column: 1 / -1;
-            display: none;
-            padding: 8px 4px 2px;
-            border-top: 1px solid rgba(255,255,255,0.07);
-            margin-top: 4px;
-        }
-        .incident-card.expanded .snapshot-detail { display: block; }
-        .snapshot-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 4px 12px;
-        }
-        .snapshot-item { display: flex; flex-direction: column; gap: 1px; }
-        .snapshot-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-        .snapshot-value { font-size: 0.82rem; font-family: "Courier New", monospace; color: var(--text); }
-        .snapshot-involved { margin-top: 6px; font-size: 0.75rem; color: var(--muted); }
-        .snapshot-tag { font-size: 0.68rem; background: rgba(255,255,255,0.07); border-radius: 4px; padding: 1px 5px; color: var(--cyan); }
-        .incident-time {
-            font-family: "Courier New", monospace;
-            font-size: 0.78rem;
-            color: var(--muted);
-            text-align: center;
-        }
-        .incident-body { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-        .incident-driver { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .incident-detail { font-size: 0.75rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-        .incident-cause-tag {
-            display: inline-block;
-            font-size: 0.68rem;
-            padding: 1px 6px;
-            border-radius: 4px;
-            background: rgba(255,255,255,0.06);
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        .incident-cause-tag.off-track { background: rgba(14,242,114,0.12); color: var(--green); }
-        .incident-cause-tag.wall { background: rgba(255,200,64,0.12); color: var(--yellow); }
-        .incident-cause-tag.spin { background: rgba(255,200,64,0.12); color: var(--yellow); }
-        .incident-cause-tag.contact { background: rgba(255,95,95,0.12); color: var(--red); }
-        .incident-cause-tag.impact { background: rgba(255,95,95,0.08); color: rgba(255,95,95,0.7); }
-        .incident-badge {
-            font-family: "Courier New", monospace;
-            font-size: 0.8rem;
-            font-weight: 700;
-            padding: 3px 7px;
-            border-radius: 6px;
-            white-space: nowrap;
-        }
-        .badge-1x { background: rgba(14,242,114,0.15); color: var(--green); border: 1px solid rgba(14,242,114,0.3); }
-        .badge-2x { background: rgba(255,200,64,0.15); color: var(--yellow); border: 1px solid rgba(255,200,64,0.3); }
-        .badge-4x { background: rgba(255,95,95,0.15); color: var(--red); border: 1px solid rgba(255,95,95,0.35); }
-        .badge-Nx { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
-
-        /* ── Debug log ─────────────────────────────────────────────── */
-        .stream-panel {
-            display: flex; flex-direction: column; gap: 6px;
-            padding: 12px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-        }
-        .stream-panel-header {
-            display: flex; align-items: center; justify-content: space-between;
-            cursor: pointer; user-select: none;
-        }
-        .stream-panel-header:hover .stream-panel-chev { color: var(--text); }
-        .stream-panel-chev { font-size: 0.7rem; color: var(--muted); transition: color 0.15s; }
-        .stream-panel.collapsed .stream-panel-chev { transform: rotate(-90deg); }
-        .stream-panel-body { overflow: hidden; }
-        .stream-panel.collapsed .stream-panel-body { display: none; }
-        .stream-alert-dot {
-            width: 8px; height: 8px; border-radius: 50%;
-            background: var(--yellow); margin-right: 6px;
-            flex-shrink: 0; display: none;
-        }
-        .stream-alert-dot.visible { display: block; }
-        .stream-alert-dot.error { background: var(--red); }
-        .stream-header {
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .stream-clear-btn {
-            font-size: 0.72rem; color: var(--muted); background: none; border: none;
-            cursor: pointer; padding: 2px 6px; border-radius: 4px;
-            transition: color 0.15s;
-        }
-        .stream-clear-btn:hover { color: var(--text); }
-        #event-stream {
-            display: flex; flex-direction: column; gap: 3px;
-            max-height: 220px; overflow-y: auto;
-            font-family: "Courier New", monospace;
-            font-size: 0.76rem;
-        }
-        #event-stream::-webkit-scrollbar { width: 4px; }
-        #event-stream::-webkit-scrollbar-track { background: transparent; }
-        #event-stream::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
-        .stream-entry {
-            display: flex; gap: 8px; align-items: baseline;
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            line-height: 1.4;
-        }
-        .stream-ts { color: rgba(245,245,245,0.3); flex-shrink: 0; }
-        .stream-lvl {
-            flex-shrink: 0; width: 3.5em; text-align: right;
-            font-weight: 700;
-        }
-        .stream-lvl.INFO  { color: rgba(245,245,245,0.5); }
-        .stream-lvl.WARN  { color: var(--yellow); }
-        .stream-lvl.ERROR { color: var(--red); }
-        .stream-lvl.INCIDENT { color: var(--accent); }
-        .stream-lvl.DETECT { color: var(--cyan); }
-        .stream-lvl.ZEROX { color: var(--muted); }
-        .stream-msg { color: var(--text); word-break: break-all; }
-
-        .log-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 8px; font-size: 0.72rem; color: var(--muted); }
-        .log-filter-row label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
-        .log-filter-row input[type="checkbox"] { margin: 0; cursor: pointer; }
-        .log-activity-summary { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 6px; line-height: 1.4; max-height: 60px; overflow-y: auto; }
-
-        /* ── Diagnostics / metrics panel ─────────────────────────── */
-        .diag-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding: 10px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-        }
-        .diag-header {
-            display: flex; align-items: center; justify-content: space-between;
-            cursor: pointer; user-select: none;
-        }
-        .diag-header-left { display: flex; align-items: center; gap: 8px; }
-        .diag-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
-        .diag-toggle { font-size: 0.7rem; color: var(--muted); transition: color 0.15s; }
-        .diag-header:hover .diag-toggle { color: var(--text); }
-        .diag-body { display: flex; flex-direction: column; gap: 8px; }
-
-        /* Infrastructure row */
-        .infra-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-            gap: 6px;
-        }
-        .infra-item {
-            display: flex; align-items: center; gap: 5px;
-            font-size: 0.76rem; color: var(--muted);
-        }
-        .infra-dot {
-            width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-            background: #333; border: 1px solid rgba(255,255,255,0.2);
-        }
-        .infra-dot.ok   { background: var(--green); box-shadow: 0 0 4px rgba(14,242,114,0.5); }
-        .infra-dot.warn { background: var(--yellow); box-shadow: 0 0 4px rgba(255,200,64,0.4); }
-        .infra-dot.err  { background: var(--red);    box-shadow: 0 0 4px rgba(255,95,95,0.4); }
-
-
-        /* yaml updates pill */
-        .diag-footer { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        .diag-pill {
-            font-size: 0.7rem; color: var(--muted);
-            background: rgba(255,255,255,0.04);
-            border: 1px solid var(--border);
-            border-radius: 99px;
-            padding: 2px 9px;
-        }
-
-        /* ── Feedback ─────────────────────────────────────────────── */
-        .feedback {
-            padding: 8px 12px;
-            border-radius: 9px;
-            border: 1px solid var(--border);
-            background: rgba(255,255,255,0.02);
-            font-size: 0.82rem;
-            color: var(--muted);
-            min-height: 34px;
-            transition: border-color 0.2s, background 0.2s;
-        }
-        .feedback.error   { border-color: rgba(255,95,95,0.5); background: rgba(255,95,95,0.08); color: var(--red); }
-        .feedback.success { border-color: rgba(14,242,114,0.4); background: rgba(14,242,114,0.08); color: var(--green); }
-
-        /* ── Session complete banner & results drawer ────────────────── */
-        .session-complete-banner {
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            padding: 10px 14px;
-            background: rgba(14,242,114,0.1);
-            border: 1px solid rgba(14,242,114,0.3);
-            border-radius: 12px;
-        }
-        .session-complete-banner.visible { display: flex; }
-        .session-complete-banner span { font-size: 0.85rem; color: var(--text); }
-        .session-complete-banner-actions { display: flex; gap: 8px; align-items: center; }
-        .session-complete-banner .btn { min-width: 0; }
-        .results-drawer-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.6);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .results-drawer-overlay.visible { display: flex; }
-        .results-drawer {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            max-width: 100%;
-            max-height: 85vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-        .results-drawer-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 14px;
-            border-bottom: 1px solid var(--border);
-        }
-        .results-drawer-header h3 { font-size: 0.9rem; font-weight: 600; }
-        .results-drawer-body {
-            overflow: auto;
-            padding: 12px;
-        }
-        .results-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.78rem;
-        }
-        .results-table th, .results-table td {
-            padding: 6px 8px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-        .results-table th { color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-    </style>
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
 </head>
 <body>
 <div class="app">
 
-    <!-- Status bar -->
-    <header class="status-bar">
-        <span class="dot" id="status-dot"></span>
-        <span id="status-text" title="Click to retry">Connecting…</span>
-        <span id="ir-status" class="ir-status"></span>
-        <span id="plugin-mode">—</span>
-        <span id="session-time">—</span>
-    </header>
-
-    <!-- Session complete banner -->
-    <div class="session-complete-banner" id="session-complete-banner">
-        <span id="session-complete-text">Session complete</span>
-        <div class="session-complete-banner-actions">
-            <button type="button" class="btn" id="session-complete-results-btn">View results</button>
-            <button type="button" class="btn" id="session-complete-dismiss-btn">Dismiss</button>
-        </div>
+  <!-- ── Status bar ── -->
+  <header class="status-bar">
+    <div class="mode-pill waiting" id="mode-pill"><span class="dot"></span><span id="mode-text">WAITING</span></div>
+    <span class="session-time" id="session-time">—:——</span>
+    <div class="sb-spacer"></div>
+    <div class="diag-row">
+      <span class="diag-item"><span class="d-dot" id="d-irsdk"></span>iRacing</span>
+      <span class="diag-item"><span class="d-dot" id="d-steam"></span>Steam</span>
+      <span class="diag-item"><span class="d-dot" id="d-simhub"></span>SimHub</span>
     </div>
+    <span class="ws-badge disconnected" id="ws-badge">WS ○</span>
+  </header>
 
-    <!-- Replay controls -->
-    <section class="replay-panel">
+  <!-- ── Main grid ── -->
+  <div class="main-grid">
+
+    <!-- Left column -->
+    <div class="left-col">
+
+      <!-- Replay controls -->
+      <div class="panel">
+        <div class="panel-title">Replay Controls</div>
+        <div class="replay-session-row" id="replay-session-row" hidden>
+          <div class="replay-session-meta">
+            <span class="replay-session-lbl">Replay session</span>
+            <span class="replay-session-text" id="replay-session-text">—</span>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn label-inc" id="replay-session-prev" title="Go to previous session in this replay file" onclick="replaySessionStep('prev')">Previous session</button>
+            <button type="button" class="btn label-inc" id="replay-session-next" title="Go to next session in this replay file" onclick="replaySessionStep('next')">Next session</button>
+          </div>
+        </div>
         <div class="btn-row">
-            <button id="sessionStartBtn" class="btn" style="flex:1 1 70px;" title="Seek to start of session">⏮ Start</button>
-            <button id="stepBack" class="btn" style="flex:0 1 50px;" title="Step back 1 frame">|◀</button>
-            <button id="playPauseBtn" class="btn primary" style="flex:2 1 120px;">Play</button>
-            <button id="stepFwd" class="btn" style="flex:0 1 50px;" title="Step forward 1 frame">▶|</button>
-            <button id="prevIncident" class="btn" style="flex:1 1 80px;">◀ Inc</button>
-            <button id="nextIncident" class="btn" style="flex:1 1 80px;">Inc ▶</button>
+          <button type="button" class="btn" title="Jump to start" onclick="ra('replay_jump','start')">⏮</button>
+          <button type="button" class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4')">⏪</button>
+          <button type="button" class="btn" id="replay-play-pause-btn" title="Pause replay" onclick="toggleReplayPlayPause()">⏸</button>
+          <button type="button" class="btn" title="Forward 4×"   onclick="ra('replay_speed','4')">⏩</button>
+          <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end')">⏭</button>
         </div>
-        <div class="btn-row" id="speed-row">
-            <button class="btn" data-speed="-1">⏪ -1×</button>
-            <button class="btn" data-speed="1">1×</button>
-            <button class="btn" data-speed="2">2×</button>
-            <button class="btn" data-speed="4">4×</button>
-            <button class="btn" data-speed="8">8×</button>
-            <button class="btn" data-speed="16">16×</button>
+        <div class="btn-row">
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
         </div>
-        <div class="replay-state-legend" id="replay-state-legend" title="Current replay direction and speed">Paused</div>
-        <div class="progress-row">
-            <div class="frame-label">
-                <span id="frame-cur">0</span>
-                <span id="frame-end">0</span>
-            </div>
-            <div class="progress-track"><div id="progress-fill"></div></div>
+        <div class="speed-pills" id="speed-pills">
+          <button class="spill" data-s="0.25" onclick="setSpeed(this)">0.25×</button>
+          <button class="spill" data-s="0.5"  onclick="setSpeed(this)">0.5×</button>
+          <button class="spill active" data-s="1" onclick="setSpeed(this)">1×</button>
+          <button class="spill" data-s="2"  onclick="setSpeed(this)">2×</button>
+          <button class="spill" data-s="4"  onclick="setSpeed(this)">4×</button>
+          <button class="spill" data-s="8"  onclick="setSpeed(this)">8×</button>
+          <button class="spill" data-s="16" onclick="setSpeed(this)">16×</button>
         </div>
-        <div class="scan-section">
-            <div class="scan-controls">
-                <button id="btn-start-scan" class="btn">&#128269; Scan Session</button>
-                <button id="btn-stop-scan" class="btn" style="display:none">&#9646;&#9646; Stop</button>
-                <span id="scan-state-label" class="scan-state-label scan-state-idle">Idle</span>
-            </div>
-            <div id="scan-progress-row" style="display:none">
-                <div class="progress-track"><div id="scan-progress-fill"></div></div>
-                <span id="scan-incidents-label">0 incidents</span>
-            </div>
-            <div id="scan-result" style="display:none"></div>
+        <div class="scrub-row">
+          <div class="scrub-labels">
+            <span id="frame-cur">Frame 21,234</span>
+            <span id="frame-end">/ 55,000</span>
+          </div>
+          <div class="scrub-track" onclick="scrubClick(event)">
+            <div class="scrub-fill" id="scrub-fill"></div>
+          </div>
         </div>
-    </section>
+      </div>
 
-    <!-- Driver standings -->
-    <section class="drivers-panel collapsed" id="drivers-panel">
-        <div class="section-header drivers-panel-header" id="drivers-panel-toggle" title="Expand/collapse">
-            <span>
-                <span>Drivers (<span class="badge" id="driver-count">0</span>)</span>
-                <span class="drivers-summary-pts" id="drivers-field-pts"></span>
-            </span>
-            <span class="drivers-panel-chev" id="drivers-panel-chev">▼</span>
+      <!-- Incident navigation -->
+      <div class="panel">
+        <div class="panel-title">Incident navigation</div>
+        <div class="panel-sub">
+          <div class="panel-sub-title">Telemetry car</div>
+          <select class="car-sel" id="car-sel" onchange="onCarSel()" title="Telemetry and incident list below use this car">
+            <option value="0" data-car="99">#99 J. Smith (You)</option>
+            <option value="1" data-car="12">#12 A. Jones</option>
+            <option value="2" data-car="42">#42 B. Lee</option>
+            <option value="3" data-car="7">#7 M. Wilson</option>
+          </select>
         </div>
-        <div class="drivers-panel-body">
-            <div id="driver-list"><div class="empty-state">Waiting for iRacing…</div></div>
+        <div class="btn-row">
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
         </div>
-    </section>
+        <div class="cap-row">
+          <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
+            title="Seek to each incident for the selected telemetry car only and capture metadata (max 200 steps, or stop)">Find selected driver’s incidents</button>
+          <button type="button" class="btn cap btn-scan btn-scan-session" id="cap-btn-session" onclick="startCaptureSessionClick()"
+            title="All drivers: seek every incident in the session and capture metadata. Asks for confirmation before starting.">Find all incidents for all drivers</button>
+          <span class="cap-status" id="cap-status">—</span>
+        </div>
+      </div>
 
-    <!-- Incident feed -->
-    <section class="incidents-panel">
-        <div class="section-header">
-            <span>Incidents</span>
-            <span class="badge" id="incident-count">0</span>
+      <!-- Driver-scoped incidents -->
+      <div class="panel incidents-panel driver-inc-panel">
+        <div class="panel-title">This driver’s incidents</div>
+        <div class="inc-list" id="inc-list-driver"></div>
+      </div>
+
+    </div><!-- /left-col -->
+
+    <!-- Right column -->
+    <div class="right-col">
+
+      <!-- Standings -->
+      <div class="panel standings-panel open" id="std-panel">
+        <div class="std-header" onclick="toggleStd()">
+          <span class="panel-title" style="margin-bottom:0">Driver Standings</span>
+          <span class="chev">▼</span>
         </div>
-        <div class="filter-bar" id="filter-bar">
-            <span class="filter-chip active" data-filter="all">All</span>
-            <span class="filter-chip" data-filter="1x">1x</span>
-            <span class="filter-chip" data-filter="2x">2x</span>
-            <span class="filter-chip" data-filter="4x">4x+</span>
-            <span class="filter-chip" data-filter="mine">Mine</span>
+        <div class="std-body">
+          <div class="std-row hdr"><span>#</span><span>Car</span><span>Driver</span><span>Inc</span></div>
+          <div id="std-list"></div>
         </div>
-        <div class="player-hero-card" id="player-hero-card">
-            <div class="player-hero-row">
-                <span class="player-hero-count" id="player-hero-count">0x</span>
-                <span class="player-hero-summary" id="player-hero-summary">—</span>
-                <button type="button" class="player-hero-btn" id="player-hero-jump-btn">&#9654; Jump to Last</button>
+      </div>
+
+    </div><!-- /right-col -->
+  </div><!-- /main-grid -->
+
+  <!-- ── Bottom: telemetry + single tab strip (leaderboard & captured are last tabs) ── -->
+  <div class="bottom-dock-rows">
+    <div class="bottom-dock-main">
+      <section class="log-section log-section--telemetry" aria-label="Telemetry">
+        <div class="log-section-head"><span class="panel-title">Telemetry</span></div>
+        <div class="log-section-body--telem">
+          <div class="input-rows">
+            <div>
+              <div class="input-lbl"><span>Throttle</span><span id="thr-pct">65%</span></div>
+              <div class="bar-track"><div class="bar-fill thr" id="thr-bar" style="width:65%"></div></div>
             </div>
+            <div>
+              <div class="input-lbl"><span>Brake</span><span id="brk-pct">0%</span></div>
+              <div class="bar-track"><div class="bar-fill brk" id="brk-bar" style="width:0%"></div></div>
+            </div>
+          </div>
+          <div class="steer-wrap">
+            <span class="steer-lbl">Steering</span>
+            <svg class="steer-svg" viewBox="0 0 130 80">
+              <path class="g-track" d="M 10,72 A 55,55 0 0,1 120,72"/>
+              <path class="g-active" id="g-active" d=""/>
+              <line class="g-ctick" x1="65" y1="17" x2="65" y2="25"/>
+              <line class="g-needle" id="g-needle" x1="65" y1="72" x2="65" y2="22"/>
+              <circle class="g-hub" cx="65" cy="72" r="4.5"/>
+              <text class="g-text" x="2"  y="76">0°</text>
+              <text class="g-text" x="108" y="76">180°</text>
+              <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">0°</text>
+            </svg>
+          </div>
         </div>
-        <div class="incident-view-toggle">
-            <button type="button" class="btn view-toggle-btn" id="view-at-playhead-btn" data-view="live">At playhead</button>
-            <button type="button" class="btn view-toggle-btn" id="view-full-session-btn" data-view="entire">Full session</button>
+      </section>
+      <section class="log-section log-section--streams" aria-label="Logs and incident views">
+        <div class="log-tabs">
+          <button class="log-tab active" data-tab="events"     onclick="switchTab(this)">iRacing Events</button>
+          <button class="log-tab"        data-tab="health"     onclick="switchTab(this)">App Health</button>
+          <button class="log-tab"        data-tab="telem"      onclick="switchTab(this)">Telemetry Data</button>
+          <button class="log-tab"        data-tab="leaderboard" onclick="switchTab(this)">Incident leaderboard</button>
+          <button class="log-tab"        data-tab="captured"   onclick="switchTab(this)">Captured incidents</button>
+          <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
         </div>
-        <div id="incident-feed-unified" class="incident-feed-unified">
-            <div class="empty-state">No incidents at or before current position.</div>
+        <div id="incident-meta-strip" class="incident-meta-strip meta-pane collapsed" role="region" aria-label="Selected incident details" aria-expanded="false">
+          <div id="incident-meta-strip-body"></div>
         </div>
-    </section>
-
-    <!-- Feedback -->
-    <div class="feedback" id="action-feedback">
-        If the dot stays grey, the Sim Steward plugin is not running.
+        <div class="log-pane active" id="log-events"></div>
+        <div class="log-pane"        id="log-health"></div>
+        <div class="log-pane"        id="log-telem"></div>
+        <div class="log-pane incidents-pane" id="log-leaderboard">
+          <div class="leaderboard-pane-stack">
+            <div class="panel-title" style="margin-bottom:4px">
+              Incident leaderboard <span id="inc-count" style="color:var(--muted)">(0)</span>
+            </div>
+            <div class="inc-header">
+              <div class="chips">
+                <span class="chip active" data-f="all"    onclick="setFilter(this)">All</span>
+                <span class="chip"        data-f="1"      onclick="setFilter(this)">1×</span>
+                <span class="chip"        data-f="2"      onclick="setFilter(this)">2×</span>
+                <span class="chip"        data-f="4"      onclick="setFilter(this)">4×</span>
+                <span class="chip"        data-f="player" onclick="setFilter(this)">Mine</span>
+              </div>
+            </div>
+            <div class="inc-list" id="inc-list"></div>
+          </div>
+        </div>
+        <div class="log-pane incidents-pane" id="log-captured">
+          <div class="captured-pane-inner">
+            <div class="log-section-toolbar">
+              <label>
+                <input type="checkbox" id="captured-group-driver" onchange="toggleCapturedGroup()"/>
+                Group by driver
+              </label>
+            </div>
+            <div class="inc-list" id="captured-list"></div>
+          </div>
+        </div>
+      </section>
     </div>
+  </div>
 
-    <!-- Diagnostics & Metrics (bottom) -->
-    <section class="diag-panel" id="diag-panel">
-        <div class="diag-header" id="diag-toggle-btn" title="Toggle diagnostics">
-            <div class="diag-header-left">
-                <span class="diag-title">Diagnostics &amp; Metrics</span>
-            </div>
-            <span class="diag-toggle" id="diag-toggle-icon">▼</span>
-        </div>
-        <div class="diag-body" id="diag-body">
-            <div class="infra-grid" id="infra-grid">
-                <div class="infra-item"><span class="infra-dot" id="di-irsdk"></span><span id="di-irsdk-lbl">iRacing SDK</span></div>
-                <div class="infra-item"><span class="infra-dot" id="di-ws"></span><span id="di-ws-lbl">WebSocket</span></div>
-                <div class="infra-item"><span class="infra-dot" id="di-car" title="In replay: car currently being watched (switch with V/Shift+V in iRacing). In live: your car."></span><span id="di-car-lbl">Player Car</span></div>
-            </div>
-            <div class="diag-footer" style="justify-content:space-between; gap:10px;">
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button type="button" class="btn" id="capture-summary-btn" title="Capture session results/incident totals if available at current state">Capture summary</button>
-                    <button type="button" class="btn" id="finalize-capture-summary-btn" title="Replay only: temporarily seek to replay end to force final results, capture, then restore position">Finalize + capture</button>
-                    <button type="button" class="btn" id="record-session-snapshot-btn" title="Append a JSON snapshot line to session-discovery.jsonl for later analysis">Record snapshot</button>
-                </div>
-            </div>
-            <div class="diag-footer">
-                <span class="diag-pill" id="dp-last">Last detection: —</span>
-                <span class="diag-pill" id="dp-captured">Incidents captured: 0</span>
-            </div>
-            <div class="diag-footer" style="gap:8px; flex-wrap:wrap;">
-                <span class="diag-pill" id="sd-core">Session: —</span>
-                <span class="diag-pill" id="sd-results">Results: —</span>
-                <span class="diag-pill" id="sd-incidents">YAML incidents: —</span>
-                <span class="diag-pill" id="sd-lastcap">Last capture: —</span>
-            </div>
-        </div>
-    </section>
+</div><!-- /app -->
+<div class="toast" id="toast"></div>
 
-    <!-- Debug Log (very bottom) -->
-    <section class="stream-panel" id="stream-panel">
-        <div class="section-header stream-panel-header" id="stream-panel-toggle" title="Expand/collapse">
-            <span style="display:flex;align-items:center;">
-                <span class="stream-alert-dot" id="stream-alert-dot"></span>
-                <span>Debug Log</span>
-            </span>
-            <span class="stream-panel-chev" id="stream-panel-chev">▼</span>
-        </div>
-        <div class="stream-panel-body">
-            <div class="stream-header">
-                <span></span>
-                <button class="stream-clear-btn" id="stream-clear-btn">clear logs</button>
-                <button class="stream-clear-btn" id="stream-clear-all-btn" style="margin-left:6px">clear all</button>
-            </div>
-            <div class="log-filter-row" id="log-filter-row">
-                <span class="log-filter-label">Hide level:</span>
-                <label><input type="checkbox" id="log-hide-debug" /> DEBUG</label>
-                <span class="log-filter-label" style="margin-left:8px">Hide events:</span>
-                <label><input type="checkbox" id="log-hide-state-broadcast" /> state_broadcast_summary</label>
-                <label><input type="checkbox" id="log-hide-tick-stats" /> tick_stats</label>
-                <label><input type="checkbox" id="log-hide-ws-raw" /> ws_message_raw</label>
-                <label><input type="checkbox" id="log-hide-action-received" /> action_received</label>
-                <label><input type="checkbox" id="log-hide-action-dispatched" /> action_dispatched</label>
-            </div>
-            <div class="log-activity-summary" id="log-activity-summary" title="Summary of recent log activity">—</div>
-            <div id="event-stream"><div class="empty-state">Waiting for events…</div></div>
-        </div>
-    </section>
-
-</div>
-
-<!-- Results drawer overlay -->
-<div class="results-drawer-overlay" id="results-drawer-overlay">
-    <div class="results-drawer">
-        <div class="results-drawer-header">
-            <h3 id="results-drawer-title">Session results</h3>
-            <button type="button" class="btn" id="results-drawer-close">Close</button>
-        </div>
-        <div class="results-drawer-body" id="results-drawer-body"></div>
-    </div>
-</div>
 <script>
-(function () {
-    const statusDot   = document.getElementById("status-dot");
-    const statusText  = document.getElementById("status-text");
-    const modeEl      = document.getElementById("plugin-mode");
-    const timeEl      = document.getElementById("session-time");
-    const playBtn     = document.getElementById("playPauseBtn");
-    const prevBtn     = document.getElementById("prevIncident");
-    const nextBtn     = document.getElementById("nextIncident");
-    const speedRow    = document.getElementById("speed-row");
-    const frameCur    = document.getElementById("frame-cur");
-    const frameEnd    = document.getElementById("frame-end");
-    const fill        = document.getElementById("progress-fill");
-    const driverList  = document.getElementById("driver-list");
-    const driverCount = document.getElementById("driver-count");
-    const incidentFeedUnified = document.getElementById("incident-feed-unified");
-    const incidentCount = document.getElementById("incident-count");
-    const eventStream = document.getElementById("event-stream");
-    const filterBar   = document.getElementById("filter-bar");
-    const feedback    = document.getElementById("action-feedback");
-    const rewindBtn = speedRow.querySelector('[data-speed="-1"]');
-    const MAX_STREAM_ENTRIES = 200;
-    let lastIncidentKey = "";
-    let lastDriverKey = "";
-    let activeFilter = "all";
-    let allIncidents = [];
-    let clearedIncidentIds = new Set(); // IDs hidden by a user-initiated clear; filtered from state pushes
-    const STORAGE_KEY_INCIDENT_VIEW = "simsteward_incident_view";
-    const STORAGE_KEY_LOG_FILTER = "simsteward_log_filter";
-    const LOG_FILTER_DEFAULTS = {
-        hiddenLevels: ["DEBUG"],
-        hiddenEvents: ["state_broadcast_summary", "tick_stats", "ws_message_raw"]
+// ── Config ──────────────────────────────────────────────
+const WS_PORT = 19847;
+function wsUrl() {
+  const h = window.location.hostname || 'localhost';
+  return 'ws://' + h + ':' + WS_PORT;
+}
+const LOG_MAX        = 500;
+const STEER_MAX_RAD = 7.0;
+/** 180° axis: 90° = straight; left end 0°, right end 180°; +vd = CW on gauge = toward 180° (steer right). */
+const STEER_AXIS_HALF_DEG = 90;
+
+// ── Mock data ────────────────────────────────────────────
+const MOCK_INC = [
+  { id:1, time:'12:34.5', car:99, driver:'J. Smith',  sev:4, cause:'contact',  frame:54321, lap:12, player:true  },
+  { id:2, time:'12:20.1', car:12, driver:'A. Jones',  sev:2, cause:'wall',     frame:52100, lap:11, player:false },
+  { id:3, time:'11:45.8', car:42, driver:'B. Lee',    sev:1, cause:'off-track',frame:48900, lap:11, player:false },
+  { id:4, time:'11:12.3', car:7,  driver:'M. Wilson', sev:4, cause:'contact',  frame:45200, lap:10, player:false },
+  { id:5, time:'10:55.0', car:99, driver:'J. Smith',  sev:2, cause:'spin',     frame:44100, lap:10, player:true  },
+];
+const MOCK_DRV = [
+  { pos:1, car:99, name:'J. Smith',  inc:6, player:true  },
+  { pos:2, car:7,  name:'M. Wilson', inc:4, player:false },
+  { pos:3, car:12, name:'A. Jones',  inc:2, player:false },
+  { pos:4, car:42, name:'B. Lee',    inc:1, player:false },
+];
+const MOCK_CAR_TELEM = [
+  { t:0.65, b:0.00, s: 0.30 },
+  { t:0.90, b:0.00, s:-1.20 },
+  { t:0.00, b:0.75, s: 2.10 },
+  { t:0.45, b:0.00, s:-3.50 },
+];
+
+// ── State ────────────────────────────────────────────────
+let incidents   = [...MOCK_INC];
+let drivers     = [...MOCK_DRV];
+let capturedIncidents = [];
+let capturedGroupByDriver = false;
+/** Driver group labels (group-by-driver mode); when present, that group's rows are hidden. */
+let capturedDriverGroupsCollapsed = new Set();
+let incFilter   = 'all';
+let autoScroll  = true;
+let activeTab   = 'events';
+let ws          = null;
+let mockTime    = 0;
+let mockPaused  = false;  // paused when real WS connected
+let mockTelem   = { t:0.65, b:0.00, s:0.30 };
+let replayPaused = false;
+let lastReplaySpeed = '1';
+/** Focus-car lap from plugin state (telemetry CarIdxLap); -1 if unknown. */
+let lastLap = -1;
+/** @type {{ kind:'session', frame:number } | { kind:'capture', seq:number } | null} */
+let incidentMetaSelection = null;
+
+// ── WebSocket ────────────────────────────────────────────
+function connectWs() {
+  try {
+    setWs('connecting');
+    const url = wsUrl();
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      setWs('connected');
+      mockPaused = true;
+      log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
     };
-    const KNOWN_LOG_EVENTS = [
-        "state_broadcast_summary", "tick_stats", "ws_message_raw",
-        "action_received", "action_dispatched", "action_result", "replay_control",
-        "seek_backward_detected", "session_summary_captured", "incident_detected",
-        "plugin_started", "plugin_ready", "plugin_stopped", "loki_status",
-        "iracing_connected", "iracing_disconnected", "ws_client_connected", "ws_client_disconnected",
-        "dashboard_opened", "baseline_established", "session_reset", "yaml_update", "session_digest"
-    ];
-    let logFilter = (function () {
-        let hiddenLevels, hiddenEvents;
-        try {
-            const s = localStorage.getItem(STORAGE_KEY_LOG_FILTER);
-            if (s) {
-                const p = JSON.parse(s);
-                hiddenLevels = new Set(Array.isArray(p.hiddenLevels) ? p.hiddenLevels : LOG_FILTER_DEFAULTS.hiddenLevels);
-                hiddenEvents = new Set(Array.isArray(p.hiddenEvents) ? p.hiddenEvents : LOG_FILTER_DEFAULTS.hiddenEvents);
-            } else {
-                hiddenLevels = new Set(LOG_FILTER_DEFAULTS.hiddenLevels);
-                hiddenEvents = new Set(LOG_FILTER_DEFAULTS.hiddenEvents);
-            }
-        } catch (_) {
-            hiddenLevels = new Set(LOG_FILTER_DEFAULTS.hiddenLevels);
-            hiddenEvents = new Set(LOG_FILTER_DEFAULTS.hiddenEvents);
-        }
-        // Reset poisoned filter: if INFO/WARN/ERROR were hidden, nothing would show
-        const wouldHideAll = ["INFO", "WARN", "ERROR"].some(l => hiddenLevels.has(l));
-        if (wouldHideAll) {
-            hiddenLevels = new Set(LOG_FILTER_DEFAULTS.hiddenLevels);
-            hiddenEvents = new Set(LOG_FILTER_DEFAULTS.hiddenEvents);
-            try {
-                localStorage.setItem(STORAGE_KEY_LOG_FILTER, JSON.stringify({
-                    hiddenLevels: LOG_FILTER_DEFAULTS.hiddenLevels,
-                    hiddenEvents: LOG_FILTER_DEFAULTS.hiddenEvents
-                }));
-            } catch (_) {}
-        }
-        // Never hide action_result or incident_detected so button clicks and incident points always show
-        hiddenEvents.delete("action_result");
-        hiddenEvents.delete("incident_detected");
-        return { hiddenLevels, hiddenEvents };
-    })();
-    let recentLogEntries = [];
-    const RECENT_LOG_MAX = 1000;
-    /** Full log buffer (including hidden entries) so we can re-render when filter changes. Newest at index 0. */
-    let fullLogEntries = [];
-    const FULL_LOG_MAX = 2000;
-    let activeIncidentView = (function () {
-        try {
-            const s = localStorage.getItem(STORAGE_KEY_INCIDENT_VIEW);
-            if (s === "entire" || s === "live") return s;
-        } catch (_) {}
-        return "live";
-    })();
-    let currentReplayFrame = 0;
-    let currentSessionTime = 0;
-    let lastLiveRenderFrame = -9999;
-    const LIVE_RENDER_FRAME_DEADZONE = 30;
-    let incidentDataDirty = false;
-    let rewindProbeStartedAt = 0;
-    let rewindProbeActive = false;
-    let rewindUnsupported = false;
-    let lastIncidentContext = { hasLiveIncidentData: false, irsdkConnected: false };
-    let playerCarIdxRef = -1;
-    let debugLogHasAlert = false;
-    let debugLogHasError = false;
-    let lastSessionSummary = null;
-    const DEBUG_STATE_LOG = false;
-    /** Map of snapshotId → IncidentSnapshot, populated from state.replayScan.snapshots. */
-    const scanSnapshotsById = new Map();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const wsToken = urlParams.get("token") || urlParams.get("wsToken");
-    const wsPort = 19847;
-    const tokenQuery = wsToken ? `?token=${encodeURIComponent(wsToken)}` : "";
-    const buildWsUrl = host => `ws://${host}:${wsPort}${tokenQuery}`;
-    const wsHost = (window.location.hostname || "localhost");
-    let ws, reconnectTimer, feedbackTimer, reconnectDelay = 2000, useFallback = false;
-
-    // ── Connection ─────────────────────────────────────────────────
-    function connect() {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-        const url = useFallback ? buildWsUrl("127.0.0.1") : buildWsUrl(wsHost);
-        ws = new WebSocket(url);
-        ws.addEventListener("open",    onOpen);
-        ws.addEventListener("error",   onError);
-        ws.addEventListener("close",   onClose);
-        ws.addEventListener("message", e => handleMessage(e.data));
-    }
-    function onOpen() {
-        statusDot.className = "dot live";
-        statusText.textContent = "Connected";
-        reconnectDelay = 2000; useFallback = false;
-        flash("success", "Connected to Sim Steward");
-    }
-    function onError() { statusText.textContent = "Connection error"; }
-    function onClose(ev) {
-        statusDot.className = "dot";
-        const msg = ev.code === 1006
-            ? "Plugin not reachable (port 19847)"
-            : (ev.reason || "Disconnected");
-        statusText.textContent = msg;
-        flash("error", msg + " – retrying…");
-        clearDiagnostics();
-        lastIncidentContext = { hasLiveIncidentData: false, irsdkConnected: false };
-        renderIncidentViews();
-        const isLocal = wsHost === 'localhost' || wsHost === '127.0.0.1';
-        if (!useFallback && isLocal && ev.code === 1006) { useFallback = true; setTimeout(connect, 600); }
-        else scheduleReconnect();
-    }
-
-    function clearDiagnostics() {
-        ["di-irsdk", "di-ws", "di-car"].forEach(id => {
-            const dot = document.getElementById(id);
-            if (dot) dot.className = "infra-dot";
-        });
-        const irStatusEl = document.getElementById("ir-status");
-        if (irStatusEl) {
-            irStatusEl.textContent = "";
-            irStatusEl.classList.remove("connected");
-        }
-        const labels = {
-            "di-irsdk-lbl": "iRacing SDK",
-            "di-ws-lbl":    "WebSocket",
-            "di-car-lbl":   "Player Car"
-        };
-        Object.entries(labels).forEach(([id, text]) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = text;
-        });
-        const dpLast = document.getElementById("dp-last");
-        const dpCaptured = document.getElementById("dp-captured");
-        if (dpLast) dpLast.textContent = "Last detection: —";
-        if (dpCaptured) dpCaptured.textContent = "Incidents captured: 0";
-
-        applyScanState(null);
-
-        const sdCore = document.getElementById("sd-core");
-        const sdResults = document.getElementById("sd-results");
-        const sdInc = document.getElementById("sd-incidents");
-        const sdLastCap = document.getElementById("sd-lastcap");
-        if (sdCore) sdCore.textContent = "Session: —";
-        if (sdResults) sdResults.textContent = "Results: —";
-        if (sdInc) sdInc.textContent = "YAML incidents: —";
-        if (sdLastCap) sdLastCap.textContent = "Last capture: —";
-    }
-    function scheduleReconnect() {
-        if (reconnectTimer) return;
-        reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); reconnectDelay = Math.min(30000, reconnectDelay * 1.5); }, reconnectDelay);
-    }
-
-    // ── Message handling ───────────────────────────────────────────
-    function handleMessage(raw) {
-        let p;
-        try { p = JSON.parse(raw); } catch { return; }
-        if (!p || typeof p !== "object") return;
-        if (DEBUG_STATE_LOG && p && p.type === "state") {
-            console.debug("[SimSteward] state message", {
-                drivers: Array.isArray(p.drivers) ? p.drivers.length : -1,
-                incidents: Array.isArray(p.incidents) ? p.incidents.length : -1,
-                mode: p.pluginMode
-            });
-        }
-        if (p.type === "state")             applyState(p);
-        else if (p.type === "actionResult") {
-            if (!p.success && p.error === "incident_not_found")
-                flash("error", "Incident not found — it may have been pruned from the feed. Seek manually.");
-            else if (!p.success && p.action === "CaptureSessionSummaryNow" && p.error === "results_not_ready")
-                flash("error", "Results not ready yet — try “Finalize + capture” (replay), or seek/play to checkered/end.");
-            else if (!p.success && p.action === "FinalizeThenCaptureSessionSummary" && p.error === "not_in_replay")
-                flash("error", "Finalize + capture is replay-only (SimMode must be replay).");
-            else
-                flash(p.success ? "success" : "error", p.success ? `${p.action} ok` : `${p.action}: ${p.error || "failed"}`);
-        }
-        else if (p.type === "pong")         flash("success", "pong");
-        else if (p.type === "error")        flash("error", p.error || "error");
-        else if (p.type === "logEvents") {
-            const entries = Array.isArray(p.entries) ? p.entries : [];
-            const incidentEntries = entries.filter(e => (e && (e.event === "incident_detected" || e.Event === "incident_detected")));
-            if (incidentEntries.length) console.info("[SimSteward] logEvents received", incidentEntries.length, "incident_detected entry/entries");
-            try { appendLogEntries(entries); }
-            catch (err) { console.error("[SimSteward] logEvents display error", err); }
-        }
-        else if (p.type === "incidentEvents") { const ev = Array.isArray(p.events) ? p.events : []; appendIncidentEntries(ev); flashIncidentsCaptured(ev); }
-        else if (p.type === "sessionComplete") showSessionCompleteBanner(p.summary);
-    }
-
-    // ── Event stream rendering ─────────────────────────────────────
-    function updateStreamAlertDot() {
-        const dot = document.getElementById("stream-alert-dot");
-        if (!dot) return;
-        dot.classList.toggle("visible", debugLogHasAlert);
-        dot.classList.toggle("error", debugLogHasError);
-    }
-
-    function saveLogFilter() {
-        try {
-            localStorage.setItem(STORAGE_KEY_LOG_FILTER, JSON.stringify({
-                hiddenLevels: Array.from(logFilter.hiddenLevels),
-                hiddenEvents: Array.from(logFilter.hiddenEvents)
-            }));
-        } catch (_) {}
-    }
-
-    function isLogEntryHidden(e) {
-        const lvl = (e.level || e.Level || "INFO").toUpperCase();
-        const ev = e.event || e.Event || "";
-        if (logFilter.hiddenLevels.has(lvl)) return true;
-        if (ev && logFilter.hiddenEvents.has(ev)) return true;
-        return false;
-    }
-
-    function updateActivitySummary() {
-        const el = document.getElementById("log-activity-summary");
-        if (!el || !recentLogEntries.length) {
-            if (el) el.textContent = "—";
-            return;
-        }
-        const byEvent = {};
-        const recentActions = [];
-        for (const x of recentLogEntries) {
-            byEvent[x.event || "unknown"] = (byEvent[x.event || "unknown"] || 0) + 1;
-            if ((x.event === "action_result" || x.event === "session_summary_captured") && x.message)
-                recentActions.push(x.message.substring(0, 50));
-        }
-        const parts = [];
-        if (byEvent.action_result) parts.push(`${byEvent.action_result} action(s)`);
-        if (byEvent.session_summary_captured) parts.push(`${byEvent.session_summary_captured} capture(s)`);
-        if (byEvent.seek_backward_detected) parts.push(`${byEvent.seek_backward_detected} seek reset(s)`);
-        if (byEvent.incident_detected) parts.push(`${byEvent.incident_detected} incident(s)`);
-        if (byEvent.replay_control) parts.push(`${byEvent.replay_control} replay control(s)`);
-        const summary = parts.length ? parts.join(" · ") : `${recentLogEntries.length} log entries`;
-        const last = recentActions.slice(-3).reverse();
-        el.textContent = last.length ? summary + " — Recent: " + last.join(" | ") : summary;
-    }
-
-    function appendLogEntries(entries) {
-        if (!Array.isArray(entries) || !entries.length) return;
-        for (const e of entries) {
-            if (e == null) continue;
-            const lvl = (e.level || e.Level || "INFO").toUpperCase();
-            if (lvl === "ERROR") debugLogHasError = true;
-            if (lvl === "WARN" || lvl === "ERROR") debugLogHasAlert = true;
-            fullLogEntries.unshift({ level: e.level || e.Level || "INFO", event: e.event || e.Event || "", message: e.message || e.Message || "", timestamp: e.timestamp || e.Timestamp || "" });
-            if (fullLogEntries.length > FULL_LOG_MAX) fullLogEntries.pop();
-        }
-        updateStreamAlertDot();
-        clearStreamPlaceholder();
-        const atTop = isStreamAtTop();
-        let added = 0;
-        for (const e of entries) {
-            if (e == null) continue;
-            if (isLogEntryHidden(e)) {
-                continue;
-            }
-            added++;
-            const row = document.createElement("div");
-            row.className = "stream-entry";
-            const ts = (e.timestamp || e.Timestamp || "").replace("T", " ").replace("Z", "").substring(11, 23);
-            const lvl = e.level || e.Level || "INFO";
-            const ev = e.event || e.Event || "";
-            const msg = e.message || e.Message || "";
-            row.dataset.level = lvl;
-            row.dataset.event = ev;
-            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${esc(lvl)}">${esc(lvl)}</span><span class="stream-msg">${esc(msg)}</span>`;
-            eventStream.insertBefore(row, eventStream.firstChild);
-            recentLogEntries.push({ event: ev, level: lvl, message: msg, ts });
-            if (recentLogEntries.length > RECENT_LOG_MAX) recentLogEntries.shift();
-        }
-        if (added === 0 && eventStream.children.length === 0) {
-            const empty = document.createElement("div");
-            empty.className = "empty-state";
-            empty.textContent = "All entries hidden by filter or waiting for events…";
-            eventStream.appendChild(empty);
-        }
-        if (recentLogEntries.length > 0) updateActivitySummary();
-        trimStream();
-        if (atTop) eventStream.scrollTop = 0;
-        if (added > 0) {
-            const panel = document.getElementById("stream-panel");
-            if (panel && panel.classList.contains("collapsed")) panel.classList.remove("collapsed");
-        }
-    }
-
-    function rerenderLogStream() {
-        const stream = document.getElementById("event-stream");
-        if (!stream) return;
-        stream.innerHTML = "";
-        recentLogEntries = [];
-        let shown = 0;
-        let hiddenSample = null;
-        for (const e of fullLogEntries) {
-            if (isLogEntryHidden(e)) {
-                if (!hiddenSample) hiddenSample = { level: e.level, event: e.event };
-                continue;
-            }
-            shown++;
-            const row = document.createElement("div");
-            row.className = "stream-entry";
-            const ts = (e.timestamp || "").replace("T", " ").replace("Z", "").substring(11, 23);
-            const lvl = e.level || "INFO";
-            const ev = e.event || "";
-            const msg = e.message || "";
-            row.dataset.level = lvl;
-            row.dataset.event = ev;
-            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${esc(lvl)}">${esc(lvl)}</span><span class="stream-msg">${esc(msg)}</span>`;
-            stream.insertBefore(row, stream.firstChild);
-            recentLogEntries.push({ event: ev, level: lvl, message: msg, ts });
-        }
-        if (recentLogEntries.length > RECENT_LOG_MAX) recentLogEntries = recentLogEntries.slice(-RECENT_LOG_MAX);
-        if (shown === 0 && fullLogEntries.length > 0) {
-            const empty = document.createElement("div");
-            empty.className = "empty-state";
-            empty.textContent = "All entries hidden by filter or waiting for events…";
-            stream.appendChild(empty);
-        } else if (shown === 0) {
-            const empty = document.createElement("div");
-            empty.className = "empty-state";
-            empty.textContent = "Waiting for events…";
-            stream.appendChild(empty);
-        }
-        trimStream();
-        updateActivitySummary();
-    }
-
-    function flashIncidentsCaptured(events) {
-        if (!events.length) return;
-        const first = events[0];
-        const typeLabel = first.type || "?";
-        const causeLabel = first.cause ? ` (${first.cause})` : "";
-        const label = events.length === 1
-            ? `Captured: ${typeLabel} #${first.carNumber ?? "?"} ${first.driverName ?? "Unknown"}${causeLabel}`
-            : `Captured ${events.length} incidents (latest: ${typeLabel} #${first.carNumber ?? "?"})`;
-        flash("success", label);
-    }
-
-    function appendIncidentEntries(events) {
-        if (!events.length) return;
-        clearStreamPlaceholder();
-        const atTop = isStreamAtTop();
-        // Newest first: prepend in chronological order (oldest then newer) so each insertBefore goes above the previous → newest ends up at top
-        for (const ev of events) {
-            const row = document.createElement("div");
-            row.className = "stream-entry";
-            const ts = ev.sessionTimeFormatted || "—";
-            const typeStr = ev.type || "?";
-            const causeStr = ev.cause ? ` [${ev.cause}]` : "";
-            const otherStr = ev.otherDriverName ? ` vs #${ev.otherCarNumber} ${ev.otherDriverName}` : "";
-            const label = `${typeStr} — #${ev.carNumber ?? "?"} ${ev.driverName ?? "Unknown"}${causeStr}${otherStr} (${ev.totalAfter ?? "?"} total)`;
-
-            let lvlClass = "INCIDENT";
-            let lvlText = ev.type === "off-track" ? "+1x" : "INC";
-
-            row.innerHTML = `<span class="stream-ts">${esc(ts)}</span><span class="stream-lvl ${lvlClass}">${lvlText}</span><span class="stream-msg">${esc(label)}</span>`;
-            eventStream.insertBefore(row, eventStream.firstChild);
-        }
-        trimStream();
-        if (atTop) eventStream.scrollTop = 0;
-    }
-
-    function clearStreamPlaceholder() {
-        const placeholder = eventStream.querySelector(".empty-state");
-        if (placeholder) placeholder.remove();
-    }
-
-    function trimStream() {
-        while (eventStream.children.length > MAX_STREAM_ENTRIES)
-            eventStream.removeChild(eventStream.lastChild);
-    }
-
-    function isStreamAtTop() {
-        return eventStream.scrollTop < 32;
-    }
-
-    function isStreamAtBottom() {
-        return eventStream.scrollHeight - eventStream.scrollTop - eventStream.clientHeight < 32;
-    }
-
-    // ── Session complete banner & results drawer ───────────────────
-    function showSessionCompleteBanner(summary) {
-        lastSessionSummary = summary || null;
-        const banner = document.getElementById("session-complete-banner");
-        const textEl = document.getElementById("session-complete-text");
-        if (!banner || !textEl) return;
-        // Prefer authoritative incident total from results table (iRacing ResultsPositions), then event count
-        const resultsIncidentSum = summary?.results?.reduce((s, r) => s + (r.incidents ?? 0), 0) ?? 0;
-        const incidentCount = resultsIncidentSum > 0 ? resultsIncidentSum : (summary?.incidentFeed?.length ?? allIncidents.length);
-        textEl.textContent = `Session complete · ${incidentCount} incident${incidentCount !== 1 ? "s" : ""} captured · Results available`;
-        banner.classList.add("visible");
-        // Populate the incidents panel from the captured feed so it's visible there as well as in "View results"
-        if (summary?.incidentFeed?.length > 0) {
-            allIncidents = summary.incidentFeed.slice();
-            lastIncidentKey = allIncidents.map(ev => ev.id ?? "").join(",");
-            incidentDataDirty = true;
-            const dpCaptured = document.getElementById("dp-captured");
-            if (dpCaptured) dpCaptured.textContent = `Incidents captured: ${allIncidents.length}`;
-            renderIncidentViews();
-        }
-    }
-
-    function openResultsDrawer() {
-        if (!lastSessionSummary) return;
-        const overlay = document.getElementById("results-drawer-overlay");
-        const titleEl = document.getElementById("results-drawer-title");
-        const bodyEl = document.getElementById("results-drawer-body");
-        if (!overlay || !bodyEl) return;
-        const s = lastSessionSummary;
-        titleEl.textContent = (s.trackName || "Session") + " — Results";
-        const parts = [];
-        parts.push(renderResultsMeta(s));
-        parts.push(renderResultsTable(s.results || []));
-        if (s.incidentFeed && s.incidentFeed.length > 0)
-            parts.push(renderResultsIncidentTimeline(s.incidentFeed));
-        bodyEl.innerHTML = parts.join("");
-        overlay.classList.add("visible");
-    }
-
-    function renderResultsMeta(s) {
-        const items = [];
-        if (s.sessionType) items.push(`Session: ${esc(s.sessionType)}`);
-        if (s.simMode) items.push(`Mode: ${esc(s.simMode)}`);
-        if (s.capturedAt) items.push(`Captured: ${esc(s.capturedAt)}`);
-        if (s.totalLapsComplete != null) items.push(`Total laps: ${s.totalLapsComplete}`);
-        if (s.numCautionFlags != null && s.numCautionFlags > 0) items.push(`Cautions: ${s.numCautionFlags}`);
-        if (s.numLeadChanges != null) items.push(`Lead changes: ${s.numLeadChanges}`);
-        if (!items.length) return "";
-        return `<div class="results-meta" style="margin-bottom:12px; font-size:0.8rem; color:var(--muted);">${items.join(" · ")}</div>`;
-    }
-
-    function renderResultsIncidentTimeline(feed) {
-        if (!feed.length) return "";
-        const rows = feed.slice(0, 200).map(ev => `<tr>
-            <td>${esc(ev.type ?? "")}</td>
-            <td>#${esc(ev.carNumber ?? "?")}</td>
-            <td>${esc(ev.driverName ?? "")}</td>
-            <td>${ev.delta ?? ""}</td>
-            <td>${ev.sessionTimeFormatted ?? formatSessionTime(ev.sessionTime ?? 0)}</td>
-            <td>${esc(ev.cause ?? "")}</td>
-            <td>${ev.otherCarNumber ? "#" + esc(ev.otherCarNumber) : ""}</td>
-        </tr>`).join("");
-        return `<h4 class="results-section-title" style="margin:16px 0 8px; font-size:0.85rem;">Incident timeline (${feed.length} events)</h4>
-            <table class="results-table incident-timeline-table">
-                <thead><tr><th>Type</th><th>Car</th><th>Driver</th><th>Δ</th><th>Time</th><th>Cause</th><th>Other</th></tr></thead>
-                <tbody>${rows}</tbody>
-            </table>`;
-    }
-
-    function closeResultsDrawer() {
-        document.getElementById("results-drawer-overlay")?.classList.remove("visible");
-    }
-
-    function renderResultsTable(results) {
-        if (!results.length) return "<p class=\"empty-state\">No results data.</p>";
-        const rows = results.map(r => `<tr>
-            <td>${esc(String(r.position ?? ""))}</td>
-            <td>#${esc(r.carNumber ?? "?")}</td>
-            <td>${esc(r.driverName ?? "Unknown")}</td>
-            <td>${esc(r.carClass ?? "")}</td>
-            <td>${r.lapsComplete ?? ""}</td>
-            <td>${r.lapsLed ?? ""}</td>
-            <td>${r.fastestTime != null ? r.fastestTime.toFixed(2) : ""}</td>
-            <td>${r.fastestLap ?? ""}</td>
-            <td>${r.lastTime != null ? r.lastTime.toFixed(2) : ""}</td>
-            <td>${r.incidents ?? ""}</td>
-            <td>${esc(r.reasonOut ?? "")}</td>
-        </tr>`).join("");
-        return `<table class="results-table">
-            <thead><tr>
-                <th>Pos</th><th>Car</th><th>Driver</th><th>Class</th><th>Laps</th><th>Led</th><th>Fastest</th><th>FL</th><th>Last</th><th>Inc</th><th>Out</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-        </table>`;
-    }
-
-    // ── Diagnostics panel ─────────────────────────────────────────
-    let diagOpen = false;
-    // Start collapsed
-    document.getElementById("diag-body").style.display = "none";
-    document.getElementById("diag-toggle-icon").textContent = "▶";
-    document.getElementById("diag-toggle-btn").addEventListener("click", () => {
-        diagOpen = !diagOpen;
-        document.getElementById("diag-body").style.display = diagOpen ? "" : "none";
-        document.getElementById("diag-toggle-icon").textContent = diagOpen ? "▼" : "▶";
-        logUiEvent("diag-toggle-btn", "click", diagOpen ? "expanded" : "collapsed");
-    });
-
-    function setInfraDot(id, status, label) {
-        const dot = document.getElementById(id);
-        const lbl = document.getElementById(id + "-lbl");
-        dot.className = "infra-dot " + status;
-        if (lbl && label) lbl.textContent = label;
-    }
-
-    function applyDiagnostics(diag, metrics) {
-        if (!diag && !metrics) return;
-
-        if (diag) {
-            const irOk = diag.irsdkConnected;
-            const irStarted = diag.irsdkStarted;
-            const irStatusEl = document.getElementById("ir-status");
-            if (irStatusEl) {
-                irStatusEl.textContent = irOk ? "iRacing ✓" : "iRacing: waiting";
-                irStatusEl.classList.toggle("connected", !!irOk);
-            }
-            setInfraDot("di-irsdk",
-                irOk ? "ok" : (irStarted ? "warn" : "err"),
-                irOk ? "iRacing: Connected" : (irStarted ? "iRacing: Waiting" : "iRacing: Not started"));
-
-            setInfraDot("di-ws",
-                diag.wsRunning ? "ok" : "err",
-                diag.wsRunning ? `WS :${diag.wsPort} (${diag.wsClients} client${diag.wsClients === 1 ? "" : "s"})` : "WS: Not running");
-
-            const carKnown = (diag.playerCarIdx ?? -1) >= 0;
-            setInfraDot("di-car", carKnown ? "ok" : "warn", "—");
-        }
-        if (metrics) {
-            const lastT = (metrics.lastDetectionSessionTime ?? -1) >= 0
-                ? `Last detection: ${formatSessionTime(metrics.lastDetectionSessionTime)}`
-                : "Last detection: —";
-            const dpLast = document.getElementById("dp-last");
-            if (dpLast) dpLast.textContent = lastT;
-        }
-    }
-
-    function applySessionDiagnostics(sd, pluginMode) {
-        if (!sd) return;
-        const coreEl = document.getElementById("sd-core");
-        const resultsEl = document.getElementById("sd-results");
-        const incEl = document.getElementById("sd-incidents");
-        const lastCapEl = document.getElementById("sd-lastcap");
-
-        const simMode = sd.simMode || pluginMode || "Unknown";
-        const flagsHex = (sd.sessionFlags ?? 0).toString(16).toUpperCase().padStart(8, "0");
-        const irSid = sd.irSessionId ?? 0;
-        const irSub = sd.irSubSessionId ?? 0;
-        if (coreEl) coreEl.textContent = `Session: ${simMode} · state ${sd.sessionState ?? 0} · sess ${sd.sessionNum ?? 0} · sub ${irSub} · sid ${irSid} · SIU ${sd.sessionInfoUpdate ?? 0} · flags 0x${flagsHex}`;
-
-        const posCount = sd.resultsPositionsCount ?? 0;
-        const ready = !!sd.resultsReady;
-        const sel = (sd.selectedResultsSessionNum ?? -1) >= 0 ? ` (sel ${sd.selectedResultsSessionNum}${sd.selectedResultsSessionType ? " " + sd.selectedResultsSessionType : ""})` : "";
-        if (resultsEl) resultsEl.textContent = `Results: ${posCount} pos · ${ready ? "READY" : "not ready"}${sel}`;
-
-        const active = sd.activeDriverCount ?? 0;
-        const nonZero = sd.driversWithNonZeroIncidents ?? 0;
-        const max = sd.maxDriverIncidents ?? 0;
-        const allZero = sd.allNonSpectatorIncidentsZero ? " (all zero)" : "";
-        if (incEl) incEl.textContent = `YAML incidents: ${nonZero}/${active} non-zero · max ${max}${allZero}`;
-
-        const lc = sd.lastSummaryCapture ?? null;
-        if (lastCapEl) {
-            if (lc && lc.attemptedAtUtc) {
-                const ok = !!lc.success;
-                const why = ok ? "ok" : (lc.error || "failed");
-                lastCapEl.textContent = `Last capture: ${why} · ${lc.trigger || "?"} · ${String(lc.attemptedAtUtc).replace("T", " ").replace("Z", "").substring(11, 19)}`;
-            } else {
-                lastCapEl.textContent = "Last capture: —";
-            }
-        }
-    }
-
-    function formatSessionTime(totalSeconds) {
-        if (!isFinite(totalSeconds) || totalSeconds < 0) return "0:00";
-        const m = Math.floor(totalSeconds / 60);
-        const s = Math.floor(totalSeconds % 60);
-        return `${m}:${s.toString().padStart(2, "0")}`;
-    }
-
-    // Resolve playerCarIdx to car number and set label (Viewing: #10 in replay, Player car: #10 in live).
-    function updatePlayerCarLabel(drivers, playerCarIdx, pluginMode) {
-        const idx = playerCarIdx ?? -1;
-        const dotEl = document.getElementById("di-car");
-        const lblEl = document.getElementById("di-car-lbl");
-        if (!dotEl || !lblEl) return;
-        if (idx < 0) {
-            dotEl.className = "infra-dot warn";
-            lblEl.textContent = "Viewing: Unknown";
-            lblEl.title = "No focused car — in replay switch to a car view (V/Shift+V).";
-            return;
-        }
-        const driver = (drivers || []).find(d => d.carIdx === idx);
-        const carNum = driver?.carNumber ?? "?";
-        const isReplay = (pluginMode || "").toLowerCase() === "replay";
-        lblEl.textContent = isReplay ? `Viewing: #${carNum}` : `Player car: #${carNum}`;
-        lblEl.title = isReplay ? `Replay: watching #${carNum}. Switch car with V/Shift+V in iRacing.` : `Your car #${carNum}.`;
-        dotEl.className = "infra-dot ok";
-    }
-
-    // ── Scan UI ────────────────────────────────────────────────────
-    const SCAN_STATE_LABELS = {
-        SeekingStart:    "Seeking to start\u2026",
-        WaitForSettle:   "Settling\u2026",
-        WaitForYaml:     "Waiting for YAML\u2026",
-        CaptureBaseline: "Capturing baseline\u2026",
-        SeekNext:        "Seeking next\u2026",
-        ReadIncident:    "Reading incident\u2026",
-        Validating:      "Validating\u2026",
-        Complete:        "Complete",
-        Error:           "Error"
+    ws.onclose = () => {
+      ws = null; mockPaused = false;
+      setWs('disconnected');
+      log('health','WARN ','ws_closed','Connection lost — retrying in 3 s');
+      setTimeout(connectWs, 3000);
     };
-    const SCAN_TERMINAL = new Set(["Complete", "Error"]);
-    const SCAN_IN_PROGRESS = new Set(["SeekingStart","WaitForSettle","WaitForYaml","CaptureBaseline","SeekNext","ReadIncident","Validating"]);
+    ws.onerror = () => { ws = null; mockPaused = false; };
+    ws.onmessage = e => { try { onMsg(JSON.parse(e.data)); } catch {} };
+  } catch {
+    setWs('disconnected');
+    setTimeout(connectWs, 3000);
+  }
+}
 
-    function scanCssClass(state) {
-        if (state === "Complete") return "complete";
-        if (state === "Error")    return "error";
-        if (SCAN_IN_PROGRESS.has(state)) return "scanning";
-        return "idle";
+function send(action, arg) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  ws.send(JSON.stringify({ action, arg: arg ?? '' }));
+  return true;
+}
+
+/** Structured UI telemetry for Loki (plugin → plugin-structured.jsonl; ingestion outside plugin). */
+function sendDashboardUiEvent({ element_id, event_type, message, value }) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  const o = { action: 'log', event: 'dashboard_ui_event', element_id, event_type, message };
+  if (value !== undefined && value !== null) o.value = value;
+  try {
+    ws.send(JSON.stringify(o));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function onMsg(m) {
+  if (!m || !m.type) return;
+  if (m.type === 'state')         onState(m);
+  else if (m.type === 'logEvents')  (m.entries || []).forEach(e => log('health', (e.level||'INFO').toUpperCase().padEnd(5), e.event||'', e.message||''));
+  else if (m.type === 'incidents')  { incidents = m.entries || []; renderInc(); }
+  else if (m.type === 'iracingEvent') log('events','EVENT', m.event||'event', m.data||JSON.stringify(m));
+  else if (m.type === 'telemetryData') log('telem','DATA ', 'telemetry', fmtTelem(m));
+  else if (m.type === 'pong') {}
+}
+
+// ── State update ─────────────────────────────────────────
+function onState(m) {
+  const mode = m.pluginMode || 'Unknown';
+  const pill = document.getElementById('mode-pill');
+  pill.className = 'mode-pill ' + (mode==='Replay'?'replay':'waiting');
+  document.getElementById('mode-text').textContent = mode.toUpperCase();
+  document.getElementById('session-time').textContent = m.currentSessionTimeFormatted || '—:——';
+  const d = m.diagnostics || {};
+  setDot('d-irsdk',  d.irsdkConnected);
+  setDot('d-steam',  d.steamRunning);
+  setDot('d-simhub', d.simHubHttpListening);
+  if (m.telemetry) setTelem(m.telemetry.throttle||0, m.telemetry.brake||0, m.telemetry.steeringWheelAngle||0);
+  if (m.drivers)   { drivers = m.drivers; renderStd(); }
+  if (typeof m.lap === 'number' && !Number.isNaN(m.lap)) lastLap = m.lap;
+  else lastLap = -1;
+  if (m.frame !== undefined) setFrame(m.frame, m.frameEnd);
+  updateReplaySessionRow(m);
+}
+
+function updateReplaySessionRow(m) {
+  const row = document.getElementById('replay-session-row');
+  if (!row) return;
+  const mode = m.pluginMode || 'Unknown';
+  const cnt = typeof m.replaySessionCount === 'number' ? m.replaySessionCount : 0;
+  const show = mode === 'Replay' && cnt > 1;
+  row.hidden = !show;
+  if (!show) return;
+  const num = typeof m.replaySessionNum === 'number' ? m.replaySessionNum : 0;
+  const name = (m.replaySessionName && String(m.replaySessionName).trim() && m.replaySessionName !== '—')
+    ? String(m.replaySessionName).trim()
+    : 'Session';
+  const idx = cnt > 0 ? Math.min(Math.max(num + 1, 1), cnt) : 1;
+  const el = document.getElementById('replay-session-text');
+  if (el) el.textContent = name + ' (' + idx + '/' + cnt + ')';
+}
+
+// ── Diag dots ────────────────────────────────────────────
+function setDot(id, ok) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'd-dot ' + (ok ? 'ok' : 'err');
+}
+function setWs(state) {
+  const el = document.getElementById('ws-badge');
+  el.className = 'ws-badge ' + state;
+  el.textContent = state==='connected'?'WS ●':state==='connecting'?'WS …':'WS ○';
+}
+
+// ── Render incidents ─────────────────────────────────────
+function getFilteredIncidents() {
+  return incidents.filter(i => {
+    if (incFilter === 'all') return true;
+    if (incFilter === 'player') return i.player;
+    return String(i.sev) === incFilter;
+  });
+}
+
+function incidentCardHtml(i) {
+  const lapStr = (typeof i.lap === 'number' && i.lap >= 0) ? ` · L${i.lap}` : '';
+  return `
+    <div class="inc-card${i.player ? ' player' : ''}" data-frame="${i.frame}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onSessionIncidentClick(${i.frame})}" onclick="onSessionIncidentClick(${i.frame})">
+      <span class="car-num">#${i.car}</span>
+      <span class="inc-name">${i.driver}</span>
+      <span class="cause-tag ${i.cause}">${i.cause.replace('-', ' ')}</span>
+      <span class="sev-badge s${i.sev}">${i.sev}×</span>
+      <span class="inc-time">${i.time}${lapStr}</span>
+    </div>`;
+}
+
+function renderInc() {
+  const filtered = getFilteredIncidents();
+  const count = '(' + filtered.length + ')';
+  const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No incidents</div>';
+  const html = !filtered.length ? empty : filtered.map(incidentCardHtml).join('');
+  document.getElementById('inc-count').textContent = count;
+  document.getElementById('inc-list').innerHTML = html;
+  renderDriverIncidents();
+  if (!incidents.length && incidentMetaSelection && incidentMetaSelection.kind === 'session') {
+    incidentMetaSelection = null;
+    collapseIncidentMetaStrip();
+  } else {
+    refreshIncidentMetaHighlight();
+  }
+  if (activeTab === 'leaderboard' && autoScroll) {
+    const list = document.getElementById('inc-list');
+    if (list) list.scrollTop = list.scrollHeight;
+  }
+}
+
+function getSelectedCarNumber() {
+  const sel = document.getElementById('car-sel');
+  if (!sel) return 0;
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt) return 0;
+  return parseInt(opt.getAttribute('data-car') || '0', 10) || 0;
+}
+
+function renderDriverIncidents() {
+  const el = document.getElementById('inc-list-driver');
+  if (!el) return;
+  const car = getSelectedCarNumber();
+  const forCar = incidents.filter(i => i.car === car);
+  const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">No incidents for this car</div>';
+  el.innerHTML = !forCar.length ? empty : forCar.map(incidentCardHtml).join('');
+  refreshIncidentMetaHighlight();
+}
+
+function parseFrameFromLabel(frameText) {
+  const s = String(frameText).replace(/,/g, '').replace(/^Frame\s*/i, '').trim();
+  const m = s.match(/^\d+/);
+  return m ? parseInt(m[0], 10) : 0;
+}
+
+function enrichCaptureRecord(frameNum, sessionTime, seq) {
+  const match = incidents.find(i => i.frame === frameNum);
+  const lapVal = (match && typeof match.lap === 'number' && match.lap >= 0)
+    ? match.lap
+    : (lastLap >= 0 ? lastLap : -1);
+  if (match) {
+    return {
+      seq,
+      frame: frameNum,
+      sessionTime,
+      capturedAt: Date.now(),
+      car: match.car,
+      driver: match.driver,
+      sev: match.sev,
+      cause: match.cause,
+      player: !!match.player,
+      lap: lapVal
+    };
+  }
+  return {
+    seq,
+    frame: frameNum,
+    sessionTime,
+    capturedAt: Date.now(),
+    car: null,
+    driver: 'Unknown',
+    sev: 1,
+    cause: 'unknown',
+    player: false,
+    lap: lapVal
+  };
+}
+
+function capturedRowHtml(rec) {
+  const sev = [1, 2, 4].includes(+rec.sev) ? +rec.sev : 1;
+  const raw = String(rec.cause || 'unknown');
+  const cause = raw.replace(/[^a-z-]/gi, '') || 'unknown';
+  const car = rec.car != null ? rec.car : '—';
+  const player = !!rec.player;
+  const label = cause.replace(/-/g, ' ');
+  const lapStr = (typeof rec.lap === 'number' && rec.lap >= 0) ? ` · L${rec.lap}` : '';
+  return `
+    <div class="inc-card${player ? ' player' : ''}" data-cap-seq="${rec.seq}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onCapturedIncidentClick(${rec.seq})}" onclick="onCapturedIncidentClick(${rec.seq})">
+      <span class="car-num">#${car}</span>
+      <span class="inc-name">${rec.driver}</span>
+      <span class="cause-tag ${cause}">${label}</span>
+      <span class="sev-badge s${sev}">${sev}×</span>
+      <span class="inc-time">${rec.sessionTime}${lapStr}</span>
+    </div>`;
+}
+
+function renderCaptured() {
+  const el = document.getElementById('captured-list');
+  if (!el) return;
+  if (!capturedIncidents.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No captured incidents yet. Run Find selected driver’s incidents or Find all incidents for all drivers.</div>';
+    if (incidentMetaSelection && incidentMetaSelection.kind === 'capture') {
+      incidentMetaSelection = null;
+      collapseIncidentMetaStrip();
+    } else {
+      refreshIncidentMetaHighlight();
     }
+    if (activeTab === 'captured' && autoScroll) el.scrollTop = 0;
+    return;
+  }
+  const sorted = [...capturedIncidents].sort((a, b) => a.frame - b.frame || a.seq - b.seq);
+  if (!capturedGroupByDriver) {
+    el.innerHTML = sorted.map(capturedRowHtml).join('');
+    refreshIncidentMetaHighlight();
+    if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
+    return;
+  }
+  const groups = new Map();
+  for (const rec of sorted) {
+    const key = `${rec.driver} (#${rec.car != null ? rec.car : '?'})`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(rec);
+  }
+  const keys = [...groups.keys()].sort((ka, kb) => {
+    const fa = Math.min(...groups.get(ka).map(r => r.frame));
+    const fb = Math.min(...groups.get(kb).map(r => r.frame));
+    return fa - fb;
+  });
+  const keySet = new Set(keys);
+  for (const k of [...capturedDriverGroupsCollapsed]) {
+    if (!keySet.has(k)) capturedDriverGroupsCollapsed.delete(k);
+  }
+  let html = '';
+  for (const k of keys) {
+    const collapsed = capturedDriverGroupsCollapsed.has(k);
+    const keyAttr = encodeURIComponent(k);
+    const body = groups.get(k).map(capturedRowHtml).join('');
+    html += `<div class="captured-group${collapsed ? ' collapsed' : ''}">`;
+    html += `<div class="captured-group-hdr" data-group-key="${keyAttr}" role="button" tabindex="0" aria-expanded="${!collapsed}" onclick="toggleCapturedDriverGroup(event)" onkeydown="capturedGroupHdrKeydown(event)">`;
+    html += `<span class="captured-group-chev" aria-hidden="true">${collapsed ? '▶' : '▼'}</span>`;
+    html += `<span class="captured-group-title">${escapeHtmlForCaptured(k)}</span>`;
+    html += '</div>';
+    html += `<div class="captured-group-body">${body}</div>`;
+    html += '</div>';
+  }
+  el.innerHTML = html;
+  refreshIncidentMetaHighlight();
+  if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
+}
 
-    function buildScanResultHtml(scan) {
-        const v = scan.validation;
-        if (scan.state === "Error") {
-            return `<div class="scan-result-header scan-result-error">Scan failed</div>` +
-                   `<div class="scan-result-error">${esc(scan.error ?? "Unknown error")}</div>`;
-        }
-        const validLabel = v?.valid ? "\u2713 Validated" : "\u26A0 Validation mismatch";
-        const validColor = v?.valid ? "#4ddf87" : "#ff5f5f";
-        let html = `<div class="scan-result-header" style="color:${validColor}">${validLabel}</div>`;
-        if (v) {
-            html += `<div class="scan-result-counts">Captured: ${v.totalCaptured} &nbsp;/&nbsp; Expected: ${v.totalExpected} &nbsp;&middot;&nbsp; ${scan.incidentsFound} incident${scan.incidentsFound !== 1 ? "s" : ""}</div>`;
-            if (v.driverMismatches && v.driverMismatches.length > 0) {
-                html += `<table class="scan-mismatch-table"><thead><tr><th>Car</th><th>Driver</th><th>Captured</th><th>Expected</th></tr></thead><tbody>`;
-                v.driverMismatches.forEach(m => {
-                    html += `<tr><td>${esc(m.car ?? "?")}</td><td>${esc(m.driver ?? "?")}</td><td>${m.captured}</td><td>${m.expected}</td></tr>`;
-                });
-                html += `</tbody></table>`;
-            }
-        } else {
-            html += `<div class="scan-result-counts">${scan.incidentsFound} incident${scan.incidentsFound !== 1 ? "s" : ""} found</div>`;
-        }
-        return html;
-    }
+function escapeHtmlForCaptured(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
-    function applyScanState(scan) {
-        // Keep snapshot lookup map current
-        if (scan && Array.isArray(scan.snapshots)) {
-            for (const s of scan.snapshots) {
-                if (s && s.incidentId) scanSnapshotsById.set(s.incidentId, s);
-            }
-        }
-        const startBtn  = document.getElementById("btn-start-scan");
-        const stopBtn   = document.getElementById("btn-stop-scan");
-        const label     = document.getElementById("scan-state-label");
-        const progressRow = document.getElementById("scan-progress-row");
-        const progFill  = document.getElementById("scan-progress-fill");
-        const incLabel  = document.getElementById("scan-incidents-label");
-        const resultEl  = document.getElementById("scan-result");
-        if (!startBtn) return;
+function capturedGroupHdrKeydown(e) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleCapturedDriverGroup(e);
+  }
+}
 
-        const inProgress = scan && SCAN_IN_PROGRESS.has(scan.state);
-        startBtn.style.display = inProgress ? "none" : "";
-        stopBtn.style.display  = inProgress ? "" : "none";
+function toggleCapturedDriverGroup(ev) {
+  const hdr = ev.currentTarget;
+  const raw = hdr.getAttribute('data-group-key');
+  if (raw == null) return;
+  let key;
+  try {
+    key = decodeURIComponent(raw);
+  } catch {
+    return;
+  }
+  if (!key) return;
+  if (capturedDriverGroupsCollapsed.has(key)) capturedDriverGroupsCollapsed.delete(key);
+  else capturedDriverGroupsCollapsed.add(key);
+  const collapsed = capturedDriverGroupsCollapsed.has(key);
+  const grp = hdr.closest('.captured-group');
+  if (grp) grp.classList.toggle('collapsed', collapsed);
+  hdr.setAttribute('aria-expanded', String(!collapsed));
+  const chev = hdr.querySelector('.captured-group-chev');
+  if (chev) chev.textContent = collapsed ? '▶' : '▼';
+  sendDashboardUiEvent({
+    element_id: 'captured-group-driver-accordion',
+    event_type: 'ui_interaction',
+    message: collapsed ? 'Captured driver group collapsed' : 'Captured driver group expanded',
+    value: key
+  });
+}
 
-        label.textContent = scan ? (SCAN_STATE_LABELS[scan.state] ?? scan.state) : "Idle";
-        label.className = "scan-state-label scan-state-" + (scan ? scanCssClass(scan.state) : "idle");
+function toggleCapturedGroup() {
+  const cb = document.getElementById('captured-group-driver');
+  capturedGroupByDriver = !!(cb && cb.checked);
+  if (!capturedGroupByDriver) capturedDriverGroupsCollapsed = new Set();
+  renderCaptured();
+  sendDashboardUiEvent({
+    element_id: 'captured-group-driver',
+    event_type: 'change',
+    message: 'Captured incidents group by driver',
+    value: capturedGroupByDriver ? 'on' : 'off'
+  });
+}
 
-        if (scan && scan.totalFrames > 0) {
-            progressRow.style.display = "";
-            const pct = Math.max(0, Math.min(1, scan.currentFrameNum / scan.totalFrames));
-            progFill.style.width = Math.round(pct * 100) + "%";
-            incLabel.textContent = scan.incidentsFound + " incident" + (scan.incidentsFound !== 1 ? "s" : "");
-        } else {
-            progressRow.style.display = "none";
-        }
+function formatIncidentMetaHtml(i) {
+  const id = i.id != null ? String(i.id) : '—';
+  const cap = i._capture
+    ? `<div class="im-row im-row-muted">Scan step #${id} · captured ${i.capturedAt ? new Date(i.capturedAt).toLocaleTimeString() : '—'}</div>`
+    : '';
+  return `<div class="im-block im-block-single">
+    <div class="im-meta-hdr">Incident ${id} · session ${i.time}</div>
+    ${cap}
+    <div class="im-row"><strong>Frame</strong> <code>${i.frame}</code> · <strong>lap</strong> ${(typeof i.lap === 'number' && i.lap >= 0) ? i.lap : '—'} · <strong>car</strong> #${i.car} · <strong>driver</strong> ${i.driver}</div>
+    <div class="im-row"><strong>Severity</strong> ${i.sev}× · <strong>cause</strong> ${String(i.cause).replace(/-/g, ' ')} · <strong>you</strong> ${i.player ? 'yes' : 'no'}</div>
+    <div class="im-future">Nearby cars / other party (e.g. proximity): reserved for future telemetry.</div>
+  </div>`;
+}
 
-        if (scan && SCAN_TERMINAL.has(scan.state)) {
-            resultEl.style.display = "";
-            resultEl.innerHTML = buildScanResultHtml(scan);
-            resultEl.className = (scan.state === "Complete" && scan.validation?.valid) ? "valid" : "invalid";
-        } else {
-            resultEl.style.display = "none";
-        }
-    }
+function expandIncidentMetaStrip(html) {
+  const strip = document.getElementById('incident-meta-strip');
+  const body = document.getElementById('incident-meta-strip-body');
+  if (body) body.innerHTML = html;
+  if (strip) {
+    strip.classList.remove('collapsed');
+    strip.setAttribute('aria-expanded', 'true');
+  }
+}
 
-    // ── State rendering ────────────────────────────────────────────
-    function applyState(s) {
-        applyDiagnostics(s.diagnostics ?? null, s.metrics ?? null);
-        updatePlayerCarLabel(s.drivers ?? [], s.playerCarIdx, s.pluginMode);
+function collapseIncidentMetaStrip() {
+  const strip = document.getElementById('incident-meta-strip');
+  const body = document.getElementById('incident-meta-strip-body');
+  if (strip) {
+    strip.classList.add('collapsed');
+    strip.setAttribute('aria-expanded', 'false');
+  }
+  if (body) body.innerHTML = '';
+  document.querySelectorAll('.inc-card-expanded').forEach(el => el.classList.remove('inc-card-expanded'));
+}
 
-        const mode = s.pluginMode ?? "Unknown";
-        modeEl.textContent = mode;
+function highlightIncidentCards(frame, capSeq) {
+  document.querySelectorAll('.inc-card[data-frame]').forEach(el => {
+    const match = capSeq == null && frame != null && +el.dataset.frame === frame;
+    el.classList.toggle('inc-card-expanded', match);
+  });
+  document.querySelectorAll('.inc-card[data-cap-seq]').forEach(el => {
+    const match = capSeq != null && +el.dataset.capSeq === capSeq;
+    el.classList.toggle('inc-card-expanded', match);
+  });
+}
 
-        applySessionDiagnostics(s.sessionDiagnostics ?? null, mode);
+function refreshIncidentMetaHighlight() {
+  if (!incidentMetaSelection) return;
+  if (incidentMetaSelection.kind === 'session') {
+    highlightIncidentCards(incidentMetaSelection.frame, null);
+  } else {
+    highlightIncidentCards(null, incidentMetaSelection.seq);
+  }
+}
 
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            if (mode === "Replay")     statusDot.className = "dot replay";
-            else if (mode === "Live")  statusDot.className = "dot live";
-            else                       statusDot.className = "dot live";
-        }
-
-        timeEl.textContent = s.currentSessionTimeFormatted ?? "—";
-
-        const a = s.replayFrameNum ?? 0;
-        const b = s.replayFrameNumEnd ?? 0;
-        const frameNum = Math.min(a, b);
-        const frameMax = Math.max(a, b);
-        currentReplayFrame = frameNum;
-        currentSessionTime = s.currentSessionTime ?? 0;
-        frameCur.textContent = frameNum.toLocaleString();
-        frameEnd.textContent = frameMax.toLocaleString();
-        fill.style.width = frameMax > 0 ? `${Math.max(0, Math.min(1, frameNum / frameMax)) * 100}%` : "0%";
-
-        const playing = s.replayIsPlaying ?? (s.replayPlaySpeed ?? 0) !== 0;
-        const curSpeed = s.replayPlaySpeed ?? 0;
-        if (playing && curSpeed < 0) playBtn.textContent = "⏸ Pause (Rewind)";
-        else playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
-
-        const legendEl = document.getElementById("replay-state-legend");
-        if (legendEl) {
-            let dir = "Paused";
-            let speedStr = "—";
-            if (curSpeed !== 0) {
-                speedStr = curSpeed < 0 ? `${curSpeed}×` : `${curSpeed}×`;
-                dir = curSpeed < 0 ? "Rewind" : "Forward";
-            }
-            const dirCls = dir === "Rewind" ? "state-dir state-rewind" : "state-dir";
-            legendEl.innerHTML = `<span class="${dirCls}">${dir}</span> · ${speedStr}`;
-        }
-
-        speedRow.querySelectorAll("[data-speed]").forEach(btn => {
-            btn.classList.toggle("active-speed", parseInt(btn.dataset.speed) === curSpeed && playing);
-        });
-        if (rewindProbeActive) {
-            if (curSpeed === -1) {
-                rewindProbeActive = false;
-                rewindProbeStartedAt = 0;
-                rewindUnsupported = false;
-                if (rewindBtn) {
-                    rewindBtn.classList.remove("unsupported");
-                    rewindBtn.removeAttribute("title");
-                }
-            } else if (Date.now() - rewindProbeStartedAt > 1500) {
-                rewindProbeActive = false;
-                rewindProbeStartedAt = 0;
-                rewindUnsupported = true;
-                if (rewindBtn) {
-                    rewindBtn.classList.add("unsupported");
-                    rewindBtn.title = "Current replay state does not support -1× rewind";
-                }
-                flash("error", "Rewind (-1×) not supported by current replay state.");
-            }
-        }
-
-        playerCarIdxRef = s.playerCarIdx ?? -1;
-        const drivers = s.drivers ?? [];
-        const incidents = s.incidents ?? [];
-        if (DEBUG_STATE_LOG) {
-            console.debug("[SimSteward] applyState payload", {
-                drivers: drivers.length,
-                incidents: incidents.length,
-                hasLiveIncidentData: !!s.hasLiveIncidentData
-            });
-        }
-        // Keep captured session incidents in the panel if state has none (e.g. baseline reset during replay).
-        // Filter out any IDs the user explicitly cleared — they should not reappear from state pushes.
-        const visible = clearedIncidentIds.size
-            ? incidents.filter(ev => !clearedIncidentIds.has(ev.id))
-            : incidents;
-        if (visible.length > 0 || !lastSessionSummary?.incidentFeed?.length)
-            allIncidents = visible;
-        const dpCaptured = document.getElementById("dp-captured");
-        if (dpCaptured) dpCaptured.textContent = `Incidents captured: ${incidents.length}`;
-        const incidentKey = incidents.map(ev => ev.id ?? "").join(",");
-        const driverKey = drivers.map(d=>`${d.carIdx}:${d.incidents}`).join("|");
-        const dataChanged = incidentKey !== lastIncidentKey || driverKey !== lastDriverKey;
-        if (dataChanged) {
-            lastIncidentKey = incidentKey;
-            lastDriverKey = driverKey;
-            incidentDataDirty = true;
-            lastIncidentContext = { hasLiveIncidentData: !!s.hasLiveIncidentData, irsdkConnected: !!s.diagnostics?.irsdkConnected };
-            renderDrivers(drivers, s.playerCarIdx ?? -1);
-        }
-        const frameDelta = Math.abs(currentReplayFrame - lastLiveRenderFrame);
-        const shouldRenderIncidents = incidentDataDirty || frameDelta > LIVE_RENDER_FRAME_DEADZONE;
-        if (shouldRenderIncidents) {
-            lastLiveRenderFrame = currentReplayFrame;
-            incidentDataDirty = false;
-            renderIncidentViews();
-        }
-
-        applyScanState(s.replayScan ?? null);
-    }
-
-    function buildDriverRowData(d, playerCarIdx) {
-        const raw = d.incidents ?? 0;
-        const pts = Math.max(0, Math.min(99, raw));
-        const ptsLabel = raw > 99 ? "99+" : pts;
-        const cls = pts === 0 ? "zero" : pts <= 4 ? "low" : pts <= 8 ? "mid" : "high";
-        const isPlayer = d.carIdx === playerCarIdx;
-        return {
-            carIdx: d.carIdx,
-            rowClass: "driver-row" + (isPlayer ? " player" : ""),
-            carNum: "#" + (d.carNumber ?? "?"),
-            name: esc(d.userName ?? "Unknown") + (isPlayer ? " ★" : ""),
-            ptsLabel,
-            incClass: "driver-incidents " + cls
-        };
-    }
-
-    function buildDriverRowHtml(data) {
-        return `<div class="${data.rowClass}" data-car-idx="${data.carIdx}">
-                    <span class="car-num">${data.carNum}</span>
-                    <span class="driver-name">${data.name}</span>
-                    <span class="${data.incClass}">${data.ptsLabel}x</span>
-                </div>`;
-    }
-
-    function renderDrivers(drivers, playerCarIdx) {
-        const active = drivers.filter(d => !d.isSpectator);
-        active.sort((a, b) => (b.incidents ?? 0) - (a.incidents ?? 0) || (a.userName || "").localeCompare(b.userName || ""));
-
-        driverCount.textContent = active.length;
-        const totalPts = active.reduce((sum, d) => sum + (d.incidents ?? 0), 0);
-        const ptsEl = document.getElementById("drivers-field-pts");
-        if (ptsEl) ptsEl.textContent = active.length > 0 ? `· ${totalPts} field pts` : "";
-
-        if (active.length === 0) {
-            driverList.innerHTML = '<div class="empty-state">Waiting for session info…</div>';
-            return;
-        }
-
-        const newCarIdxs = new Set(active.map(d => d.carIdx));
-        const existingRows = Array.from(driverList.querySelectorAll(".driver-row[data-car-idx]"));
-        const existingByCarIdx = new Map(existingRows.map(el => [parseInt(el.dataset.carIdx, 10), el]));
-
-        existingByCarIdx.forEach((el, carIdx) => {
-            if (!newCarIdxs.has(carIdx)) el.remove();
-        });
-
-        const driverOrder = active.map(d => buildDriverRowData(d, playerCarIdx));
-        let nextInsertBefore = driverList.firstChild;
-
-        driverOrder.forEach(data => {
-            const existing = existingByCarIdx.get(data.carIdx);
-            if (existing) {
-                const carNumEl = existing.querySelector(".car-num");
-                const nameEl = existing.querySelector(".driver-name");
-                const incEl = existing.querySelector(".driver-incidents");
-                if (carNumEl && carNumEl.textContent !== data.carNum) carNumEl.textContent = data.carNum;
-                if (nameEl && nameEl.innerHTML !== data.name) nameEl.innerHTML = data.name;
-                if (incEl) {
-                    if (incEl.textContent !== data.ptsLabel + "x") incEl.textContent = data.ptsLabel + "x";
-                    if (incEl.className !== data.incClass) incEl.className = data.incClass;
-                }
-                existing.className = data.rowClass;
-                driverList.insertBefore(existing, nextInsertBefore);
-                nextInsertBefore = existing.nextSibling;
-            } else {
-                const wrap = document.createElement("div");
-                wrap.innerHTML = buildDriverRowHtml(data);
-                const row = wrap.firstElementChild;
-                driverList.insertBefore(row, nextInsertBefore);
-                nextInsertBefore = row.nextSibling;
-            }
-        });
-    }
-
-    // ── Incident filtering ─────────────────────────────────────────
-    function filterIncidents(incidents) {
-        if (activeFilter === "all") return incidents;
-        return incidents.filter(ev => {
-            switch (activeFilter) {
-                case "1x": return ev.type === "1x" || ev.type === "off-track";
-                case "2x": return ev.type === "2x";
-                case "4x": return ev.delta >= 4 && ev.type !== "detected";
-                case "mine": return ev.isPlayer === true || ev.carIdx === playerCarIdxRef;
-                default: return true;
-            }
-        });
-    }
-
-    function buildIncidentCardData(ev) {
-        const badgeCls = ev.type === "off-track" || ev.type === "1x" ? "badge-1x"
-                       : ev.type === "2x" ? "badge-2x"
-                       : ev.type === "4x" ? "badge-4x"
-                       : "badge-Nx";
-        const isPlayer = ev.isPlayer === true || ev.carIdx === playerCarIdxRef;
-        const cardClass = isPlayer ? "player-incident" : "";
-        const badgeLabel = ev.type === "off-track" ? "+1x" : (ev.delta != null && ev.delta > 0 ? `+${ev.delta}x` : "+?x");
-        const causeTag = formatCauseTag(ev.cause);
-        const otherLabel = ev.otherDriverName ? `vs #${esc(ev.otherCarNumber || "?")} ${esc(ev.otherDriverName)}` : "";
-        const lapLabel = ev.lap > 0 ? `Lap ${ev.lap}` : "";
-        const pctLabel = ev.trackPct > 0 ? `T${(ev.trackPct * 100).toFixed(1)}%` : "";
-        const hasSnapshot = !!(ev.snapshotRef && scanSnapshotsById.has(ev.snapshotRef));
-        const snapTag = hasSnapshot ? `<span class="snapshot-tag" title="Scan telemetry available">&#128202; data</span>` : "";
-        const detailParts = [
-            ev.totalAfter != null && ev.delta > 0 ? `${Math.min(999, Math.max(0, ev.totalAfter))} pts total` : "",
-            causeTag,
-            otherLabel,
-            lapLabel,
-            pctLabel
-        ].filter(Boolean);
-        const driverLabel = isPlayer
-            ? `YOU · #${esc(ev.carNumber ?? "?")} ${esc(ev.driverName ?? "Unknown")}`
-            : `#${esc(ev.carNumber ?? "?")} ${esc(ev.driverName ?? "Unknown")}`;
-        return {
-            id: ev.id ?? "",
-            snapshotRef: ev.snapshotRef ?? "",
-            cardClass,
-            badgeCls,
-            badgeLabel,
-            time: ev.sessionTimeFormatted ?? "—",
-            driver: driverLabel,
-            detailHtml: (snapTag ? snapTag + " " : "") + detailParts.join(" · ")
-        };
-    }
-
-    function buildSnapshotDetailHtml(snap) {
-        if (!snap) return `<div class="snapshot-detail"></div>`;
-        const speedKph = (snap.camSpeed * 3.6).toFixed(1);
-        const latG = snap.camLatAccel != null ? (snap.camLatAccel / 9.81).toFixed(2) : "—";
-        const longG = snap.camLongAccel != null ? (snap.camLongAccel / 9.81).toFixed(2) : "—";
-        const throttle = snap.camThrottle != null ? Math.round(snap.camThrottle * 100) + "%" : "—";
-        const brake = snap.camBrake != null ? Math.round(snap.camBrake * 100) + "%" : "—";
-        const frame = snap.replayFrameNum > 0 ? snap.replayFrameNum.toLocaleString() : "—";
-        const items = [
-            ["Speed", speedKph + " km/h"],
-            ["Lat G", latG + " g"],
-            ["Long G", longG + " g"],
-            ["Throttle", throttle],
-            ["Brake", brake],
-            ["Frame", frame],
-        ];
-        const gridHtml = items.map(([label, val]) =>
-            `<div class="snapshot-item"><span class="snapshot-label">${label}</span><span class="snapshot-value">${val}</span></div>`
-        ).join("");
-        const involved = Array.isArray(snap.driversInvolved) && snap.driversInvolved.length > 0
-            ? "Involved: " + snap.driversInvolved.map(d => `#${esc(d.carNumber ?? "?")} ${esc(d.driverName ?? "?")}${d.incidentDelta > 0 ? " +" + d.incidentDelta + "x" : ""}`).join(", ")
-            : "";
-        return `<div class="snapshot-detail"><div class="snapshot-grid">${gridHtml}</div>${involved ? `<div class="snapshot-involved">${involved}</div>` : ""}</div>`;
-    }
-
-    function buildIncidentCardHtml(data, isNew) {
-        const extraCls = [data.cardClass, isNew ? "card-new" : ""].filter(Boolean).join(" ");
-        const cls = extraCls ? "incident-card " + extraCls : "incident-card";
-        const snapRef = data.snapshotRef ? ` data-snapshot-ref="${esc(data.snapshotRef)}"` : "";
-        const snap = data.snapshotRef ? scanSnapshotsById.get(data.snapshotRef) : null;
-        // Always include snapshot-detail div (may be empty); content injected/patched when snapshot arrives
-        const snapDetailHtml = buildSnapshotDetailHtml(snap);
-        return `<div class="${cls}" data-incident-id="${esc(data.id)}"${snapRef} title="Click to seek replay${snap ? " · expand for telemetry" : ""}">
-                    <span class="incident-time">${esc(data.time)}</span>
-                    <div class="incident-body">
-                        <span class="incident-driver">${data.driver}</span>
-                        <span class="incident-detail">${data.detailHtml}</span>
-                    </div>
-                    <div class="incident-badge-cell">
-                        <span class="incident-badge ${data.badgeCls}">${data.badgeLabel}</span>
-                        <span class="seek-hint">&#9654; Seek</span>
-                    </div>
-                    ${snapDetailHtml}
-                </div>`;
-    }
-
-    function getLiveIncidents() {
-        return allIncidents.filter(ev => {
-            if ((ev.replayFrameNum ?? 0) > 0)
-                return ev.replayFrameNum <= currentReplayFrame;
-            return (ev.sessionTime ?? 0) <= currentSessionTime;
-        });
-    }
-
-    function getIncidentsForActiveView() {
-        const base = activeIncidentView === "live" ? getLiveIncidents() : allIncidents;
-        return filterIncidents(base);
-    }
-
-    function renderIncidents(targetFeed, incidents, isLiveView, updateMainBadge) {
-        const totalAll = (isLiveView ? getLiveIncidents() : allIncidents).length;
-        const countLabel = activeFilter === "all" ? totalAll : `${incidents.length}/${totalAll}`;
-        if (updateMainBadge) incidentCount.textContent = countLabel;
-
-        if (incidents.length === 0) {
-            let msg;
-            if (totalAll > 0) {
-                msg = "No incidents match this filter.";
-            } else if (isLiveView && allIncidents.length > 0) {
-                msg = "No incidents at or before current position.";
-            } else if (!lastIncidentContext.irsdkConnected) {
-                msg = "Waiting for iRacing to connect…";
-            } else if (!lastIncidentContext.hasLiveIncidentData) {
-                msg = "Connected — establishing baseline…";
-            } else {
-                msg = "No incidents detected yet.";
-            }
-            // Only update if not already showing the same empty state
-            const existing = targetFeed.querySelector(".empty-state");
-            if (!existing || existing.textContent !== msg) {
-                targetFeed.innerHTML = `<div class="empty-state">${msg}</div>`;
-            }
-            return;
-        }
-
-        // Remove any empty-state placeholder
-        const placeholder = targetFeed.querySelector(".empty-state");
-        if (placeholder) placeholder.remove();
-
-        const newIds = new Set(incidents.map(ev => ev.id ?? ""));
-        const existingCards = Array.from(targetFeed.querySelectorAll(".incident-card[data-incident-id]"));
-        const existingById = new Map(existingCards.map(el => [el.dataset.incidentId, el]));
-
-        // Remove cards no longer in the list
-        existingById.forEach((el, id) => {
-            if (!newIds.has(id)) el.remove();
-        });
-
-        // Build the ordered card list, patching existing and creating new ones
-        const orderedCards = incidents.map(ev => {
-            const data = buildIncidentCardData(ev);
-            const id = data.id;
-            const existing = existingById.get(id);
-            if (existing) {
-                // Patch only changed fields — never reassign className to avoid transition flicker
-                const timeEl = existing.querySelector(".incident-time");
-                const driverEl = existing.querySelector(".incident-driver");
-                const detailEl = existing.querySelector(".incident-detail");
-                const badgeEl = existing.querySelector(".incident-badge");
-                if (timeEl && timeEl.textContent !== data.time) timeEl.textContent = data.time;
-                if (driverEl && driverEl.innerHTML !== data.driver) driverEl.innerHTML = data.driver;
-                if (detailEl && detailEl.innerHTML !== data.detailHtml) detailEl.innerHTML = data.detailHtml;
-                if (badgeEl) {
-                    if (badgeEl.textContent !== data.badgeLabel) badgeEl.textContent = data.badgeLabel;
-                    const wantCls = "incident-badge " + data.badgeCls;
-                    if (badgeEl.className !== wantCls) badgeEl.className = wantCls;
-                }
-                const wantCardCls = "incident-card" + (data.cardClass ? " " + data.cardClass : "");
-                // Preserve transient classes during patch to avoid flickering/collapsing mid-interaction
-                const hasCardNew  = existing.classList.contains("card-new");
-                const hasExpanded = existing.classList.contains("expanded");
-                const extras = [hasCardNew ? "card-new" : "", hasExpanded ? "expanded" : ""].filter(Boolean).join(" ");
-                const wantFull = extras ? wantCardCls + " " + extras : wantCardCls;
-                if (existing.className !== wantFull) existing.className = wantFull;
-                // Patch snapshot ref attribute and detail content when scan data arrives post-creation
-                const curRef = existing.dataset.snapshotRef ?? "";
-                if (curRef !== (data.snapshotRef ?? "")) {
-                    if (data.snapshotRef) existing.dataset.snapshotRef = data.snapshotRef;
-                    else delete existing.dataset.snapshotRef;
-                }
-                // Populate snapshot-detail once snapshot data arrives (div exists but was empty at creation)
-                const snapDetailEl = existing.querySelector(".snapshot-detail");
-                if (snapDetailEl && !snapDetailEl.hasChildNodes() && data.snapshotRef) {
-                    const snap = scanSnapshotsById.get(data.snapshotRef);
-                    if (snap) {
-                        const tmp = document.createElement("div");
-                        tmp.innerHTML = buildSnapshotDetailHtml(snap);
-                        const newDetail = tmp.firstElementChild;
-                        if (newDetail) snapDetailEl.replaceWith(newDetail);
-                    }
-                }
-                return existing;
-            } else {
-                const wrap = document.createElement("div");
-                wrap.innerHTML = buildIncidentCardHtml(data, true);
-                const card = wrap.firstElementChild;
-                // Auto-remove card-new after animation so it never re-triggers
-                card.addEventListener("animationend", () => card.classList.remove("card-new"), { once: true });
-                return card;
-            }
-        });
-
-        // Re-order the DOM only where positions differ (avoids triggering transitions)
-        let refNode = targetFeed.firstChild;
-        for (const card of orderedCards) {
-            if (card !== refNode) {
-                targetFeed.insertBefore(card, refNode);
-            } else {
-                refNode = refNode.nextSibling;
-            }
-        }
-    }
-
-    function setIncidentView(view) {
-        activeIncidentView = view === "entire" ? "entire" : "live";
-        document.querySelectorAll(".view-toggle-btn").forEach(btn => {
-            btn.classList.toggle("active-view", btn.dataset.view === activeIncidentView);
-        });
-        try { localStorage.setItem(STORAGE_KEY_INCIDENT_VIEW, activeIncidentView); } catch (_) {}
-        renderIncidentViews();
-    }
-
-    function getPlayerIncidents() {
-        return allIncidents.filter(ev => ev.isPlayer === true || ev.carIdx === playerCarIdxRef);
-    }
-
-    function updatePlayerHeroCard() {
-        const heroEl = document.getElementById("player-hero-card");
-        const countEl = document.getElementById("player-hero-count");
-        const summaryEl = document.getElementById("player-hero-summary");
-        const playerIncidents = getPlayerIncidents();
-        if (!playerIncidents.length) {
-            heroEl.classList.remove("visible");
-            return;
-        }
-        heroEl.classList.add("visible");
-        countEl.textContent = playerIncidents.length === 1 ? "1 incident" : `${playerIncidents.length} incidents`;
-        const last = playerIncidents[0];
-        const delta = last.type === "off-track" ? 1 : (last.delta ?? 0);
-        countEl.className = "player-hero-count" + (delta >= 4 ? " severity-4x" : delta === 2 ? " severity-2x" : delta === 1 ? " severity-1x" : "");
-        const typeStr = last.type === "off-track" ? "+1x" : `+${last.delta ?? 0}x`;
-        const causeStr = last.cause ? formatCauseLabel(last.cause) : "";
-        const pctStr = last.trackPct > 0 ? `T${(last.trackPct * 100).toFixed(1)}%` : "";
-        const lapStr = last.lap > 0 ? `Lap ${last.lap}` : "";
-        const parts = [typeStr, causeStr, pctStr, lapStr].filter(Boolean);
-        summaryEl.textContent = parts.join(" · ") || "—";
-        const btn = document.getElementById("player-hero-jump-btn");
-        btn.dataset.incidentId = last.id ?? "";
-    }
-
-    function formatCauseLabel(cause) {
-        const labels = { "off-track": "OFF-TRACK", "wall": "WALL", "spin": "SPIN", "wall-or-spin": "WALL/SPIN", "car-contact": "CONTACT", "heavy-contact": "HEAVY CONTACT", "impact": "IMPACT" };
-        return (labels[cause] || cause).toUpperCase().replace(/-/g, " ");
-    }
-
-    function updateFilterChipCounts(baseList) {
-        const nAll = baseList.length;
-        const n1x = baseList.filter(ev => ev.type === "1x" || ev.type === "off-track").length;
-        const n2x = baseList.filter(ev => ev.type === "2x").length;
-        const n4x = baseList.filter(ev => ev.delta >= 4 && ev.type !== "detected").length;
-        const nMine = baseList.filter(ev => ev.isPlayer === true || ev.carIdx === playerCarIdxRef).length;
-        const chips = [
-            { filter: "all", label: "All", count: nAll },
-            { filter: "1x", label: "1x", count: n1x },
-            { filter: "2x", label: "2x", count: n2x },
-            { filter: "4x", label: "4x+", count: n4x },
-            { filter: "mine", label: "Mine", count: nMine }
-        ];
-        chips.forEach(({ filter, label, count }) => {
-            const el = filterBar.querySelector(`[data-filter="${filter}"]`);
-            if (el) el.textContent = count > 0 ? `${label} (${count})` : label;
-        });
-    }
-
-    function renderIncidentViews() {
-        const baseList = activeIncidentView === "live" ? getLiveIncidents() : allIncidents;
-        const filtered = filterIncidents(baseList);
-
-        updateFilterChipCounts(baseList);
-        updatePlayerHeroCard();
-        renderIncidents(incidentFeedUnified, filtered, activeIncidentView === "live", true);
-        document.querySelectorAll(".view-toggle-btn").forEach(btn => {
-            btn.classList.toggle("active-view", btn.dataset.view === activeIncidentView);
-        });
-    }
-
-    function formatCauseTag(cause) {
-        if (!cause) return "";
-        const causeLabels = {
-            "off-track": "OFF-TRACK",
-            "wall": "WALL",
-            "spin": "SPIN",
-            "wall-or-spin": "WALL/SPIN",
-            "car-contact": "CONTACT",
-            "heavy-contact": "HEAVY CONTACT",
-            "impact": "IMPACT"
-        };
-        const label = causeLabels[cause] || cause.toUpperCase();
-        let cls = "incident-cause-tag";
-        if (cause === "off-track") cls += " off-track";
-        else if (cause === "wall" || cause === "spin" || cause === "wall-or-spin") cls += " wall";
-        else if (cause.includes("contact")) cls += " contact";
-        else if (cause === "impact") cls += " impact";
-        return `<span class="${cls}">${label}</span>`;
-    }
-
-    // ── Actions ────────────────────────────────────────────────────
-    function send(action, arg) {
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            flash("error", "Not connected");
-            const ts = new Date().toISOString().replace("T", " ").replace("Z", "").substring(11, 23);
-            const row = document.createElement("div");
-            row.className = "stream-entry";
-            row.dataset.level = "WARN";
-            row.dataset.event = "";
-            row.innerHTML = `<span class="stream-ts">${ts}</span><span class="stream-lvl WARN">WARN</span><span class="stream-msg">${esc(action)} — not connected, action not sent</span>`;
-            clearStreamPlaceholder();
-            eventStream.insertBefore(row, eventStream.firstChild);
-            fullLogEntries.unshift({ level: "WARN", event: "", message: `${action} — not connected, action not sent`, timestamp: ts });
-            if (fullLogEntries.length > FULL_LOG_MAX) fullLogEntries.pop();
-            return;
-        }
-        const p = { action };
-        if (arg !== undefined) p.arg = arg;
-        ws.send(JSON.stringify(p));
-    }
-
-    /** Send a dashboard UI event to the plugin for structured logging (dashboard_ui_event). No-op if not connected. */
-    function logUiEvent(elementId, eventType, value) {
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        const message = [elementId, eventType, value].filter(Boolean).join(" ");
-        const p = {
-            action: "log",
-            level: "INFO",
-            source: "dashboard",
-            event: "dashboard_ui_event",
-            message: message || elementId,
-            element_id: elementId,
-            event_type: eventType
-        };
-        if (value !== undefined && value !== "") p.value = String(value);
-        ws.send(JSON.stringify(p));
-    }
-
-    function flash(type, msg) {
-        feedback.textContent = msg;
-        feedback.className = "feedback" + (type ? " " + type : "");
-        clearTimeout(feedbackTimer);
-        feedbackTimer = setTimeout(() => { feedback.textContent = ""; feedback.className = "feedback"; }, 7000);
-    }
-
-    function esc(s) {
-        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    }
-
-    // ── Event listeners ────────────────────────────────────────────
-    statusText.addEventListener("click", () => { if (!ws || ws.readyState > WebSocket.OPEN) { useFallback = false; connect(); } });
-    function clearLogs() {
-        fullLogEntries = [];
-        recentLogEntries = [];
-        debugLogHasAlert = false;
-        debugLogHasError = false;
-        eventStream.innerHTML = '<div class="empty-state">Logs cleared.</div>';
-        updateStreamAlertDot();
-        updateActivitySummary();
-    }
-    function clearIncidents() {
-        allIncidents.forEach(ev => { if (ev.id) clearedIncidentIds.add(ev.id); });
-        allIncidents = [];
-        lastIncidentKey = "";
-        renderIncidentViews();
-    }
-    document.getElementById("stream-clear-btn").addEventListener("click", () => {
-        logUiEvent("stream-clear-btn", "click", "");
-        clearLogs();
+function onSessionIncidentClick(frame) {
+  const i = incidents.find(x => x.frame === frame);
+  if (!i) return;
+  if (incidentMetaSelection && incidentMetaSelection.kind === 'session' && incidentMetaSelection.frame === frame) {
+    incidentMetaSelection = null;
+    collapseIncidentMetaStrip();
+    sendDashboardUiEvent({
+      element_id: 'incident-meta-strip',
+      event_type: 'ui_interaction',
+      message: 'Session incident meta collapsed',
+      value: String(frame)
     });
-    document.getElementById("stream-clear-all-btn").addEventListener("click", () => {
-        logUiEvent("stream-clear-all-btn", "click", "");
-        clearLogs();
-        clearIncidents();
-    });
-    (function initLogFilterCheckboxes() {
-        const map = [
-            ["log-hide-debug", "hiddenLevels", "DEBUG"],
-            ["log-hide-state-broadcast", "hiddenEvents", "state_broadcast_summary"],
-            ["log-hide-tick-stats", "hiddenEvents", "tick_stats"],
-            ["log-hide-ws-raw", "hiddenEvents", "ws_message_raw"],
-            ["log-hide-action-received", "hiddenEvents", "action_received"],
-            ["log-hide-action-dispatched", "hiddenEvents", "action_dispatched"]
-        ];
-        map.forEach(([id, key, value]) => {
-            const cb = document.getElementById(id);
-            if (!cb) return;
-            cb.checked = key === "hiddenLevels" ? logFilter.hiddenLevels.has(value) : logFilter.hiddenEvents.has(value);
-            cb.addEventListener("change", () => {
-                if (key === "hiddenLevels") {
-                    if (cb.checked) logFilter.hiddenLevels.add(value); else logFilter.hiddenLevels.delete(value);
-                } else {
-                    if (cb.checked) logFilter.hiddenEvents.add(value); else logFilter.hiddenEvents.delete(value);
-                }
-                logUiEvent(id, "change", value + "=" + cb.checked);
-                saveLogFilter();
-                rerenderLogStream();
-            });
-        });
-    })();
-    document.getElementById("capture-summary-btn")?.addEventListener("click", () => {
-        logUiEvent("capture-summary-btn", "click", "Capture summary");
-        send("CaptureSessionSummaryNow");
-    });
-    document.getElementById("finalize-capture-summary-btn")?.addEventListener("click", () => {
-        logUiEvent("finalize-capture-summary-btn", "click", "Finalize + capture");
-        send("FinalizeThenCaptureSessionSummary");
-    });
-    document.getElementById("record-session-snapshot-btn")?.addEventListener("click", () => {
-        const label = prompt("Snapshot label (optional)", "");
-        const trimmed = (label || "").trim();
-        logUiEvent("record-session-snapshot-btn", "click", trimmed.length ? trimmed : "no-label");
-        send("RecordSessionSnapshot", trimmed.length ? trimmed : undefined);
-    });
-    document.getElementById("btn-start-scan").addEventListener("click", () => { logUiEvent("btn-start-scan", "click", "StartReplayScan"); send("StartReplayScan"); });
-    document.getElementById("btn-stop-scan").addEventListener("click",  () => { logUiEvent("btn-stop-scan",  "click", "StopReplayScan");  send("StopReplayScan");  });
-    document.getElementById("sessionStartBtn").addEventListener("click", () => { logUiEvent("sessionStartBtn", "click", "ReplaySeekSessionStart"); send("ReplaySeekSessionStart"); });
-    playBtn.addEventListener("click", () => { logUiEvent("playPauseBtn", "click", "ReplayPlayPause"); send("ReplayPlayPause"); });
-    document.getElementById("stepBack").addEventListener("click", () => { logUiEvent("stepBack", "click", "-1"); send("ReplayStepFrame", "-1"); });
-    document.getElementById("stepFwd").addEventListener("click", () => { logUiEvent("stepFwd", "click", "1"); send("ReplayStepFrame", "1"); });
-    prevBtn.addEventListener("click", () => { logUiEvent("prevIncident", "click", ""); send("PrevIncident"); });
-    nextBtn.addEventListener("click", () => { logUiEvent("nextIncident", "click", ""); send("NextIncident"); });
-    speedRow.querySelectorAll("[data-speed]").forEach(btn => btn.addEventListener("click", () => {
-        const requestedSpeed = parseInt(btn.dataset.speed, 10);
-        if (requestedSpeed === -1) {
-            if (rewindUnsupported) {
-                flash("error", "Rewind is currently unsupported in this replay state.");
-                return;
-            }
-            rewindProbeActive = true;
-            rewindProbeStartedAt = Date.now();
-        } else {
-            rewindProbeActive = false;
-            rewindProbeStartedAt = 0;
-        }
-        logUiEvent("speed-row", "click", String(btn.dataset.speed));
-        send("ReplaySetSpeed", btn.dataset.speed);
-    }));
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (!ws || ws.readyState > WebSocket.OPEN)) connect(); });
+    return;
+  }
+  incidentMetaSelection = { kind: 'session', frame };
+  seekInc(frame);
+  expandIncidentMetaStrip(formatIncidentMetaHtml(i));
+  highlightIncidentCards(frame, null);
+  sendDashboardUiEvent({
+    element_id: 'incident-meta-strip',
+    event_type: 'ui_interaction',
+    message: 'Session incident meta expanded',
+    value: String(frame)
+  });
+}
 
-    filterBar.querySelectorAll(".filter-chip").forEach(chip => {
-        chip.addEventListener("click", () => {
-            filterBar.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
-            chip.classList.add("active");
-            activeFilter = chip.dataset.filter;
-            logUiEvent("filter-chip", "click", activeFilter);
-            renderIncidentViews();
-        });
+function onCapturedIncidentClick(seq) {
+  const r = capturedIncidents.find(x => x.seq === seq);
+  if (!r) return;
+  if (incidentMetaSelection && incidentMetaSelection.kind === 'capture' && incidentMetaSelection.seq === seq) {
+    incidentMetaSelection = null;
+    collapseIncidentMetaStrip();
+    sendDashboardUiEvent({
+      element_id: 'incident-meta-strip',
+      event_type: 'ui_interaction',
+      message: 'Captured incident meta collapsed',
+      value: String(seq)
     });
+    return;
+  }
+  incidentMetaSelection = { kind: 'capture', seq };
+  seekInc(r.frame);
+  const pseudo = {
+    id: r.seq,
+    time: r.sessionTime,
+    car: r.car != null ? r.car : '—',
+    driver: r.driver,
+    sev: r.sev,
+    cause: r.cause,
+    player: !!r.player,
+    frame: r.frame,
+    _capture: true,
+    capturedAt: r.capturedAt
+  };
+  expandIncidentMetaStrip(formatIncidentMetaHtml(pseudo));
+  highlightIncidentCards(null, seq);
+  sendDashboardUiEvent({
+    element_id: 'incident-meta-strip',
+    event_type: 'ui_interaction',
+    message: 'Captured incident meta expanded',
+    value: String(seq)
+  });
+}
 
-    document.getElementById("view-at-playhead-btn").addEventListener("click", () => { logUiEvent("view-at-playhead-btn", "click", "live"); setIncidentView("live"); });
-    document.getElementById("view-full-session-btn").addEventListener("click", () => { logUiEvent("view-full-session-btn", "click", "entire"); setIncidentView("entire"); });
+function setFilter(el) {
+  incFilter = el.dataset.f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.f === incFilter));
+  renderInc();
+  sendDashboardUiEvent({
+    element_id: 'inc-filter-chip',
+    event_type: 'click',
+    message: 'Incident list filter',
+    value: incFilter
+  });
+}
 
-    document.getElementById("drivers-panel-toggle").addEventListener("click", () => {
-        const panel = document.getElementById("drivers-panel");
-        panel.classList.toggle("collapsed");
-        logUiEvent("drivers-panel-toggle", "click", panel.classList.contains("collapsed") ? "collapsed" : "expanded");
+// ── Render standings ─────────────────────────────────────
+function renderStd() {
+  document.getElementById('std-list').innerHTML = drivers.map(d => {
+    const cls = d.inc===0?'zero':d.inc<=2?'low':d.inc<=4?'mid':'high';
+    return `<div class="std-row${d.player?' player':''}">
+      <span class="std-pos">${d.pos}</span>
+      <span class="car-num">#${d.car}</span>
+      <span>${d.name}</span>
+      <span class="std-inc ${cls}">${d.inc}x</span>
+    </div>`;
+  }).join('');
+}
+function toggleStd() {
+  const el = document.getElementById('std-panel');
+  el.classList.toggle('open');
+  sendDashboardUiEvent({
+    element_id: 'standings-panel',
+    event_type: 'click',
+    message: 'Driver standings toggle',
+    value: el.classList.contains('open') ? 'open' : 'collapsed'
+  });
+}
+
+// ── Telemetry ────────────────────────────────────────────
+function setTelem(t, b, sRad) {
+  const tp = Math.round(t*100), bp = Math.round(b*100);
+  document.getElementById('thr-bar').style.width = tp+'%';
+  document.getElementById('thr-pct').textContent  = tp+'%';
+  document.getElementById('brk-bar').style.width = bp+'%';
+  document.getElementById('brk-pct').textContent  = bp+'%';
+  updateWheel(sRad);
+}
+
+function formatSteerDeviation(vd) {
+  const a = Math.abs(vd);
+  if (a < 0.05) return '0°';
+  const mag = a < 10 ? String(+a.toFixed(1)).replace(/\.0$/, '') : String(Math.round(a));
+  return vd > 0 ? mag + '° R' : mag + '° L';
+}
+
+function updateWheel(sRad) {
+  const vd = Math.max(
+    -STEER_AXIS_HALF_DEG,
+    Math.min(STEER_AXIS_HALF_DEG, (sRad / STEER_MAX_RAD) * STEER_AXIS_HALF_DEG)
+  );
+  document.getElementById('g-needle').setAttribute('transform', `rotate(${vd},65,72)`);
+  const arc = document.getElementById('g-active');
+  arc.setAttribute('d', Math.abs(vd) < 0.5 ? '' : arcPath(65, 72, 55, 0, vd));
+  document.getElementById('g-angle').textContent = formatSteerDeviation(vd);
+}
+
+// SVG arc helper: 0°=up, +ve=clockwise
+function pxy(cx,cy,r,a) {
+  const rad=(a-90)*Math.PI/180;
+  return [cx+r*Math.cos(rad), cy+r*Math.sin(rad)];
+}
+function arcPath(cx,cy,r,a0,a1) {
+  const [sx,sy]=pxy(cx,cy,r,a0), [ex,ey]=pxy(cx,cy,r,a1);
+  const d=a1-a0, large=Math.abs(d)>180?1:0, sweep=d>0?1:0;
+  return `M ${sx.toFixed(2)},${sy.toFixed(2)} A ${r},${r} 0 ${large},${sweep} ${ex.toFixed(2)},${ey.toFixed(2)}`;
+}
+
+function onCarSel() {
+  const sel = document.getElementById('car-sel');
+  const idx = +sel.value;
+  const opt = sel.options[sel.selectedIndex];
+  const m = MOCK_CAR_TELEM[idx] || MOCK_CAR_TELEM[0];
+  mockTelem = m;
+  setTelem(m.t, m.b, m.s);
+  renderDriverIncidents();
+  sendDashboardUiEvent({
+    element_id: 'telemetry-car-sel',
+    event_type: 'change',
+    message: 'Telemetry car: ' + (opt ? opt.textContent.trim() : ''),
+    value: String(idx)
+  });
+}
+
+// ── Replay ───────────────────────────────────────────────
+function ra(action, arg) {
+  sendDashboardUiEvent({
+    element_id: 'replay-control',
+    event_type: 'click',
+    message: 'Replay ' + action + (arg !== undefined && arg !== '' ? ' ' + arg : ''),
+    value: arg != null ? String(arg) : ''
+  });
+  if (!send(action, arg)) toast('[PoC] ' + action + ' ' + arg + ' — not yet wired');
+  log('events','INFO ','replay_action', action + ' arg=' + arg);
+}
+
+function replaySessionStep(dir) {
+  const prev = dir === 'prev';
+  sendDashboardUiEvent({
+    element_id: prev ? 'replay-session-prev' : 'replay-session-next',
+    event_type: 'click',
+    message: prev ? 'Replay previous session' : 'Replay next session',
+    value: dir
+  });
+  if (!send('replay_session', dir)) toast('[PoC] replay_session ' + dir + ' — not yet wired');
+  log('events', 'INFO ', 'replay_action', 'replay_session arg=' + dir);
+}
+function updatePlayPauseBtn() {
+  const btn = document.getElementById('replay-play-pause-btn');
+  if (!btn) return;
+  btn.textContent = replayPaused ? '▶' : '⏸';
+  btn.title = replayPaused ? 'Play replay' : 'Pause replay';
+}
+
+function toggleReplayPlayPause() {
+  if (replayPaused) {
+    replayPaused = false;
+    ra('replay_speed', lastReplaySpeed);
+  } else {
+    replayPaused = true;
+    ra('replay_speed', '0');
+  }
+  updatePlayPauseBtn();
+  sendDashboardUiEvent({
+    element_id: 'replay-play-pause',
+    event_type: 'click',
+    message: replayPaused ? 'Replay paused' : 'Replay playing',
+    value: replayPaused ? 'paused' : 'playing'
+  });
+}
+
+function setSpeed(el) {
+  document.querySelectorAll('.spill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  lastReplaySpeed = el.dataset.s || '1';
+  replayPaused = false;
+  updatePlayPauseBtn();
+  ra('replay_speed', el.dataset.s);
+}
+function seekInc(frame) {
+  sendDashboardUiEvent({
+    element_id: 'incident-card',
+    event_type: 'click',
+    message: 'Seek to incident frame',
+    value: String(frame)
+  });
+  if (!send('seek_to_incident', String(frame))) toast('[PoC] Seek to frame ' + frame);
+  log('events','INFO ','seek_requested','frame=' + frame);
+}
+// ── Capture incidents ────────────────────────────────────
+// Driver: seek each incident frame for the selected telemetry car only (from session list).
+// Session: seek every incident frame for all drivers in the session; confirms before start.
+const CAPTURE_STEP_MS = 600;
+const CAPTURE_MAX_QUEUE = 200;
+
+let capturing = false;
+let captureKind = 'driver';
+let captureQueue = [];
+let captureQueueIndex = 0;
+let captureCount = 0;
+let captureTimer = null;
+
+function buildDriverCaptureQueue() {
+  const car = getSelectedCarNumber();
+  let frames = [...new Set(incidents.filter(i => i.car === car).map(i => i.frame))].sort((a, b) => a - b);
+  if (frames.length > CAPTURE_MAX_QUEUE) frames = frames.slice(0, CAPTURE_MAX_QUEUE);
+  return frames;
+}
+
+function buildSessionCaptureQueue() {
+  let frames = [...new Set(incidents.map(i => i.frame))].sort((a, b) => a - b);
+  if (frames.length > CAPTURE_MAX_QUEUE) frames = frames.slice(0, CAPTURE_MAX_QUEUE);
+  return frames;
+}
+
+function selectCarInDropdownForFrame(frame) {
+  const inc = incidents.find(i => i.frame === frame);
+  if (!inc) return;
+  const sel = document.getElementById('car-sel');
+  if (!sel) return;
+  const n = Number(inc.car);
+  for (let i = 0; i < sel.options.length; i++) {
+    if (+sel.options[i].getAttribute('data-car') === n) {
+      sel.selectedIndex = i;
+      break;
+    }
+  }
+}
+
+function toggleCaptureDriver() {
+  if (capturing) {
+    if (captureKind === 'driver') stopCapture();
+    return;
+  }
+  startCaptureDriver();
+}
+
+function startCaptureDriver() {
+  captureQueue = buildDriverCaptureQueue();
+  if (!captureQueue.length) {
+    toast('No incidents for the selected driver in the current session list.');
+    sendDashboardUiEvent({
+      element_id: 'find-selected-driver-incidents',
+      event_type: 'ui_interaction',
+      message: 'Find selected driver’s incidents: empty queue',
+      value: String(getSelectedCarNumber())
     });
+    return;
+  }
+  captureKind = 'driver';
+  capturing = true;
+  captureCount = 0;
+  captureQueueIndex = 0;
+  setCaptureUI(true);
+  sendDashboardUiEvent({
+    element_id: 'find-selected-driver-incidents',
+    event_type: 'click',
+    message: 'Find selected driver’s incidents: scan started',
+    value: String(captureQueue.length)
+  });
+  log('events', 'INFO ', 'capture_start', "driver scan  steps:" + captureQueue.length + '  step:' + CAPTURE_STEP_MS + 'ms');
+  captureStep();
+}
 
-    document.getElementById("stream-panel-toggle").addEventListener("click", (e) => {
-        if (e.target.closest(".stream-clear-btn")) return;
-        const panel = document.getElementById("stream-panel");
-        panel.classList.toggle("collapsed");
-        logUiEvent("stream-panel-toggle", "click", panel.classList.contains("collapsed") ? "collapsed" : "expanded");
-        if (!panel.classList.contains("collapsed")) {
-            debugLogHasAlert = false;
-            debugLogHasError = false;
-            updateStreamAlertDot();
-        }
+function startCaptureSessionClick() {
+  if (capturing) {
+    if (captureKind === 'session') stopCapture();
+    return;
+  }
+  sendDashboardUiEvent({
+    element_id: 'find-all-drivers-incidents',
+    event_type: 'click',
+    message: 'Find all incidents for all drivers: confirm shown'
+  });
+  const msg = 'This will seek through every incident for all drivers in the session, rotate the telemetry car to match each incident, and capture metadata for each. It may take a while. Are you sure?';
+  if (!confirm(msg)) {
+    sendDashboardUiEvent({
+      element_id: 'find-all-drivers-incidents',
+      event_type: 'ui_interaction',
+      message: 'Find all incidents for all drivers: cancelled at confirm'
     });
+    return;
+  }
+  startCaptureSession();
+}
 
-    document.getElementById("session-complete-dismiss-btn").addEventListener("click", () => {
-        logUiEvent("session-complete-dismiss-btn", "click", "Dismiss");
-        document.getElementById("session-complete-banner")?.classList.remove("visible");
+function startCaptureSession() {
+  captureQueue = buildSessionCaptureQueue();
+  if (!captureQueue.length) {
+    toast('No incidents in the current session list.');
+    sendDashboardUiEvent({
+      element_id: 'find-all-drivers-incidents',
+      event_type: 'ui_interaction',
+      message: 'Find all incidents for all drivers: empty queue'
     });
-    document.getElementById("session-complete-results-btn").addEventListener("click", () => { logUiEvent("session-complete-results-btn", "click", "View results"); openResultsDrawer(); });
-    document.getElementById("results-drawer-close").addEventListener("click", () => { logUiEvent("results-drawer-close", "click", "Close drawer"); closeResultsDrawer(); });
-    document.getElementById("results-drawer-overlay").addEventListener("click", (e) => {
-        if (e.target.id === "results-drawer-overlay") { logUiEvent("results-drawer-overlay", "click", "Backdrop"); closeResultsDrawer(); }
-    });
+    return;
+  }
+  captureKind = 'session';
+  capturing = true;
+  captureCount = 0;
+  captureQueueIndex = 0;
+  setCaptureUI(true);
+  sendDashboardUiEvent({
+    element_id: 'find-all-drivers-incidents',
+    event_type: 'click',
+    message: 'Find all incidents for all drivers: scan started',
+    value: String(captureQueue.length)
+  });
+  log('events', 'INFO ', 'capture_start', 'session scan  steps:' + captureQueue.length + '  step:' + CAPTURE_STEP_MS + 'ms');
+  captureStep();
+}
 
-    // Apply saved incident view so accordion matches localStorage
-    setIncidentView(activeIncidentView);
+function stopCapture() {
+  capturing = false;
+  clearTimeout(captureTimer);
+  captureTimer = null;
+  setCaptureUI(false);
+  const elId = captureKind === 'session' ? 'find-all-drivers-incidents' : 'find-selected-driver-incidents';
+  sendDashboardUiEvent({
+    element_id: elId,
+    event_type: 'click',
+    message: (captureKind === 'session'
+      ? 'Find all incidents for all drivers'
+      : 'Find selected driver’s incidents') + ': scan stopped',
+    value: String(captureCount)
+  });
+  log('events', 'INFO ', 'capture_end', 'Incident scan stopped  kind:' + captureKind + '  incidents_visited:' + captureCount);
+}
 
-    document.querySelector(".incidents-panel").addEventListener("click", (e) => {
-        const card = e.target.closest("[data-incident-id]");
-        if (card && card.dataset.incidentId) {
-            logUiEvent("incident-card", "click", card.dataset.incidentId);
-            const ref = card.dataset.snapshotRef;
-            if (ref && scanSnapshotsById.has(ref)) {
-                const wasExpanded = card.classList.contains("expanded");
-                document.querySelectorAll(".incident-card.expanded").forEach(c => c.classList.remove("expanded"));
-                if (!wasExpanded) card.classList.add("expanded");
-            }
-            send("SelectIncidentAndSeek", card.dataset.incidentId);
-        }
-        const heroBtn = e.target.closest("#player-hero-jump-btn");
-        if (heroBtn && heroBtn.dataset.incidentId) {
-            logUiEvent("player-hero-jump-btn", "click", heroBtn.dataset.incidentId);
-            send("SelectIncidentAndSeek", heroBtn.dataset.incidentId);
-        }
-    });
+function captureStep() {
+  if (!capturing) return;
+  if (captureQueueIndex >= captureQueue.length) {
+    stopCapture();
+    return;
+  }
 
-    connect();
-})();
+  const frame = captureQueue[captureQueueIndex++];
+  captureCount++;
+  if (captureKind === 'session') selectCarInDropdownForFrame(frame);
+  const sent = send('seek_to_incident', String(frame));
+
+  captureTimer = setTimeout(() => {
+    if (!capturing) return;
+    const frameEl = document.getElementById('frame-cur').textContent;
+    const timeEl = document.getElementById('session-time').textContent;
+    const lapPart = (lastLap >= 0 ? '  lap:' + lastLap : '  lap:—');
+    log('events', 'EVENT', 'capture_incident',
+      '#' + String(captureCount).padStart(2, '0') + '  frame:' + frameEl.replace('Frame ', '') +
+      '  session:' + timeEl + lapPart + (sent ? '' : '  [PoC-mock]'));
+
+    const frameNum = parseFrameFromLabel(frameEl);
+    capturedIncidents.push(enrichCaptureRecord(frameNum, timeEl, captureCount));
+    renderCaptured();
+
+    const total = captureQueue.length;
+    const prefix = captureKind === 'session' ? 'Session ' : 'Driver ';
+    document.getElementById('cap-status').textContent = prefix + captureCount + '/' + total + '…';
+
+    captureTimer = setTimeout(captureStep, CAPTURE_STEP_MS);
+  }, CAPTURE_STEP_MS);
+}
+
+function setCaptureUI(active) {
+  const btnD = document.getElementById('cap-btn');
+  const btnS = document.getElementById('cap-btn-session');
+  const lbl = document.getElementById('cap-status');
+  if (!btnD || !btnS || !lbl) return;
+  btnD.classList.toggle('active', active && captureKind === 'driver');
+  btnS.classList.toggle('active', active && captureKind === 'session');
+  btnD.disabled = active && captureKind === 'session';
+  btnS.disabled = active && captureKind === 'driver';
+  btnD.textContent = active && captureKind === 'driver' ? 'Stop scan' : 'Find selected driver’s incidents';
+  btnS.textContent = active && captureKind === 'session' ? 'Stop scan' : 'Find all incidents for all drivers';
+  lbl.className = 'cap-status' + (active ? ' running' : '');
+  if (!active) {
+    lbl.textContent = captureCount ? 'Done (' + captureCount + ' found)' : '—';
+    btnD.disabled = false;
+    btnS.disabled = false;
+  }
+}
+
+function scrubClick(e) {
+  const pct = Math.round((e.clientX - e.currentTarget.getBoundingClientRect().left) / e.currentTarget.offsetWidth * 100);
+  sendDashboardUiEvent({
+    element_id: 'replay-scrub',
+    event_type: 'click',
+    message: 'Replay scrub bar click',
+    value: String(pct)
+  });
+  toast('[PoC] Scrub to ' + pct + '%');
+}
+function setFrame(cur, end) {
+  if (cur !== undefined) document.getElementById('frame-cur').textContent = 'Frame ' + cur.toLocaleString();
+  if (end !== undefined) document.getElementById('frame-end').textContent = '/ ' + end.toLocaleString();
+  if (cur !== undefined && end && end > 0)
+    document.getElementById('scrub-fill').style.width = (cur/end*100).toFixed(1)+'%';
+}
+
+// ── Logs ─────────────────────────────────────────────────
+function log(tab, level, event, message) {
+  const pane = document.getElementById('log-' + tab);
+  if (!pane) return;
+  const l = level.trim();
+  const cls = l==='WARN'||l==='ERROR' ? l.toLowerCase() : l==='EVENT' ? 'event' : l==='DATA' ? 'data' : 'info';
+  const ts = new Date().toTimeString().slice(0,8);
+  const div = document.createElement('div');
+  div.className = 'll ' + cls;
+  div.textContent = '['+ts+'] '+level.padEnd(5)+' '+event.padEnd(22)+' '+message;
+  pane.appendChild(div);
+  while (pane.childElementCount > LOG_MAX) pane.removeChild(pane.firstChild);
+  if (autoScroll && tab === activeTab) pane.scrollTop = pane.scrollHeight;
+}
+
+function switchTab(el) {
+  activeTab = el.dataset.tab;
+  sendDashboardUiEvent({
+    element_id: 'log-tab-' + activeTab,
+    event_type: 'click',
+    message: 'Log tab: ' + (el.textContent || '').trim()
+  });
+  document.querySelectorAll('.log-tab').forEach(t => t.classList.toggle('active', t===el));
+  document.querySelectorAll('.log-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById('log-' + activeTab);
+  if (pane) { pane.classList.add('active'); if (autoScroll) pane.scrollTop = pane.scrollHeight; }
+}
+
+function toggleAS() {
+  autoScroll = !autoScroll;
+  document.getElementById('asbtn').classList.toggle('on', autoScroll);
+  sendDashboardUiEvent({
+    element_id: 'log-autoscroll',
+    event_type: 'click',
+    message: autoScroll ? 'Log autoscroll on' : 'Log autoscroll off',
+    value: autoScroll ? 'on' : 'off'
+  });
+}
+
+function fmtTelem(m) {
+  return `Throttle:${(m.throttle||0).toFixed(2)}  Brake:${(m.brake||0).toFixed(2)}  Steer:${(m.steeringAngle||0).toFixed(3)}rad  Speed:${(m.speed||0).toFixed(1)}mph`;
+}
+
+// ── Toast ────────────────────────────────────────────────
+let toastT = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ── Mock animation ───────────────────────────────────────
+function mockTick() {
+  if (mockPaused) return;
+  mockTime += 0.05;
+  const t = Math.max(0, Math.min(1, 0.6 + 0.35*Math.sin(mockTime*0.7)));
+  const b = Math.max(0, Math.min(1, Math.max(0, -Math.sin(mockTime*0.7+Math.PI))*0.8));
+  const s = 3.5*Math.sin(mockTime*0.4);
+  setTelem(t, b, s);
+  const pct = (38 + 18*Math.sin(mockTime*0.04)).toFixed(1);
+  document.getElementById('scrub-fill').style.width = pct + '%';
+  const frame = Math.round(21000 + 4000*Math.sin(mockTime*0.04));
+  document.getElementById('frame-cur').textContent = 'Frame ' + frame.toLocaleString();
+  // Emit mock telemetry log line occasionally
+  if (Math.round(mockTime*20)%40 === 0) {
+    log('telem','DATA ','telemetry', `Throttle:${t.toFixed(2)}  Brake:${b.toFixed(2)}  Steer:${s.toFixed(3)}rad`);
+  }
+}
+
+// ── Seed mock logs ────────────────────────────────────────
+function seedLogs() {
+  [
+    ['event','EVENT','session_start',    'WeekendInfo: Monza GP  SimMode:replay'],
+    ['event','INFO ','replay_position',  'Frame 0 of 55000  ratio:0.000'],
+    ['event','EVENT','incident',         '#99 J. Smith  +4x  contact (wall)  frame:54321'],
+    ['event','INFO ','replay_position',  'Frame 12100 of 55000  ratio:0.220'],
+    ['event','EVENT','incident',         '#12 A. Jones  +2x  wall  frame:52100'],
+    ['event','EVENT','incident',         '#42 B. Lee    +1x  off-track  frame:48900'],
+    ['event','EVENT','flag_change',      'Yellow  sector:3'],
+    ['event','EVENT','incident',         '#7 M. Wilson  +4x  contact  frame:45200'],
+    ['event','INFO ','replay_position',  'Frame 21234 of 55000  ratio:0.386'],
+  ].forEach(([t,l,e,m]) => log(t,l,e,m));
+
+  [
+    ['health','INFO ','plugin_started',      'SimSteward plugin starting'],
+    ['health','INFO ','irsdk_started',       'iRacing SDK started successfully'],
+    ['health','INFO ','bridge_starting',     'WebSocket bridge starting  bind:0.0.0.0  port:19847'],
+    ['health','INFO ','plugin_ready',        'SimSteward ready  ws_port:19847'],
+    ['health','INFO ','iracing_connected',   'iRacing connected'],
+    ['health','WARN ','broadcast_no_clients','Broadcast skipped: 0 connected clients'],
+    ['health','INFO ','ws_client_connected', 'client connected  ip:127.0.0.1  count:1'],
+  ].forEach(([t,l,e,m]) => log(t,l,e,m));
+
+  [
+    ['telem','DATA ','telemetry','Throttle:0.65  Brake:0.00  Steer: 0.300rad  Speed:145.2mph'],
+    ['telem','DATA ','telemetry','Throttle:0.72  Brake:0.00  Steer:-0.120rad  Speed:148.7mph'],
+    ['telem','DATA ','telemetry','Throttle:0.00  Brake:0.82  Steer: 1.450rad  Speed:132.1mph'],
+    ['telem','DATA ','telemetry','Throttle:0.00  Brake:0.95  Steer: 2.100rad  Speed: 87.4mph'],
+    ['telem','DATA ','telemetry','Throttle:0.35  Brake:0.10  Steer: 1.950rad  Speed: 65.0mph'],
+    ['telem','DATA ','telemetry','Throttle:0.88  Brake:0.00  Steer: 0.500rad  Speed: 89.3mph'],
+  ].forEach(([t,l,e,m]) => log(t,l,e,m));
+}
+
+// ── Init ─────────────────────────────────────────────────
+function init() {
+  renderInc();
+  renderCaptured();
+  renderStd();
+  seedLogs();
+  setTelem(mockTelem.t, mockTelem.b, mockTelem.s);
+  updatePlayPauseBtn();
+  setInterval(mockTick, 50);
+  connectWs();
+}
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>

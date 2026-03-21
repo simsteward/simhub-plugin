@@ -1,0 +1,9 @@
+flowchart TD
+  A([Click Find all session incidents]) --> B[Confirm dialog shown\nExplains: seek every incident · rotate car · capture metadata]
+  B --> C{User confirms?}
+  C -- No  --> D([Cancelled — no-op])
+  C -- Yes --> E[Queue all unique frames from leaderboard\nall drivers · max 200]
+  E --> F[Same 600 ms seek loop as driver walk]
+  F --> G[Each step: rotate Telemetry car dropdown\nto match incident's car]
+  G --> H[Same timing + data-quality issues as Flow 4]
+  H --> I([Captured tab grows with all visited incidents])

@@ -1,0 +1,12 @@
+flowchart TD
+  A([Change Telemetry car dropdown]) --> B{Options populated?}
+  B -- "⚠️ No — hardcoded mock" --> C["Options: #99 J. Smith You · #12 A. Jones · #42 B. Lee · #7 M. Wilson\nNot from plugin drivers state"]
+  B -- Future: Yes --> D[Populated from plugin drivers state]
+  C --> E[Left col: This driver's incidents re-filters\nshows incidents where car = selected car#]
+  E --> F{Any incidents for car?}
+  F -- No  --> G([Empty: No incidents for this car])
+  F -- Yes --> H([Incident cards for that car only])
+  C --> I[Telemetry strip updates — mock data only\nNot real iRacing telem for that car]
+
+  note2["⚠️ Mine filter chip ≠ This driver's incidents.\nMine = player:true your own car.\nThis driver = any selected car.\nKey for steward reviewing opponents."]
+  E -.-> note2

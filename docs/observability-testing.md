@@ -1,6 +1,6 @@
-# Observability testing and dashboard validation
+# Observability testing and Explore validation
 
-Grafana/Loki **test harness** (CI/local) plus **manual dashboard validation** in Explore.
+Grafana/Loki **test harness** (CI/local) plus **manual LogQL validation** in Explore.
 
 ---
 
@@ -10,14 +10,6 @@ Grafana/Loki **test harness** (CI/local) plus **manual dashboard validation** in
 
 1. Emit structured events (`action_result`, `incident_detected`, `session_digest`) with `testing="true"` and `test_tag` (e.g. `grafana-harness`).
 2. Assert via Loki HTTP API or MCP that expected fields exist.
-
-### Full test (local stack + harness)
-
-```powershell
-.\tests\observability\run_grafana_tests.ps1
-```
-
-Requires Docker, .NET SDK, storage path (default `S:\sim-steward-grafana-storage` or set `GRAFANA_STORAGE_PATH`).
 
 ### Harness only (Loki already running)
 
@@ -38,7 +30,7 @@ dotnet run --project tests\observability\AssertLokiQueries\AssertLokiQueries.csp
 
 ### MCP assertions
 
-After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"`. Expect ≥2 `action_result`, ≥1 `incident_detected`, ≥1 `session_digest` with required fields. See **tests/observability/assert_via_mcp.md**.
+After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"`. Expect ≥2 `action_result`, ≥1 `incident_detected`, ≥1 `session_digest` with required fields.
 
 ### LogQL: test vs production
 
@@ -47,7 +39,7 @@ After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | t
 
 ### CI
 
-`run_grafana_tests.ps1` is not in `deploy.ps1` by default; add to pipeline if desired.
+Observability harness is not in `deploy.ps1` by default; add harness + Loki stack steps to the pipeline if desired.
 
 ### Troubleshooting (harness)
 
@@ -60,7 +52,7 @@ After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | t
 
 ---
 
-## Dashboard validation (e.g. last 7 days)
+## Explore validation (e.g. last 7 days)
 
 Run in **Grafana → Explore → Loki**, range **Last 7 days**.
 
@@ -74,7 +66,7 @@ If grouping fails, use `{app="sim-steward"} | json` and group in UI.
 
 ### Label check
 
-Query `{app="sim-steward"}` — expect `env`, `component`, `level`. Cloud: match datasource UID to provisioned dashboards (`loki_local` or variable `DS_LOKI`).
+Query `{app="sim-steward"}` — expect `env`, `component`, `level`. Cloud: use your Loki datasource (local provisioning uses UID `loki_local`).
 
 ### Component breakdown (optional)
 
@@ -86,11 +78,11 @@ Expect `simhub-plugin`, `bridge`, `tracker` (and optionally `dashboard`).
 
 ### Outcome
 
-Confirm events exist and dashboards in **docs/GRAFANA-LOGGING.md** (provisioned list) show data.
+Confirm expected events exist and panels/queries in **docs/GRAFANA-LOGGING.md** (LogQL reference) return data.
 
 ---
 
 ## References
 
-- **docs/GRAFANA-LOGGING.md** — Taxonomy, dashboards, LogQL.
+- **docs/GRAFANA-LOGGING.md** — Taxonomy, LogQL, housekeeping.
 - **observability/local/** — Docker Compose and provisioning.

@@ -6,10 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace SimSteward.Plugin
 {
-    /// <summary>
-    /// Fleck WebSocket server for dashboard communication. Thread-safe: Fleck callbacks
-    /// run on thread-pool threads; BroadcastState is called from DataUpdate (SimHub thread).
-    /// </summary>
+    /// <summary>Fleck WebSocket server for dashboard communication.</summary>
     public class DashboardBridge
     {
         private WebSocketServer _server;
@@ -25,14 +22,6 @@ namespace SimSteward.Plugin
         private readonly Action _onNoClients;
         private string _authToken;
 
-        /// <param name="getStateForNewClient">Called when a client connects to get initial state JSON.</param>
-        /// <param name="getLogTailForNewClient">Called when a client connects to get recent log entries JSON (may be null).</param>
-        /// <param name="dispatchAction">(action, arg, correlationId) => (success, result, error).</param>
-        /// <param name="onLog">(level, message, source) for log action.</param>
-        /// <param name="logger">Optional; for bridge lifecycle messages.</param>
-        /// <param name="onStructuredLog">Optional; (eventType, message, fields) for structured log (e.g. dashboard_ui_event).</param>
-        /// <param name="onSendError">Optional; invoked when client.Send throws (exception, payloadType e.g. "logEvents" or "state").</param>
-        /// <param name="onNoClients">Optional; invoked when Broadcast/BroadcastState is called with 0 connected clients.</param>
         public DashboardBridge(
             Func<string> getStateForNewClient,
             Func<string> getLogTailForNewClient,
@@ -75,11 +64,9 @@ namespace SimSteward.Plugin
                         var clientIp = socket.ConnectionInfo?.ClientIpAddress ?? "unknown";
                         _logger?.Structured("INFO", "bridge", "ws_client_connected", "client connected",
                             new Dictionary<string, object> { ["client_ip"] = clientIp, ["client_count"] = clientCount });
-                        string stateJson = null;
-                        string tailJson = null;
                         try
                         {
-                            stateJson = _getStateForNewClient();
+                            var stateJson = _getStateForNewClient();
                             if (!string.IsNullOrEmpty(stateJson))
                                 socket.Send(stateJson);
                         }
@@ -87,10 +74,9 @@ namespace SimSteward.Plugin
                         {
                             _logger?.Warn($"DashboardBridge: getStateForNewClient failed: {ex.Message}");
                         }
-                        // Send recent log tail so late-joining clients see context immediately
                         try
                         {
-                            tailJson = _getLogTailForNewClient?.Invoke();
+                            var tailJson = _getLogTailForNewClient?.Invoke();
                             if (!string.IsNullOrEmpty(tailJson))
                                 socket.Send(tailJson);
                         }
@@ -98,9 +84,6 @@ namespace SimSteward.Plugin
                         {
                             _logger?.Warn($"DashboardBridge: getLogTailForNewClient failed: {ex.Message}");
                         }
-                        AgentDebugLog.WriteB0C27E("H3", "DashboardBridge.OnOpen", "client_opened", new { clientCount, stateLen = stateJson?.Length ?? 0, tailLen = tailJson?.Length ?? 0 });
-                        _logger?.Structured("INFO", "bridge", "dashboard_opened", "Dashboard opened (page loaded or refreshed)",
-                            new Dictionary<string, object> { ["client_ip"] = clientIp, ["client_count"] = clientCount });
                     };
 
                     socket.OnClose = () =>
@@ -131,19 +114,13 @@ namespace SimSteward.Plugin
         public void Stop()
         {
             if (_server == null) return;
-            try
-            {
-                _server.Dispose();
-            }
+            try { _server.Dispose(); }
             catch (Exception ex)
             {
                 _logger?.Warn($"DashboardBridge: dispose error: {ex.Message}");
             }
             _server = null;
-            lock (_clientLock)
-            {
-                _clients.Clear();
-            }
+            lock (_clientLock) { _clients.Clear(); }
             _logger?.Info("DashboardBridge: WebSocket server stopped");
         }
 
@@ -152,16 +129,6 @@ namespace SimSteward.Plugin
             get { lock (_clientLock) { return _clients.Count; } }
         }
 
-        // #region agent log — WebSocket debug (session b0c27e)
-        private static int _broadcastNoClientsCount;
-        private static readonly Dictionary<string, int> _broadcastSendCountByType = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        // #endregion
-
-        /// <summary>
-        /// Send an arbitrary JSON message to all connected clients. Invokes onSendError when Send throws; onNoClients when 0 clients.
-        /// Use for push events (logEvents, incidentEvents) that are not the throttled state.
-        /// </summary>
-        /// <param name="payloadType">Hint for error logging (e.g. "logEvents", "incidentEvents").</param>
         public void Broadcast(string json, string payloadType = "logEvents")
         {
             if (string.IsNullOrEmpty(json)) return;
@@ -172,29 +139,15 @@ namespace SimSteward.Plugin
                 clientCount = _clients.Count;
                 snapshot = new List<IWebSocketConnection>(_clients);
             }
-            lock (_broadcastSendCountByType)
-            {
-                if (!_broadcastSendCountByType.TryGetValue(payloadType, out var n)) n = 0;
-                n++;
-                _broadcastSendCountByType[payloadType] = n;
-                if (n <= 5 || n % 50 == 0)
-                    AgentDebugLog.WriteB0C27E("H4", "DashboardBridge.Broadcast", "sent", new { payloadType, clientCount, payloadLen = json?.Length ?? 0, sendCount = n });
-            }
             foreach (var client in snapshot)
             {
                 try { client.Send(json); }
                 catch (Exception ex) { _onSendError?.Invoke(ex, payloadType); }
             }
             if (clientCount == 0)
-            {
-                _broadcastNoClientsCount++;
                 _onNoClients?.Invoke();
-            }
         }
 
-        /// <summary>
-        /// Send state JSON to all connected clients. Invokes onSendError when Send throws; onNoClients when 0 clients.
-        /// </summary>
         public void BroadcastState(string json)
         {
             if (string.IsNullOrEmpty(json)) return;
@@ -211,10 +164,7 @@ namespace SimSteward.Plugin
                 catch (Exception ex) { _onSendError?.Invoke(ex, "state"); }
             }
             if (clientCount == 0)
-            {
-                _broadcastNoClientsCount++;
                 _onNoClients?.Invoke();
-            }
         }
 
         private bool Authenticate(IWebSocketConnection socket)
@@ -264,11 +214,7 @@ namespace SimSteward.Plugin
             if (_logger?.IsDebugMode == true)
             {
                 _logger.Debug("ws message raw", "bridge", "ws_message_raw",
-                    new Dictionary<string, object>
-                    {
-                        ["raw_json"] = msg,
-                        ["client_ip"] = clientIp
-                    });
+                    new Dictionary<string, object> { ["raw_json"] = msg, ["client_ip"] = clientIp });
             }
 
             string action = null;
@@ -327,14 +273,6 @@ namespace SimSteward.Plugin
             }
 
             var correlationId = Guid.NewGuid().ToString("N").Substring(0, 8);
-            _logger?.Structured("INFO", "bridge", "action_received", $"DashboardBridge received {action}",
-                new Dictionary<string, object>
-                {
-                    ["action"] = action,
-                    ["arg"] = arg ?? "",
-                    ["client_ip"] = clientIp,
-                    ["correlation_id"] = correlationId
-                });
             var (success, result, error) = _dispatchAction(action, arg ?? "", correlationId);
             SendActionResult(socket, action, success, result, error);
         }
@@ -349,11 +287,7 @@ namespace SimSteward.Plugin
             };
             if (!string.IsNullOrEmpty(result)) obj["result"] = result;
             if (!string.IsNullOrEmpty(error)) obj["error"] = error;
-            try
-            {
-                socket.Send(obj.ToString());
-            }
-            catch { }
+            try { socket.Send(obj.ToString()); } catch { }
         }
 
         private void SendResponse(IWebSocketConnection socket, string type, string error)

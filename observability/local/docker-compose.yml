@@ -60,22 +60,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  alloy:
-    image: grafana/alloy:latest
-    depends_on:
-      loki-gateway:
-        condition: service_healthy
-    command:
-      - run
-      - /etc/alloy/config.alloy
-      - --storage.path=/var/lib/alloy/data
-    env_file:
-      - .env.observability.local
-    environment:
-      - LOKI_PUSH_TOKEN=${LOKI_PUSH_TOKEN:-}
-    volumes:
-      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
-      # Mount plugin data dir so Alloy can tail plugin-structured.jsonl. On Windows set SIMSTEWARD_DATA_PATH (e.g. %LOCALAPPDATA%\SimHubWpf\PluginsData\SimSteward). Fallback: ./sample-logs for testing.
-      - ${SIMSTEWARD_DATA_PATH:-./sample-logs}:/var/log/simsteward:ro
-      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/alloy:/var/lib/alloy/data

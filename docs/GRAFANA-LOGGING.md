@@ -1,14 +1,14 @@
 # Grafana Loki Structured Logging
 
-Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk); **Grafana Alloy** (or another tailer) tails that file and pushes to Loki. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Dashboards and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
+Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk). **Loki ingestion** (reading that file or pushing lines to Loki) runs **outside the plugin**—your Grafana Cloud setup, a log shipper, `POST` to **loki-gateway** (local Docker), or another path you configure. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
 
-**Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; Alloy (or any forwarder) tails that file and pushes to Loki with no filter. Loki retains the full stream.
+**Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; whatever forwards those lines to Loki must not filter them. Loki retains the full stream.
 
 **Filtering is dashboard-only.** The web dashboard receives the full stream via WebSocket and applies level/event visibility filters for display only (checkboxes and `hiddenLevels` / `hiddenEvents`). Toggling "hide DEBUG" or "hide state_broadcast_summary" etc. in the dashboard shows or hides entries that are already in the stream; nothing is dropped at the plugin.
 
 ### Local vs prod (same pipeline; env label only)
 
-One pipeline for both: plugin writes all logs to **plugin-structured.jsonl**; Alloy (or any forwarder) tails it and pushes to Loki. You choose the Loki endpoint (local URL or Grafana Cloud) in the **forwarder** config, not in the plugin. Set `SIMSTEWARD_LOG_ENV=local` for local dev (e.g. Docker stack) or `SIMSTEWARD_LOG_ENV=production` (default); this sets the `env` label only. No source-level omission: Loki and the dashboard stream are full. Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
+One pipeline for both: plugin writes all logs to **plugin-structured.jsonl**; your **Loki ingestion** path ships them to Loki. You choose the Loki endpoint (local URL or Grafana Cloud) in that ingestion config, not in the plugin. Set `SIMSTEWARD_LOG_ENV=local` for local dev (e.g. Docker stack) or `SIMSTEWARD_LOG_ENV=production` (default); this sets metadata on log lines (`log_env` / routing hints). No source-level omission: Loki and the dashboard stream are full. Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
 
 ## Grafana Cloud free tier limits
 
@@ -59,7 +59,7 @@ Every log line has an `event` field. Key events:
 |-------|-----------|------------|-------|
 | `logging_ready` | simhub-plugin | — | First log after logger creation; init continues. |
 | `settings_saved` | simhub-plugin | — | UI settings persisted. |
-| `file_tail_ready` | simhub-plugin | `path` | Structured log file path ready for Alloy/Loki file-tail. |
+| `file_tail_ready` | simhub-plugin | `path` | Structured log file path ready for Loki ingestion (outside plugin). |
 | `plugin_started` | simhub-plugin | — | SimSteward plugin starting; tracker callback set. |
 | `actions_registered` | simhub-plugin | — | SimHub properties and actions registered. |
 | `bridge_starting` | simhub-plugin | `bind`, `port` | WebSocket bridge starting. |
@@ -73,10 +73,10 @@ Every log line has an `event` field. Key events:
 | `dashboard_opened` | bridge | `client_ip`, `client_count` | When a dashboard client connects (page load or refresh). |
 | `ws_client_rejected` | bridge | `client_ip`, `reason` | Token missing or invalid. |
 | `action_received` | bridge | `action`, `arg`, `client_ip`, `correlation_id` | Logged before `DispatchAction`. In production, omitted by default; enable "Log all action traffic" in settings or `SIMSTEWARD_LOG_ALL_ACTIONS=1` to keep. |
-| `action_dispatched` | simhub-plugin | `action`, `arg`, `correlation_id`, `session_id`, `session_num` | Start of every command. In production, omitted by default; enable "Log all action traffic" to keep. |
-| `action_result` | simhub-plugin | `action`, `correlation_id`, `success`, `result`, `error`, `duration_ms` | End of command. |
+| `action_dispatched` | simhub-plugin | `action`, `arg`, `correlation_id`, `subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, `lap`, `log_env`, `loki_push_target`, plus spine `session_id` / `replay_frame` when set | Start of every command. **subsession_id** = iRacing `WeekendInfo.SubSessionID` when &gt; 0, else `"not in session"`. **parent_session_id** = `WeekendInfo.SessionID` when &gt; 0, else `"not in session"`. **session_num** = telemetry `SessionNum` when connected, else `"not in session"`. **lap** = telemetry `CarIdxLap` for the focus car (CamCarIdx if valid, else PlayerCarIdx); **`-1`** when unknown/disconnected. **log_env** = `SIMSTEWARD_LOG_ENV` or `unset`. **loki_push_target** = `disabled` \| `grafana_cloud` \| `local_or_custom` from `SIMSTEWARD_LOKI_URL` (same env the Loki sink uses — set before SimHub starts, e.g. launcher loading `.env`). In production, omitted by default; enable "Log all action traffic" to keep. |
+| `action_result` | simhub-plugin | Same session/routing fields as `action_dispatched` where applicable, plus `success`, `result`, `error`, `duration_ms` | End of command. |
 | `plugin_ui_changed` | simhub-plugin | `element`, `value` | Settings panel interaction (omit level/event, data API endpoint, log all action traffic). |
-| `dashboard_ui_event` | bridge | `client_ip`, `element_id`, `event_type`, `value` | Dashboard UI-only interaction (panel toggles, log filter checkboxes, filter chips, view buttons, results drawer, etc.). |
+| `dashboard_ui_event` | bridge | `client_ip`, `element_id`, `event_type`, `value`, plus same `subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, `lap`, `log_env`, `loki_push_target` as actions | Dashboard UI-only interaction (panel toggles, log filter checkboxes, filter chips, view buttons, results drawer, etc.). |
 | `replay_control` | simhub-plugin | `mode`, `speed`, `search_mode` | Replay buttons. |
 | `session_snapshot_recorded` | simhub-plugin | `path` | Writable snapshot log. |
 | `session_end_fingerprint` | simhub-plugin | `session_num`, `results_ready`, `results_positions_count`, `replay_frame_num`, `session_time` | Emitted when RecordSessionSnapshot is called with a trigger containing "session_end" (e.g. session_end:2). Fingerprint of what data is available at session end. |
@@ -88,14 +88,57 @@ Every log line has an `event` field. Key events:
 | `session_end_datapoints_session` | simhub-plugin | `trigger`, `session_id`, `session_num`, session-level fields (track, series_id, session_name, incident_limit, …), `telemetry_*` at capture, `results_driver_count` | Emitted once per successful session summary capture. Session metadata and telemetry snapshot only; no results array. Use with `session_end_datapoints_results` chunks to get full data. Scales to hundreds of drivers. |
 | `session_end_datapoints_results` | simhub-plugin | `session_id`, `session_num`, `chunk_index`, `chunk_total`, `results_driver_count`, `results` (array of up to 35 driver rows: pos, car_idx, driver, abbrev, car, class, laps, incidents, reason_out, user_id, team, irating, etc.) | One log line per chunk (35 drivers per chunk). Merge chunks by `session_id` and sort by `chunk_index` for full results table. See **docs/observability-scaling.md** and § LogQL reference below. |
 | `finalize_capture_started` / `complete` / `timeout` | simhub-plugin | `target_frame`, `duration_ms` | Debug / automation. |
-| `incident_detected` | tracker | `incident_type`, `car_number`, `driver_name`, `delta`, `session_time`, `session_num`, `replay_frame`, `cause`, `other_car_number` | Each YAML delta. |
+| `incident_detected` | tracker | `incident_type`, `car_number`, `driver_name`, `unique_user_id` (iRacing **CustID**), `delta`, `session_time`, `session_num`, `lap` (per-car `CarIdxLap` for the incident car), `replay_frame`, `replay_frame_end` (optional window), `cause`, `other_car_number`, `subsession_id`, `parent_session_id`, `track_display_name`, `cam_car_idx` / `camera_group` (when available), `log_env`, `loki_push_target` | **Canonical rule name:** `iracing_incident` — **emitted JSON `event`:** `incident_detected` (use this string in LogQL until code renames). Each YAML delta. **Incident fingerprint (for correlation / future storage):** combine `parent_session_id`, `subsession_id`, `session_num`, focused driver (`unique_user_id` + `driver_name`), camera/view fields, `track_display_name`, `session_time`, `lap`, and `replay_frame` (± `replay_frame_end` if the event spans a window). Use `"not in session"` for `subsession_id` / `parent_session_id` when iRacing has no loaded session. *Tracker implementation may not emit all optional fields until wired in code.* |
 | `baseline_established` | tracker | `driver_count` | When tracker baseline is ready. |
 | `session_reset` | tracker | `old_session`, `new_session` | When `SessionNum` changes. |
 | `seek_backward_detected` | tracker | `from_frame`, `to_frame`, `session_time` | Replay seek. |
 | `yaml_update` | tracker | `session_info_update`, `session_num`, `session_time` | Debug-only. |
-| `session_digest` | simhub-plugin | `session_id`, `session_num`, `track`, `duration_minutes`, `total_incidents`, `results_incident_sum`, `incident_summary`, `incident_summary_truncated`, `results_table`, `results_driver_count`, `actions_dispatched`, … | Single-row session summary. **total_incidents** = count of incident_detected events (plugin); **results_incident_sum** = sum of iRacing per-driver incident points; **results_table** = authoritative ResultsPositions (pos, car, driver, incidents, laps, class, reason_out per driver). |
+| `session_digest` | simhub-plugin | `session_id`, `session_num`, `track`, `duration_minutes`, `total_incidents`, `results_incident_sum`, `incident_summary`, `incident_summary_truncated`, `results_table`, `results_driver_count`, `actions_dispatched`, … | Single-row session summary. **total_incidents** = count of `incident_detected` events (plugin); **results_incident_sum** = sum of iRacing per-driver incident points; **results_table** = authoritative ResultsPositions (pos, car, driver, incidents, laps, class, reason_out per driver). |
 
-`incident_detected` feeds the **Incident Timeline** dashboard; `session_digest` feeds the **Session Overview** dashboard.
+### Schema reference: `action_dispatched`, `action_result`, `iracing_incident`
+
+PR checklist and `domain` taxonomy: **docs/RULES-ActionCoverage.md**. Full-field checklist below for dashboards, PR review, and Loki queries. Labels stay the four-label schema; everything else is JSON body.
+
+#### `action_dispatched`
+
+| Field | Required for completeness | Notes |
+|-------|---------------------------|--------|
+| `action` | yes | Command name |
+| `arg` | yes | Argument payload (may be empty) |
+| `correlation_id` | yes | Trace id for paired `action_result` |
+| `subsession_id`, `parent_session_id`, `session_num`, `track_display_name` | yes | Use `"not in session"` when offline |
+| `lap` | yes | Integer; **`-1`** when unknown (same as `SessionLogging.LapUnknown`) |
+| `session_id`, `replay_frame` | when applicable | Spine / replay context |
+| `log_env`, `loki_push_target` | recommended | Observability metadata |
+
+**Volume:** In production, often **omitted** unless plugin setting “Log all action traffic” or `SIMSTEWARD_LOG_ALL_ACTIONS=1`. Same row in the table above lists additional bridge fields when `action_received` is enabled.
+
+#### `action_result`
+
+| Field | Required for completeness | Notes |
+|-------|---------------------------|--------|
+| `success` | yes | Boolean outcome |
+| `result` / `error` | as applicable | Payload or error detail |
+| `duration_ms` | yes | Handler duration |
+| `action`, `arg`, `correlation_id` | yes | Same command identity as `action_dispatched` |
+| Session + routing fields | yes | Same set as `action_dispatched` (`subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, spine fields, `log_env`, `loki_push_target`) |
+
+#### `iracing_incident` (canonical) / `incident_detected` (emitted)
+
+| Field | Required for completeness | Notes |
+|-------|---------------------------|--------|
+| `unique_user_id` | yes | iRacing CustID |
+| `driver_name` | yes | Display name in JSONL (`display_name` in coding rules = same concept) |
+| `session_time` | yes | Time of detection |
+| `subsession_id`, `parent_session_id`, `session_num`, `track_display_name` | yes | `"not in session"` when no session |
+| `replay_frame` | yes | Start frame; use `replay_frame_end` if the event spans a window |
+| `lap` | yes | `CarIdxLap` for the car incurring the incident; **`-1`** if unknown |
+| `cam_car_idx` / `camera_group` | when available | Camera / view context |
+| `incident_type`, `delta`, `car_number`, … | per implementation | Taxonomy / YAML delta fields |
+
+**LogQL today:** filter on `event = "incident_detected"`. If the emitter is renamed to `iracing_incident`, update queries and this doc in the same change.
+
+`incident_detected` and `session_digest` are the main LogQL entry points for incidents and session-level summaries (use **Explore** or any Loki panel you add).
 
 ## Local vs. cloud configuration
 
@@ -121,7 +164,7 @@ The plugin reads these once at `Init()`. To switch environment, edit `.env` and 
 
 ## No data in Grafana
 
-If Explore or dashboards show no logs for `{app="sim-steward"}`:
+If Explore (or any Loki-backed panel) shows no logs for `{app="sim-steward"}`:
 
 1. **Loki URL not set** — The plugin pushes to Loki only when `SIMSTEWARD_LOKI_URL` is set. If you start SimHub by double‑clicking (or from the Start menu), that variable is usually unset.
    - **Fix:** Start SimHub via `.\scripts\run-simhub-local-observability.ps1` for local Loki, or set the Loki env vars before starting SimHub.
@@ -131,12 +174,9 @@ If Explore or dashboards show no logs for `{app="sim-steward"}`:
 
 After fixing, restart SimHub (using the script for local) and trigger some activity (e.g. open the dashboard, connect iRacing, or run a replay); logs should appear within a few seconds to a minute depending on flush interval.
 
-### Dashboards show no data
+### Panels show no data
 
-If provisioned dashboards load but every panel shows "No data", check both:
-
-1. **Dashboard JSON and datasource** — Each file in `observability/local/grafana/provisioning/dashboards/` must be a **single** provisioner object: `{ "dashboard": { ... }, "overwrite": true }`. Every panel must use the explicit datasource `{ "type": "loki", "uid": "loki_local" }`. If a panel uses `"datasource": "${DS_LOKI}"`, that variable is not set in provisioning and the panel will have no datasource. Remove any duplicate or legacy JSON objects from the same file.
-2. **Data flow** — If the pipeline is not sending logs to Loki, dashboards will be empty even with correct JSON. Follow the **Logs not in Grafana? Checklist** below; confirm in **Explore** with query `{app="sim-steward"}` and time range "Last 1 hour" that at least some log lines are returned before relying on dashboards.
+If **Explore** works but a dashboard panel shows "No data", fix the panel’s datasource (use UID `loki_local` for local provisioning, or your Cloud Loki datasource) and time range. If **Explore** is also empty, follow the checklist below.
 
 ### Logs not in Grafana? Checklist
 
@@ -155,7 +195,7 @@ Use this checklist so button presses (Play, etc.) show up in Grafana:
 
 Set `SIMSTEWARD_LOG_DEBUG=1` for local debugging only. When enabled:
 
-- **PluginLogger.Debug()** emits `DEBUG`-level entries (still sent to Loki; filter in dashboards/AI).
+- **PluginLogger.Debug()** emits `DEBUG`-level entries (still sent to Loki; filter in Explore/AI).
 - **LokiSink** uses relaxed flush rules: 2 s timer, 500-entry batch, 5,000-entry queue, no line-size enforcement.
 - Additional log events are emitted:
   - `state_broadcast_summary` (throttled ~5/s): plugin mode, incident count, client count, replay frame.
@@ -179,30 +219,15 @@ Never enable debug in production. For AI or assistant queries, filter with `| le
 | `ActionLatenciesMs` | Rolling sample for P50/P95. |
 | `Incidents` | Incident summaries (e.g. for digest). |
 
-**session_digest** is emitted at most once per session (guarded by `_sessionDigestEmitted`). It caps `incident_summary` to 20 entries (highest severity first) and sets `incident_summary_truncated: true` when truncated. Trigger the digest manually (`CaptureSessionSummaryNow`, `FinalizeThenCaptureSessionSummary`, or checkered flag) so downstream AI and dashboards see the session as complete.
+**session_digest** is emitted at most once per session (guarded by `_sessionDigestEmitted`). It caps `incident_summary` to 20 entries (highest severity first) and sets `incident_summary_truncated: true` when truncated. Trigger the digest manually (`CaptureSessionSummaryNow`, `FinalizeThenCaptureSessionSummary`, or checkered flag) so downstream AI and Grafana panels see the session as complete.
 
 **Incident semantics:** `total_incidents` is the **count of incident_detected events** (from IncidentTracker CurDriverIncidentCount deltas). The **results_table** `incidents` column and **results_incident_sum** are iRacing’s per-driver incident **points** at session end (from ResultsPositions). So total_incidents (e.g. 12 events) and results_incident_sum (e.g. 24 points) can both be correct but differ.
 
-## Provisioned dashboards
+## Grafana dashboards (repo)
 
-Grafana can load dashboards from `observability/local/grafana/provisioning/dashboards/`. Each JSON file uses the provisioner format `{ "dashboard": { ... }, "overwrite": true }`. Most panels reference datasource UID `loki_local`; **Event Coverage** uses a datasource variable `DS_LOKI` so Grafana Cloud users can select their Loki instance.
+There are **no** provisioned dashboard JSON files in the repo at the moment. Use **Grafana → Explore** with the queries in § LogQL reference. To add dashboards again, put files under `observability/local/grafana/provisioning/dashboards/` as a single object per file: `{ "dashboard": { ... }, "overwrite": true }`, with panels using datasource `{ "type": "loki", "uid": "loki_local" }` locally, or a variable such as `DS_LOKI` on Grafana Cloud.
 
-| File | Dashboard | Panels |
-|------|-----------|--------|
-| `event-coverage.json` | Event Coverage | Log volume (timeseries), event distribution (table), component breakdown (table), recent logs (logs). Default time range 7 days. |
-| `command-audit.json` | Command Audit | Action results (logs), failed actions stat, action volume (timeseries). |
-| `incident-timeline.json` | Incident Timeline | Incidents (logs), incidents table (type/driver/car/lap/session_time), incident rate (timeseries). |
-| `plugin-health.json` | Plugin Health | ERROR/WARN rate (timeseries), all ERROR logs (logs), lifecycle (logs). |
-| `session-overview.json` | Session Overview | Session digests (logs), lifecycle events (logs), WebSocket client events (logs). |
-| `session-capture.json` | Session Capture | session_summary_captured, session_end_datapoints_session, checkered/retry, capture skipped/mismatch/fingerprint, capture vs skip rate. |
-| `replay-tracker.json` | Replay & Tracker | replay_control (logs), tracker state (baseline_established, session_reset, seek_backward_detected), replay control count. |
-| `bridge-actions.json` | Bridge & Actions | action_received, dashboard_opened/ws_client_rejected/bridge_start_failed, rejections stat. |
-| `errors-warnings.json` | Errors & Warnings | ERROR/WARN rate (timeseries), ERROR logs, WARN logs. |
-| `session-end-results.json` | Session End Results | session_end_datapoints_results (all chunks), chunks over time; merge by session_id and chunk_index for full table. |
-
-To validate which events appear in your data (e.g. last 7 days) and confirm the datasource, see **docs/observability-testing.md** (dashboard validation).
-
-See **Local quickstart** below to run Grafana and Loki so these dashboards load.
+Validate events over a time range in **docs/observability-testing.md** (Explore / LogQL checks).
 
 ### Derived fields (Loki datasource)
 
@@ -239,11 +264,18 @@ cd observability/local
 docker compose up -d
 # Grafana: http://localhost:3000  |  Loki: http://localhost:3100 (no auth for direct push)
 
-# Optional: start Alloy (file-tail) and Loki gateway for file-based ingestion:
-# docker compose --profile file-tail up -d
+# Optional: local **loki-gateway** (token-protected push) — see observability-local.md
 ```
 
-See **docs/observability-local.md** for the file-tail/gateway/alloy setup and token-protected push.
+See **docs/observability-local.md** for Grafana + Loki + gateway setup and `LOKI_PUSH_TOKEN`.
+
+## Housekeeping (Grafana Cloud)
+
+**Dashboards:** Delete in the Grafana UI or via the HTTP API using an existing editor/admin token. Do **not** delete the Loki datasource or change stack URLs, `SIMSTEWARD_LOKI_USER`, or `SIMSTEWARD_LOKI_TOKEN`.
+
+**Stored logs:** Rely on plan **retention**, or use Grafana Cloud / Loki **documented deletion** flows for your tier. Clearing data must not require rotating credentials.
+
+**Local Docker:** Wipe Loki (and optionally Grafana) bind-mount data with **docs/observability-local.md** § Housekeeping (`scripts/obs-wipe-local-data.ps1`).
 
 ## LogQL reference
 
@@ -256,7 +288,7 @@ See **docs/observability-local.md** for the file-tail/gateway/alloy setup and to
 | Plugin lifecycle | `{app="sim-steward", component="simhub-plugin"} \| json \| event =~ "plugin_started\|plugin_ready\|iracing_connected\|iracing_disconnected\|plugin_stopped"` |
 | Session digests | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_digest"` |
 | Session end metadata | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_end_datapoints_session"` |
-| Session end results (all chunks for one session) | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_end_datapoints_results" \| session_id = "<id>"` — merge in dashboard by sorting on `chunk_index` and flattening `results`. |
+| Session end results (all chunks for one session) | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_end_datapoints_results" \| session_id = "<id>"` — merge in panels by sorting on `chunk_index` and flattening `results`. |
 | WS peak (stat) | `max_over_time({app="sim-steward"} \| json \| event = "session_digest" \| unwrap ws_peak_clients [24h])` |
 | Trace by correlation | `{app="sim-steward"} \| json \| correlation_id = "<id>"` |
 | All errors | `{app="sim-steward", level="ERROR"}` |
@@ -274,7 +306,7 @@ See **docs/observability-local.md** for the file-tail/gateway/alloy setup and to
 
 ### Chunked session results (hundreds of drivers)
 
-End-of-session driver results are emitted as **session_end_datapoints_session** (metadata once) plus **session_end_datapoints_results** (one log line per chunk of 35 drivers). To show a full results table for a session in Grafana:
+End-of-session driver results are emitted as **session_end_datapoints_session** (metadata once) plus **session_end_datapoints_results** (one log line per chunk of 35 drivers). To show a full results table for a session in Grafana log/table panels:
 
 1. Query: `{app="sim-steward", component="simhub-plugin"} | json | event = "session_end_datapoints_results" | session_id = "<session_id>"`.
 2. In the panel transform: sort by `chunk_index`, then use a transform that flattens the `results` array from each chunk into a single table (e.g. "Merge" / "Flatten" or a custom transformation that concatenates `results` in order).

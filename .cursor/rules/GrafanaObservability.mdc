@@ -11,4 +11,4 @@ alwaysApply: false
 
 # Grafana Observability
 
-When working on Loki, Grafana dashboards, alerting, OTEL, or observability docs/tests, use the project skill **grafana-loki-observability** and follow `docs/GRAFANA-LOGGING.md` and the Grafana Loki logging plan (`.cursor/plans/grafana_loki_logging_4a33de1c.plan.md`).
+When working on Loki, Grafana dashboards, alerting, OTEL, or observability docs/tests, use the project skill **grafana-loki-observability** and follow `docs/GRAFANA-LOGGING.md`.
