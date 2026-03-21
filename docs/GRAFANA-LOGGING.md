@@ -65,6 +65,7 @@ Every log line has an `event` field. Key events:
 | `bridge_starting` | simhub-plugin | `bind`, `port` | WebSocket bridge starting. |
 | `bridge_start_failed` | simhub-plugin | `bind`, `port`, `error` | WebSocket server failed to start (WARN). |
 | `plugin_ready` | simhub-plugin | `ws_port`, `env` | Lifecycle readiness. |
+| `host_resource_sample` | simhub-plugin | `process_cpu_pct`, `process_working_set_mb`, `process_private_mb`, `gc_heap_mb`, `process_threads`, `disk_root`, `disk_total_gb`, `disk_free_gb`, `disk_used_pct`, `ws_clients`, `sample_interval_sec` | **~1/min** (default): SimHub process CPU (share of all logical CPUs), memory, managed heap, and usage of the drive that hosts plugin data. Tune interval with `SIMSTEWARD_RESOURCE_SAMPLE_SEC` (15–3600). Use Explore time series on numeric fields to spot spikes; rising `process_working_set_mb` / `gc_heap_mb` over hours suggests growth (not necessarily a leak—correlate with sessions). |
 | `log_streaming_subscribed` | simhub-plugin | — | Dashboard log streaming attached. |
 | `irsdk_started` | simhub-plugin | — | iRacing SDK started. |
 | `plugin_stopped` | simhub-plugin | — | Emitted from `End()`. |
@@ -150,6 +151,7 @@ PR checklist and `domain` taxonomy: **docs/RULES-ActionCoverage.md**. Full-field
 | `SIMSTEWARD_LOG_ENV` | `local` | `production` |
 | `SIMSTEWARD_LOG_DEBUG` | `1` (optional) | `0` or unset |
 | `SIMSTEWARD_LOG_ALL_ACTIONS` | `1` to keep `action_received` and `action_dispatched` in logs | unset (production omits them by default) |
+| `SIMSTEWARD_RESOURCE_SAMPLE_SEC` | Interval in seconds for `host_resource_sample` (15–3600) | `60` |
 
 **Log all action traffic:** In production, `action_received` and `action_dispatched` are omitted at source to reduce volume. To capture every command (e.g. for debugging or full click/event visibility), enable **Log all action traffic** in the plugin settings (Observability / Log filters), or set `SIMSTEWARD_LOG_ALL_ACTIONS=1` before starting SimHub.
 

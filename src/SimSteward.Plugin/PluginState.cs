@@ -28,6 +28,32 @@ namespace SimSteward.Plugin
 
         [JsonProperty("dashboardPing")]
         public string DashboardPing { get; set; } = "—";
+
+        /// <summary>Seconds since last <c>host_resource_sample</c>; <c>-1</c> if none yet.</summary>
+        [JsonProperty("resourceSampleAgeSec")]
+        public double ResourceSampleAgeSec { get; set; } = -1;
+
+        /// <summary>SimHub process CPU % (all logical processors), last sample.</summary>
+        [JsonProperty("processCpuPct")]
+        public double ProcessCpuPct { get; set; }
+
+        [JsonProperty("processWorkingSetMb")]
+        public double ProcessWorkingSetMb { get; set; }
+
+        [JsonProperty("processPrivateMb")]
+        public double ProcessPrivateMb { get; set; }
+
+        [JsonProperty("gcHeapMb")]
+        public double GcHeapMb { get; set; }
+
+        [JsonProperty("diskRoot")]
+        public string DiskRoot { get; set; } = "";
+
+        [JsonProperty("diskUsedPct")]
+        public double DiskUsedPct { get; set; }
+
+        [JsonProperty("diskFreeGb")]
+        public double DiskFreeGb { get; set; }
     }
 
     /// <summary>Minimal snapshot for WebSocket state push.</summary>
