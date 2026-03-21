@@ -295,7 +295,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   display: flex;
   gap: 8px;
   min-height: 0;
-  height: 420px;
+  height: 300px;
 }
 .log-section--telemetry {
   width: 300px;
@@ -307,8 +307,27 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   padding: 8px 12px 6px;
   border-bottom: 1px solid var(--border);
 }
+.log-section--telemetry .log-section-head { padding: 6px 10px 4px; }
 .log-section-head .panel-title { margin-bottom: 0; }
-.log-section-body--telem { flex: 1; min-height: 0; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+.log-section-body--telem {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 8px 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.log-section--telemetry .input-rows {
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.log-section--telemetry .input-lbl { margin-bottom: 2px; }
+.log-section--telemetry .bar-track { height: 6px; border-radius: 3px; }
+.log-section--telemetry .bar-fill { border-radius: 3px; }
+.log-section--telemetry .steer-wrap { gap: 2px; }
+.log-section--telemetry .steer-lbl { font-size: 0.62rem; }
+.log-section--telemetry .steer-svg { max-width: 150px; }
 .log-section--streams {
   flex: 1;
   min-width: 0;
@@ -773,6 +792,12 @@ function sendDashboardUiEvent({ element_id, event_type, message, value }) {
   }
 }
 
+// #region agent log
+function __dbgAgent(hypothesisId, location, message, data) {
+  fetch('http://127.0.0.1:7495/ingest/8b54de0f-5482-4c03-853b-a275c1b55527', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '1a14ab' }, body: JSON.stringify({ sessionId: '1a14ab', hypothesisId, location, message, data: data || {}, timestamp: Date.now() }) }).catch(function () {});
+}
+// #endregion
+
 function onMsg(m) {
   if (!m || !m.type) return;
   if (m.type === 'state')         onState(m);
@@ -814,6 +839,14 @@ function onState(m) {
   else lastLap = -1;
   if (m.frame !== undefined) setFrame(m.frame, m.frameEnd);
   updateReplaySessionRow(m);
+  // #region agent log
+  __dbgAgent('H2', 'index.html:onState', 'state_tick', {
+    driversLen: m.drivers && Array.isArray(m.drivers) ? m.drivers.length : null,
+    cgIsArray: Array.isArray(m.cameraGroups),
+    cgLen: Array.isArray(m.cameraGroups) ? m.cameraGroups.length : null,
+    emptyCgSkippedUi: !!(Array.isArray(m.cameraGroups) && m.cameraGroups.length === 0)
+  });
+  // #endregion
 }
 
 function updateReplaySessionRow(m) {
@@ -926,6 +959,9 @@ function populateCarDropdown(driversArr) {
       if (sel.options[i].getAttribute('data-player') === '1') { sel.selectedIndex = i; break; }
     }
   }
+  // #region agent log
+  __dbgAgent('H4', 'index.html:populateCarDropdown', 'car_restore', { prevCar: prevCar, restored: restored, optCount: sel.options.length });
+  // #endregion
   renderDriverIncidents();
 }
 
@@ -998,6 +1034,9 @@ function selectPrevIncident() {
   if (!selectedIncident) return;
   const filtered = getFilteredIncidents();
   const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
+  // #region agent log
+  __dbgAgent('H3', 'index.html:selectPrevIncident', 'nav', { idx: idx, filteredLen: filtered.length, selFrame: selectedIncident.frame, incFilter: incFilter });
+  // #endregion
   sendDashboardUiEvent({ element_id: 'selected-inc-prev', event_type: 'click', message: 'Selected incident prev' });
   if (idx > 0) onSessionIncidentClick(filtered[idx - 1].frame);
 }
@@ -1006,6 +1045,9 @@ function selectNextIncident() {
   if (!selectedIncident) return;
   const filtered = getFilteredIncidents();
   const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
+  // #region agent log
+  __dbgAgent('H3', 'index.html:selectNextIncident', 'nav', { idx: idx, filteredLen: filtered.length, selFrame: selectedIncident.frame, incFilter: incFilter });
+  // #endregion
   sendDashboardUiEvent({ element_id: 'selected-inc-next', event_type: 'click', message: 'Selected incident next' });
   if (idx >= 0 && idx < filtered.length - 1) onSessionIncidentClick(filtered[idx + 1].frame);
 }
@@ -1378,6 +1420,15 @@ function onCarSel() {
   const idx = +sel.value;
   const opt = sel.options[sel.selectedIndex];
   const m = MOCK_CAR_TELEM[idx] || MOCK_CAR_TELEM[0];
+  // #region agent log
+  __dbgAgent('H1', 'index.html:onCarSel', 'mock_telem_lookup', {
+    selValue: sel.value,
+    idxNum: idx,
+    mockTelemLen: MOCK_CAR_TELEM.length,
+    usedFallback: !MOCK_CAR_TELEM[idx],
+    dataCar: opt ? opt.getAttribute('data-car') : null
+  });
+  // #endregion
   mockTelem = m;
   setTelem(m.t, m.b, m.s);
   renderDriverIncidents();
