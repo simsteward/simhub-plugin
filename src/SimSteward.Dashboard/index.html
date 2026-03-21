@@ -510,7 +510,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
               <circle class="g-hub" cx="65" cy="72" r="4.5"/>
               <text class="g-text" x="2"  y="76">0°</text>
               <text class="g-text" x="108" y="76">180°</text>
-              <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">90°</text>
+              <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">0°</text>
             </svg>
           </div>
         </div>
@@ -907,6 +907,14 @@ function setTelem(t, b, sRad) {
   updateWheel(sRad);
 }
 
+function formatSteerDeviation(vd) {
+  const a = Math.abs(vd);
+  if (a < 0.05) return '0°';
+  const mag = a < 10 ? String(+a.toFixed(1)).replace(/\.0$/, '') : String(Math.round(a));
+  /* Needle clockwise (+vd) = toward 180° on gauge = left steer in car; CCW (−vd) = right steer. */
+  return vd > 0 ? mag + '° L' : mag + '° R';
+}
+
 function updateWheel(sRad) {
   const vd = Math.max(
     -STEER_AXIS_HALF_DEG,
@@ -915,8 +923,7 @@ function updateWheel(sRad) {
   document.getElementById('g-needle').setAttribute('transform', `rotate(${vd},65,72)`);
   const arc = document.getElementById('g-active');
   arc.setAttribute('d', Math.abs(vd) < 0.5 ? '' : arcPath(65, 72, 55, 0, vd));
-  const axisDeg = 90 + vd;
-  document.getElementById('g-angle').textContent = Math.round(axisDeg) + '°';
+  document.getElementById('g-angle').textContent = formatSteerDeviation(vd);
 }
 
 // SVG arc helper: 0°=up, +ve=clockwise
