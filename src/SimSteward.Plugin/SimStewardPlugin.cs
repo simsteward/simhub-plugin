@@ -61,6 +61,8 @@ namespace SimSteward.Plugin
         private double _lastSessionTime;
         private string _pluginMode = "Unknown";
         private int _replayFrameNumEnd;
+        /// <summary>Replay length (telemetry <c>ReplayFrameNumEnd</c>); 0 if unknown.</summary>
+        private int _replayFrameTotal;
         private string _currentSessionId = "";
         private string _currentSessionSeq = "";
         /// <summary>Latest iRacing session context for structured logs (WebSocket thread reads; DataUpdate writes).</summary>
@@ -68,6 +70,8 @@ namespace SimSteward.Plugin
         private volatile string _logCtxParent = SessionLogging.NotInSession;
         private volatile string _logCtxSessionNum = SessionLogging.NotInSession;
         private volatile string _logCtxTrack = SessionLogging.NotInSession;
+        /// <summary>CarIdxLap for focus car (CamCarIdx if valid, else PlayerCarIdx); -1 if unknown.</summary>
+        private volatile int _logCtxLap = SessionLogging.LapUnknown;
 #endif
 
 #if SIMHUB_SDK
@@ -79,6 +83,9 @@ namespace SimSteward.Plugin
                 pluginMode = snapshot.PluginMode,
                 currentSessionTime = snapshot.CurrentSessionTime,
                 currentSessionTimeFormatted = snapshot.CurrentSessionTimeFormatted,
+                lap = snapshot.Lap,
+                frame = snapshot.Frame,
+                frameEnd = snapshot.FrameEnd,
                 diagnostics = snapshot.Diagnostics
             };
             return JsonConvert.SerializeObject(state);
@@ -178,6 +185,9 @@ namespace SimSteward.Plugin
                 PluginMode = _pluginMode,
                 CurrentSessionTime = _lastSessionTime,
                 CurrentSessionTimeFormatted = FormatSessionTime(_lastSessionTime),
+                Lap = _logCtxLap,
+                Frame = _replayFrameNumEnd,
+                FrameEnd = _replayFrameTotal,
                 Diagnostics = new PluginDiagnostics
                 {
                     IrsdkStarted = _irsdk != null,
@@ -245,6 +255,7 @@ namespace SimSteward.Plugin
             fields["parent_session_id"] = _logCtxParent;
             fields["session_num"] = _logCtxSessionNum;
             fields["track_display_name"] = _logCtxTrack;
+            fields["lap"] = _logCtxLap;
             SessionLogging.AppendRoutingAndDestination(fields);
         }
 
@@ -432,6 +443,7 @@ namespace SimSteward.Plugin
                 }
 
                 _replayFrameNumEnd = SafeGetInt("ReplayFrameNum");
+                _replayFrameTotal = SafeGetInt("ReplayFrameNumEnd");
                 int subId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
                 int parentId = 0;
                 try
@@ -453,18 +465,22 @@ namespace SimSteward.Plugin
                 _logCtxParent = parentId > 0 ? parentId.ToString() : SessionLogging.NotInSession;
                 _logCtxSessionNum = sessionNum.ToString();
                 _logCtxTrack = string.IsNullOrEmpty(trackName) ? SessionLogging.NotInSession : trackName;
+                int focusCar = ResolveFocusCarIdx();
+                _logCtxLap = focusCar >= 0 ? SafeGetCarIdxLap(focusCar) : SessionLogging.LapUnknown;
             }
             else
             {
                 _lastSessionTime = 0;
                 _pluginMode = "Unknown";
                 _replayFrameNumEnd = 0;
+                _replayFrameTotal = 0;
                 _currentSessionId = "";
                 _currentSessionSeq = "";
                 _logCtxSubsession = SessionLogging.NotInSession;
                 _logCtxParent = SessionLogging.NotInSession;
                 _logCtxSessionNum = SessionLogging.NotInSession;
                 _logCtxTrack = SessionLogging.NotInSession;
+                _logCtxLap = SessionLogging.LapUnknown;
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
@@ -508,6 +524,31 @@ namespace SimSteward.Plugin
             catch
             {
                 return 0;
+            }
+        }
+
+        /// <summary>Replay camera car if valid; otherwise player car index.</summary>
+        private int ResolveFocusCarIdx()
+        {
+            const int maxCars = 64;
+            int cam = SafeGetInt("CamCarIdx");
+            if (cam >= 0 && cam < maxCars)
+                return cam;
+            int player = SafeGetInt("PlayerCarIdx");
+            if (player >= 0 && player < maxCars)
+                return player;
+            return -1;
+        }
+
+        private int SafeGetCarIdxLap(int carIdx)
+        {
+            try
+            {
+                return _irsdk.Data.GetInt("CarIdxLap", carIdx);
+            }
+            catch
+            {
+                return SessionLogging.LapUnknown;
             }
         }
 

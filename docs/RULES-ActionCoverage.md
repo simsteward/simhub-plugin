@@ -21,7 +21,7 @@ Canonical reference for *every user-facing interaction must be logged with the c
 
 ### Session context (all `action` + `iracing` logs)
 
-Include each field, or fall back to `"not in session"` (`SessionLogging.NotInSession`):
+Include each field, or fall back to `"not in session"` (`SessionLogging.NotInSession`) for string ids. **Lap** uses integer **`SessionLogging.LapUnknown` (`-1`)** when unavailable.
 
 | Field                 | Meaning |
 |-----------------------|---------|
@@ -29,6 +29,7 @@ Include each field, or fall back to `"not in session"` (`SessionLogging.NotInSes
 | `parent_session_id`   | Broader event id (`WeekendInfo.SessionID`) |
 | `session_num`         | Phase: practice / qualify / race (`SessionNum`) |
 | `track_display_name`  | Track name from `WeekendInfo` |
+| `lap`                 | Focus car `CarIdxLap` (CamCarIdx if valid, else PlayerCarIdx); `-1` if unknown |
 
 Action and `dashboard_ui_event` paths merge these via `MergeSessionAndRoutingFields()` in `SimStewardPlugin`.
 
@@ -41,6 +42,7 @@ Action and `dashboard_ui_event` paths merge these via `MergeSessionAndRoutingFie
 | `start_frame`   | Replay frame at incident start |
 | `end_frame`     | Replay frame at incident end |
 | `session_time`  | `SessionTime` at detection |
+| `lap`           | `CarIdxLap` for the incident car; `-1` if unknown |
 
 **Canonical event name in this rule:** `iracing_incident`. **Current JSONL `event`:** `incident_detected` (tracker) — align names when code is updated; until then, LogQL uses `incident_detected`.
 

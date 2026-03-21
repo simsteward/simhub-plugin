@@ -42,6 +42,18 @@ namespace SimSteward.Plugin
         [JsonProperty("currentSessionTimeFormatted")]
         public string CurrentSessionTimeFormatted { get; set; } = "0:00";
 
+        /// <summary>CarIdxLap for focus car; <see cref="SessionLogging.LapUnknown"/> if unknown.</summary>
+        [JsonProperty("lap")]
+        public int Lap { get; set; } = SessionLogging.LapUnknown;
+
+        /// <summary>Current replay frame (<c>ReplayFrameNum</c>).</summary>
+        [JsonProperty("frame")]
+        public int Frame { get; set; }
+
+        /// <summary>Replay end frame (<c>ReplayFrameNumEnd</c>); 0 if unknown.</summary>
+        [JsonProperty("frameEnd")]
+        public int FrameEnd { get; set; }
+
         [JsonProperty("diagnostics")]
         public PluginDiagnostics Diagnostics { get; set; } = new PluginDiagnostics();
     }

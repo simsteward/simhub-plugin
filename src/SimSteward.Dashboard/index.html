@@ -635,11 +635,11 @@ const STEER_AXIS_HALF_DEG = 90;
 
 // ── Mock data ────────────────────────────────────────────
 const MOCK_INC = [
-  { id:1, time:'12:34.5', car:99, driver:'J. Smith',  sev:4, cause:'contact',  frame:54321, player:true  },
-  { id:2, time:'12:20.1', car:12, driver:'A. Jones',  sev:2, cause:'wall',     frame:52100, player:false },
-  { id:3, time:'11:45.8', car:42, driver:'B. Lee',    sev:1, cause:'off-track',frame:48900, player:false },
-  { id:4, time:'11:12.3', car:7,  driver:'M. Wilson', sev:4, cause:'contact',  frame:45200, player:false },
-  { id:5, time:'10:55.0', car:99, driver:'J. Smith',  sev:2, cause:'spin',     frame:44100, player:true  },
+  { id:1, time:'12:34.5', car:99, driver:'J. Smith',  sev:4, cause:'contact',  frame:54321, lap:12, player:true  },
+  { id:2, time:'12:20.1', car:12, driver:'A. Jones',  sev:2, cause:'wall',     frame:52100, lap:11, player:false },
+  { id:3, time:'11:45.8', car:42, driver:'B. Lee',    sev:1, cause:'off-track',frame:48900, lap:11, player:false },
+  { id:4, time:'11:12.3', car:7,  driver:'M. Wilson', sev:4, cause:'contact',  frame:45200, lap:10, player:false },
+  { id:5, time:'10:55.0', car:99, driver:'J. Smith',  sev:2, cause:'spin',     frame:44100, lap:10, player:true  },
 ];
 const MOCK_DRV = [
   { pos:1, car:99, name:'J. Smith',  inc:6, player:true  },
@@ -670,6 +670,8 @@ let mockPaused  = false;  // paused when real WS connected
 let mockTelem   = { t:0.65, b:0.00, s:0.30 };
 let replayPaused = false;
 let lastReplaySpeed = '1';
+/** Focus-car lap from plugin state (telemetry CarIdxLap); -1 if unknown. */
+let lastLap = -1;
 /** @type {{ kind:'session', frame:number } | { kind:'capture', seq:number } | null} */
 let incidentMetaSelection = null;
 
@@ -740,6 +742,8 @@ function onState(m) {
   setDot('d-simhub', d.simHubHttpListening);
   if (m.telemetry) setTelem(m.telemetry.throttle||0, m.telemetry.brake||0, m.telemetry.steeringWheelAngle||0);
   if (m.drivers)   { drivers = m.drivers; renderStd(); }
+  if (typeof m.lap === 'number' && !Number.isNaN(m.lap)) lastLap = m.lap;
+  else lastLap = -1;
   if (m.frame !== undefined) setFrame(m.frame, m.frameEnd);
 }
 
@@ -764,13 +768,14 @@ function getFilteredIncidents() {
 }
 
 function incidentCardHtml(i) {
+  const lapStr = (typeof i.lap === 'number' && i.lap >= 0) ? ` · L${i.lap}` : '';
   return `
     <div class="inc-card${i.player ? ' player' : ''}" data-frame="${i.frame}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onSessionIncidentClick(${i.frame})}" onclick="onSessionIncidentClick(${i.frame})">
       <span class="car-num">#${i.car}</span>
       <span class="inc-name">${i.driver}</span>
       <span class="cause-tag ${i.cause}">${i.cause.replace('-', ' ')}</span>
       <span class="sev-badge s${i.sev}">${i.sev}×</span>
-      <span class="inc-time">${i.time}</span>
+      <span class="inc-time">${i.time}${lapStr}</span>
     </div>`;
 }
 
@@ -820,6 +825,9 @@ function parseFrameFromLabel(frameText) {
 
 function enrichCaptureRecord(frameNum, sessionTime, seq) {
   const match = incidents.find(i => i.frame === frameNum);
+  const lapVal = (match && typeof match.lap === 'number' && match.lap >= 0)
+    ? match.lap
+    : (lastLap >= 0 ? lastLap : -1);
   if (match) {
     return {
       seq,
@@ -830,7 +838,8 @@ function enrichCaptureRecord(frameNum, sessionTime, seq) {
       driver: match.driver,
       sev: match.sev,
       cause: match.cause,
-      player: !!match.player
+      player: !!match.player,
+      lap: lapVal
     };
   }
   return {
@@ -842,7 +851,8 @@ function enrichCaptureRecord(frameNum, sessionTime, seq) {
     driver: 'Unknown',
     sev: 1,
     cause: 'unknown',
-    player: false
+    player: false,
+    lap: lapVal
   };
 }
 
@@ -853,13 +863,14 @@ function capturedRowHtml(rec) {
   const car = rec.car != null ? rec.car : '—';
   const player = !!rec.player;
   const label = cause.replace(/-/g, ' ');
+  const lapStr = (typeof rec.lap === 'number' && rec.lap >= 0) ? ` · L${rec.lap}` : '';
   return `
     <div class="inc-card${player ? ' player' : ''}" data-cap-seq="${rec.seq}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onCapturedIncidentClick(${rec.seq})}" onclick="onCapturedIncidentClick(${rec.seq})">
       <span class="car-num">#${car}</span>
       <span class="inc-name">${rec.driver}</span>
       <span class="cause-tag ${cause}">${label}</span>
       <span class="sev-badge s${sev}">${sev}×</span>
-      <span class="inc-time">${rec.sessionTime}</span>
+      <span class="inc-time">${rec.sessionTime}${lapStr}</span>
     </div>`;
 }
 
@@ -980,7 +991,7 @@ function formatIncidentMetaHtml(i) {
   return `<div class="im-block im-block-single">
     <div class="im-meta-hdr">Incident ${id} · session ${i.time}</div>
     ${cap}
-    <div class="im-row"><strong>Frame</strong> <code>${i.frame}</code> · <strong>car</strong> #${i.car} · <strong>driver</strong> ${i.driver}</div>
+    <div class="im-row"><strong>Frame</strong> <code>${i.frame}</code> · <strong>lap</strong> ${(typeof i.lap === 'number' && i.lap >= 0) ? i.lap : '—'} · <strong>car</strong> #${i.car} · <strong>driver</strong> ${i.driver}</div>
     <div class="im-row"><strong>Severity</strong> ${i.sev}× · <strong>cause</strong> ${String(i.cause).replace(/-/g, ' ')} · <strong>you</strong> ${i.player ? 'yes' : 'no'}</div>
     <div class="im-future">Nearby cars / other party (e.g. proximity): reserved for future telemetry.</div>
   </div>`;
@@ -1389,9 +1400,10 @@ function captureStep() {
     if (!capturing) return;
     const frameEl = document.getElementById('frame-cur').textContent;
     const timeEl = document.getElementById('session-time').textContent;
+    const lapPart = (lastLap >= 0 ? '  lap:' + lastLap : '  lap:—');
     log('events', 'EVENT', 'capture_incident',
       '#' + String(captureCount).padStart(2, '0') + '  frame:' + frameEl.replace('Frame ', '') +
-      '  session:' + timeEl + (sent ? '' : '  [PoC-mock]'));
+      '  session:' + timeEl + lapPart + (sent ? '' : '  [PoC-mock]'));
 
     const frameNum = parseFrameFromLabel(frameEl);
     capturedIncidents.push(enrichCaptureRecord(frameNum, timeEl, captureCount));

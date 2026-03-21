@@ -141,6 +141,7 @@ namespace SimSteward.GrafanaTestHarness
             fields["subsession_id"] = "42700101";
             fields["parent_session_id"] = "17001234";
             fields["track_display_name"] = "Test Track";
+            fields["lap"] = SessionLogging.LapUnknown;
             SessionLogging.AppendRoutingAndDestination(fields);
         }
 

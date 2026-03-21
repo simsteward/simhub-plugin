@@ -14,6 +14,12 @@ namespace SimSteward.Plugin.Tests
         }
 
         [Fact]
+        public void SessionLogging_LapUnknown_IsMinusOne()
+        {
+            Assert.Equal(-1, SessionLogging.LapUnknown);
+        }
+
+        [Fact]
         public void SessionLogging_AppendRouting_DisabledWhenNoUrl()
         {
             var f = new Dictionary<string, object>();

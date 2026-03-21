@@ -11,6 +11,9 @@ namespace SimSteward.Plugin
     {
         public const string NotInSession = "not in session";
 
+        /// <summary>Telemetry lap not available (disconnected, invalid car index, or read failure).</summary>
+        public const int LapUnknown = -1;
+
         /// <summary>
         /// Adds <c>log_env</c> (SIMSTEWARD_LOG_ENV) and <c>loki_push_target</c> derived from SIMSTEWARD_LOKI_URL.
         /// </summary>
