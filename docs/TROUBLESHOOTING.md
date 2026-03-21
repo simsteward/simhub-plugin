@@ -142,7 +142,7 @@ See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL exam
 - **401 on ingest or `verify-key`** — The ContextStream API key must be in `.env` (`CONTEXTSTREAM_API_KEY`, etc.) and loaded for CLI commands. From the repo root:  
   `npx -y envmcp --env-file .env cmd /c "%LocalAppData%\ContextStream\contextstream-mcp.exe verify-key"`  
   If that fails, rotate the key in the ContextStream account and update `.env` (do not commit real secrets).
-- **`ingest` fails with "not a terminal"`** — Run `contextstream-mcp.exe ingest --path <repo>` (or `index --path <repo>`) in a **normal interactive** terminal (Windows Terminal / `cmd`), not from a non-TTY automation shell. The MCP server uses the same key via Cursor env.
+- **`ingest` fails with "not a terminal"`** — From repo root (with `.env`): `powershell -ExecutionPolicy Bypass -File scripts/contextstream-ingest.ps1` (spawns `cmd` so the CLI sees a console). Or run `contextstream-mcp.exe ingest --path <repo>` manually in Windows Terminal / `cmd`. The MCP server uses the same key via Cursor env.
 - **Search says index freshness `missing`** — After a successful ingest from step above, keyword search still works; semantic/index metadata syncs once ingestion completes.
 
 ---
