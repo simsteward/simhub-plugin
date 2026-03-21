@@ -8,6 +8,7 @@
     "obs:down": "docker compose -f observability/local/docker-compose.yml down",
     "obs:ps": "docker compose -f observability/local/docker-compose.yml ps",
     "obs:poll": "pwsh -NoProfile -File scripts/poll-loki.ps1",
+    "obs:poll:grafana": "pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana",
     "obs:wipe": "pwsh -NoProfile -File scripts/obs-wipe-local-data.ps1"
   }
 }

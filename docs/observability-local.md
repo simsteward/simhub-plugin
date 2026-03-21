@@ -24,7 +24,7 @@ Quick start for plugin logs in local Grafana/Loki and the **loki-gateway** push 
 
 **Storage override:** Set `GRAFANA_STORAGE_PATH` in `.env.observability.local`; compose uses `${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}`.
 
-**Terminal tail:** `npm run obs:poll` or `.\scripts\poll-loki.ps1`.
+**Terminal tail:** `npm run obs:poll` (direct Loki :3100) or `npm run obs:poll:grafana` / `.\scripts\poll-loki.ps1 -ViaGrafana` using **GRAFANA_API_TOKEN** (or admin user/password) in repo `.env` — same path Grafana Explore uses (`loki_local` datasource).
 
 ---
 

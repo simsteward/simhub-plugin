@@ -1,13 +1,17 @@
 # Continuously poll Loki for SimSteward logs and print new lines (tail-style).
-# Run from repo root: .\scripts\poll-loki.ps1 [-Query '{app="sim-steward"} | json | level != "DEBUG"']
-# Auth: loads repo .env — LOKI_QUERY_URL or SIMSTEWARD_LOKI_URL; optional SIMSTEWARD_LOKI_USER + SIMSTEWARD_LOKI_TOKEN (Grafana Cloud).
-# Ctrl+C to stop.
+# Run from repo root:
+#   Direct Loki:  .\scripts\poll-loki.ps1
+#   Via Grafana:  .\scripts\poll-loki.ps1 -ViaGrafana   (or npm run obs:poll:grafana)
+# .env: LOKI_QUERY_URL / SIMSTEWARD_LOKI_URL + optional SIMSTEWARD_LOKI_* (cloud).
+# -ViaGrafana: GRAFANA_URL, GRAFANA_API_TOKEN (or GRAFANA_ADMIN_USER + GRAFANA_ADMIN_PASSWORD), optional GRAFANA_LOKI_DATASOURCE_UID=loki_local.
+# Env SIMSTEWARD_LOKI_VIA_GRAFANA=1 enables -ViaGrafana without the switch.
 
 param(
     [string]$LokiUrl = "",
     [string]$Query = '{app="sim-steward"} | json | level != "DEBUG"',
     [int]$IntervalSeconds = 2,
-    [int]$LookbackSeconds = 120
+    [int]$LookbackSeconds = 120,
+    [switch]$ViaGrafana
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +27,30 @@ if (Test-Path $envFile) {
         }
     }
 }
+
+$useGrafanaProxy = [bool]$ViaGrafana
+if (-not $useGrafanaProxy) {
+    $vf = [System.Environment]::GetEnvironmentVariable("SIMSTEWARD_LOKI_VIA_GRAFANA", "Process")
+    if ($vf) {
+        $vf = $vf.Trim().ToLowerInvariant()
+        $useGrafanaProxy = ($vf -eq "1" -or $vf -eq "true" -or $vf -eq "yes")
+    }
+}
+
+$GrafanaUrl = "http://localhost:3000"
+$tmpG = [System.Environment]::GetEnvironmentVariable("GRAFANA_URL", "Process")
+if ($tmpG) { $GrafanaUrl = $tmpG.Trim().TrimEnd('/') }
+
+$DatasourceUid = "loki_local"
+$tmpUid = [System.Environment]::GetEnvironmentVariable("GRAFANA_LOKI_DATASOURCE_UID", "Process")
+if ($tmpUid) { $DatasourceUid = $tmpUid.Trim() }
+
+$grafanaToken = [System.Environment]::GetEnvironmentVariable("GRAFANA_API_TOKEN", "Process")
+if ($grafanaToken) { $grafanaToken = $grafanaToken.Trim() }
+$grafanaAdminUser = [System.Environment]::GetEnvironmentVariable("GRAFANA_ADMIN_USER", "Process")
+if ($grafanaAdminUser) { $grafanaAdminUser = $grafanaAdminUser.Trim() }
+$grafanaAdminPass = [System.Environment]::GetEnvironmentVariable("GRAFANA_ADMIN_PASSWORD", "Process")
+if ($grafanaAdminPass) { $grafanaAdminPass = $grafanaAdminPass.Trim() }
 
 $lu = $LokiUrl.Trim()
 if (-not $lu) {
@@ -41,6 +69,13 @@ if ($lokiUser) { $lokiUser = $lokiUser.Trim() }
 $lokiToken = [System.Environment]::GetEnvironmentVariable("SIMSTEWARD_LOKI_TOKEN", "Process")
 if ($lokiToken) { $lokiToken = $lokiToken.Trim() }
 
+if ($useGrafanaProxy) {
+    if (-not $grafanaToken -and (-not $grafanaAdminUser -or -not $grafanaAdminPass)) {
+        Write-Host "FAIL: -ViaGrafana requires GRAFANA_API_TOKEN or GRAFANA_ADMIN_USER + GRAFANA_ADMIN_PASSWORD in .env." -ForegroundColor Red
+        exit 1
+    }
+}
+
 $script:Seen = @{}
 
 function Get-UnixNano {
@@ -48,7 +83,7 @@ function Get-UnixNano {
     [long](([DateTime]::UtcNow - $epoch).TotalSeconds * 1000000000)
 }
 
-function Get-LokiHeaders {
+function Get-DirectLokiHeaders {
     $h = @{}
     if ($lokiUser -and $lokiToken) {
         $pair = "${lokiUser}:${lokiToken}"
@@ -58,14 +93,37 @@ function Get-LokiHeaders {
     $h
 }
 
+function Get-GrafanaProxyHeaders {
+    $h = @{}
+    if ($grafanaToken) {
+        $h["Authorization"] = "Bearer " + $grafanaToken
+    } elseif ($grafanaAdminUser -and $grafanaAdminPass) {
+        $pair = "${grafanaAdminUser}:${grafanaAdminPass}"
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($pair)
+        $h["Authorization"] = "Basic " + [Convert]::ToBase64String($bytes)
+    }
+    $h
+}
+
 function Get-LokiLogs {
     $endNs = Get-UnixNano
     $startNs = $endNs - ([long]$LookbackSeconds * 1000000000)
-    $url = "$LokiUrl/loki/api/v1/query_range?query=" + [Uri]::EscapeDataString($Query) + "&limit=200&start=$startNs&end=$endNs"
+    $q = [Uri]::EscapeDataString($Query)
+    if ($useGrafanaProxy) {
+        $base = "$GrafanaUrl/api/datasources/proxy/uid/$DatasourceUid"
+        $url = "$base/loki/api/v1/query_range?query=$q&limit=200&start=$startNs&end=$endNs"
+        $headers = Get-GrafanaProxyHeaders
+    } else {
+        $url = "$LokiUrl/loki/api/v1/query_range?query=$q&limit=200&start=$startNs&end=$endNs"
+        $headers = Get-DirectLokiHeaders
+    }
     try {
-        $r = Invoke-RestMethod -Uri $url -Method Get -Headers (Get-LokiHeaders) -ErrorAction Stop
+        $r = Invoke-RestMethod -Uri $url -Method Get -Headers $headers -ErrorAction Stop
     } catch {
         Write-Host "Loki request failed: $_" -ForegroundColor Red
+        return @()
+    }
+    if (-not $r.data -or -not $r.data.result) {
         return @()
     }
     $lines = @()
@@ -87,8 +145,12 @@ function Format-LogLine {
     "$dt $preview"
 }
 
-Write-Host "Polling Loki every ${IntervalSeconds}s for $Query (lookback ${LookbackSeconds}s). Ctrl+C to stop." -ForegroundColor Cyan
-Write-Host "Loki URL: $LokiUrl" -ForegroundColor Gray
+Write-Host "Polling every ${IntervalSeconds}s for $Query (lookback ${LookbackSeconds}s). Ctrl+C to stop." -ForegroundColor Cyan
+if ($useGrafanaProxy) {
+    Write-Host "Route: Grafana proxy → $GrafanaUrl (datasource uid=$DatasourceUid)" -ForegroundColor Gray
+} else {
+    Write-Host "Route: direct Loki → $LokiUrl" -ForegroundColor Gray
+}
 Write-Host ""
 
 while ($true) {
