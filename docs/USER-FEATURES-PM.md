@@ -1,93 +1,180 @@
-# Sim Steward — user features and flows (PM summary)
+# Sim Steward — User features (PM-style) and how they connect
 
-This page is the product-manager-style map of user-facing capabilities, the intended replay-review journey, how pieces connect (SimHub / WebSocket / iRacing), and how that relates to [PRODUCT-FLOW.md](PRODUCT-FLOW.md) (shipped vs missing vs future).
+## Scope
 
-## North-star story (what we’re building toward)
-
-From [PRODUCT-FLOW.md](PRODUCT-FLOW.md): the **problem** is slow manual replay review in iRacing. The **solution narrative** is: load a replay → **discover all incidents** into a **review queue** → **jump** incident to incident → **frame the camera** → **capture** clips (today often with OBS manually) → repeat until the session is reviewed.
-
-That doc’s **mermaid diagram** is the canonical “happy path” product story: entry → (optional) **Find All Incidents** scan → **incident list** → **selected incident** controls → **Capture** (seek pre-roll, set camera, 1×) → **Next** / done. It also calls out **future** paths: dual-view capture and **OBS automation** (dashed nodes).
+This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.html`](../src/SimSteward.Dashboard/index.html)) plus implied **plugin WebSocket** behavior (replay/incidents/telemetry). [PRODUCT-FLOW.md](PRODUCT-FLOW.md) still lists several **target** features (Selected Incident Panel, camera dropdown, atomic capture, YAML scan) as **not shipped**—below calls out what is **actually in the UI today** vs that north-star.
 
 ---
 
-## Feature buckets (how to talk about them)
+## Feature 1 — Session awareness and health (status bar)
 
-| Bucket | User-facing value | Primary surfaces |
-|--------|-------------------|------------------|
-| **Connection and trust** | User knows SimHub + plugin + dashboard are alive | Status bar: mode pill, session time, WS badge, diagnostic dots (iRacing, Steam, SimHub HTTP) |
-| **Situational awareness** | User sees where they are in the replay | Replay frame / scrub UI, session time, mode (Replay vs not) |
-| **Incident discovery** | User gets a list of incidents instead of hunting blind | Incident list (+ dock), filters (All / severity / Mine), optional **Find all incidents** scan |
-| **Incident navigation** | User moves the replay to the right moment | Row click / seek controls / prev–next (intended: `seek_to_incident`, replay seek) |
-| **Driving context** | User sees who did what in the field | Standings panel, per-car telemetry selector |
-| **Review instrumentation** | User (and support) can see what the app thought happened | Multi-tab **logs** (events, health, telemetry, incident meta), plugin log stream over WebSocket |
-| **Operator analytics** | Team observes sessions in Grafana/Loki | Structured logs (`plugin-structured.jsonl` + your ingestion); not a driver-facing “feature” but connects to the same events |
+**User story:** As a steward, I see whether I’m in replay vs waiting, current session time, dependency lights (iRacing / Steam / SimHub), and WebSocket connectivity so I know the UI is live.
+
+**Flow:** Open dashboard → header shows mode pill, time, dots, WS badge → plugin `state` updates refine these as replay/session data arrives.
+
+**Connects to:** Everything else—if WS is down, scans and seeks may not reach the plugin; dots explain “why nothing moves.”
 
 ---
 
-## Flows described like a PM (per feature)
+## Feature 2 — Replay transport controls
 
-**1. Land in the dashboard**  
-User opens the SimHub-hosted page (Web Page component → `http://<host>:8888/Web/sim-steward-dash/index.html`; see `.cursor/rules/SimHub.mdc`). They expect a **green WS** indicator: the browser opens a WebSocket to the plugin’s Fleck server. *Emotional outcome:* “I’m connected to Sim Steward.”
+**User story:** I can jump start/end, change speed, play/pause, step prev/next **incident** in replay, and see frame + scrub bar.
 
-**2. Understand session state**  
-User glances at **mode** (Replay vs waiting), **session time**, and **frame** so they know whether iRacing data is flowing. Diagnostics confirm **iRacing SDK**, **Steam**, **SimHub HTTP**. *Outcome:* confidence the pipeline is healthy before touching controls.
+**Flow:** Use transport buttons → `replay_*` actions over WebSocket → logs in iRacing Events / App Health as implemented → frame label and scrub fill update from `state`.
 
-**3. Browse incidents**  
-User scans the **incident list** (and optional docked copy), uses **chips** to narrow (e.g. player-only or severity). *Outcome:* a prioritized queue of “what went wrong” without scrubbing the whole replay.
-
-**4. “Find all incidents” (scan)**  
-User starts a **scan** that steps the replay (documented in PRODUCT-FLOW as **partial**: dashboard-driven stepping, not a full YAML deep-scan yet). *Intended outcome:* fill or refresh the list automatically. *Product risk called out in doc:* fragile vs true server-side scan.
-
-**5. Navigate replay**  
-User uses **replay buttons** (jump start/end, speed pills, prev/next incident) or **clicks an incident row** to jump. *Intended outcome:* time travel to the right frame for review. **Connection:** each action is a WebSocket message to the plugin’s dispatcher.
-
-**6. Telemetry and standings**  
-User picks a **car** for throttle/brake/steer display and expands **standings** for positions/incidents. *Outcome:* context for “who” while reviewing “what” in the incident list.
-
-**7. Logs and meta**  
-User switches **log tabs** (iRacing events, app health, telemetry lines, incident meta) to debug or narrate the session. UI actions can emit **`dashboard_ui_event`** for observability. *Outcome:* same session story in human-readable form; aligns with Grafana for operators.
-
-**8. SimHub plugin settings (desktop)**  
-User opens **Sim Steward** in SimHub’s left menu for port, paths, connection text. *Outcome:* power users fix deploy/path issues without editing files.
+**Connects to:** **Incident navigation** (duplicate prev/next incident), **capture scans** (seek to frames), and **leaderboard** (seek when clicking an incident). Same replay “surface,” different entry points.
 
 ---
 
-## How the pieces connect (system view)
+## Feature 3 — Telemetry car selection
+
+**User story:** I pick which car the **telemetry strip** and **“This driver’s incidents”** list represent.
+
+**Flow:** Change **Telemetry car** dropdown → mock telemetry in PoC updates; driver incident list filters by `car`; session-scan capture can rotate this dropdown per incident when scanning the whole session.
+
+**Connects to:** **This driver’s incidents** (left), **Find driver’s incidents** (queue built from plugin incident list for that car), and **session scan** (UI follows each incident’s car).
+
+---
+
+## Feature 4 — Incident leaderboard (filtered session list)
+
+**User story:** I see all incidents from the plugin, filter by severity / mine, and use this as the main review list.
+
+**Flow:** Receive `incidents` over WS → list + count refresh → chips filter → click row → **seek** + optional **incident meta strip** (expand/collapse).
+
+**Connects to:** **Plugin incident feed** (source of truth); **meta strip** (detail on selection); **capture** flows (same incident objects, different purpose—capture builds a **second** list of snapshots).
+
+---
+
+## Feature 5 — This driver’s incidents (left column)
+
+**User story:** Without changing tabs, I see only incidents for the **telemetry car**.
+
+**Flow:** Same incident cards as leaderboard; filtered by selected car; click → same seek + meta strip behavior.
+
+**Connects to:** **Telemetry car** and **leaderboard** (same cards, different scope). PRODUCT-FLOW once suggested removing this as redundant with “Mine”—**product decision still open**; today it’s driver-scoped, not “mine only.”
+
+---
+
+## Feature 6 — Driver standings
+
+**User story:** I see positions, car, driver, incident counts; I can collapse the panel.
+
+**Flow:** Populated from `drivers` in `state` → optional toggle header.
+
+**Connects to:** **Context** for who’s who; not wired to seek/capture directly in the HTML reviewed.
+
+---
+
+## Feature 7 — Bottom telemetry strip
+
+**User story:** I monitor throttle, brake, and steering (gauge + L/R) for the selected car’s telemetry stream.
+
+**Flow:** `telemetryData` / mock path → bars + wheel; steering sign adjusted to match iRacing convention in code.
+
+**Connects to:** **Telemetry car** (what you’re watching); **logs** tab “Telemetry Data” for raw lines—parallel views of the same signal at different granularity.
+
+---
+
+## Feature 8 — Logging / observability tabs
+
+**User story:** I inspect iRacing events, app health, telemetry log lines, with autoscroll control.
+
+**Flow:** Switch tabs → `switchTab` → panes swap; Auto toggles scroll behavior.
+
+**Connects to:** **Operational debugging** next to incident review; structured logging rules ([RULES-ActionCoverage.md](RULES-ActionCoverage.md)) govern what gets emitted when users click controls.
+
+---
+
+## Feature 9 — Incident meta strip (selected incident details)
+
+**User story:** When I **choose** an incident (leaderboard, driver list, or captured row), I can **expand** a detail block under the tabs (frame, car, driver, severity, cause, etc.) and **collapse** by clicking again.
+
+**Flow:** Click card → seek + strip expands; same card again → strip collapses; selection highlights cards where applicable.
+
+**Connects to:** **Leaderboard / driver list / captured** as three entry points into one detail surface; replaces an older dedicated “Incident meta” tab.
+
+---
+
+## Feature 10 — Find driver’s incidents (capture)
+
+**User story:** I automatically walk **each incident frame for the current telemetry car** (from the session incident list), seek each, and append **captured** records with metadata (PoC timing).
+
+**Flow:** Click **Find driver’s incidents** → queue from `incidents` filtered by car → `seek_to_incident` per frame → delayed snapshot → append to **Captured incidents** → stop or cap.
+
+**Connects to:** **Telemetry car**, **plugin incident list**, **Captured incidents** tab; complements manual clicking through the leaderboard.
+
+---
+
+## Feature 11 — Find all session incidents (capture)
+
+**User story:** I scan **every** incident in the session (all drivers), with a **confirm** dialog, rotating telemetry car in the UI to match each incident as we go.
+
+**Flow:** Click → confirm → queue all unique frames → seek loop → snapshots → **Captured** list grows.
+
+**Connects to:** Same **Captured** destination as driver scan; **broader** scope and **explicit consent**; shares status/stop pattern with driver scan.
+
+---
+
+## Feature 12 — Captured incidents tab
+
+**User story:** I review everything the scan (or sequence) recorded, optionally **group by driver**, and **collapse/expand** per driver group.
+
+**Flow:** Open tab → list from `capturedIncidents` → optional grouping → accordion headers → click row → seek + meta strip (capture path).
+
+**Connects to:** **Capture scans** (producer); **meta strip** (inspection); **group-by-driver** + **accordion** for dense sessions.
+
+---
+
+## How the pillars fit together (mermaid)
 
 ```mermaid
 flowchart LR
-  subgraph user [User]
-    Browser[Dashboard browser]
-    SimHubApp[SimHub WPF]
+  subgraph entry [Entry]
+    Status[Status bar]
+    WS[WebSocket plugin]
   end
-  subgraph host [Same PC]
-    Plugin[SimSteward plugin]
-    IRSDK[iRacing SDK]
+  subgraph review [Incident review]
+    LB[Leaderboard plus chips]
+    DrvList[This driver incidents]
+    Meta[Incident meta strip]
   end
-  Browser -->|WebSocket actions and logs| Plugin
-  Plugin -->|state telemetry incidents logs| Browser
-  SimHubApp -->|loads plugin| Plugin
-  Plugin --> IRSDK
-  Plugin -->|structured NDJSON| Jsonl[plugin-structured.jsonl]
-  Jsonl -->|your ingestion| Loki[Loki / Grafana]
+  subgraph transport [Replay]
+    Replay[Replay controls]
+    Seek[seek_to_incident]
+  end
+  subgraph capture [Capture]
+    DrvCap[Find driver incidents]
+    SessCap[Find all session incidents]
+    CapList[Captured incidents tab]
+  end
+  WS --> Status
+  WS --> LB
+  WS --> DrvList
+  LB --> Seek
+  DrvList --> Seek
+  CapList --> Seek
+  DrvCap --> CapList
+  SessCap --> CapList
+  Seek --> Meta
+  DrvCap --> Seek
+  SessCap --> Seek
+  Replay --> Seek
 ```
 
-- **SimHub** loads the **plugin**; the plugin runs **iRacing SDK** and a **WebSocket bridge**.
-- The **dashboard** is not served by the plugin; SimHub’s HTTP server serves static HTML; the page **calls the plugin** only via WebSocket (and optional token).
-- **Telemetry/mode/frame** flow: `DataUpdate` → throttled **state** broadcast → dashboard updates UI.
-- **Actions** from buttons (replay, seek, capture, etc.) flow: dashboard `send(action, arg)` → `DispatchAction` in [`SimStewardPlugin.cs`](../src/SimSteward.Plugin/SimStewardPlugin.cs). **Important:** today’s dispatcher **always returns `not_supported`** while still logging `action_dispatched` / `action_result` — so the **UI story is ahead of command execution** until real handlers replace `not_supported`.
-- **Observability** runs **parallel** to the interactive loop: structured logs land on disk (and then Grafana via your stack), not on the WebSocket hot path.
+---
+
+## Vision vs shipped (from PRODUCT-FLOW)
+
+| Area | Today (dashboard) | North-star in doc |
+|------|---------------------|-------------------|
+| Incident list + seek + filters | Shipped | Aligned |
+| Selected detail | Meta strip (not full “panel” with cameras) | Selected Incident Panel + cameras |
+| Capture | Metadata snapshots to **Captured** list | Atomic `capture_incident` + OBS |
+| Scan | Queue seeks from incident list + confirm for session | YAML scan in plugin |
 
 ---
 
-## Honest “shipped vs vision” line (from PRODUCT-FLOW + code)
+## One-line product narrative
 
-[PRODUCT-FLOW.md](PRODUCT-FLOW.md) **Feature maturity** table is explicit: **Replay mode detection** and **basic navigation** concepts are marked shipped; **Selected Incident Panel**, **camera dropdown**, **`set_camera` / `capture_incident`**, **suggestedCamera**, **true YAML scan**, **OBS integration** are **missing or future**.
-
-Align expectations: the **product narrative** in PRODUCT-FLOW is the **target**; the **dispatcher stub** means many dashboard commands are **not yet implemented behaviors** — they are **logged and rejected** until real handlers replace `not_supported`.
-
----
-
-## Summary sentence for stakeholders
-
-**Sim Steward** connects **iRacing replay telemetry** to a **browser dashboard** over **WebSocket**, aiming to turn replay review into an **incident-driven queue** with **navigation**, **context** (standings/telemetry), and **rich logging**; the **full capture/camera/OBS loop** in PRODUCT-FLOW is largely **roadmap**, and **command execution** must be verified against the current `DispatchAction` implementation before marketing specific buttons as “working.”
+**Sim Steward today** is a **replay-aware incident console**: connect (**WS**), **navigate** the session (**replay + seek**), **focus** a driver (**car + lists**), **inspect** details (**meta strip**), and **batch-record** incident snapshots into **Captured** with optional **grouping/accordion**—while **telemetry** and **logs** explain what the car and app are doing. The **PRODUCT-FLOW** doc describes the next leap to **camera-directed capture** and **OBS**; that path is not yet the shipped UI.
