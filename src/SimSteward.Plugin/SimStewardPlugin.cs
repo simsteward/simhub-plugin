@@ -235,7 +235,7 @@ namespace SimSteward.Plugin
         {
             if (string.IsNullOrEmpty(eventType) || fields == null) return;
             MergeSessionAndRoutingFields(fields);
-            _logger?.Structured("INFO", "bridge", eventType, message, fields, "action", null);
+            _logger?.Structured("INFO", "bridge", eventType, message, fields, "ui", null);
         }
 
         private void MergeSessionAndRoutingFields(System.Collections.Generic.Dictionary<string, object> fields)

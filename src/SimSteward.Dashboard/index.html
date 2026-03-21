@@ -472,7 +472,11 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 <script>
 // ── Config ──────────────────────────────────────────────
-const WS_URL         = 'ws://localhost:19847';
+const WS_PORT = 19847;
+function wsUrl() {
+  const h = window.location.hostname || 'localhost';
+  return 'ws://' + h + ':' + WS_PORT;
+}
 const LOG_MAX        = 500;
 const STEER_MAX_RAD  = 7.0;
 const STEER_VIS_MAX  = 88;   // ±degrees visual
@@ -513,11 +517,12 @@ let mockTelem   = { t:0.65, b:0.00, s:0.30 };
 function connectWs() {
   try {
     setWs('connecting');
-    ws = new WebSocket(WS_URL);
+    const url = wsUrl();
+    ws = new WebSocket(url);
     ws.onopen = () => {
       setWs('connected');
       mockPaused = true;
-      log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + WS_URL);
+      log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
     };
     ws.onclose = () => {
       ws = null; mockPaused = false;
@@ -537,6 +542,19 @@ function send(action, arg) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
   ws.send(JSON.stringify({ action, arg: arg ?? '' }));
   return true;
+}
+
+/** Structured UI telemetry for Loki (plugin → plugin-structured.jsonl → Alloy). */
+function sendDashboardUiEvent({ element_id, event_type, message, value }) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  const o = { action: 'log', event: 'dashboard_ui_event', element_id, event_type, message };
+  if (value !== undefined && value !== null) o.value = value;
+  try {
+    ws.send(JSON.stringify(o));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function onMsg(m) {
@@ -634,6 +652,12 @@ function setFilter(el) {
   incFilter = el.dataset.f;
   document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.f === incFilter));
   renderInc();
+  sendDashboardUiEvent({
+    element_id: 'inc-filter-chip',
+    event_type: 'click',
+    message: 'Incident list filter',
+    value: incFilter
+  });
 }
 
 // ── Render standings ─────────────────────────────────────
@@ -648,7 +672,16 @@ function renderStd() {
     </div>`;
   }).join('');
 }
-function toggleStd() { document.getElementById('std-panel').classList.toggle('open'); }
+function toggleStd() {
+  const el = document.getElementById('std-panel');
+  el.classList.toggle('open');
+  sendDashboardUiEvent({
+    element_id: 'standings-panel',
+    event_type: 'click',
+    message: 'Driver standings toggle',
+    value: el.classList.contains('open') ? 'open' : 'collapsed'
+  });
+}
 
 // ── Telemetry ────────────────────────────────────────────
 function setTelem(t, b, sRad) {
@@ -681,14 +714,28 @@ function arcPath(cx,cy,r,a0,a1) {
 }
 
 function onCarSel() {
-  const idx = +document.getElementById('car-sel').value;
+  const sel = document.getElementById('car-sel');
+  const idx = +sel.value;
+  const opt = sel.options[sel.selectedIndex];
   const m = MOCK_CAR_TELEM[idx] || MOCK_CAR_TELEM[0];
   mockTelem = m;
   setTelem(m.t, m.b, m.s);
+  sendDashboardUiEvent({
+    element_id: 'telemetry-car-sel',
+    event_type: 'change',
+    message: 'Telemetry car: ' + (opt ? opt.textContent.trim() : ''),
+    value: String(idx)
+  });
 }
 
 // ── Replay ───────────────────────────────────────────────
 function ra(action, arg) {
+  sendDashboardUiEvent({
+    element_id: 'replay-control',
+    event_type: 'click',
+    message: 'Replay ' + action + (arg !== undefined && arg !== '' ? ' ' + arg : ''),
+    value: arg != null ? String(arg) : ''
+  });
   if (!send(action, arg)) toast('[PoC] ' + action + ' ' + arg + ' — not yet wired');
   log('events','INFO ','replay_action', action + ' arg=' + arg);
 }
@@ -698,6 +745,12 @@ function setSpeed(el) {
   ra('replay_speed', el.dataset.s);
 }
 function seekInc(frame) {
+  sendDashboardUiEvent({
+    element_id: 'incident-card',
+    event_type: 'click',
+    message: 'Seek to incident frame',
+    value: String(frame)
+  });
   if (!send('seek_to_incident', String(frame))) toast('[PoC] Seek to frame ' + frame);
   log('events','INFO ','seek_requested','frame=' + frame);
 }
@@ -721,6 +774,11 @@ function startCapture() {
   capturing    = true;
   captureCount = 0;
   setCaptureUI(true);
+  sendDashboardUiEvent({
+    element_id: 'find-all-incidents',
+    event_type: 'click',
+    message: 'Find all incidents scan started'
+  });
   log('events','INFO ','capture_start','Find-all-incidents scan started  max:' + CAPTURE_MAX + '  step:' + CAPTURE_STEP_MS + 'ms');
   captureStep();
 }
@@ -729,6 +787,12 @@ function stopCapture() {
   capturing = false;
   clearTimeout(captureTimer);
   setCaptureUI(false);
+  sendDashboardUiEvent({
+    element_id: 'find-all-incidents',
+    event_type: 'click',
+    message: 'Find all incidents scan stopped',
+    value: String(captureCount)
+  });
   log('events','INFO ','capture_end','Incident scan stopped  incidents_visited:' + captureCount);
 }
 
@@ -767,6 +831,12 @@ function setCaptureUI(active) {
 
 function scrubClick(e) {
   const pct = Math.round((e.clientX - e.currentTarget.getBoundingClientRect().left) / e.currentTarget.offsetWidth * 100);
+  sendDashboardUiEvent({
+    element_id: 'replay-scrub',
+    event_type: 'click',
+    message: 'Replay scrub bar click',
+    value: String(pct)
+  });
   toast('[PoC] Scrub to ' + pct + '%');
 }
 function setFrame(cur, end) {
@@ -793,6 +863,11 @@ function log(tab, level, event, message) {
 
 function switchTab(el) {
   activeTab = el.dataset.tab;
+  sendDashboardUiEvent({
+    element_id: 'log-tab-' + activeTab,
+    event_type: 'click',
+    message: 'Log tab: ' + (el.textContent || '').trim()
+  });
   document.querySelectorAll('.log-tab').forEach(t => t.classList.toggle('active', t===el));
   document.querySelectorAll('.log-pane').forEach(p => p.classList.remove('active'));
   const pane = document.getElementById('log-' + activeTab);
@@ -802,6 +877,12 @@ function switchTab(el) {
 function toggleAS() {
   autoScroll = !autoScroll;
   document.getElementById('asbtn').classList.toggle('on', autoScroll);
+  sendDashboardUiEvent({
+    element_id: 'log-autoscroll',
+    event_type: 'click',
+    message: autoScroll ? 'Log autoscroll on' : 'Log autoscroll off',
+    value: autoScroll ? 'on' : 'off'
+  });
 }
 
 function fmtTelem(m) {
