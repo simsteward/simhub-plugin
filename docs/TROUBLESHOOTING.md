@@ -94,6 +94,7 @@ If you run a replay and incidents are not captured or signaled:
 | Mode always "Unknown" | iRacing running and shared memory enabled |
 | No logs in Grafana / Loki | Section 8: SIMSTEWARD_LOKI_URL, local stack, auth, data source |
 | Log stream empty when clicking buttons | Section 4b: connection, broadcast-errors.log, browser console |
+| ContextStream 401 / index missing | Section 9: `.env` key, verify-key, ingest in interactive terminal |
 
 ---
 
@@ -133,6 +134,16 @@ If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 5. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `state_broadcast_summary`, `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
 
 See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL examples.
+
+---
+
+## 9. ContextStream MCP (index / search / 401)
+
+- **401 on ingest or `verify-key`** — The ContextStream API key must be in `.env` (`CONTEXTSTREAM_API_KEY`, etc.) and loaded for CLI commands. From the repo root:  
+  `npx -y envmcp --env-file .env cmd /c "%LocalAppData%\ContextStream\contextstream-mcp.exe verify-key"`  
+  If that fails, rotate the key in the ContextStream account and update `.env` (do not commit real secrets).
+- **`ingest` fails with "not a terminal"`** — Run `contextstream-mcp.exe ingest --path <repo>` (or `index --path <repo>`) in a **normal interactive** terminal (Windows Terminal / `cmd`), not from a non-TTY automation shell. The MCP server uses the same key via Cursor env.
+- **Search says index freshness `missing`** — After a successful ingest from step above, keyword search still works; semantic/index metadata syncs once ingestion completes.
 
 ---
 
