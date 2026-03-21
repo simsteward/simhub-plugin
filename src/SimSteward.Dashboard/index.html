@@ -86,8 +86,33 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .scrub-labels { display: flex; justify-content: space-between; font-size: 0.67rem; color: var(--muted); }
 .scrub-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; cursor: pointer; }
 .scrub-fill { height: 100%; width: 38%; background: linear-gradient(90deg, var(--accent), var(--cyan)); border-radius: 4px; transition: width 0.2s; }
-.cap-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.panel-sub {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.panel-sub-title {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.panel-sub .car-sel { margin-bottom: 0; }
+.cap-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .btn.cap { font-size: 0.8rem; padding: 7px 14px; flex-shrink: 0; border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.07); }
+.btn.cap.btn-scan {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: normal;
+  line-height: 1.25;
+  padding: 8px 10px;
+  text-align: center;
+}
 .btn.cap:hover { background: rgba(31,156,255,0.16); }
 .btn.cap.active { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.07); animation: cap-pulse 1.2s ease-in-out infinite; }
 .cap-status { font-size: 0.7rem; color: var(--muted); }
@@ -239,17 +264,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
     <!-- Left column -->
     <div class="left-col">
 
-      <!-- Driver -->
-      <div class="panel">
-        <div class="panel-title">Selected car</div>
-        <select class="car-sel" id="car-sel" onchange="onCarSel()">
-          <option value="0">#99 J. Smith (You)</option>
-          <option value="1">#12 A. Jones</option>
-          <option value="2">#42 B. Lee</option>
-          <option value="3">#7 M. Wilson</option>
-        </select>
-      </div>
-
       <!-- Replay controls -->
       <div class="panel">
         <div class="panel-title">Replay Controls</div>
@@ -284,19 +298,29 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
       <!-- Incident navigation -->
       <div class="panel">
         <div class="panel-title">Incident navigation</div>
+        <div class="panel-sub">
+          <div class="panel-sub-title">Telemetry car</div>
+          <select class="car-sel" id="car-sel" onchange="onCarSel()" title="Driver whose throttle, brake, and steering are shown below">
+            <option value="0">#99 J. Smith (You)</option>
+            <option value="1">#12 A. Jones</option>
+            <option value="2">#42 B. Lee</option>
+            <option value="3">#7 M. Wilson</option>
+          </select>
+        </div>
         <div class="btn-row">
-          <button class="btn" title="Prev incident"    onclick="ra('replay_seek','prev')">◀</button>
-          <button class="btn" title="Next incident"    onclick="ra('replay_seek','next')">▶</button>
+          <button class="btn" title="Previous incident in replay" onclick="ra('replay_seek','prev')">◀</button>
+          <button class="btn" title="Next incident in replay"     onclick="ra('replay_seek','next')">▶</button>
         </div>
         <div class="cap-row">
-          <button class="btn cap" id="cap-btn" onclick="toggleCapture()">⏺ Capture</button>
+          <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCapture()"
+            title="Step through incidents and log each position (stops after 50 or when you stop)">Find all incidents</button>
           <span class="cap-status" id="cap-status">—</span>
         </div>
       </div>
 
       <!-- Telemetry -->
       <div class="panel">
-        <div class="panel-title">Telemetry — Selected Car</div>
+        <div class="panel-title">Telemetry</div>
         <div class="input-rows">
           <div>
             <div class="input-lbl"><span>Throttle</span><span id="thr-pct">65%</span></div>
@@ -598,7 +622,7 @@ function startCapture() {
   capturing    = true;
   captureCount = 0;
   setCaptureUI(true);
-  log('events','INFO ','capture_start','Incident capture started  max:' + CAPTURE_MAX + '  step:' + CAPTURE_STEP_MS + 'ms');
+  log('events','INFO ','capture_start','Find-all-incidents scan started  max:' + CAPTURE_MAX + '  step:' + CAPTURE_STEP_MS + 'ms');
   captureStep();
 }
 
@@ -606,7 +630,7 @@ function stopCapture() {
   capturing = false;
   clearTimeout(captureTimer);
   setCaptureUI(false);
-  log('events','INFO ','capture_end','Capture stopped  incidents_visited:' + captureCount);
+  log('events','INFO ','capture_end','Incident scan stopped  incidents_visited:' + captureCount);
 }
 
 function captureStep() {
@@ -629,7 +653,7 @@ function captureStep() {
     '#' + String(captureCount).padStart(2,'0') + '  frame:' + frameEl.replace('Frame ','') +
     '  session:' + timeEl + (sent ? '' : '  [PoC-mock]'));
 
-  document.getElementById('cap-status').textContent = 'Captured ' + captureCount + '…';
+  document.getElementById('cap-status').textContent = 'Found ' + captureCount + '…';
   captureTimer = setTimeout(captureStep, CAPTURE_STEP_MS);
 }
 
@@ -637,9 +661,9 @@ function setCaptureUI(active) {
   const btn = document.getElementById('cap-btn');
   const lbl = document.getElementById('cap-status');
   btn.classList.toggle('active', active);
-  btn.textContent = active ? '◼ Stop' : '⏺ Capture';
+  btn.textContent = active ? 'Stop scan' : 'Find all incidents';
   lbl.className   = 'cap-status' + (active ? ' running' : '');
-  if (!active) lbl.textContent = captureCount ? 'Done (' + captureCount + ')' : '—';
+  if (!active) lbl.textContent = captureCount ? 'Done (' + captureCount + ' found)' : '—';
 }
 
 function scrubClick(e) {
