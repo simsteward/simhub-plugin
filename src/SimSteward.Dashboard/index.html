@@ -373,6 +373,19 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   padding: 8px 12px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  transition: max-height 0.18s ease, padding 0.18s ease, border-width 0.18s ease;
+}
+.incident-meta-strip.collapsed {
+  max-height: 0;
+  min-height: 0;
+  padding: 0;
+  border-bottom-width: 0;
+  overflow: hidden;
+}
+.inc-card.inc-card-expanded {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: rgba(255,255,255,0.06);
 }
 .im-strip-placeholder { font-size: 0.72rem; color: var(--muted); }
 .im-block-single { padding: 0; border: none; margin: 0; }
@@ -537,10 +550,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           <button class="log-tab"        data-tab="captured"   onclick="switchTab(this)">Captured incidents</button>
           <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
         </div>
-        <div id="incident-meta-strip" class="incident-meta-strip meta-pane" role="region" aria-label="Selected incident details">
-          <div id="incident-meta-strip-body">
-            <span class="im-strip-placeholder">Select an incident in This driver's incidents, Incident leaderboard, or Captured incidents.</span>
-          </div>
+        <div id="incident-meta-strip" class="incident-meta-strip meta-pane collapsed" role="region" aria-label="Selected incident details" aria-expanded="false">
+          <div id="incident-meta-strip-body"></div>
         </div>
         <div class="log-pane active" id="log-events"></div>
         <div class="log-pane"        id="log-health"></div>
@@ -627,6 +638,8 @@ let mockPaused  = false;  // paused when real WS connected
 let mockTelem   = { t:0.65, b:0.00, s:0.30 };
 let replayPaused = false;
 let lastReplaySpeed = '1';
+/** @type {{ kind:'session', frame:number } | { kind:'capture', seq:number } | null} */
+let incidentMetaSelection = null;
 
 // ── WebSocket ────────────────────────────────────────────
 function connectWs() {
@@ -720,7 +733,7 @@ function getFilteredIncidents() {
 
 function incidentCardHtml(i) {
   return `
-    <div class="inc-card${i.player ? ' player' : ''}" onclick="onSessionIncidentClick(${i.frame})">
+    <div class="inc-card${i.player ? ' player' : ''}" data-frame="${i.frame}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onSessionIncidentClick(${i.frame})}" onclick="onSessionIncidentClick(${i.frame})">
       <span class="car-num">#${i.car}</span>
       <span class="inc-name">${i.driver}</span>
       <span class="cause-tag ${i.cause}">${i.cause.replace('-', ' ')}</span>
@@ -737,6 +750,12 @@ function renderInc() {
   document.getElementById('inc-count').textContent = count;
   document.getElementById('inc-list').innerHTML = html;
   renderDriverIncidents();
+  if (!incidents.length && incidentMetaSelection && incidentMetaSelection.kind === 'session') {
+    incidentMetaSelection = null;
+    collapseIncidentMetaStrip();
+  } else {
+    refreshIncidentMetaHighlight();
+  }
   if (activeTab === 'leaderboard' && autoScroll) {
     const list = document.getElementById('inc-list');
     if (list) list.scrollTop = list.scrollHeight;
@@ -758,6 +777,7 @@ function renderDriverIncidents() {
   const forCar = incidents.filter(i => i.car === car);
   const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">No incidents for this car</div>';
   el.innerHTML = !forCar.length ? empty : forCar.map(incidentCardHtml).join('');
+  refreshIncidentMetaHighlight();
 }
 
 function parseFrameFromLabel(frameText) {
@@ -802,7 +822,7 @@ function capturedRowHtml(rec) {
   const player = !!rec.player;
   const label = cause.replace(/-/g, ' ');
   return `
-    <div class="inc-card${player ? ' player' : ''}" onclick="onCapturedIncidentClick(${rec.seq})">
+    <div class="inc-card${player ? ' player' : ''}" data-cap-seq="${rec.seq}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onCapturedIncidentClick(${rec.seq})}" onclick="onCapturedIncidentClick(${rec.seq})">
       <span class="car-num">#${car}</span>
       <span class="inc-name">${rec.driver}</span>
       <span class="cause-tag ${cause}">${label}</span>
@@ -816,12 +836,19 @@ function renderCaptured() {
   if (!el) return;
   if (!capturedIncidents.length) {
     el.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No captured incidents yet. Run Find all incidents.</div>';
+    if (incidentMetaSelection && incidentMetaSelection.kind === 'capture') {
+      incidentMetaSelection = null;
+      collapseIncidentMetaStrip();
+    } else {
+      refreshIncidentMetaHighlight();
+    }
     if (activeTab === 'captured' && autoScroll) el.scrollTop = 0;
     return;
   }
   const sorted = [...capturedIncidents].sort((a, b) => a.frame - b.frame || a.seq - b.seq);
   if (!capturedGroupByDriver) {
     el.innerHTML = sorted.map(capturedRowHtml).join('');
+    refreshIncidentMetaHighlight();
     if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
     return;
   }
@@ -842,6 +869,7 @@ function renderCaptured() {
     html += groups.get(k).map(capturedRowHtml).join('');
   }
   el.innerHTML = html;
+  refreshIncidentMetaHighlight();
   if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
 }
 
@@ -871,20 +899,69 @@ function formatIncidentMetaHtml(i) {
   </div>`;
 }
 
-function setIncidentMetaStripHtml(html) {
+function expandIncidentMetaStrip(html) {
+  const strip = document.getElementById('incident-meta-strip');
   const body = document.getElementById('incident-meta-strip-body');
   if (body) body.innerHTML = html;
+  if (strip) {
+    strip.classList.remove('collapsed');
+    strip.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function collapseIncidentMetaStrip() {
+  const strip = document.getElementById('incident-meta-strip');
+  const body = document.getElementById('incident-meta-strip-body');
+  if (strip) {
+    strip.classList.add('collapsed');
+    strip.setAttribute('aria-expanded', 'false');
+  }
+  if (body) body.innerHTML = '';
+  document.querySelectorAll('.inc-card-expanded').forEach(el => el.classList.remove('inc-card-expanded'));
+}
+
+function highlightIncidentCards(frame, capSeq) {
+  document.querySelectorAll('.inc-card[data-frame]').forEach(el => {
+    const match = capSeq == null && frame != null && +el.dataset.frame === frame;
+    el.classList.toggle('inc-card-expanded', match);
+  });
+  document.querySelectorAll('.inc-card[data-cap-seq]').forEach(el => {
+    const match = capSeq != null && +el.dataset.capSeq === capSeq;
+    el.classList.toggle('inc-card-expanded', match);
+  });
+}
+
+function refreshIncidentMetaHighlight() {
+  if (!incidentMetaSelection) return;
+  if (incidentMetaSelection.kind === 'session') {
+    highlightIncidentCards(incidentMetaSelection.frame, null);
+  } else {
+    highlightIncidentCards(null, incidentMetaSelection.seq);
+  }
 }
 
 function onSessionIncidentClick(frame) {
   const i = incidents.find(x => x.frame === frame);
   if (!i) return;
+  if (incidentMetaSelection && incidentMetaSelection.kind === 'session' && incidentMetaSelection.frame === frame) {
+    incidentMetaSelection = null;
+    collapseIncidentMetaStrip();
+    sendDashboardUiEvent({
+      element_id: 'incident-meta-strip',
+      event_type: 'ui_interaction',
+      message: 'Session incident meta collapsed',
+      value: String(frame)
+    });
+    return;
+  }
+  incidentMetaSelection = { kind: 'session', frame };
   seekInc(frame);
-  setIncidentMetaStripHtml(formatIncidentMetaHtml(i));
+  expandIncidentMetaStrip(formatIncidentMetaHtml(i));
+  highlightIncidentCards(frame, null);
   sendDashboardUiEvent({
     element_id: 'incident-meta-strip',
-    event_type: 'click',
-    message: 'Session incident selected (leaderboard or driver list)',
+    event_type: 'ui_interaction',
+    message: 'Session incident meta expanded',
     value: String(frame)
   });
 }
@@ -892,6 +969,18 @@ function onSessionIncidentClick(frame) {
 function onCapturedIncidentClick(seq) {
   const r = capturedIncidents.find(x => x.seq === seq);
   if (!r) return;
+  if (incidentMetaSelection && incidentMetaSelection.kind === 'capture' && incidentMetaSelection.seq === seq) {
+    incidentMetaSelection = null;
+    collapseIncidentMetaStrip();
+    sendDashboardUiEvent({
+      element_id: 'incident-meta-strip',
+      event_type: 'ui_interaction',
+      message: 'Captured incident meta collapsed',
+      value: String(seq)
+    });
+    return;
+  }
+  incidentMetaSelection = { kind: 'capture', seq };
   seekInc(r.frame);
   const pseudo = {
     id: r.seq,
@@ -905,11 +994,12 @@ function onCapturedIncidentClick(seq) {
     _capture: true,
     capturedAt: r.capturedAt
   };
-  setIncidentMetaStripHtml(formatIncidentMetaHtml(pseudo));
+  expandIncidentMetaStrip(formatIncidentMetaHtml(pseudo));
+  highlightIncidentCards(null, seq);
   sendDashboardUiEvent({
     element_id: 'incident-meta-strip',
-    event_type: 'click',
-    message: 'Captured incident selected',
+    event_type: 'ui_interaction',
+    message: 'Captured incident meta expanded',
     value: String(seq)
   });
 }
