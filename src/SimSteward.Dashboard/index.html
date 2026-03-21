@@ -32,7 +32,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   text-transform: uppercase; letter-spacing: 0.1em; border: 1px solid currentColor;
 }
 .mode-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.mode-pill.live    { color: var(--green); background: rgba(14,242,114,0.07); }
 .mode-pill.replay  { color: var(--accent); background: rgba(31,156,255,0.07); }
 .mode-pill.waiting { color: var(--muted); background: transparent; }
 .session-time { font-family: "Courier New", monospace; font-size: 0.95rem; }
@@ -60,6 +59,13 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent;
 }
 .right-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+.right-col > .standings-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.right-col > .standings-panel .std-body { flex: 1; min-height: 0; overflow-y: auto; }
 
 /* ── Panel ── */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; flex-shrink: 0; }
@@ -177,6 +183,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .cause-tag.wall      { background: rgba(255,200,64,0.1);  color: var(--yellow); }
 .cause-tag.spin      { background: rgba(255,200,64,0.1);  color: var(--yellow); }
 .cause-tag.contact   { background: rgba(255,95,95,0.1);   color: var(--red); }
+.cause-tag.unknown   { background: rgba(255,255,255,0.06); color: var(--muted); }
 
 /* ── Standings ── */
 .std-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
@@ -235,25 +242,76 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .ll.debug { color: rgba(240,240,240,0.25); }
 .ll.data  { color: rgba(13,216,255,0.7); }
 
-/* ── Bottom dock: incidents + logs ── */
-.bottom-dock {
+/* ── Bottom dock: telemetry + leaderboard + captured, then stream logs ── */
+.bottom-dock-rows {
   flex-shrink: 0;
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  height: 220px;
   min-height: 0;
 }
-.incidents-dock {
+.bottom-dock-row {
+  display: flex;
+  gap: 8px;
+  min-height: 0;
+}
+.bottom-dock-row.row-1 { height: 220px; }
+.bottom-dock-row.row-2 { height: 200px; }
+.log-section--telemetry {
   width: 300px;
+  flex: none;
+  flex-shrink: 0;
+}
+.log-section--streams { flex: 1; min-width: 0; }
+.log-section-head {
+  flex-shrink: 0;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.log-section-head .panel-title { margin-bottom: 0; }
+.log-section-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.log-section-toolbar label { cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
+.log-section-toolbar input { accent-color: var(--accent); }
+.log-section-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 10px 10px;
+}
+.log-section-body--telem { padding: 10px; overflow-y: auto; }
+.leaderboard-body { padding-top: 8px; }
+.leaderboard-body .inc-header { margin-bottom: 6px; }
+.leaderboard-body .inc-list,
+.captured-body .inc-list { flex: 1; min-height: 0; }
+.captured-body { padding-top: 8px; }
+.driver-inc-panel {
+  max-height: 260px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-.incidents-dock > .panel.incidents-panel {
-  flex: 1;
-  min-height: 0;
+.driver-inc-panel .inc-list { flex: 1; min-height: 0; }
+.captured-group-hdr {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding: 8px 4px 4px;
+  border-top: 1px solid var(--border);
 }
+.captured-group-hdr:first-child { border-top: none; padding-top: 0; }
 .log-pane.meta-pane {
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 0.72rem;
@@ -348,11 +406,11 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
         <div class="panel-title">Incident navigation</div>
         <div class="panel-sub">
           <div class="panel-sub-title">Telemetry car</div>
-          <select class="car-sel" id="car-sel" onchange="onCarSel()" title="Driver whose throttle, brake, and steering are shown below">
-            <option value="0">#99 J. Smith (You)</option>
-            <option value="1">#12 A. Jones</option>
-            <option value="2">#42 B. Lee</option>
-            <option value="3">#7 M. Wilson</option>
+          <select class="car-sel" id="car-sel" onchange="onCarSel()" title="Telemetry and incident list below use this car">
+            <option value="0" data-car="99">#99 J. Smith (You)</option>
+            <option value="1" data-car="12">#12 A. Jones</option>
+            <option value="2" data-car="42">#42 B. Lee</option>
+            <option value="3" data-car="7">#7 M. Wilson</option>
           </select>
         </div>
         <div class="btn-row">
@@ -366,57 +424,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
         </div>
       </div>
 
-      <!-- Telemetry -->
-      <div class="panel">
-        <div class="panel-title">Telemetry</div>
-        <div class="input-rows">
-          <div>
-            <div class="input-lbl"><span>Throttle</span><span id="thr-pct">65%</span></div>
-            <div class="bar-track"><div class="bar-fill thr" id="thr-bar" style="width:65%"></div></div>
-          </div>
-          <div>
-            <div class="input-lbl"><span>Brake</span><span id="brk-pct">0%</span></div>
-            <div class="bar-track"><div class="bar-fill brk" id="brk-bar" style="width:0%"></div></div>
-          </div>
-        </div>
-        <div class="steer-wrap">
-          <span class="steer-lbl">Steering</span>
-          <!-- viewBox: 130×80, gauge center (65, 72), radius 55 -->
-          <!-- Track: left (10,72) through top (65,17) to right (120,72), sweep=1 -->
-          <svg class="steer-svg" viewBox="0 0 130 80">
-            <path class="g-track" d="M 10,72 A 55,55 0 0,1 120,72"/>
-            <path class="g-active" id="g-active" d=""/>
-            <line class="g-ctick" x1="65" y1="17" x2="65" y2="25"/>
-            <line class="g-needle" id="g-needle" x1="65" y1="72" x2="65" y2="22"/>
-            <circle class="g-hub" cx="65" cy="72" r="4.5"/>
-            <text class="g-text" x="4"  y="76">L</text>
-            <text class="g-text" x="118" y="76">R</text>
-            <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">0°</text>
-          </svg>
-        </div>
+      <!-- Driver-scoped incidents -->
+      <div class="panel incidents-panel driver-inc-panel">
+        <div class="panel-title">This driver’s incidents</div>
+        <div class="inc-list" id="inc-list-driver"></div>
       </div>
 
     </div><!-- /left-col -->
 
     <!-- Right column -->
     <div class="right-col">
-
-      <!-- Incidents -->
-      <div class="panel incidents-panel">
-        <div class="inc-header">
-          <span class="panel-title" style="margin-bottom:0">
-            Incidents <span id="inc-count" style="color:var(--muted)">(5)</span>
-          </span>
-          <div class="chips">
-            <span class="chip active" data-f="all"    onclick="setFilter(this)">All</span>
-            <span class="chip"        data-f="1"      onclick="setFilter(this)">1×</span>
-            <span class="chip"        data-f="2"      onclick="setFilter(this)">2×</span>
-            <span class="chip"        data-f="4"      onclick="setFilter(this)">4×</span>
-            <span class="chip"        data-f="player" onclick="setFilter(this)">Mine</span>
-          </div>
-        </div>
-        <div class="inc-list" id="inc-list"></div>
-      </div>
 
       <!-- Standings -->
       <div class="panel standings-panel open" id="std-panel">
@@ -433,38 +450,84 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
     </div><!-- /right-col -->
   </div><!-- /main-grid -->
 
-  <!-- ── Bottom: incidents (mirror) + logs ── -->
-  <div class="bottom-dock">
-    <aside class="incidents-dock" aria-label="Incidents list">
-      <div class="panel incidents-panel">
-        <div class="inc-header">
-          <span class="panel-title" style="margin-bottom:0">
-            Incidents <span id="inc-count-dock" style="color:var(--muted)">(0)</span>
-          </span>
-          <div class="chips">
-            <span class="chip active" data-f="all"    onclick="setFilter(this)">All</span>
-            <span class="chip"        data-f="1"      onclick="setFilter(this)">1×</span>
-            <span class="chip"        data-f="2"      onclick="setFilter(this)">2×</span>
-            <span class="chip"        data-f="4"      onclick="setFilter(this)">4×</span>
-            <span class="chip"        data-f="player" onclick="setFilter(this)">Mine</span>
+  <!-- ── Bottom: telemetry + leaderboard + captured; then stream logs ── -->
+  <div class="bottom-dock-rows">
+    <div class="bottom-dock-row row-1">
+      <section class="log-section log-section--telemetry" aria-label="Telemetry">
+        <div class="log-section-head"><span class="panel-title">Telemetry</span></div>
+        <div class="log-section-body log-section-body--telem">
+          <div class="input-rows">
+            <div>
+              <div class="input-lbl"><span>Throttle</span><span id="thr-pct">65%</span></div>
+              <div class="bar-track"><div class="bar-fill thr" id="thr-bar" style="width:65%"></div></div>
+            </div>
+            <div>
+              <div class="input-lbl"><span>Brake</span><span id="brk-pct">0%</span></div>
+              <div class="bar-track"><div class="bar-fill brk" id="brk-bar" style="width:0%"></div></div>
+            </div>
+          </div>
+          <div class="steer-wrap">
+            <span class="steer-lbl">Steering</span>
+            <svg class="steer-svg" viewBox="0 0 130 80">
+              <path class="g-track" d="M 10,72 A 55,55 0 0,1 120,72"/>
+              <path class="g-active" id="g-active" d=""/>
+              <line class="g-ctick" x1="65" y1="17" x2="65" y2="25"/>
+              <line class="g-needle" id="g-needle" x1="65" y1="72" x2="65" y2="22"/>
+              <circle class="g-hub" cx="65" cy="72" r="4.5"/>
+              <text class="g-text" x="4"  y="76">L</text>
+              <text class="g-text" x="118" y="76">R</text>
+              <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">0°</text>
+            </svg>
           </div>
         </div>
-        <div class="inc-list" id="inc-list-dock"></div>
-      </div>
-    </aside>
-    <section class="log-section">
-      <div class="log-tabs">
-        <button class="log-tab active" data-tab="events"   onclick="switchTab(this)">iRacing Events</button>
-        <button class="log-tab"        data-tab="health"   onclick="switchTab(this)">App Health</button>
-        <button class="log-tab"        data-tab="telem"    onclick="switchTab(this)">Telemetry Data</button>
-        <button class="log-tab"        data-tab="incmeta"  onclick="switchTab(this)">Incident meta</button>
-        <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
-      </div>
-      <div class="log-pane active" id="log-events"></div>
-      <div class="log-pane"        id="log-health"></div>
-      <div class="log-pane"        id="log-telem"></div>
-      <div class="log-pane meta-pane" id="log-incmeta"></div>
-    </section>
+      </section>
+      <section class="log-section incidents-panel" aria-label="Incident leaderboard">
+        <div class="log-section-head">
+          <span class="panel-title" style="margin-bottom:0">
+            Incident leaderboard <span id="inc-count" style="color:var(--muted)">(0)</span>
+          </span>
+        </div>
+        <div class="log-section-body leaderboard-body">
+          <div class="inc-header">
+            <div class="chips">
+              <span class="chip active" data-f="all"    onclick="setFilter(this)">All</span>
+              <span class="chip"        data-f="1"      onclick="setFilter(this)">1×</span>
+              <span class="chip"        data-f="2"      onclick="setFilter(this)">2×</span>
+              <span class="chip"        data-f="4"      onclick="setFilter(this)">4×</span>
+              <span class="chip"        data-f="player" onclick="setFilter(this)">Mine</span>
+            </div>
+          </div>
+          <div class="inc-list" id="inc-list"></div>
+        </div>
+      </section>
+      <section class="log-section" aria-label="Captured incidents">
+        <div class="log-section-head"><span class="panel-title">Captured incidents</span></div>
+        <div class="log-section-toolbar">
+          <label>
+            <input type="checkbox" id="captured-group-driver" onchange="toggleCapturedGroup()"/>
+            Group by driver
+          </label>
+        </div>
+        <div class="log-section-body captured-body">
+          <div class="inc-list" id="captured-list"></div>
+        </div>
+      </section>
+    </div>
+    <div class="bottom-dock-row row-2">
+      <section class="log-section log-section--streams">
+        <div class="log-tabs">
+          <button class="log-tab active" data-tab="events"   onclick="switchTab(this)">iRacing Events</button>
+          <button class="log-tab"        data-tab="health"   onclick="switchTab(this)">App Health</button>
+          <button class="log-tab"        data-tab="telem"    onclick="switchTab(this)">Telemetry Data</button>
+          <button class="log-tab"        data-tab="incmeta"  onclick="switchTab(this)">Incident meta</button>
+          <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
+        </div>
+        <div class="log-pane active" id="log-events"></div>
+        <div class="log-pane"        id="log-health"></div>
+        <div class="log-pane"        id="log-telem"></div>
+        <div class="log-pane meta-pane" id="log-incmeta"></div>
+      </section>
+    </div>
   </div>
 
 </div><!-- /app -->
@@ -505,6 +568,8 @@ const MOCK_CAR_TELEM = [
 // ── State ────────────────────────────────────────────────
 let incidents   = [...MOCK_INC];
 let drivers     = [...MOCK_DRV];
+let capturedIncidents = [];
+let capturedGroupByDriver = false;
 let incFilter   = 'all';
 let autoScroll  = true;
 let activeTab   = 'events';
@@ -571,7 +636,7 @@ function onMsg(m) {
 function onState(m) {
   const mode = m.pluginMode || 'Unknown';
   const pill = document.getElementById('mode-pill');
-  pill.className = 'mode-pill ' + (mode==='Live'?'live':mode==='Replay'?'replay':'waiting');
+  pill.className = 'mode-pill ' + (mode==='Replay'?'replay':'waiting');
   document.getElementById('mode-text').textContent = mode.toUpperCase();
   document.getElementById('session-time').textContent = m.currentSessionTimeFormatted || '—:——';
   const d = m.diagnostics || {};
@@ -621,11 +686,119 @@ function renderInc() {
   const html = !filtered.length ? empty : filtered.map(incidentCardHtml).join('');
   document.getElementById('inc-count').textContent = count;
   document.getElementById('inc-list').innerHTML = html;
-  const dockCnt = document.getElementById('inc-count-dock');
-  const dockList = document.getElementById('inc-list-dock');
-  if (dockCnt) dockCnt.textContent = count;
-  if (dockList) dockList.innerHTML = html;
   renderIncMetaLog();
+  renderDriverIncidents();
+}
+
+function getSelectedCarNumber() {
+  const sel = document.getElementById('car-sel');
+  if (!sel) return 0;
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt) return 0;
+  return parseInt(opt.getAttribute('data-car') || '0', 10) || 0;
+}
+
+function renderDriverIncidents() {
+  const el = document.getElementById('inc-list-driver');
+  if (!el) return;
+  const car = getSelectedCarNumber();
+  const forCar = incidents.filter(i => i.car === car);
+  const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">No incidents for this car</div>';
+  el.innerHTML = !forCar.length ? empty : forCar.map(incidentCardHtml).join('');
+}
+
+function parseFrameFromLabel(frameText) {
+  const s = String(frameText).replace(/,/g, '').replace(/^Frame\s*/i, '').trim();
+  const m = s.match(/^\d+/);
+  return m ? parseInt(m[0], 10) : 0;
+}
+
+function enrichCaptureRecord(frameNum, sessionTime, seq) {
+  const match = incidents.find(i => i.frame === frameNum);
+  if (match) {
+    return {
+      seq,
+      frame: frameNum,
+      sessionTime,
+      capturedAt: Date.now(),
+      car: match.car,
+      driver: match.driver,
+      sev: match.sev,
+      cause: match.cause,
+      player: !!match.player
+    };
+  }
+  return {
+    seq,
+    frame: frameNum,
+    sessionTime,
+    capturedAt: Date.now(),
+    car: null,
+    driver: 'Unknown',
+    sev: 1,
+    cause: 'unknown',
+    player: false
+  };
+}
+
+function capturedRowHtml(rec) {
+  const sev = [1, 2, 4].includes(+rec.sev) ? +rec.sev : 1;
+  const raw = String(rec.cause || 'unknown');
+  const cause = raw.replace(/[^a-z-]/gi, '') || 'unknown';
+  const car = rec.car != null ? rec.car : '—';
+  const player = !!rec.player;
+  const label = cause.replace(/-/g, ' ');
+  return `
+    <div class="inc-card${player ? ' player' : ''}" onclick="seekInc(${rec.frame})">
+      <span class="car-num">#${car}</span>
+      <span class="inc-name">${rec.driver}</span>
+      <span class="cause-tag ${cause}">${label}</span>
+      <span class="sev-badge s${sev}">${sev}×</span>
+      <span class="inc-time">${rec.sessionTime}</span>
+    </div>`;
+}
+
+function renderCaptured() {
+  const el = document.getElementById('captured-list');
+  if (!el) return;
+  if (!capturedIncidents.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No captured incidents yet. Run Find all incidents.</div>';
+    return;
+  }
+  const sorted = [...capturedIncidents].sort((a, b) => a.frame - b.frame || a.seq - b.seq);
+  if (!capturedGroupByDriver) {
+    el.innerHTML = sorted.map(capturedRowHtml).join('');
+    return;
+  }
+  const groups = new Map();
+  for (const rec of sorted) {
+    const key = `${rec.driver} (#${rec.car != null ? rec.car : '?'})`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(rec);
+  }
+  const keys = [...groups.keys()].sort((ka, kb) => {
+    const fa = Math.min(...groups.get(ka).map(r => r.frame));
+    const fb = Math.min(...groups.get(kb).map(r => r.frame));
+    return fa - fb;
+  });
+  let html = '';
+  for (const k of keys) {
+    html += `<div class="captured-group-hdr">${k}</div>`;
+    html += groups.get(k).map(capturedRowHtml).join('');
+  }
+  el.innerHTML = html;
+}
+
+function toggleCapturedGroup() {
+  const cb = document.getElementById('captured-group-driver');
+  capturedGroupByDriver = !!(cb && cb.checked);
+  renderCaptured();
+  sendDashboardUiEvent({
+    element_id: 'captured-group-driver',
+    event_type: 'change',
+    message: 'Captured incidents group by driver',
+    value: capturedGroupByDriver ? 'on' : 'off'
+  });
 }
 
 function renderIncMetaLog() {
@@ -720,6 +893,7 @@ function onCarSel() {
   const m = MOCK_CAR_TELEM[idx] || MOCK_CAR_TELEM[0];
   mockTelem = m;
   setTelem(m.t, m.b, m.s);
+  renderDriverIncidents();
   sendDashboardUiEvent({
     element_id: 'telemetry-car-sel',
     event_type: 'change',
@@ -815,6 +989,10 @@ function captureStep() {
   log('events','EVENT','capture_incident',
     '#' + String(captureCount).padStart(2,'0') + '  frame:' + frameEl.replace('Frame ','') +
     '  session:' + timeEl + (sent ? '' : '  [PoC-mock]'));
+
+  const frameNum = parseFrameFromLabel(frameEl);
+  capturedIncidents.push(enrichCaptureRecord(frameNum, timeEl, captureCount));
+  renderCaptured();
 
   document.getElementById('cap-status').textContent = 'Found ' + captureCount + '…';
   captureTimer = setTimeout(captureStep, CAPTURE_STEP_MS);
@@ -952,6 +1130,7 @@ function seedLogs() {
 // ── Init ─────────────────────────────────────────────────
 function init() {
   renderInc();
+  renderCaptured();
   renderStd();
   seedLogs();
   setTelem(mockTelem.t, mockTelem.b, mockTelem.s);
