@@ -426,6 +426,10 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
             <option value="3" data-car="7">#7 M. Wilson</option>
           </select>
         </div>
+        <div class="btn-row">
+          <button type="button" class="btn label-inc" title="Previous incident in replay" onclick="ra('replay_seek','prev')">Previous incident</button>
+          <button type="button" class="btn label-inc" title="Next incident in replay"     onclick="ra('replay_seek','next')">Next incident</button>
+        </div>
         <div class="cap-row">
           <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCapture()"
             title="Step through incidents and log each position (stops after 50 or when you stop)">Find all incidents</button>
