@@ -1,31 +1,69 @@
 # Continuously poll Loki for SimSteward logs and print new lines (tail-style).
-# Run from repo root: .\scripts\poll-loki.ps1
-# Requires: Local Loki at http://localhost:3100 (npm run obs:up). Ctrl+C to stop.
+# Run from repo root: .\scripts\poll-loki.ps1 [-Query '{app="sim-steward"} | json | level != "DEBUG"']
+# Auth: loads repo .env — LOKI_QUERY_URL or SIMSTEWARD_LOKI_URL; optional SIMSTEWARD_LOKI_USER + SIMSTEWARD_LOKI_TOKEN (Grafana Cloud).
+# Ctrl+C to stop.
 
 param(
-    [string]$LokiUrl = "http://localhost:3100",
-    [string]$Query = '{app="sim-steward"}',
+    [string]$LokiUrl = "",
+    [string]$Query = '{app="sim-steward"} | json | level != "DEBUG"',
     [int]$IntervalSeconds = 2,
-    [int]$LookbackSeconds = 60
+    [int]$LookbackSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
-$script:LastEndNs = $null
-$script:Seen = @{}  # dedupe by "ts|line"
+$repoRoot = $PSScriptRoot | Split-Path -Parent
+$envFile = Join-Path $repoRoot ".env"
+
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*([^#][^=]*)=(.*)$') {
+            $name = $Matches[1].Trim()
+            $value = $Matches[2].Trim().Trim('"')
+            [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
+        }
+    }
+}
+
+$lu = $LokiUrl.Trim()
+if (-not $lu) {
+    $tmp = [System.Environment]::GetEnvironmentVariable("LOKI_QUERY_URL", "Process")
+    if ($tmp) { $lu = $tmp.Trim() }
+}
+if (-not $lu) {
+    $tmp = [System.Environment]::GetEnvironmentVariable("SIMSTEWARD_LOKI_URL", "Process")
+    if ($tmp) { $lu = $tmp.Trim() }
+}
+if (-not $lu) { $lu = "http://localhost:3100" }
+$LokiUrl = $lu.TrimEnd('/')
+
+$lokiUser = [System.Environment]::GetEnvironmentVariable("SIMSTEWARD_LOKI_USER", "Process")
+if ($lokiUser) { $lokiUser = $lokiUser.Trim() }
+$lokiToken = [System.Environment]::GetEnvironmentVariable("SIMSTEWARD_LOKI_TOKEN", "Process")
+if ($lokiToken) { $lokiToken = $lokiToken.Trim() }
+
+$script:Seen = @{}
 
 function Get-UnixNano {
     $epoch = [datetime]::new(1970, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)
     [long](([DateTime]::UtcNow - $epoch).TotalSeconds * 1000000000)
 }
 
+function Get-LokiHeaders {
+    $h = @{}
+    if ($lokiUser -and $lokiToken) {
+        $pair = "${lokiUser}:${lokiToken}"
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($pair)
+        $h["Authorization"] = "Basic " + [Convert]::ToBase64String($bytes)
+    }
+    $h
+}
+
 function Get-LokiLogs {
     $endNs = Get-UnixNano
     $startNs = $endNs - ([long]$LookbackSeconds * 1000000000)
-    $startSec = [math]::Floor($startNs / 1000000000)
-    $endSec = [math]::Floor($endNs / 1000000000)
-    $url = "$LokiUrl/loki/api/v1/query_range?query=" + [Uri]::EscapeDataString($Query) + "&limit=200&start=$startSec&end=$endSec"
+    $url = "$LokiUrl/loki/api/v1/query_range?query=" + [Uri]::EscapeDataString($Query) + "&limit=200&start=$startNs&end=$endNs"
     try {
-        $r = Invoke-RestMethod -Uri $url -Method Get -ErrorAction Stop
+        $r = Invoke-RestMethod -Uri $url -Method Get -Headers (Get-LokiHeaders) -ErrorAction Stop
     } catch {
         Write-Host "Loki request failed: $_" -ForegroundColor Red
         return @()
@@ -62,7 +100,6 @@ while ($true) {
             Write-Host (Format-LogLine -TsNs $entry.Ts -Line $entry.Line)
         }
     }
-    # Keep seen set bounded
     if ($script:Seen.Count -gt 5000) {
         $script:Seen = @{}
     }
