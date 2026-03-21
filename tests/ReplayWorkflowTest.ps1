@@ -1,7 +1,7 @@
 # Replay capture workflow test — state shape and snapshot file structure
 # Requires: SimHub running with Sim Steward plugin loaded
 # Run: .\tests\ReplayWorkflowTest.ps1
-# Expectations: see docs/replay-workflow.md (test checklist)
+# Expectations: WebSocket state shape and session-discovery.jsonl structure (see script checks below).
 
 $ErrorActionPreference = "Stop"
 $port = 19847
@@ -134,4 +134,4 @@ if (Test-Path -LiteralPath $snapshotPath) {
 }
 
 Write-Host ""
-Write-Host "All replay workflow checks passed. See docs/replay-workflow.md for full test cases."
+Write-Host "All replay workflow checks passed."

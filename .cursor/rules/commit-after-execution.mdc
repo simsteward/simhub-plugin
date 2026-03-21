@@ -11,4 +11,4 @@ Tracked changes from a plan step, agent command, or edit must end in a **git com
 - Commit only when **build + lints** meet project rules (see SimHub rule / globs for plugin work).
 - Message: one line reflecting what shipped.
 
-Cross-ref: [plan-rebase-on-code-changes](.cursor/rules/plan-rebase-on-code-changes.mdc); SimHub **Development cadence** for milestone commits.
+Cross-ref: SimHub **Development cadence** (`.cursor/rules/SimHub.mdc`) for milestone commits.

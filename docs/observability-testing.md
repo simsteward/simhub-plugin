@@ -11,14 +11,6 @@ Grafana/Loki **test harness** (CI/local) plus **manual dashboard validation** in
 1. Emit structured events (`action_result`, `incident_detected`, `session_digest`) with `testing="true"` and `test_tag` (e.g. `grafana-harness`).
 2. Assert via Loki HTTP API or MCP that expected fields exist.
 
-### Full test (local stack + harness)
-
-```powershell
-.\tests\observability\run_grafana_tests.ps1
-```
-
-Requires Docker, .NET SDK, storage path (default `S:\sim-steward-grafana-storage` or set `GRAFANA_STORAGE_PATH`).
-
 ### Harness only (Loki already running)
 
 ```powershell
@@ -38,7 +30,7 @@ dotnet run --project tests\observability\AssertLokiQueries\AssertLokiQueries.csp
 
 ### MCP assertions
 
-After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"`. Expect ≥2 `action_result`, ≥1 `incident_detected`, ≥1 `session_digest` with required fields. See **tests/observability/assert_via_mcp.md**.
+After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"`. Expect ≥2 `action_result`, ≥1 `incident_detected`, ≥1 `session_digest` with required fields.
 
 ### LogQL: test vs production
 
@@ -47,7 +39,7 @@ After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | t
 
 ### CI
 
-`run_grafana_tests.ps1` is not in `deploy.ps1` by default; add to pipeline if desired.
+Observability harness is not in `deploy.ps1` by default; add harness + Loki stack steps to the pipeline if desired.
 
 ### Troubleshooting (harness)
 

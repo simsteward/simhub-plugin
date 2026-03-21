@@ -10,10 +10,8 @@ globs:
   - "tests/**/*.ps1"
   - "scripts/**/*.ps1"
   - "deploy.ps1"
-  - "docs/INTERFACE.md"
   - "docs/GRAFANA-LOGGING.md"
   - "docs/TROUBLESHOOTING.md"
-  - "docs/STATUS.md"
 alwaysApply: false
 ---
 
@@ -72,10 +70,6 @@ alwaysApply: false
 - [Fleck](https://github.com/statianzo/Fleck) — WebSocket server library for .NET.
 - [IRSDKSharper](https://github.com/mherbold/IRSDKSharper) — high-performance C# iRacing SDK wrapper (session info + telemetry threads, YAML parsing, replay event system).
 - [RaceAdmin](https://github.com/GameDotPlay/RaceAdmin) — reference for all-driver incident tracking from iRacing SDK with delta detection and caution logic.
-
-## Detailed skill
-
-For a compact technical reference, see `.cursor/skills/simhub-dashboard-plugin/SKILL.md`.
 
 ## Loki logging
 

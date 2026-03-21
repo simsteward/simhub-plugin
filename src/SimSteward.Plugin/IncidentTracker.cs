@@ -293,7 +293,7 @@ namespace SimSteward.Plugin
             // #endregion
 
             // ── Seek-backward detection (diagnostic only; we do not reset incident counts) ──
-            // Use ReplayFrameNum as current playback position (per END-OF-SESSION-DATAPOINTS: "Replay position").
+            // Use ReplayFrameNum as current playback position (iRacing replay position).
             // ReplayFrameNumEnd is session end frame and can cause false backward detection if used here.
             // Threshold: decrease of 10+ frames (≈0.17s at 60 Hz). When ReplayPlaySpeed > 1, ignore backward blips.
             int replayFrame = GetInt(irsdk, "ReplayFrameNum");
@@ -318,7 +318,7 @@ namespace SimSteward.Plugin
 
             if (seekedBackward)
             {
-                // Log only; do not reset incident baselines or counts (per user requirement; see docs/STATUS.md).
+                // Log only; do not reset incident baselines or counts (per product requirement).
                 int frameDelta = prevReplayFrame >= 0 ? prevReplayFrame - replayFrame : 0;
                 double sessionTimeDelta = prevSessionTime >= 0 ? sessionTime - prevSessionTime : 0;
                 AgentDebugLog.Write740824("H1", "IncidentTracker.Update", "seek_backward_detected", new
