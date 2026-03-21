@@ -813,7 +813,8 @@ function onActionResult(m) {
   if (m.success) return;
   const err = m.error || '';
   if (err === 'not_connected') {
-    toast('Not connected — iRacing isn’t running or has no active session for this plugin. Open the sim or load a replay, then try again.', 4200);
+    const a = m.action || 'unknown';
+    toast('Not connected — iRacing isn’t running or has no active session for this plugin. Open the sim or load a replay, then try again.', 4200, 'actionResult:not_connected:' + a);
   }
 }
 
@@ -1059,7 +1060,7 @@ function captureSelectedIncident() {
   const camera = sel ? sel.value : '';
   const arg = JSON.stringify({ frame: selectedIncident.frame, camera });
   sendDashboardUiEvent({ element_id: 'capture-btn', event_type: 'click', message: 'Capture incident', value: String(selectedIncident.frame) });
-  if (!send('capture_incident', arg)) toast('[PoC] capture_incident not connected');
+  if (!send('capture_incident', arg)) toast('[PoC] capture_incident not connected', undefined, 'capture_incident');
   log('events', 'INFO ', 'capture_incident', 'frame:' + selectedIncident.frame + '  camera:' + camera);
 }
 
@@ -1068,7 +1069,7 @@ function selectPrevIncident() {
   const filtered = getFilteredIncidents();
   const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
   if (idx < 0) {
-    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200);
+    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200, 'selected-inc-prev-filter');
     selectedIncident = null;
     incidentMetaSelection = null;
     hideSelectedIncidentPanel();
@@ -1084,7 +1085,7 @@ function selectNextIncident() {
   const filtered = getFilteredIncidents();
   const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
   if (idx < 0) {
-    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200);
+    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200, 'selected-inc-next-filter');
     selectedIncident = null;
     incidentMetaSelection = null;
     hideSelectedIncidentPanel();
@@ -1392,7 +1393,7 @@ function clearSelectionIfNotInFilter() {
   incidentMetaSelection = null;
   hideSelectedIncidentPanel();
   collapseIncidentMetaStrip();
-  toast('Selection cleared — not visible with this filter.', 2800);
+  toast('Selection cleared — not visible with this filter.', 2800, 'filter-clear-selection');
 }
 
 function setFilter(el) {
@@ -1505,7 +1506,7 @@ function ra(action, arg, elementId) {
     message: 'Replay ' + action + (arg !== undefined && arg !== '' ? ' ' + arg : ''),
     value: arg != null ? String(arg) : ''
   });
-  if (!send(action, arg)) toast('[PoC] ' + action + ' ' + arg + ' — not yet wired');
+  if (!send(action, arg)) toast('[PoC] ' + action + ' ' + arg + ' — not yet wired', undefined, 'replay:' + action + ':' + String(arg ?? ''));
   log('events','INFO ','replay_action', action + ' arg=' + arg);
 }
 
@@ -1517,7 +1518,7 @@ function replaySessionStep(dir) {
     message: prev ? 'Replay previous session' : 'Replay next session',
     value: dir
   });
-  if (!send('replay_session', dir)) toast('[PoC] replay_session ' + dir + ' — not yet wired');
+  if (!send('replay_session', dir)) toast('[PoC] replay_session ' + dir + ' — not yet wired', undefined, 'replay_session:' + dir);
   log('events', 'INFO ', 'replay_action', 'replay_session arg=' + dir);
 }
 function updatePlayPauseBtn() {
@@ -1553,7 +1554,7 @@ function seekInc(frame) {
     message: 'Seek to incident frame',
     value: String(frame)
   });
-  if (!send('seek_to_incident', String(frame))) toast('[PoC] Seek to frame ' + frame);
+  if (!send('seek_to_incident', String(frame))) toast('[PoC] Seek to frame ' + frame, undefined, 'seek_to_incident:' + frame);
   log('events','INFO ','seek_requested','frame=' + frame);
 }
 // ── Capture incidents ────────────────────────────────────
@@ -1633,7 +1634,7 @@ function toggleCaptureDriver() {
 function startCaptureDriver() {
   captureQueue = buildDriverCaptureQueue();
   if (!captureQueue.length) {
-    toast('No incidents for the selected driver in the current session list.');
+    toast('No incidents for the selected driver in the current session list.', undefined, 'walk-driver-empty');
     sendDashboardUiEvent({
       element_id: 'find-selected-driver-incidents',
       event_type: 'ui_interaction',
@@ -1682,7 +1683,7 @@ function startCaptureSessionClick() {
 function startCaptureSession() {
   captureQueue = buildSessionCaptureQueue();
   if (!captureQueue.length) {
-    toast('No incidents in the current session list.');
+    toast('No incidents in the current session list.', undefined, 'walk-session-empty');
     sendDashboardUiEvent({
       element_id: 'find-all-drivers-incidents',
       event_type: 'ui_interaction',
@@ -1785,7 +1786,7 @@ function scrubClick(e) {
     message: 'Replay scrub bar click',
     value: String(pct)
   });
-  toast('[PoC] Scrub to ' + pct + '%');
+  toast('[PoC] Scrub to ' + pct + '%', undefined, 'replay-scrub');
 }
 function setFrame(cur, end) {
   if (cur !== undefined) {
@@ -1841,8 +1842,18 @@ function fmtTelem(m) {
 }
 
 // ── Toast ────────────────────────────────────────────────
+/** Suppress repeat toasts for the same control within this window; a different debounceKey always shows. */
+const TOAST_DEBOUNCE_MS = 800;
+let lastToastDebounceKey = null;
+let lastToastDebounceAt = 0;
 let toastT = null;
-function toast(msg, durationMs) {
+function toast(msg, durationMs, debounceKey) {
+  const now = Date.now();
+  if (debounceKey != null && debounceKey !== '') {
+    if (debounceKey === lastToastDebounceKey && (now - lastToastDebounceAt) < TOAST_DEBOUNCE_MS) return;
+    lastToastDebounceKey = debounceKey;
+    lastToastDebounceAt = now;
+  }
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
   clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), durationMs != null ? durationMs : 2600);
