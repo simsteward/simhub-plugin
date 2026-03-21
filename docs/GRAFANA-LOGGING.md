@@ -277,6 +277,18 @@ See **docs/observability-local.md** for Grafana + Loki + gateway setup and `LOKI
 
 **Local Docker:** Wipe Loki (and optionally Grafana) bind-mount data with **docs/observability-local.md** § Housekeeping (`scripts/obs-wipe-local-data.ps1`).
 
+### CLI: direct Loki query (repo)
+
+With `.env` containing `SIMSTEWARD_LOKI_URL`, `SIMSTEWARD_LOKI_USER`, and `SIMSTEWARD_LOKI_TOKEN` (optional override: `LOKI_QUERY_URL`):
+
+| Command | Purpose |
+|---------|---------|
+| `npm run loki:query` | One-off `GET .../loki/api/v1/query_range` via `scripts/query-loki-once.mjs`. Flags: `--query` (LogQL), `--limit`, `--lookback` (seconds). |
+| `npm run env:run -- <command>` | Load `.env` into the child process (e.g. `npm run env:run -- pwsh -NoProfile -File scripts/poll-loki.ps1`). |
+| `npm run obs:poll` / `npm run obs:poll:grafana` | Tail-style poll (`scripts/poll-loki.ps1`); `-ViaGrafana` path needs `GRAFANA_URL` (stack `https://<slug>.grafana.net`, **not** the `logs-prod-*` Loki host), token, and datasource UID — see `.env.example`. |
+
+**401/403:** The `glc_*` token’s Cloud Access Policy may lack Loki **read** (query). For Grafana API proxy instead, use a token with datasource query scope and `npm run obs:poll:grafana`.
+
 ## LogQL reference
 
 | Purpose | LogQL |
