@@ -464,9 +464,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 /* ── Toast ── */
 .toast {
-  position: fixed; bottom: 18px; right: 18px; padding: 9px 15px;
+  position: fixed; bottom: 18px; right: 18px; max-width: min(420px, calc(100vw - 36px)); padding: 9px 15px;
   background: rgba(18,18,22,0.97); border: 1px solid var(--border); border-radius: 8px;
-  font-size: 0.8rem; color: var(--text); opacity: 0; transform: translateY(6px);
+  font-size: 0.8rem; line-height: 1.35; color: var(--text); opacity: 0; transform: translateY(6px);
   transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 100;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
@@ -805,7 +805,17 @@ function onMsg(m) {
   else if (m.type === 'incidents')  { incidents = m.entries || []; renderInc(); }
   else if (m.type === 'iracingEvent') log('events','EVENT', m.event||'event', m.data||JSON.stringify(m));
   else if (m.type === 'telemetryData') log('telem','DATA ', 'telemetry', fmtTelem(m));
+  else if (m.type === 'actionResult') onActionResult(m);
   else if (m.type === 'pong') {}
+}
+
+/** Plugin ack for dashboard actions (see DashboardBridge.SendActionResult). */
+function onActionResult(m) {
+  if (m.success) return;
+  const err = m.error || '';
+  if (err === 'not_connected') {
+    toast('Not connected — iRacing isn’t running or has no active session for this plugin. Open the sim or load a replay, then try again.', 4200);
+  }
 }
 
 // ── State update ─────────────────────────────────────────
@@ -1753,10 +1763,10 @@ function fmtTelem(m) {
 
 // ── Toast ────────────────────────────────────────────────
 let toastT = null;
-function toast(msg) {
+function toast(msg, durationMs) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
-  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600);
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), durationMs != null ? durationMs : 2600);
 }
 
 // ── Mock animation ───────────────────────────────────────
