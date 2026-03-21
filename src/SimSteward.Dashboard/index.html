@@ -384,10 +384,11 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
       <div class="panel">
         <div class="panel-title">Replay Controls</div>
         <div class="btn-row">
-          <button class="btn" title="Jump to start" onclick="ra('replay_jump','start')">⏮</button>
-          <button class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4')">⏪</button>
-          <button class="btn" title="Forward 4×"   onclick="ra('replay_speed','4')">⏩</button>
-          <button class="btn" title="Jump to end"  onclick="ra('replay_jump','end')">⏭</button>
+          <button type="button" class="btn" title="Jump to start" onclick="ra('replay_jump','start')">⏮</button>
+          <button type="button" class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4')">⏪</button>
+          <button type="button" class="btn" id="replay-play-pause-btn" title="Pause replay" onclick="toggleReplayPlayPause()">⏸</button>
+          <button type="button" class="btn" title="Forward 4×"   onclick="ra('replay_speed','4')">⏩</button>
+          <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end')">⏭</button>
         </div>
         <div class="btn-row">
           <button type="button" class="btn label-inc" title="Previous incident in replay" onclick="ra('replay_seek','prev')">Previous incident</button>
@@ -589,6 +590,8 @@ let ws          = null;
 let mockTime    = 0;
 let mockPaused  = false;  // paused when real WS connected
 let mockTelem   = { t:0.65, b:0.00, s:0.30 };
+let replayPaused = false;
+let lastReplaySpeed = '1';
 
 // ── WebSocket ────────────────────────────────────────────
 function connectWs() {
@@ -925,9 +928,36 @@ function ra(action, arg) {
   if (!send(action, arg)) toast('[PoC] ' + action + ' ' + arg + ' — not yet wired');
   log('events','INFO ','replay_action', action + ' arg=' + arg);
 }
+function updatePlayPauseBtn() {
+  const btn = document.getElementById('replay-play-pause-btn');
+  if (!btn) return;
+  btn.textContent = replayPaused ? '▶' : '⏸';
+  btn.title = replayPaused ? 'Play replay' : 'Pause replay';
+}
+
+function toggleReplayPlayPause() {
+  if (replayPaused) {
+    replayPaused = false;
+    ra('replay_speed', lastReplaySpeed);
+  } else {
+    replayPaused = true;
+    ra('replay_speed', '0');
+  }
+  updatePlayPauseBtn();
+  sendDashboardUiEvent({
+    element_id: 'replay-play-pause',
+    event_type: 'click',
+    message: replayPaused ? 'Replay paused' : 'Replay playing',
+    value: replayPaused ? 'paused' : 'playing'
+  });
+}
+
 function setSpeed(el) {
   document.querySelectorAll('.spill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
+  lastReplaySpeed = el.dataset.s || '1';
+  replayPaused = false;
+  updatePlayPauseBtn();
   ra('replay_speed', el.dataset.s);
 }
 function seekInc(frame) {
@@ -1146,6 +1176,7 @@ function init() {
   renderStd();
   seedLogs();
   setTelem(mockTelem.t, mockTelem.b, mockTelem.s);
+  updatePlayPauseBtn();
   setInterval(mockTick, 50);
   connectWs();
 }
