@@ -10,7 +10,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 
 | Doc | Use when |
 |-----|----------|
-| [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) | Loki labels, events, LogQL, dashboards |
+| [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) | Loki labels, events, LogQL, housekeeping |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Runtime issues, logs, deploy |
 
 ---

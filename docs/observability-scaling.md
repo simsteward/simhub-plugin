@@ -70,6 +70,6 @@ Same as Part A: chunked `session_end_datapoints_results` lines; **docs/GRAFANA-L
 
 ## References
 
-- **docs/GRAFANA-LOGGING.md** — Schema, volume budget, LogQL, dashboards.
+- **docs/GRAFANA-LOGGING.md** — Schema, volume budget, LogQL, housekeeping.
 - **docs/observability-local.md** — Local stack quick start.
 - Grafana: [Label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Query best practices](https://grafana.com/docs/loki/latest/query/bp-query/).

@@ -20,11 +20,24 @@ Quick start for plugin logs in local Grafana, plus optional **file-tail + gatewa
 
 4. **Grafana** — http://localhost:3000 → Explore → Loki → `{app="sim-steward", env="local"}`.
 
-5. **Generate traffic** — Use SimHub + dashboard; provisioned dashboards fill for `app="sim-steward"`, `env="local"`.
+5. **Generate traffic** — Use SimHub + web dashboard; confirm logs in **Explore** with `{app="sim-steward", env="local"}` (no repo-provisioned Grafana dashboards until you add JSON under `observability/local/grafana/provisioning/dashboards/`).
 
 **Storage override:** Set `GRAFANA_STORAGE_PATH` in `.env.observability.local`; compose uses `${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}`.
 
 **Terminal tail:** `npm run obs:poll` or `.\scripts\poll-loki.ps1`.
+
+---
+
+## Housekeeping: wipe dashboards’ data (local)
+
+To **clear Loki chunks/WAL** and optional Alloy/Grafana bind-mount state **without** changing compose, `loki-config.yml`, datasource provisioning, `LOKI_PUSH_TOKEN`, or `SIMSTEWARD_LOKI_*`:
+
+1. From repo root, run **`npm run obs:wipe -- -Force`** (always clears the `loki` subdirectory under `GRAFANA_STORAGE_PATH`).
+2. Optional flags: **`-Alloy`** (reset file-tail positions), **`-Grafana`** (wipes `grafana.db`; re-run `scripts/grafana-bootstrap.ps1` if you use `GRAFANA_API_TOKEN`), **`-SampleLogs`** (clears `observability/local/sample-logs/*` files), or **`-All`** for all of the above.
+
+Equivalent: `.\scripts\obs-wipe-local-data.ps1 -Force` (same switches).
+
+**Grafana Cloud** (delete dashboards and old log lines without rotating Loki credentials): see **docs/GRAFANA-LOGGING.md** § Housekeeping (Grafana Cloud).
 
 ---
 
@@ -54,6 +67,6 @@ Alloy tails `observability/local/sample-logs/*.log` (or mount plugin data — se
 
 ## See also
 
-- **docs/GRAFANA-LOGGING.md** — Labels, events, LogQL, dashboards.
+- **docs/GRAFANA-LOGGING.md** — Labels, events, LogQL, housekeeping.
 - **docs/observability-scaling.md** — Many users / large grids.
-- **docs/observability-testing.md** — Harness and dashboard validation.
+- **docs/observability-testing.md** — Harness and Explore validation.

@@ -1,6 +1,6 @@
-# Observability testing and dashboard validation
+# Observability testing and Explore validation
 
-Grafana/Loki **test harness** (CI/local) plus **manual dashboard validation** in Explore.
+Grafana/Loki **test harness** (CI/local) plus **manual LogQL validation** in Explore.
 
 ---
 
@@ -52,7 +52,7 @@ Observability harness is not in `deploy.ps1` by default; add harness + Loki stac
 
 ---
 
-## Dashboard validation (e.g. last 7 days)
+## Explore validation (e.g. last 7 days)
 
 Run in **Grafana → Explore → Loki**, range **Last 7 days**.
 
@@ -66,7 +66,7 @@ If grouping fails, use `{app="sim-steward"} | json` and group in UI.
 
 ### Label check
 
-Query `{app="sim-steward"}` — expect `env`, `component`, `level`. Cloud: match datasource UID to provisioned dashboards (`loki_local` or variable `DS_LOKI`).
+Query `{app="sim-steward"}` — expect `env`, `component`, `level`. Cloud: use your Loki datasource (local provisioning uses UID `loki_local`).
 
 ### Component breakdown (optional)
 
@@ -78,11 +78,11 @@ Expect `simhub-plugin`, `bridge`, `tracker` (and optionally `dashboard`).
 
 ### Outcome
 
-Confirm events exist and dashboards in **docs/GRAFANA-LOGGING.md** (provisioned list) show data.
+Confirm expected events exist and panels/queries in **docs/GRAFANA-LOGGING.md** (LogQL reference) return data.
 
 ---
 
 ## References
 
-- **docs/GRAFANA-LOGGING.md** — Taxonomy, dashboards, LogQL.
+- **docs/GRAFANA-LOGGING.md** — Taxonomy, LogQL, housekeeping.
 - **observability/local/** — Docker Compose and provisioning.

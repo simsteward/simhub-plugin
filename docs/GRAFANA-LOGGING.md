@@ -1,6 +1,6 @@
 # Grafana Loki Structured Logging
 
-Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk); **Grafana Alloy** (or another tailer) tails that file and pushes to Loki. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Dashboards and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
+Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk); **Grafana Alloy** (or another tailer) tails that file and pushes to Loki. The plugin does no Loki HTTP I/O. The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Local Docker / quick start: **docs/observability-local.md**.
 
 **Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; Alloy (or any forwarder) tails that file and pushes to Loki with no filter. Loki retains the full stream.
 
@@ -95,7 +95,7 @@ Every log line has an `event` field. Key events:
 | `yaml_update` | tracker | `session_info_update`, `session_num`, `session_time` | Debug-only. |
 | `session_digest` | simhub-plugin | `session_id`, `session_num`, `track`, `duration_minutes`, `total_incidents`, `results_incident_sum`, `incident_summary`, `incident_summary_truncated`, `results_table`, `results_driver_count`, `actions_dispatched`, … | Single-row session summary. **total_incidents** = count of incident_detected events (plugin); **results_incident_sum** = sum of iRacing per-driver incident points; **results_table** = authoritative ResultsPositions (pos, car, driver, incidents, laps, class, reason_out per driver). |
 
-`incident_detected` feeds the **Incident Timeline** dashboard; `session_digest` feeds the **Session Overview** dashboard.
+`incident_detected` and `session_digest` are the main LogQL entry points for incidents and session-level summaries (use **Explore** or any Loki panel you add).
 
 ## Local vs. cloud configuration
 
@@ -121,7 +121,7 @@ The plugin reads these once at `Init()`. To switch environment, edit `.env` and 
 
 ## No data in Grafana
 
-If Explore or dashboards show no logs for `{app="sim-steward"}`:
+If Explore (or any Loki-backed panel) shows no logs for `{app="sim-steward"}`:
 
 1. **Loki URL not set** — The plugin pushes to Loki only when `SIMSTEWARD_LOKI_URL` is set. If you start SimHub by double‑clicking (or from the Start menu), that variable is usually unset.
    - **Fix:** Start SimHub via `.\scripts\run-simhub-local-observability.ps1` for local Loki, or set the Loki env vars before starting SimHub.
@@ -131,12 +131,9 @@ If Explore or dashboards show no logs for `{app="sim-steward"}`:
 
 After fixing, restart SimHub (using the script for local) and trigger some activity (e.g. open the dashboard, connect iRacing, or run a replay); logs should appear within a few seconds to a minute depending on flush interval.
 
-### Dashboards show no data
+### Panels show no data
 
-If provisioned dashboards load but every panel shows "No data", check both:
-
-1. **Dashboard JSON and datasource** — Each file in `observability/local/grafana/provisioning/dashboards/` must be a **single** provisioner object: `{ "dashboard": { ... }, "overwrite": true }`. Every panel must use the explicit datasource `{ "type": "loki", "uid": "loki_local" }`. If a panel uses `"datasource": "${DS_LOKI}"`, that variable is not set in provisioning and the panel will have no datasource. Remove any duplicate or legacy JSON objects from the same file.
-2. **Data flow** — If the pipeline is not sending logs to Loki, dashboards will be empty even with correct JSON. Follow the **Logs not in Grafana? Checklist** below; confirm in **Explore** with query `{app="sim-steward"}` and time range "Last 1 hour" that at least some log lines are returned before relying on dashboards.
+If **Explore** works but a dashboard panel shows "No data", fix the panel’s datasource (use UID `loki_local` for local provisioning, or your Cloud Loki datasource) and time range. If **Explore** is also empty, follow the checklist below.
 
 ### Logs not in Grafana? Checklist
 
@@ -155,7 +152,7 @@ Use this checklist so button presses (Play, etc.) show up in Grafana:
 
 Set `SIMSTEWARD_LOG_DEBUG=1` for local debugging only. When enabled:
 
-- **PluginLogger.Debug()** emits `DEBUG`-level entries (still sent to Loki; filter in dashboards/AI).
+- **PluginLogger.Debug()** emits `DEBUG`-level entries (still sent to Loki; filter in Explore/AI).
 - **LokiSink** uses relaxed flush rules: 2 s timer, 500-entry batch, 5,000-entry queue, no line-size enforcement.
 - Additional log events are emitted:
   - `state_broadcast_summary` (throttled ~5/s): plugin mode, incident count, client count, replay frame.
@@ -179,30 +176,15 @@ Never enable debug in production. For AI or assistant queries, filter with `| le
 | `ActionLatenciesMs` | Rolling sample for P50/P95. |
 | `Incidents` | Incident summaries (e.g. for digest). |
 
-**session_digest** is emitted at most once per session (guarded by `_sessionDigestEmitted`). It caps `incident_summary` to 20 entries (highest severity first) and sets `incident_summary_truncated: true` when truncated. Trigger the digest manually (`CaptureSessionSummaryNow`, `FinalizeThenCaptureSessionSummary`, or checkered flag) so downstream AI and dashboards see the session as complete.
+**session_digest** is emitted at most once per session (guarded by `_sessionDigestEmitted`). It caps `incident_summary` to 20 entries (highest severity first) and sets `incident_summary_truncated: true` when truncated. Trigger the digest manually (`CaptureSessionSummaryNow`, `FinalizeThenCaptureSessionSummary`, or checkered flag) so downstream AI and Grafana panels see the session as complete.
 
 **Incident semantics:** `total_incidents` is the **count of incident_detected events** (from IncidentTracker CurDriverIncidentCount deltas). The **results_table** `incidents` column and **results_incident_sum** are iRacing’s per-driver incident **points** at session end (from ResultsPositions). So total_incidents (e.g. 12 events) and results_incident_sum (e.g. 24 points) can both be correct but differ.
 
-## Provisioned dashboards
+## Grafana dashboards (repo)
 
-Grafana can load dashboards from `observability/local/grafana/provisioning/dashboards/`. Each JSON file uses the provisioner format `{ "dashboard": { ... }, "overwrite": true }`. Most panels reference datasource UID `loki_local`; **Event Coverage** uses a datasource variable `DS_LOKI` so Grafana Cloud users can select their Loki instance.
+There are **no** provisioned dashboard JSON files in the repo at the moment. Use **Grafana → Explore** with the queries in § LogQL reference. To add dashboards again, put files under `observability/local/grafana/provisioning/dashboards/` as a single object per file: `{ "dashboard": { ... }, "overwrite": true }`, with panels using datasource `{ "type": "loki", "uid": "loki_local" }` locally, or a variable such as `DS_LOKI` on Grafana Cloud.
 
-| File | Dashboard | Panels |
-|------|-----------|--------|
-| `event-coverage.json` | Event Coverage | Log volume (timeseries), event distribution (table), component breakdown (table), recent logs (logs). Default time range 7 days. |
-| `command-audit.json` | Command Audit | Action results (logs), failed actions stat, action volume (timeseries). |
-| `incident-timeline.json` | Incident Timeline | Incidents (logs), incidents table (type/driver/car/lap/session_time), incident rate (timeseries). |
-| `plugin-health.json` | Plugin Health | ERROR/WARN rate (timeseries), all ERROR logs (logs), lifecycle (logs). |
-| `session-overview.json` | Session Overview | Session digests (logs), lifecycle events (logs), WebSocket client events (logs). |
-| `session-capture.json` | Session Capture | session_summary_captured, session_end_datapoints_session, checkered/retry, capture skipped/mismatch/fingerprint, capture vs skip rate. |
-| `replay-tracker.json` | Replay & Tracker | replay_control (logs), tracker state (baseline_established, session_reset, seek_backward_detected), replay control count. |
-| `bridge-actions.json` | Bridge & Actions | action_received, dashboard_opened/ws_client_rejected/bridge_start_failed, rejections stat. |
-| `errors-warnings.json` | Errors & Warnings | ERROR/WARN rate (timeseries), ERROR logs, WARN logs. |
-| `session-end-results.json` | Session End Results | session_end_datapoints_results (all chunks), chunks over time; merge by session_id and chunk_index for full table. |
-
-To validate which events appear in your data (e.g. last 7 days) and confirm the datasource, see **docs/observability-testing.md** (dashboard validation).
-
-See **Local quickstart** below to run Grafana and Loki so these dashboards load.
+Validate events over a time range in **docs/observability-testing.md** (Explore / LogQL checks).
 
 ### Derived fields (Loki datasource)
 
@@ -245,6 +227,14 @@ docker compose up -d
 
 See **docs/observability-local.md** for the file-tail/gateway/alloy setup and token-protected push.
 
+## Housekeeping (Grafana Cloud)
+
+**Dashboards:** Delete in the Grafana UI or via the HTTP API using an existing editor/admin token. Do **not** delete the Loki datasource or change stack URLs, `SIMSTEWARD_LOKI_USER`, or `SIMSTEWARD_LOKI_TOKEN`.
+
+**Stored logs:** Rely on plan **retention**, or use Grafana Cloud / Loki **documented deletion** flows for your tier. Clearing data must not require rotating credentials.
+
+**Local Docker:** Wipe Loki (and optionally Alloy/Grafana) bind-mount data with **docs/observability-local.md** § Housekeeping (`scripts/obs-wipe-local-data.ps1`).
+
 ## LogQL reference
 
 | Purpose | LogQL |
@@ -256,7 +246,7 @@ See **docs/observability-local.md** for the file-tail/gateway/alloy setup and to
 | Plugin lifecycle | `{app="sim-steward", component="simhub-plugin"} \| json \| event =~ "plugin_started\|plugin_ready\|iracing_connected\|iracing_disconnected\|plugin_stopped"` |
 | Session digests | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_digest"` |
 | Session end metadata | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_end_datapoints_session"` |
-| Session end results (all chunks for one session) | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_end_datapoints_results" \| session_id = "<id>"` — merge in dashboard by sorting on `chunk_index` and flattening `results`. |
+| Session end results (all chunks for one session) | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_end_datapoints_results" \| session_id = "<id>"` — merge in panels by sorting on `chunk_index` and flattening `results`. |
 | WS peak (stat) | `max_over_time({app="sim-steward"} \| json \| event = "session_digest" \| unwrap ws_peak_clients [24h])` |
 | Trace by correlation | `{app="sim-steward"} \| json \| correlation_id = "<id>"` |
 | All errors | `{app="sim-steward", level="ERROR"}` |
@@ -274,7 +264,7 @@ See **docs/observability-local.md** for the file-tail/gateway/alloy setup and to
 
 ### Chunked session results (hundreds of drivers)
 
-End-of-session driver results are emitted as **session_end_datapoints_session** (metadata once) plus **session_end_datapoints_results** (one log line per chunk of 35 drivers). To show a full results table for a session in Grafana:
+End-of-session driver results are emitted as **session_end_datapoints_session** (metadata once) plus **session_end_datapoints_results** (one log line per chunk of 35 drivers). To show a full results table for a session in Grafana log/table panels:
 
 1. Query: `{app="sim-steward", component="simhub-plugin"} | json | event = "session_end_datapoints_results" | session_id = "<session_id>"`.
 2. In the panel transform: sort by `chunk_index`, then use a transform that flattens the `results` array from each chunk into a single table (e.g. "Merge" / "Flatten" or a custom transformation that concatenates `results` in order).
