@@ -225,7 +225,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   border-radius: var(--r);
   overflow: hidden;
 }
-.log-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.log-tabs { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .log-tab {
   padding: 7px 14px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--muted); cursor: pointer; border: none; border-bottom: 2px solid transparent;
@@ -252,7 +252,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .ll.debug { color: rgba(240,240,240,0.25); }
 .ll.data  { color: rgba(13,216,255,0.7); }
 
-/* ── Bottom dock: telemetry + leaderboard + captured, then stream logs ── */
+/* ── Bottom dock: telemetry + tabbed logs (leaderboard & captured are last tabs) ── */
 .bottom-dock-rows {
   flex-shrink: 0;
   display: flex;
@@ -260,51 +260,72 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   gap: 8px;
   min-height: 0;
 }
-.bottom-dock-row {
+.bottom-dock-main {
   display: flex;
   gap: 8px;
   min-height: 0;
+  height: 420px;
 }
-.bottom-dock-row.row-1 { height: 220px; }
-.bottom-dock-row.row-2 { height: 200px; }
 .log-section--telemetry {
   width: 300px;
   flex: none;
   flex-shrink: 0;
 }
-.log-section--streams { flex: 1; min-width: 0; }
 .log-section-head {
   flex-shrink: 0;
   padding: 8px 12px 6px;
   border-bottom: 1px solid var(--border);
 }
 .log-section-head .panel-title { margin-bottom: 0; }
+.log-section-body--telem { flex: 1; min-height: 0; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+.log-section--streams {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.log-section--streams .log-pane { flex: 1; min-height: 0; }
 .log-section-toolbar {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 6px 0 8px;
   font-size: 0.68rem;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
 }
 .log-section-toolbar label { cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
 .log-section-toolbar input { accent-color: var(--accent); }
-.log-section-body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+.leaderboard-pane-stack {
   display: flex;
   flex-direction: column;
-  padding: 0 10px 10px;
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
 }
-.log-section-body--telem { padding: 10px; overflow-y: auto; }
-.leaderboard-body { padding-top: 8px; }
-.leaderboard-body .inc-header { margin-bottom: 6px; }
-.leaderboard-body .inc-list,
-.captured-body .inc-list { flex: 1; min-height: 0; }
-.captured-body { padding-top: 8px; }
+.leaderboard-pane-stack .inc-header { flex-shrink: 0; margin-bottom: 0; }
+.leaderboard-pane-stack .inc-list { flex: 1; min-height: 0; }
+.log-pane.incidents-pane {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.82rem;
+  padding: 8px 10px;
+  flex-direction: column;
+}
+.log-pane.incidents-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+.log-pane.incidents-pane .inc-list { flex: 1; min-height: 0; }
+.captured-pane-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.captured-pane-inner .inc-list { flex: 1; min-height: 0; }
 .driver-inc-panel {
   max-height: 260px;
   flex-shrink: 0;
@@ -463,12 +484,12 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
     </div><!-- /right-col -->
   </div><!-- /main-grid -->
 
-  <!-- ── Bottom: telemetry + leaderboard + captured; then stream logs ── -->
+  <!-- ── Bottom: telemetry + single tab strip (leaderboard & captured are last tabs) ── -->
   <div class="bottom-dock-rows">
-    <div class="bottom-dock-row row-1">
+    <div class="bottom-dock-main">
       <section class="log-section log-section--telemetry" aria-label="Telemetry">
         <div class="log-section-head"><span class="panel-title">Telemetry</span></div>
-        <div class="log-section-body log-section-body--telem">
+        <div class="log-section-body--telem">
           <div class="input-rows">
             <div>
               <div class="input-lbl"><span>Throttle</span><span id="thr-pct">65%</span></div>
@@ -494,51 +515,48 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           </div>
         </div>
       </section>
-      <section class="log-section incidents-panel" aria-label="Incident leaderboard">
-        <div class="log-section-head">
-          <span class="panel-title" style="margin-bottom:0">
-            Incident leaderboard <span id="inc-count" style="color:var(--muted)">(0)</span>
-          </span>
-        </div>
-        <div class="log-section-body leaderboard-body">
-          <div class="inc-header">
-            <div class="chips">
-              <span class="chip active" data-f="all"    onclick="setFilter(this)">All</span>
-              <span class="chip"        data-f="1"      onclick="setFilter(this)">1×</span>
-              <span class="chip"        data-f="2"      onclick="setFilter(this)">2×</span>
-              <span class="chip"        data-f="4"      onclick="setFilter(this)">4×</span>
-              <span class="chip"        data-f="player" onclick="setFilter(this)">Mine</span>
-            </div>
-          </div>
-          <div class="inc-list" id="inc-list"></div>
-        </div>
-      </section>
-      <section class="log-section" aria-label="Captured incidents">
-        <div class="log-section-head"><span class="panel-title">Captured incidents</span></div>
-        <div class="log-section-toolbar">
-          <label>
-            <input type="checkbox" id="captured-group-driver" onchange="toggleCapturedGroup()"/>
-            Group by driver
-          </label>
-        </div>
-        <div class="log-section-body captured-body">
-          <div class="inc-list" id="captured-list"></div>
-        </div>
-      </section>
-    </div>
-    <div class="bottom-dock-row row-2">
-      <section class="log-section log-section--streams">
+      <section class="log-section log-section--streams" aria-label="Logs and incident views">
         <div class="log-tabs">
-          <button class="log-tab active" data-tab="events"   onclick="switchTab(this)">iRacing Events</button>
-          <button class="log-tab"        data-tab="health"   onclick="switchTab(this)">App Health</button>
-          <button class="log-tab"        data-tab="telem"    onclick="switchTab(this)">Telemetry Data</button>
-          <button class="log-tab"        data-tab="incmeta"  onclick="switchTab(this)">Incident meta</button>
+          <button class="log-tab active" data-tab="events"     onclick="switchTab(this)">iRacing Events</button>
+          <button class="log-tab"        data-tab="health"     onclick="switchTab(this)">App Health</button>
+          <button class="log-tab"        data-tab="telem"      onclick="switchTab(this)">Telemetry Data</button>
+          <button class="log-tab"        data-tab="incmeta"    onclick="switchTab(this)">Incident meta</button>
+          <button class="log-tab"        data-tab="leaderboard" onclick="switchTab(this)">Incident leaderboard</button>
+          <button class="log-tab"        data-tab="captured"   onclick="switchTab(this)">Captured incidents</button>
           <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
         </div>
         <div class="log-pane active" id="log-events"></div>
         <div class="log-pane"        id="log-health"></div>
         <div class="log-pane"        id="log-telem"></div>
         <div class="log-pane meta-pane" id="log-incmeta"></div>
+        <div class="log-pane incidents-pane" id="log-leaderboard">
+          <div class="leaderboard-pane-stack">
+            <div class="panel-title" style="margin-bottom:4px">
+              Incident leaderboard <span id="inc-count" style="color:var(--muted)">(0)</span>
+            </div>
+            <div class="inc-header">
+              <div class="chips">
+                <span class="chip active" data-f="all"    onclick="setFilter(this)">All</span>
+                <span class="chip"        data-f="1"      onclick="setFilter(this)">1×</span>
+                <span class="chip"        data-f="2"      onclick="setFilter(this)">2×</span>
+                <span class="chip"        data-f="4"      onclick="setFilter(this)">4×</span>
+                <span class="chip"        data-f="player" onclick="setFilter(this)">Mine</span>
+              </div>
+            </div>
+            <div class="inc-list" id="inc-list"></div>
+          </div>
+        </div>
+        <div class="log-pane incidents-pane" id="log-captured">
+          <div class="captured-pane-inner">
+            <div class="log-section-toolbar">
+              <label>
+                <input type="checkbox" id="captured-group-driver" onchange="toggleCapturedGroup()"/>
+                Group by driver
+              </label>
+            </div>
+            <div class="inc-list" id="captured-list"></div>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -703,6 +721,10 @@ function renderInc() {
   document.getElementById('inc-list').innerHTML = html;
   renderIncMetaLog();
   renderDriverIncidents();
+  if (activeTab === 'leaderboard' && autoScroll) {
+    const list = document.getElementById('inc-list');
+    if (list) list.scrollTop = list.scrollHeight;
+  }
 }
 
 function getSelectedCarNumber() {
@@ -778,11 +800,13 @@ function renderCaptured() {
   if (!el) return;
   if (!capturedIncidents.length) {
     el.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No captured incidents yet. Run Find all incidents.</div>';
+    if (activeTab === 'captured' && autoScroll) el.scrollTop = 0;
     return;
   }
   const sorted = [...capturedIncidents].sort((a, b) => a.frame - b.frame || a.seq - b.seq);
   if (!capturedGroupByDriver) {
     el.innerHTML = sorted.map(capturedRowHtml).join('');
+    if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
     return;
   }
   const groups = new Map();
@@ -802,6 +826,7 @@ function renderCaptured() {
     html += groups.get(k).map(capturedRowHtml).join('');
   }
   el.innerHTML = html;
+  if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
 }
 
 function toggleCapturedGroup() {
