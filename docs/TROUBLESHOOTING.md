@@ -132,7 +132,7 @@ If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 3. **Local stack** — Start observability from `observability/local/` (`docker compose up -d`) so Loki (3100) and Grafana (3000) run; compose does **not** tail `plugin-structured.jsonl` for you.
 4. **Auth (Grafana Cloud)** — For Grafana Cloud direct push from *your* agent, use your stack’s credentials; wrong tokens show up in that agent’s logs, not as a built-in “LokiSink” in this plugin.
 5. **Data source in Grafana** — Point the Loki data source at your Loki URL (e.g. `http://localhost:3100` for local). Explore: `{app="sim-steward"}`.
-6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `state_broadcast_summary`, `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
+6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
 
 See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL examples.
 

@@ -928,16 +928,6 @@ namespace SimSteward.Plugin
 
             var snapshot = BuildPluginSnapshot();
             _bridge.BroadcastState(BuildStateJson(snapshot));
-
-            if (_logger.IsDebugMode)
-            {
-                _logger.Debug("state broadcast", "simhub-plugin", "state_broadcast_summary",
-                    new System.Collections.Generic.Dictionary<string, object>
-                    {
-                        ["mode"] = snapshot.PluginMode,
-                        ["client_count"] = clientCount
-                    });
-            }
         }
 
         private int SafeGetInt(string name)

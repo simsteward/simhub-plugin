@@ -4,7 +4,7 @@ Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or 
 
 **Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl**; whatever forwards those lines to Loki must not filter them. Loki retains the full stream.
 
-**Filtering is dashboard-only.** The web dashboard receives the full stream via WebSocket and applies level/event visibility filters for display only (checkboxes and `hiddenLevels` / `hiddenEvents`). Toggling "hide DEBUG" or "hide state_broadcast_summary" etc. in the dashboard shows or hides entries that are already in the stream; nothing is dropped at the plugin.
+**Filtering is dashboard-only.** The web dashboard receives the full stream via WebSocket and applies level/event visibility filters for display only (checkboxes and `hiddenLevels` / `hiddenEvents`). Toggling "hide DEBUG" or hiding specific event types in the dashboard shows or hides entries that are already in the stream; nothing is dropped at the plugin.
 
 ### Local vs prod (same pipeline; env label only)
 
@@ -198,7 +198,6 @@ Set `SIMSTEWARD_LOG_DEBUG=1` for local debugging only. When enabled:
 - **PluginLogger.Debug()** emits `DEBUG`-level entries (still sent to Loki; filter in Explore/AI).
 - **LokiSink** uses relaxed flush rules: 2 s timer, 500-entry batch, 5,000-entry queue, no line-size enforcement.
 - Additional log events are emitted:
-  - `state_broadcast_summary` (throttled ~5/s): plugin mode, incident count, client count, replay frame.
   - `tick_stats` every 60 ticks (≈1 s): running average `data_update_ms`, `frames_dropped`.
   - `yaml_update`: each `SessionInfoUpdate` refresh.
   - `ws_message_raw`: every WebSocket message (raw JSON) for debugging dashboard commands.
