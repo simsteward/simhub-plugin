@@ -364,6 +364,19 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .im-row { color: var(--text); margin: 2px 0; word-break: break-word; }
 .im-row code { font-family: "Courier New", monospace; font-size: 0.7rem; color: var(--cyan); }
 .im-future { font-size: 0.65rem; color: var(--muted); font-style: italic; margin-top: 6px; }
+.incident-meta-strip {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.025);
+  max-height: 132px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.im-strip-placeholder { font-size: 0.72rem; color: var(--muted); }
+.im-block-single { padding: 0; border: none; margin: 0; }
+.im-row-muted { font-size: 0.65rem; color: var(--muted); }
 
 /* ── Toast ── */
 .toast {
@@ -520,15 +533,18 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           <button class="log-tab active" data-tab="events"     onclick="switchTab(this)">iRacing Events</button>
           <button class="log-tab"        data-tab="health"     onclick="switchTab(this)">App Health</button>
           <button class="log-tab"        data-tab="telem"      onclick="switchTab(this)">Telemetry Data</button>
-          <button class="log-tab"        data-tab="incmeta"    onclick="switchTab(this)">Incident meta</button>
           <button class="log-tab"        data-tab="leaderboard" onclick="switchTab(this)">Incident leaderboard</button>
           <button class="log-tab"        data-tab="captured"   onclick="switchTab(this)">Captured incidents</button>
           <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
         </div>
+        <div id="incident-meta-strip" class="incident-meta-strip meta-pane" role="region" aria-label="Selected incident details">
+          <div id="incident-meta-strip-body">
+            <span class="im-strip-placeholder">Select an incident in Incident leaderboard or Captured incidents (below).</span>
+          </div>
+        </div>
         <div class="log-pane active" id="log-events"></div>
         <div class="log-pane"        id="log-health"></div>
         <div class="log-pane"        id="log-telem"></div>
-        <div class="log-pane meta-pane" id="log-incmeta"></div>
         <div class="log-pane incidents-pane" id="log-leaderboard">
           <div class="leaderboard-pane-stack">
             <div class="panel-title" style="margin-bottom:4px">
@@ -704,7 +720,7 @@ function getFilteredIncidents() {
 
 function incidentCardHtml(i) {
   return `
-    <div class="inc-card${i.player ? ' player' : ''}" onclick="seekInc(${i.frame})">
+    <div class="inc-card${i.player ? ' player' : ''}" onclick="onSessionIncidentClick(${i.frame})">
       <span class="car-num">#${i.car}</span>
       <span class="inc-name">${i.driver}</span>
       <span class="cause-tag ${i.cause}">${i.cause.replace('-', ' ')}</span>
@@ -720,7 +736,6 @@ function renderInc() {
   const html = !filtered.length ? empty : filtered.map(incidentCardHtml).join('');
   document.getElementById('inc-count').textContent = count;
   document.getElementById('inc-list').innerHTML = html;
-  renderIncMetaLog();
   renderDriverIncidents();
   if (activeTab === 'leaderboard' && autoScroll) {
     const list = document.getElementById('inc-list');
@@ -787,7 +802,7 @@ function capturedRowHtml(rec) {
   const player = !!rec.player;
   const label = cause.replace(/-/g, ' ');
   return `
-    <div class="inc-card${player ? ' player' : ''}" onclick="seekInc(${rec.frame})">
+    <div class="inc-card${player ? ' player' : ''}" onclick="onCapturedIncidentClick(${rec.seq})">
       <span class="car-num">#${car}</span>
       <span class="inc-name">${rec.driver}</span>
       <span class="cause-tag ${cause}">${label}</span>
@@ -842,24 +857,61 @@ function toggleCapturedGroup() {
   });
 }
 
-function renderIncMetaLog() {
-  const pane = document.getElementById('log-incmeta');
-  if (!pane) return;
-  const filtered = getFilteredIncidents();
-  if (!filtered.length) {
-    pane.innerHTML = '<div class="ll info">No incidents for this filter.</div>';
-    return;
-  }
-  pane.innerHTML = filtered.map(i => {
-    const id = i.id != null ? String(i.id) : '—';
-    return `<div class="im-block">
-      <div class="im-meta-hdr">Incident ${id} · session ${i.time}</div>
-      <div class="im-row"><strong>Frame</strong> <code>${i.frame}</code> · <strong>car</strong> #${i.car} · <strong>driver</strong> ${i.driver}</div>
-      <div class="im-row"><strong>Severity</strong> ${i.sev}× · <strong>cause</strong> ${String(i.cause).replace('-', ' ')} · <strong>you</strong> ${i.player ? 'yes' : 'no'}</div>
-      <div class="im-future">Nearby cars / other party (e.g. proximity): reserved for future telemetry.</div>
-    </div>`;
-  }).join('');
-  if (activeTab === 'incmeta' && autoScroll) pane.scrollTop = pane.scrollHeight;
+function formatIncidentMetaHtml(i) {
+  const id = i.id != null ? String(i.id) : '—';
+  const cap = i._capture
+    ? `<div class="im-row im-row-muted">Scan step #${id} · captured ${i.capturedAt ? new Date(i.capturedAt).toLocaleTimeString() : '—'}</div>`
+    : '';
+  return `<div class="im-block im-block-single">
+    <div class="im-meta-hdr">Incident ${id} · session ${i.time}</div>
+    ${cap}
+    <div class="im-row"><strong>Frame</strong> <code>${i.frame}</code> · <strong>car</strong> #${i.car} · <strong>driver</strong> ${i.driver}</div>
+    <div class="im-row"><strong>Severity</strong> ${i.sev}× · <strong>cause</strong> ${String(i.cause).replace(/-/g, ' ')} · <strong>you</strong> ${i.player ? 'yes' : 'no'}</div>
+    <div class="im-future">Nearby cars / other party (e.g. proximity): reserved for future telemetry.</div>
+  </div>`;
+}
+
+function setIncidentMetaStripHtml(html) {
+  const body = document.getElementById('incident-meta-strip-body');
+  if (body) body.innerHTML = html;
+}
+
+function onSessionIncidentClick(frame) {
+  const i = incidents.find(x => x.frame === frame);
+  if (!i) return;
+  seekInc(frame);
+  setIncidentMetaStripHtml(formatIncidentMetaHtml(i));
+  sendDashboardUiEvent({
+    element_id: 'incident-meta-strip',
+    event_type: 'click',
+    message: 'Session incident selected (leaderboard or driver list)',
+    value: String(frame)
+  });
+}
+
+function onCapturedIncidentClick(seq) {
+  const r = capturedIncidents.find(x => x.seq === seq);
+  if (!r) return;
+  seekInc(r.frame);
+  const pseudo = {
+    id: r.seq,
+    time: r.sessionTime,
+    car: r.car != null ? r.car : '—',
+    driver: r.driver,
+    sev: r.sev,
+    cause: r.cause,
+    player: !!r.player,
+    frame: r.frame,
+    _capture: true,
+    capturedAt: r.capturedAt
+  };
+  setIncidentMetaStripHtml(formatIncidentMetaHtml(pseudo));
+  sendDashboardUiEvent({
+    element_id: 'incident-meta-strip',
+    event_type: 'click',
+    message: 'Captured incident selected',
+    value: String(seq)
+  });
 }
 
 function setFilter(el) {
