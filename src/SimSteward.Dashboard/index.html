@@ -508,9 +508,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
               <line class="g-ctick" x1="65" y1="17" x2="65" y2="25"/>
               <line class="g-needle" id="g-needle" x1="65" y1="72" x2="65" y2="22"/>
               <circle class="g-hub" cx="65" cy="72" r="4.5"/>
-              <text class="g-text" x="4"  y="76">L</text>
-              <text class="g-text" x="118" y="76">R</text>
-              <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">0°</text>
+              <text class="g-text" x="2"  y="76">0°</text>
+              <text class="g-text" x="108" y="76">180°</text>
+              <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">90°</text>
             </svg>
           </div>
         </div>
@@ -572,8 +572,9 @@ function wsUrl() {
   return 'ws://' + h + ':' + WS_PORT;
 }
 const LOG_MAX        = 500;
-const STEER_MAX_RAD  = 7.0;
-const STEER_VIS_MAX  = 88;   // ±degrees visual
+const STEER_MAX_RAD = 7.0;
+/** 180° axis: 90° = straight; left end 0°, right end 180°; ±90° from center at full lock. */
+const STEER_AXIS_HALF_DEG = 90;
 
 // ── Mock data ────────────────────────────────────────────
 const MOCK_INC = [
@@ -907,12 +908,15 @@ function setTelem(t, b, sRad) {
 }
 
 function updateWheel(sRad) {
-  const vd = Math.max(-STEER_VIS_MAX, Math.min(STEER_VIS_MAX, (sRad/STEER_MAX_RAD)*STEER_VIS_MAX));
+  const vd = Math.max(
+    -STEER_AXIS_HALF_DEG,
+    Math.min(STEER_AXIS_HALF_DEG, (sRad / STEER_MAX_RAD) * STEER_AXIS_HALF_DEG)
+  );
   document.getElementById('g-needle').setAttribute('transform', `rotate(${vd},65,72)`);
   const arc = document.getElementById('g-active');
-  arc.setAttribute('d', Math.abs(vd) < 1 ? '' : arcPath(65,72,55,0,vd));
-  const deg = Math.round(sRad*(180/Math.PI));
-  document.getElementById('g-angle').textContent = deg + '°';
+  arc.setAttribute('d', Math.abs(vd) < 0.5 ? '' : arcPath(65, 72, 55, 0, vd));
+  const axisDeg = 90 + vd;
+  document.getElementById('g-angle').textContent = Math.round(axisDeg) + '°';
 }
 
 // SVG arc helper: 0°=up, +ve=clockwise
