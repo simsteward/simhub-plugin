@@ -131,6 +131,13 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 }
 .btn.cap:hover { background: rgba(31,156,255,0.16); }
 .btn.cap.active { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.07); animation: cap-pulse 1.2s ease-in-out infinite; }
+.btn.cap.btn-scan.btn-scan-session {
+  border-color: rgba(255, 180, 72, 0.85);
+  color: #e8b060;
+  background: rgba(255, 180, 72, 0.08);
+}
+.btn.cap:disabled { opacity: 0.45; cursor: not-allowed; }
+.cap-row .cap-status { flex: 1 1 100%; margin-top: 4px; }
 .cap-status { font-size: 0.7rem; color: var(--muted); }
 .cap-status.running { color: var(--accent); }
 @keyframes cap-pulse { 0%,100%{opacity:1} 50%{opacity:.55} }
@@ -478,8 +485,10 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           <button type="button" class="btn label-inc" title="Next incident in replay"     onclick="ra('replay_seek','next')">Next incident</button>
         </div>
         <div class="cap-row">
-          <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCapture()"
-            title="Step through incidents and log each position (stops after 50 or when you stop)">Find all incidents</button>
+          <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
+            title="Seek to each incident for the telemetry car and capture metadata (max 200 steps, or stop)">Find driver's incidents</button>
+          <button type="button" class="btn cap btn-scan btn-scan-session" id="cap-btn-session" onclick="startCaptureSessionClick()"
+            title="All drivers: seek every incident in the session and capture metadata. Asks for confirmation before starting.">Find all session incidents</button>
           <span class="cap-status" id="cap-status">—</span>
         </div>
       </div>
@@ -835,7 +844,7 @@ function renderCaptured() {
   const el = document.getElementById('captured-list');
   if (!el) return;
   if (!capturedIncidents.length) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No captured incidents yet. Run Find all incidents.</div>';
+    el.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No captured incidents yet. Run Find driver\'s incidents or Find all session incidents.</div>';
     if (incidentMetaSelection && incidentMetaSelection.kind === 'capture') {
       incidentMetaSelection = null;
       collapseIncidentMetaStrip();
@@ -1149,82 +1158,192 @@ function seekInc(frame) {
   log('events','INFO ','seek_requested','frame=' + frame);
 }
 // ── Capture incidents ────────────────────────────────────
-// Loops "next incident" hotkey rapidly to collect per-incident metadata.
-// Each iteration: send seek-next, wait CAPTURE_STEP_MS, record state snapshot.
-// Stops after CAPTURE_MAX steps or when user clicks Stop.
+// Driver: seek each incident frame for the selected telemetry car (from session list).
+// Session: seek every incident frame in the session (all drivers); confirms before start.
 const CAPTURE_STEP_MS = 600;
-const CAPTURE_MAX     = 50;
+const CAPTURE_MAX_QUEUE = 200;
 
-let capturing    = false;
+let capturing = false;
+let captureKind = 'driver';
+let captureQueue = [];
+let captureQueueIndex = 0;
 let captureCount = 0;
 let captureTimer = null;
 
-function toggleCapture() {
-  if (capturing) stopCapture();
-  else startCapture();
+function buildDriverCaptureQueue() {
+  const car = getSelectedCarNumber();
+  let frames = [...new Set(incidents.filter(i => i.car === car).map(i => i.frame))].sort((a, b) => a - b);
+  if (frames.length > CAPTURE_MAX_QUEUE) frames = frames.slice(0, CAPTURE_MAX_QUEUE);
+  return frames;
 }
 
-function startCapture() {
-  capturing    = true;
+function buildSessionCaptureQueue() {
+  let frames = [...new Set(incidents.map(i => i.frame))].sort((a, b) => a - b);
+  if (frames.length > CAPTURE_MAX_QUEUE) frames = frames.slice(0, CAPTURE_MAX_QUEUE);
+  return frames;
+}
+
+function selectCarInDropdownForFrame(frame) {
+  const inc = incidents.find(i => i.frame === frame);
+  if (!inc) return;
+  const sel = document.getElementById('car-sel');
+  if (!sel) return;
+  const n = Number(inc.car);
+  for (let i = 0; i < sel.options.length; i++) {
+    if (+sel.options[i].getAttribute('data-car') === n) {
+      sel.selectedIndex = i;
+      break;
+    }
+  }
+}
+
+function toggleCaptureDriver() {
+  if (capturing) {
+    if (captureKind === 'driver') stopCapture();
+    return;
+  }
+  startCaptureDriver();
+}
+
+function startCaptureDriver() {
+  captureQueue = buildDriverCaptureQueue();
+  if (!captureQueue.length) {
+    toast('No incidents for this driver in the current session list.');
+    sendDashboardUiEvent({
+      element_id: 'find-driver-incidents',
+      event_type: 'ui_interaction',
+      message: "Find driver's incidents: empty queue",
+      value: String(getSelectedCarNumber())
+    });
+    return;
+  }
+  captureKind = 'driver';
+  capturing = true;
   captureCount = 0;
+  captureQueueIndex = 0;
   setCaptureUI(true);
   sendDashboardUiEvent({
-    element_id: 'find-all-incidents',
+    element_id: 'find-driver-incidents',
     event_type: 'click',
-    message: 'Find all incidents scan started'
+    message: "Find driver's incidents scan started",
+    value: String(captureQueue.length)
   });
-  log('events','INFO ','capture_start','Find-all-incidents scan started  max:' + CAPTURE_MAX + '  step:' + CAPTURE_STEP_MS + 'ms');
+  log('events', 'INFO ', 'capture_start', "driver scan  steps:" + captureQueue.length + '  step:' + CAPTURE_STEP_MS + 'ms');
+  captureStep();
+}
+
+function startCaptureSessionClick() {
+  if (capturing) {
+    if (captureKind === 'session') stopCapture();
+    return;
+  }
+  sendDashboardUiEvent({
+    element_id: 'find-session-incidents',
+    event_type: 'click',
+    message: 'Find all session incidents: confirm shown'
+  });
+  const msg = 'This will seek through every incident in the session (all drivers), rotate the telemetry car to match each incident, and capture metadata for each. It may take a while. Are you sure?';
+  if (!confirm(msg)) {
+    sendDashboardUiEvent({
+      element_id: 'find-session-incidents',
+      event_type: 'ui_interaction',
+      message: 'Find all session incidents: cancelled at confirm'
+    });
+    return;
+  }
+  startCaptureSession();
+}
+
+function startCaptureSession() {
+  captureQueue = buildSessionCaptureQueue();
+  if (!captureQueue.length) {
+    toast('No incidents in the current session list.');
+    sendDashboardUiEvent({
+      element_id: 'find-session-incidents',
+      event_type: 'ui_interaction',
+      message: 'Find all session incidents: empty queue'
+    });
+    return;
+  }
+  captureKind = 'session';
+  capturing = true;
+  captureCount = 0;
+  captureQueueIndex = 0;
+  setCaptureUI(true);
+  sendDashboardUiEvent({
+    element_id: 'find-session-incidents',
+    event_type: 'click',
+    message: 'Find all session incidents scan started',
+    value: String(captureQueue.length)
+  });
+  log('events', 'INFO ', 'capture_start', 'session scan  steps:' + captureQueue.length + '  step:' + CAPTURE_STEP_MS + 'ms');
   captureStep();
 }
 
 function stopCapture() {
   capturing = false;
   clearTimeout(captureTimer);
+  captureTimer = null;
   setCaptureUI(false);
+  const elId = captureKind === 'session' ? 'find-session-incidents' : 'find-driver-incidents';
   sendDashboardUiEvent({
-    element_id: 'find-all-incidents',
+    element_id: elId,
     event_type: 'click',
-    message: 'Find all incidents scan stopped',
+    message: (captureKind === 'session' ? 'Find all session' : "Find driver's") + ' incidents scan stopped',
     value: String(captureCount)
   });
-  log('events','INFO ','capture_end','Incident scan stopped  incidents_visited:' + captureCount);
+  log('events', 'INFO ', 'capture_end', 'Incident scan stopped  kind:' + captureKind + '  incidents_visited:' + captureCount);
 }
 
 function captureStep() {
   if (!capturing) return;
-  if (captureCount >= CAPTURE_MAX) { stopCapture(); return; }
+  if (captureQueueIndex >= captureQueue.length) {
+    stopCapture();
+    return;
+  }
 
+  const frame = captureQueue[captureQueueIndex++];
   captureCount++;
+  if (captureKind === 'session') selectCarInDropdownForFrame(frame);
+  const sent = send('seek_to_incident', String(frame));
 
-  // Send "next incident" action — plugin advances replay to the next incident frame.
-  // When the plugin implements replay_seek/next it will respond with updated state
-  // (frame number, session time) which we capture as the incident metadata.
-  const sent = send('replay_seek', 'next');
-  const ts   = new Date().toTimeString().slice(0,8);
+  captureTimer = setTimeout(() => {
+    if (!capturing) return;
+    const frameEl = document.getElementById('frame-cur').textContent;
+    const timeEl = document.getElementById('session-time').textContent;
+    log('events', 'EVENT', 'capture_incident',
+      '#' + String(captureCount).padStart(2, '0') + '  frame:' + frameEl.replace('Frame ', '') +
+      '  session:' + timeEl + (sent ? '' : '  [PoC-mock]'));
 
-  // Record current known state as the metadata snapshot for this incident.
-  // onState() will fire after the seek with the actual frame data.
-  const frameEl = document.getElementById('frame-cur').textContent;
-  const timeEl  = document.getElementById('session-time').textContent;
-  log('events','EVENT','capture_incident',
-    '#' + String(captureCount).padStart(2,'0') + '  frame:' + frameEl.replace('Frame ','') +
-    '  session:' + timeEl + (sent ? '' : '  [PoC-mock]'));
+    const frameNum = parseFrameFromLabel(frameEl);
+    capturedIncidents.push(enrichCaptureRecord(frameNum, timeEl, captureCount));
+    renderCaptured();
 
-  const frameNum = parseFrameFromLabel(frameEl);
-  capturedIncidents.push(enrichCaptureRecord(frameNum, timeEl, captureCount));
-  renderCaptured();
+    const total = captureQueue.length;
+    const prefix = captureKind === 'session' ? 'Session ' : 'Driver ';
+    document.getElementById('cap-status').textContent = prefix + captureCount + '/' + total + '…';
 
-  document.getElementById('cap-status').textContent = 'Found ' + captureCount + '…';
-  captureTimer = setTimeout(captureStep, CAPTURE_STEP_MS);
+    captureTimer = setTimeout(captureStep, CAPTURE_STEP_MS);
+  }, CAPTURE_STEP_MS);
 }
 
 function setCaptureUI(active) {
-  const btn = document.getElementById('cap-btn');
+  const btnD = document.getElementById('cap-btn');
+  const btnS = document.getElementById('cap-btn-session');
   const lbl = document.getElementById('cap-status');
-  btn.classList.toggle('active', active);
-  btn.textContent = active ? 'Stop scan' : 'Find all incidents';
-  lbl.className   = 'cap-status' + (active ? ' running' : '');
-  if (!active) lbl.textContent = captureCount ? 'Done (' + captureCount + ' found)' : '—';
+  if (!btnD || !btnS || !lbl) return;
+  btnD.classList.toggle('active', active && captureKind === 'driver');
+  btnS.classList.toggle('active', active && captureKind === 'session');
+  btnD.disabled = active && captureKind === 'session';
+  btnS.disabled = active && captureKind === 'driver';
+  btnD.textContent = active && captureKind === 'driver' ? 'Stop scan' : "Find driver's incidents";
+  btnS.textContent = active && captureKind === 'session' ? 'Stop scan' : 'Find all session incidents';
+  lbl.className = 'cap-status' + (active ? ' running' : '');
+  if (!active) {
+    lbl.textContent = captureCount ? 'Done (' + captureCount + ' found)' : '—';
+    btnD.disabled = false;
+    btnS.disabled = false;
+  }
 }
 
 function scrubClick(e) {
