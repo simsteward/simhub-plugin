@@ -53,6 +53,9 @@ alwaysApply: false
 - At **16x replay speed**: TickRate stays 60 Hz (real-clock). YAML batches incidents at high speed.
 - Use `IRacingSdk.UpdateInterval = 1` for maximum polling fidelity.
 - The SDK broadcast API supports `RpySrch_NextIncident` / `RpySrch_PrevIncident` — expose as "Jump to Incident" buttons.
+- **iRacing replay hotkeys (official)**: [Keyboard Shortcuts: Replay / Camera Controls](https://www.iracing.com/keyboard-shortcuts-replay-camera-controls/) — **Next incident** `Ctrl`+**Numpad 3**; **Previous incident** `Ctrl`+**Numpad 1**.
+- **Unverified**: That page does not say whether next/previous incident is **session-wide** or **scoped to the car selected in the replay UI**; confirm in-client if it matters.
+- **SDK vs hotkeys**: `HandleReplaySearch` calls `_irsdk.ReplaySearch(mode)` with no car index (session-level API hint) — not proof of in-game behavior when another car is focused.
 - Always call `_irsdk.Stop()` in `End()` to clean up background threads.
 
 ## Deployment & Testing
