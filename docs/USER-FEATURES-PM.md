@@ -18,9 +18,9 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 ## Feature 2 — Replay transport controls
 
-**User story:** I can jump start/end, change speed, play/pause, step prev/next **incident** in replay, and see frame + scrub bar.
+**User story:** I can jump start/end, change speed, play/pause, step prev/next **incident** in replay, see frame + scrub bar, and when the replay file has **multiple sessions**, switch **previous / next session** via dedicated buttons.
 
-**Flow:** Use transport buttons → `replay_*` actions over WebSocket → logs in iRacing Events / App Health as implemented → frame label and scrub fill update from `state`.
+**Flow:** Use transport buttons → `replay_*` actions over WebSocket → logs in iRacing Events / App Health as implemented → frame label and scrub fill update from `state`. When `replaySessionCount > 1` in `state`, the session row appears and sends `replay_session` (`prev` / `next`) to the plugin.
 
 **Connects to:** **Incident navigation** (duplicate prev/next incident), **capture scans** (seek to frames), and **leaderboard** (seek when clicking an incident). Same replay “surface,” different entry points.
 
@@ -32,7 +32,7 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 **Flow:** Change **Telemetry car** dropdown → mock telemetry in PoC updates; driver incident list filters by `car`; session-scan capture can rotate this dropdown per incident when scanning the whole session.
 
-**Connects to:** **This driver’s incidents** (left), **Find driver’s incidents** (queue built from plugin incident list for that car), and **session scan** (UI follows each incident’s car).
+**Connects to:** **This driver’s incidents** (left), **Find selected driver’s incidents** (queue built from plugin incident list for **that selected car only**), and **Find all incidents for all drivers** (UI follows each incident’s car during the session scan).
 
 ---
 
@@ -96,19 +96,19 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 ---
 
-## Feature 10 — Find driver’s incidents (capture)
+## Feature 10 — Find selected driver’s incidents (capture)
 
-**User story:** I automatically walk **each incident frame for the current telemetry car** (from the session incident list), seek each, and append **captured** records with metadata (PoC timing).
+**User story:** I automatically walk **each incident frame for the selected telemetry car only** (from the session incident list), seek each, and append **captured** records with metadata (PoC timing).
 
-**Flow:** Click **Find driver’s incidents** → queue from `incidents` filtered by car → `seek_to_incident` per frame → delayed snapshot → append to **Captured incidents** → stop or cap.
+**Flow:** Click **Find selected driver’s incidents** → queue from `incidents` filtered by **selected** car → `seek_to_incident` per frame → delayed snapshot → append to **Captured incidents** → stop or cap.
 
 **Connects to:** **Telemetry car**, **plugin incident list**, **Captured incidents** tab; complements manual clicking through the leaderboard.
 
 ---
 
-## Feature 11 — Find all session incidents (capture)
+## Feature 11 — Find all incidents for all drivers (capture)
 
-**User story:** I scan **every** incident in the session (all drivers), with a **confirm** dialog, rotating telemetry car in the UI to match each incident as we go.
+**User story:** I scan **every** incident for **all drivers** in the session, with a **confirm** dialog, rotating telemetry car in the UI to match each incident as we go.
 
 **Flow:** Click → confirm → queue all unique frames → seek loop → snapshots → **Captured** list grows.
 
@@ -144,8 +144,8 @@ flowchart LR
     Seek[seek_to_incident]
   end
   subgraph capture [Capture]
-    DrvCap[Find driver incidents]
-    SessCap[Find all session incidents]
+    DrvCap[Find selected driver incidents]
+    SessCap[Find all incidents all drivers]
     CapList[Captured incidents tab]
   end
   WS --> Status

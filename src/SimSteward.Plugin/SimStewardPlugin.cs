@@ -6,9 +6,11 @@ using System.Windows.Media;
 #endif
 
 using System;
+using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
@@ -86,6 +88,9 @@ namespace SimSteward.Plugin
                 lap = snapshot.Lap,
                 frame = snapshot.Frame,
                 frameEnd = snapshot.FrameEnd,
+                replaySessionCount = snapshot.ReplaySessionCount,
+                replaySessionNum = snapshot.ReplaySessionNum,
+                replaySessionName = snapshot.ReplaySessionName,
                 diagnostics = snapshot.Diagnostics
             };
             return JsonConvert.SerializeObject(state);
@@ -180,6 +185,26 @@ namespace SimSteward.Plugin
         {
             var irConnected = _irsdk?.IsConnected ?? false;
             var clientCount = _bridge?.ClientCount ?? 0;
+            int replaySessionCount = 0;
+            int replaySessionNum = 0;
+            var replaySessionName = "—";
+            if (irConnected && _irsdk != null)
+            {
+                try
+                {
+                    replaySessionNum = SafeGetInt("SessionNum");
+                    var si = _irsdk.Data?.SessionInfo;
+                    replaySessionCount = SafeSessionListCount(si);
+                    replaySessionName = ResolveSessionNameFromYaml(si, replaySessionNum);
+                }
+                catch
+                {
+                    replaySessionCount = 0;
+                    replaySessionNum = 0;
+                    replaySessionName = "—";
+                }
+            }
+
             return new PluginSnapshot
             {
                 PluginMode = _pluginMode,
@@ -188,6 +213,9 @@ namespace SimSteward.Plugin
                 Lap = _logCtxLap,
                 Frame = _replayFrameNumEnd,
                 FrameEnd = _replayFrameTotal,
+                ReplaySessionCount = replaySessionCount,
+                ReplaySessionNum = replaySessionNum,
+                ReplaySessionName = replaySessionName,
                 Diagnostics = new PluginDiagnostics
                 {
                     IrsdkStarted = _irsdk != null,
@@ -200,6 +228,62 @@ namespace SimSteward.Plugin
                     DashboardPing = _dashboardPingStatus
                 }
             };
+        }
+
+        private static int SafeSessionListCount(IRacingSdkSessionInfo sessionInfo)
+        {
+            try
+            {
+                var sessions = sessionInfo?.SessionInfo?.Sessions;
+                return sessions is IList list ? list.Count : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static string ResolveSessionNameFromYaml(IRacingSdkSessionInfo sessionInfo, int sessionNum)
+        {
+            try
+            {
+                if (!(sessionInfo?.SessionInfo?.Sessions is IList list))
+                    return "—";
+                foreach (var o in list)
+                {
+                    if (o == null) continue;
+                    var t = o.GetType();
+                    var snProp = t.GetProperty("SessionNum");
+                    var nameProp = t.GetProperty("SessionName");
+                    if (snProp == null || nameProp == null) continue;
+                    var snVal = snProp.GetValue(o);
+                    if (snVal is int num && num == sessionNum)
+                        return nameProp.GetValue(o)?.ToString() ?? "—";
+                }
+            }
+            catch
+            {
+                // ignored
+            }
+
+            return "—";
+        }
+
+        private void LogActionResult(string action, string arg, string correlationId, bool success, string error)
+        {
+            var resultFields = new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["action"] = action,
+                ["arg"] = arg,
+                ["correlation_id"] = correlationId,
+                ["success"] = success,
+                ["error"] = error ?? ""
+            };
+            MergeSessionAndRoutingFields(resultFields);
+            var summary = success
+                ? $"{action} -> ok"
+                : $"{action} -> {error ?? "failed"}";
+            _logger?.Structured("INFO", "simhub-plugin", "action_result", summary, resultFields, "action", null);
         }
 
         private (bool success, string result, string error) DispatchAction(string action, string arg, string correlationId)
@@ -215,16 +299,41 @@ namespace SimSteward.Plugin
             MergeSessionAndRoutingFields(dispatchFields);
             _logger?.Structured("INFO", "simhub-plugin", "action_dispatched", action, dispatchFields, "action", null);
 
-            var resultFields = new System.Collections.Generic.Dictionary<string, object>
+            if (string.Equals(action, "replay_session", StringComparison.OrdinalIgnoreCase))
             {
-                ["action"] = action,
-                ["arg"] = arg,
-                ["correlation_id"] = correlationId,
-                ["success"] = false,
-                ["error"] = "not_supported"
-            };
-            MergeSessionAndRoutingFields(resultFields);
-            _logger?.Structured("INFO", "simhub-plugin", "action_result", $"{action} -> not_supported", resultFields, "action", null);
+                var dir = (arg ?? "").Trim().ToLowerInvariant();
+                if (dir != "prev" && dir != "next")
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    var mode = dir == "prev"
+                        ? IRacingSdkEnum.RpySrchMode.PrevSession
+                        : IRacingSdkEnum.RpySrchMode.NextSession;
+                    _irsdk.ReplaySearch(mode);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "replay_session_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            LogActionResult(action, arg, correlationId, false, "not_supported");
             return (false, null, "not_supported");
         }
 

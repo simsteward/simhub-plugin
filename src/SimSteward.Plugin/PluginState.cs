@@ -54,6 +54,18 @@ namespace SimSteward.Plugin
         [JsonProperty("frameEnd")]
         public int FrameEnd { get; set; }
 
+        /// <summary>Number of sessions in weekend session list; 0 if unknown.</summary>
+        [JsonProperty("replaySessionCount")]
+        public int ReplaySessionCount { get; set; }
+
+        /// <summary>Current <c>SessionNum</c> from telemetry.</summary>
+        [JsonProperty("replaySessionNum")]
+        public int ReplaySessionNum { get; set; }
+
+        /// <summary>Display name for current session from YAML; "—" if unknown.</summary>
+        [JsonProperty("replaySessionName")]
+        public string ReplaySessionName { get; set; } = "—";
+
         [JsonProperty("diagnostics")]
         public PluginDiagnostics Diagnostics { get; set; } = new PluginDiagnostics();
     }
