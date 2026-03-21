@@ -88,12 +88,53 @@ Every log line has an `event` field. Key events:
 | `session_end_datapoints_session` | simhub-plugin | `trigger`, `session_id`, `session_num`, session-level fields (track, series_id, session_name, incident_limit, …), `telemetry_*` at capture, `results_driver_count` | Emitted once per successful session summary capture. Session metadata and telemetry snapshot only; no results array. Use with `session_end_datapoints_results` chunks to get full data. Scales to hundreds of drivers. |
 | `session_end_datapoints_results` | simhub-plugin | `session_id`, `session_num`, `chunk_index`, `chunk_total`, `results_driver_count`, `results` (array of up to 35 driver rows: pos, car_idx, driver, abbrev, car, class, laps, incidents, reason_out, user_id, team, irating, etc.) | One log line per chunk (35 drivers per chunk). Merge chunks by `session_id` and sort by `chunk_index` for full results table. See **docs/observability-scaling.md** and § LogQL reference below. |
 | `finalize_capture_started` / `complete` / `timeout` | simhub-plugin | `target_frame`, `duration_ms` | Debug / automation. |
-| `incident_detected` | tracker | `incident_type`, `car_number`, `driver_name`, `unique_user_id` (iRacing **CustID**), `delta`, `session_time`, `session_num`, `replay_frame`, `replay_frame_end` (optional window), `cause`, `other_car_number`, `subsession_id`, `parent_session_id`, `track_display_name`, `cam_car_idx` / `camera_group` (when available), `log_env`, `loki_push_target` | Each YAML delta. **Incident fingerprint (for correlation / future storage):** combine `parent_session_id`, `subsession_id`, `session_num`, focused driver (`unique_user_id` + `driver_name`), camera/view fields, `track_display_name`, `session_time`, and `replay_frame` (± `replay_frame_end` if the event spans a window). Use `"not in session"` for `subsession_id` / `parent_session_id` when iRacing has no loaded session. *Tracker implementation may not emit all optional fields until wired in code.* |
+| `incident_detected` | tracker | `incident_type`, `car_number`, `driver_name`, `unique_user_id` (iRacing **CustID**), `delta`, `session_time`, `session_num`, `replay_frame`, `replay_frame_end` (optional window), `cause`, `other_car_number`, `subsession_id`, `parent_session_id`, `track_display_name`, `cam_car_idx` / `camera_group` (when available), `log_env`, `loki_push_target` | **Canonical rule name:** `iracing_incident` — **emitted JSON `event`:** `incident_detected` (use this string in LogQL until code renames). Each YAML delta. **Incident fingerprint (for correlation / future storage):** combine `parent_session_id`, `subsession_id`, `session_num`, focused driver (`unique_user_id` + `driver_name`), camera/view fields, `track_display_name`, `session_time`, and `replay_frame` (± `replay_frame_end` if the event spans a window). Use `"not in session"` for `subsession_id` / `parent_session_id` when iRacing has no loaded session. *Tracker implementation may not emit all optional fields until wired in code.* |
 | `baseline_established` | tracker | `driver_count` | When tracker baseline is ready. |
 | `session_reset` | tracker | `old_session`, `new_session` | When `SessionNum` changes. |
 | `seek_backward_detected` | tracker | `from_frame`, `to_frame`, `session_time` | Replay seek. |
 | `yaml_update` | tracker | `session_info_update`, `session_num`, `session_time` | Debug-only. |
-| `session_digest` | simhub-plugin | `session_id`, `session_num`, `track`, `duration_minutes`, `total_incidents`, `results_incident_sum`, `incident_summary`, `incident_summary_truncated`, `results_table`, `results_driver_count`, `actions_dispatched`, … | Single-row session summary. **total_incidents** = count of incident_detected events (plugin); **results_incident_sum** = sum of iRacing per-driver incident points; **results_table** = authoritative ResultsPositions (pos, car, driver, incidents, laps, class, reason_out per driver). |
+| `session_digest` | simhub-plugin | `session_id`, `session_num`, `track`, `duration_minutes`, `total_incidents`, `results_incident_sum`, `incident_summary`, `incident_summary_truncated`, `results_table`, `results_driver_count`, `actions_dispatched`, … | Single-row session summary. **total_incidents** = count of `incident_detected` events (plugin); **results_incident_sum** = sum of iRacing per-driver incident points; **results_table** = authoritative ResultsPositions (pos, car, driver, incidents, laps, class, reason_out per driver). |
+
+### Schema reference: `action_dispatched`, `action_result`, `iracing_incident`
+
+PR checklist and `domain` taxonomy: **docs/RULES-ActionCoverage.md**. Full-field checklist below for dashboards, PR review, and Loki queries. Labels stay the four-label schema; everything else is JSON body.
+
+#### `action_dispatched`
+
+| Field | Required for completeness | Notes |
+|-------|---------------------------|--------|
+| `action` | yes | Command name |
+| `arg` | yes | Argument payload (may be empty) |
+| `correlation_id` | yes | Trace id for paired `action_result` |
+| `subsession_id`, `parent_session_id`, `session_num`, `track_display_name` | yes | Use `"not in session"` when offline |
+| `session_id`, `replay_frame` | when applicable | Spine / replay context |
+| `log_env`, `loki_push_target` | recommended | Observability metadata |
+
+**Volume:** In production, often **omitted** unless plugin setting “Log all action traffic” or `SIMSTEWARD_LOG_ALL_ACTIONS=1`. Same row in the table above lists additional bridge fields when `action_received` is enabled.
+
+#### `action_result`
+
+| Field | Required for completeness | Notes |
+|-------|---------------------------|--------|
+| `success` | yes | Boolean outcome |
+| `result` / `error` | as applicable | Payload or error detail |
+| `duration_ms` | yes | Handler duration |
+| `action`, `arg`, `correlation_id` | yes | Same command identity as `action_dispatched` |
+| Session + routing fields | yes | Same set as `action_dispatched` (`subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, spine fields, `log_env`, `loki_push_target`) |
+
+#### `iracing_incident` (canonical) / `incident_detected` (emitted)
+
+| Field | Required for completeness | Notes |
+|-------|---------------------------|--------|
+| `unique_user_id` | yes | iRacing CustID |
+| `driver_name` | yes | Display name in JSONL (`display_name` in coding rules = same concept) |
+| `session_time` | yes | Time of detection |
+| `subsession_id`, `parent_session_id`, `session_num`, `track_display_name` | yes | `"not in session"` when no session |
+| `replay_frame` | yes | Start frame; use `replay_frame_end` if the event spans a window |
+| `cam_car_idx` / `camera_group` | when available | Camera / view context |
+| `incident_type`, `delta`, `car_number`, … | per implementation | Taxonomy / YAML delta fields |
+
+**LogQL today:** filter on `event = "incident_detected"`. If the emitter is renamed to `iracing_incident`, update queries and this doc in the same change.
 
 `incident_detected` and `session_digest` are the main LogQL entry points for incidents and session-level summaries (use **Explore** or any Loki panel you add).
 
