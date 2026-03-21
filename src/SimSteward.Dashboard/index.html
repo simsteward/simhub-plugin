@@ -198,8 +198,15 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 /* ── Log section ── */
 .log-section {
-  flex-shrink: 0; height: 188px; display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
 }
 .log-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .log-tab {
@@ -227,6 +234,47 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .ll.event { color: var(--cyan); }
 .ll.debug { color: rgba(240,240,240,0.25); }
 .ll.data  { color: rgba(13,216,255,0.7); }
+
+/* ── Bottom dock: incidents + logs ── */
+.bottom-dock {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  height: 220px;
+  min-height: 0;
+}
+.incidents-dock {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.incidents-dock > .panel.incidents-panel {
+  flex: 1;
+  min-height: 0;
+}
+.log-pane.meta-pane {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  padding: 8px 12px;
+}
+.im-block {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.im-block:last-child { border-bottom: none; }
+.im-meta-hdr {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.im-row { color: var(--text); margin: 2px 0; word-break: break-word; }
+.im-row code { font-family: "Courier New", monospace; font-size: 0.7rem; color: var(--cyan); }
+.im-future { font-size: 0.65rem; color: var(--muted); font-style: italic; margin-top: 6px; }
 
 /* ── Toast ── */
 .toast {
@@ -385,18 +433,39 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
     </div><!-- /right-col -->
   </div><!-- /main-grid -->
 
-  <!-- ── Log section ── -->
-  <section class="log-section">
-    <div class="log-tabs">
-      <button class="log-tab active" data-tab="events"   onclick="switchTab(this)">iRacing Events</button>
-      <button class="log-tab"        data-tab="health"   onclick="switchTab(this)">App Health</button>
-      <button class="log-tab"        data-tab="telem"    onclick="switchTab(this)">Telemetry Data</button>
-      <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
-    </div>
-    <div class="log-pane active" id="log-events"></div>
-    <div class="log-pane"        id="log-health"></div>
-    <div class="log-pane"        id="log-telem"></div>
-  </section>
+  <!-- ── Bottom: incidents (mirror) + logs ── -->
+  <div class="bottom-dock">
+    <aside class="incidents-dock" aria-label="Incidents list">
+      <div class="panel incidents-panel">
+        <div class="inc-header">
+          <span class="panel-title" style="margin-bottom:0">
+            Incidents <span id="inc-count-dock" style="color:var(--muted)">(0)</span>
+          </span>
+          <div class="chips">
+            <span class="chip active" data-f="all"    onclick="setFilter(this)">All</span>
+            <span class="chip"        data-f="1"      onclick="setFilter(this)">1×</span>
+            <span class="chip"        data-f="2"      onclick="setFilter(this)">2×</span>
+            <span class="chip"        data-f="4"      onclick="setFilter(this)">4×</span>
+            <span class="chip"        data-f="player" onclick="setFilter(this)">Mine</span>
+          </div>
+        </div>
+        <div class="inc-list" id="inc-list-dock"></div>
+      </div>
+    </aside>
+    <section class="log-section">
+      <div class="log-tabs">
+        <button class="log-tab active" data-tab="events"   onclick="switchTab(this)">iRacing Events</button>
+        <button class="log-tab"        data-tab="health"   onclick="switchTab(this)">App Health</button>
+        <button class="log-tab"        data-tab="telem"    onclick="switchTab(this)">Telemetry Data</button>
+        <button class="log-tab"        data-tab="incmeta"  onclick="switchTab(this)">Incident meta</button>
+        <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
+      </div>
+      <div class="log-pane active" id="log-events"></div>
+      <div class="log-pane"        id="log-health"></div>
+      <div class="log-pane"        id="log-telem"></div>
+      <div class="log-pane meta-pane" id="log-incmeta"></div>
+    </section>
+  </div>
 
 </div><!-- /app -->
 <div class="toast" id="toast"></div>
@@ -508,32 +577,62 @@ function setWs(state) {
 }
 
 // ── Render incidents ─────────────────────────────────────
-function renderInc() {
-  const list = document.getElementById('inc-list');
-  const filtered = incidents.filter(i => {
-    if (incFilter === 'all')    return true;
+function getFilteredIncidents() {
+  return incidents.filter(i => {
+    if (incFilter === 'all') return true;
     if (incFilter === 'player') return i.player;
     return String(i.sev) === incFilter;
   });
-  document.getElementById('inc-count').textContent = '(' + filtered.length + ')';
-  if (!filtered.length) {
-    list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No incidents</div>';
-    return;
-  }
-  list.innerHTML = filtered.map(i => `
-    <div class="inc-card${i.player?' player':''}" onclick="seekInc(${i.frame})">
+}
+
+function incidentCardHtml(i) {
+  return `
+    <div class="inc-card${i.player ? ' player' : ''}" onclick="seekInc(${i.frame})">
       <span class="car-num">#${i.car}</span>
       <span class="inc-name">${i.driver}</span>
-      <span class="cause-tag ${i.cause}">${i.cause.replace('-',' ')}</span>
+      <span class="cause-tag ${i.cause}">${i.cause.replace('-', ' ')}</span>
       <span class="sev-badge s${i.sev}">${i.sev}×</span>
       <span class="inc-time">${i.time}</span>
-    </div>`).join('');
+    </div>`;
+}
+
+function renderInc() {
+  const filtered = getFilteredIncidents();
+  const count = '(' + filtered.length + ')';
+  const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No incidents</div>';
+  const html = !filtered.length ? empty : filtered.map(incidentCardHtml).join('');
+  document.getElementById('inc-count').textContent = count;
+  document.getElementById('inc-list').innerHTML = html;
+  const dockCnt = document.getElementById('inc-count-dock');
+  const dockList = document.getElementById('inc-list-dock');
+  if (dockCnt) dockCnt.textContent = count;
+  if (dockList) dockList.innerHTML = html;
+  renderIncMetaLog();
+}
+
+function renderIncMetaLog() {
+  const pane = document.getElementById('log-incmeta');
+  if (!pane) return;
+  const filtered = getFilteredIncidents();
+  if (!filtered.length) {
+    pane.innerHTML = '<div class="ll info">No incidents for this filter.</div>';
+    return;
+  }
+  pane.innerHTML = filtered.map(i => {
+    const id = i.id != null ? String(i.id) : '—';
+    return `<div class="im-block">
+      <div class="im-meta-hdr">Incident ${id} · session ${i.time}</div>
+      <div class="im-row"><strong>Frame</strong> <code>${i.frame}</code> · <strong>car</strong> #${i.car} · <strong>driver</strong> ${i.driver}</div>
+      <div class="im-row"><strong>Severity</strong> ${i.sev}× · <strong>cause</strong> ${String(i.cause).replace('-', ' ')} · <strong>you</strong> ${i.player ? 'yes' : 'no'}</div>
+      <div class="im-future">Nearby cars / other party (e.g. proximity): reserved for future telemetry.</div>
+    </div>`;
+  }).join('');
+  if (activeTab === 'incmeta' && autoScroll) pane.scrollTop = pane.scrollHeight;
 }
 
 function setFilter(el) {
   incFilter = el.dataset.f;
-  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.f === incFilter));
   renderInc();
 }
 
