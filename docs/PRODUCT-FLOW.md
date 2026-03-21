@@ -14,7 +14,59 @@ Sim Steward eliminates that. It turns a replay session into a structured review 
 
 ## User Flow Diagram
 
-[diagrams/product-flow-user-flow.mmd](diagrams/product-flow-user-flow.mmd)
+```mermaid
+flowchart TD
+
+  %% ── Entry ─────────────────────────────────────────────────
+  A([User opens iRacing\nand loads a replay]) --> B[SimHub plugin detects\nReplay mode]
+  B --> C[User opens Sim Steward\ndashboard in browser]
+  C --> D{Incidents already\nscanned?}
+
+  D -- No --> E[User clicks\nFind All Incidents]
+  D -- Yes --> L
+
+  %% ── Scan ──────────────────────────────────────────────────
+  E --> F[Plugin scrubs replay YAML\nfor CurDriverIncidentCount deltas\nacross all cars all frames]
+  F --> G[Authoritative incident list sent\nto dashboard via WS incidents message\nfields: driver · type · time · frame · suggestedCamera]
+  G --> L
+
+  %% ── Review queue ──────────────────────────────────────────
+  L([Incident List\nshown in leaderboard]) --> M{Any incidents?}
+  M -- No --> N([No incidents found\nSession clean])
+  M -- Yes --> O[User clicks incident row\nin list]
+
+  %% ── Selected Incident Panel ───────────────────────────────
+  O --> P[Selected Incident Panel activates\n───────────────────────\nDriver · car · type · session time\nIncident View 1 dropdown\n↳ use suggested view link\nPrev · Capture · Next]
+
+  P --> Q{Camera OK?}
+  Q -- No  --> R[User picks camera\nfrom View 1 dropdown]
+  Q -- Yes --> S
+  R --> S
+
+  %% ── Capture sequence ──────────────────────────────────────
+  S[User clicks Capture] --> T[Plugin: seek to\nstart_frame − pre-roll buffer]
+  T --> U[Plugin: set iRacing camera\nto selected Incident View 1]
+  U --> V[Plugin: set playback speed → 1×]
+  V --> W[OBS records the clip\nmanual trigger today]
+  W --> X{More incidents?}
+
+  X -- Yes --> Y[User clicks Next →\nor selects from list]
+  Y --> O
+  X -- No  --> Z([Session review complete])
+
+  %% ── Dual-view future path ─────────────────────────────────
+  P -.-> DV[Future: 2-view mode toggle]
+  DV -.-> DV2[View 1 + View 2 selectors\nboth with suggested view links]
+  DV2 -.-> DV3[Capture: play View 1\nthen auto-switch to View 2]
+  DV3 -.-> W
+
+  %% ── OBS future path ───────────────────────────────────────
+  W -.-> OBS[Future: OBS integration\nauto start · stop · name clip]
+
+  %% ── Styles ────────────────────────────────────────────────
+  classDef future stroke-dasharray:5 5,color:#888
+  class DV,DV2,DV3,OBS future
+```
 
 ---
 

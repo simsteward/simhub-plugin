@@ -493,15 +493,15 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           </div>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn" title="Jump to start" onclick="ra('replay_jump','start')">⏮</button>
-          <button type="button" class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4')">⏪</button>
+          <button type="button" class="btn" title="Jump to start" onclick="ra('replay_jump','start','replay-jump-start')">⏮</button>
+          <button type="button" class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4','replay-rewind')">⏪</button>
           <button type="button" class="btn" id="replay-play-pause-btn" title="Pause replay" onclick="toggleReplayPlayPause()">⏸</button>
-          <button type="button" class="btn" title="Forward 4×"   onclick="ra('replay_speed','4')">⏩</button>
-          <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end')">⏭</button>
+          <button type="button" class="btn" title="Forward 4×"   onclick="ra('replay_speed','4','replay-forward')">⏩</button>
+          <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end','replay-jump-end')">⏭</button>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
-          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev','replay-seek-prev')">Prev replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next','replay-seek-next')">Next replay incident</button>
         </div>
         <div class="speed-pills" id="speed-pills">
           <button class="spill" data-s="0.25" onclick="setSpeed(this)">0.25×</button>
@@ -536,8 +536,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           </select>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
-          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev','replay-seek-prev')">Prev replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next','replay-seek-next')">Next replay incident</button>
         </div>
         <div class="cap-row">
           <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
@@ -718,6 +718,10 @@ function connectWs() {
     ws.onopen = () => {
       setWs('connected');
       mockPaused = true;
+      incidents = [];
+      drivers = [];
+      renderInc();
+      renderStd();
       log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
     };
     ws.onclose = () => {
@@ -1245,9 +1249,9 @@ function onCarSel() {
 }
 
 // ── Replay ───────────────────────────────────────────────
-function ra(action, arg) {
+function ra(action, arg, elementId) {
   sendDashboardUiEvent({
-    element_id: 'replay-control',
+    element_id: elementId || 'replay-control',
     event_type: 'click',
     message: 'Replay ' + action + (arg !== undefined && arg !== '' ? ' ' + arg : ''),
     value: arg != null ? String(arg) : ''
@@ -1277,18 +1281,12 @@ function updatePlayPauseBtn() {
 function toggleReplayPlayPause() {
   if (replayPaused) {
     replayPaused = false;
-    ra('replay_speed', lastReplaySpeed);
+    ra('replay_speed', lastReplaySpeed, 'replay-play-pause');
   } else {
     replayPaused = true;
-    ra('replay_speed', '0');
+    ra('replay_speed', '0', 'replay-play-pause');
   }
   updatePlayPauseBtn();
-  sendDashboardUiEvent({
-    element_id: 'replay-play-pause',
-    event_type: 'click',
-    message: replayPaused ? 'Replay paused' : 'Replay playing',
-    value: replayPaused ? 'paused' : 'playing'
-  });
 }
 
 function setSpeed(el) {

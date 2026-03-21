@@ -140,13 +140,12 @@ namespace SimSteward.Plugin
                 catch { }
             }
 
-            WriteJsonLine(entry);
-
             lock (_lock)
             {
                 _ring.Enqueue(entry);
                 if (_ring.Count > RingBufferCapacity)
                     _ring.Dequeue();
+                WriteJsonLine(entry);
                 WriteToFile($"{entry.Timestamp} [{entry.Level}] {entry.Message}{Environment.NewLine}");
             }
 

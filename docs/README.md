@@ -15,6 +15,14 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 
 ---
 
+## Tier A+ — architecture (data structures + flows)
+
+| Doc | Use when |
+|-----|----------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Class diagrams (PluginSnapshot, LogEntry, WS messages), ER diagram (data API), sequence diagrams (action dispatch, incident pipeline) |
+
+---
+
 ## Tier B — topic hubs (open when needed)
 
 | Doc | Use when |

@@ -128,7 +128,39 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 ## How the pillars fit together (mermaid)
 
-[diagrams/features-pm-pillars.mmd](diagrams/features-pm-pillars.mmd)
+```mermaid
+flowchart LR
+  subgraph entry [Entry]
+    Status[Status bar]
+    WS[WebSocket plugin]
+  end
+  subgraph review [Incident review]
+    LB[Leaderboard plus chips]
+    DrvList[This driver incidents]
+    Meta[Incident meta strip]
+  end
+  subgraph transport [Replay]
+    Replay[Replay controls]
+    Seek[seek_to_incident]
+  end
+  subgraph capture [Capture]
+    DrvCap[Find selected driver incidents]
+    SessCap[Find all incidents all drivers]
+    CapList[Captured incidents tab]
+  end
+  WS --> Status
+  WS --> LB
+  WS --> DrvList
+  LB --> Seek
+  DrvList --> Seek
+  CapList --> Seek
+  DrvCap --> CapList
+  SessCap --> CapList
+  Seek --> Meta
+  DrvCap --> Seek
+  SessCap --> Seek
+  Replay --> Seek
+```
 
 ---
 

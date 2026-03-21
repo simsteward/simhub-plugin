@@ -42,5 +42,14 @@ debug-*.log
 # ContextStream local
 .contextstream/
 
+# One-off MCP upload payload dumps (repo root)
+/_ctx_*.json
+/_grafana_create.json
+/_mcp_memory_args.json
+/_mem_update_arch.json
+/_push_pf.json
+/_test_list.json
+/_tmp_arch.json
+
 # Local observability stack host data (Docker bind mounts)
 observability/local/.storage/

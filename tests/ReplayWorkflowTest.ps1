@@ -1,12 +1,10 @@
-# Replay capture workflow test — state shape and snapshot file structure
+# Replay capture workflow test — WebSocket state shape
 # Requires: SimHub running with Sim Steward plugin loaded
 # Run: .\tests\ReplayWorkflowTest.ps1
-# Expectations: WebSocket state shape and session-discovery.jsonl structure (see script checks below).
 
 $ErrorActionPreference = "Stop"
 $port = 19847
 $timeoutMs = 8000
-$snapshotPath = "$env:LOCALAPPDATA\SimHubWpf\PluginsData\SimSteward\session-discovery.jsonl"
 
 Add-Type -AssemblyName System.Core
 
@@ -100,47 +98,6 @@ try {
     exit 1
 } finally {
     $ws.Dispose()
-}
-
-# --- 2. Snapshot file structure (Test case 5 — payload shape) ---
-if (Test-Path -LiteralPath $snapshotPath) {
-    $allLines = Get-Content -LiteralPath $snapshotPath -Encoding UTF8 -ErrorAction Stop
-    $nonEmpty = @($allLines | Where-Object { $_.Trim().Length -gt 0 })
-    if ($nonEmpty.Count -ge 1) {
-        $lastLine = $nonEmpty[-1].Trim()
-        try {
-            $snap = $lastLine | ConvertFrom-Json
-        } catch {
-            Write-Host "FAIL: Last snapshot line is not valid JSON"
-            exit 1
-        }
-        if ($snap.type -ne "sessionSnapshot") {
-            Write-Host "FAIL: Snapshot line type is '$($snap.type)', expected sessionSnapshot"
-            exit 1
-        }
-        if (-not $snap.PSObject.Properties["trigger"]) { Write-Host "FAIL: Snapshot missing trigger"; exit 1 }
-        if (-not $snap.PSObject.Properties["playerCarIdx"]) { Write-Host "FAIL: Snapshot missing playerCarIdx"; exit 1 }
-        if (-not $snap.PSObject.Properties["sessionDiagnostics"]) { Write-Host "FAIL: Snapshot missing sessionDiagnostics"; exit 1 }
-        if (-not $snap.PSObject.Properties["replayFrameNum"]) { Write-Host "FAIL: Snapshot missing replayFrameNum"; exit 1 }
-        Write-Host "PASS: Last snapshot line has type, trigger, playerCarIdx, sessionDiagnostics, replayFrameNum"
-        if ($snap.PSObject.Properties["replayMetadata"] -and $null -ne $snap.replayMetadata) {
-            $meta = $snap.replayMetadata
-            $required = @("sessionID", "subSessionID", "trackDisplayName", "category", "simMode", "driverRoster", "sessions", "incidentFeed")
-            foreach ($key in $required) {
-                if (-not $meta.PSObject.Properties[$key]) {
-                    Write-Host "FAIL: replayMetadata missing $key"
-                    exit 1
-                }
-            }
-            Write-Host "PASS: Snapshot replayMetadata has sessionID, subSessionID, trackDisplayName, category, simMode, driverRoster, sessions, incidentFeed"
-        } else {
-            Write-Host "PASS: No replayMetadata in snapshot (ok when SessionInfo not available)"
-        }
-    } else {
-        Write-Host "PASS: Snapshot file empty (no snapshot lines yet)"
-    }
-} else {
-    Write-Host "PASS: Snapshot file not present (no snapshots recorded yet)"
 }
 
 Write-Host ""

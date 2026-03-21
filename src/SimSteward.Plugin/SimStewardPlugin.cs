@@ -333,6 +333,157 @@ namespace SimSteward.Plugin
                 }
             }
 
+            if (string.Equals(action, "replay_speed", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!double.TryParse((arg ?? "").Trim(),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var speed))
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    int multiplier;
+                    bool slowMotion;
+                    if (speed == 0.0)
+                    {
+                        multiplier = 0; slowMotion = false;
+                    }
+                    else if (speed > 0.0 && speed < 1.0)
+                    {
+                        multiplier = (int)Math.Round(1.0 / speed);
+                        slowMotion = true;
+                    }
+                    else if (speed >= 1.0)
+                    {
+                        multiplier = (int)speed; slowMotion = false;
+                    }
+                    else
+                    {
+                        // negative: rewind at magnitude (e.g. -4 → 4x reverse)
+                        multiplier = (int)Math.Abs(speed); slowMotion = false;
+                    }
+                    _irsdk.ReplaySetPlaySpeed(multiplier, slowMotion);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "replay_speed_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_seek", StringComparison.OrdinalIgnoreCase))
+            {
+                var dir = (arg ?? "").Trim().ToLowerInvariant();
+                if (dir != "prev" && dir != "next")
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    var mode = dir == "prev"
+                        ? IRacingSdkEnum.RpySrchMode.PrevIncident
+                        : IRacingSdkEnum.RpySrchMode.NextIncident;
+                    _irsdk.ReplaySearch(mode);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "replay_seek_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_jump", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = (arg ?? "").Trim().ToLowerInvariant();
+                if (target != "start" && target != "end")
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    var mode = target == "start"
+                        ? IRacingSdkEnum.RpySrchMode.ToStart
+                        : IRacingSdkEnum.RpySrchMode.ToEnd;
+                    _irsdk.ReplaySearch(mode);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "replay_jump_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "seek_to_incident", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!int.TryParse((arg ?? "").Trim(), out var frame) || frame < 0)
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, frame);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "seek_to_incident_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
             LogActionResult(action, arg, correlationId, false, "not_supported");
             return (false, null, "not_supported");
         }
