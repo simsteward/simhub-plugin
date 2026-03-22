@@ -31,6 +31,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 | [USER-FLOWS.md](USER-FLOWS.md) | Step-by-step user journeys through today's UI (mermaid diagrams); PM issues and flow gaps |
 | [observability-local.md](observability-local.md) | Local Grafana/Loki stack, npm scripts, loki-gateway |
 | [observability-scaling.md](observability-scaling.md) | Many users, large grids, Loki cardinality |
+| [DATA-ROUTING-OBSERVABILITY.md](DATA-ROUTING-OBSERVABILITY.md) | OTel vs Loki vs Prometheus, ~1k-user sizing, car telemetry taxonomy |
 | [observability-testing.md](observability-testing.md) | Harness, AssertLokiQueries, Explore validation |
 | [DATA-API-DEPLOY.md](DATA-API-DEPLOY.md) | Data API env (local vs prod) |
 | [REDEPLOY-CONCEPT.md](REDEPLOY-CONCEPT.md) | Redeploy mental model |

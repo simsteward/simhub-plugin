@@ -1,6 +1,6 @@
 # iRacing Telemetry — SDK Variable Reference
 
-This document describes the telemetry data available from the iRacing SDK (via IRSDKSharper) and how it maps to this plugin's data pipeline.
+This document describes the telemetry data available from the iRacing SDK (via IRSDKSharper) and how it maps to this plugin's data pipeline. **Where high-rate data should go (OTel metrics vs Loki)** is defined in **docs/DATA-ROUTING-OBSERVABILITY.md** §5.
 
 ---
 

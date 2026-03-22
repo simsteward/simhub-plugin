@@ -1,6 +1,6 @@
 # Observability scaling (Loki / many users / large sessions)
 
-How SimSteward logging scales in Grafana Loki: **many drivers per session**, **many plugin instances**, and **collecting logs from many users** without a heavy stack on each PC. Label rules and volume: **docs/GRAFANA-LOGGING.md**.
+How SimSteward logging scales in Grafana Loki: **many drivers per session**, **many plugin instances**, and **collecting logs from many users** without a heavy stack on each PC. Label rules and volume: **docs/GRAFANA-LOGGING.md**. **What goes to Loki vs OTel/metrics** and rough **~1k-user** math: **docs/DATA-ROUTING-OBSERVABILITY.md**.
 
 ---
 
@@ -66,6 +66,7 @@ Same as Part A: chunked `session_end_datapoints_results` lines; **docs/GRAFANA-L
 
 ## References
 
+- **docs/DATA-ROUTING-OBSERVABILITY.md** — Routing decisions (events → Loki; high-rate telemetry → OTel → Prometheus/Mimir), sizing, car telemetry taxonomy.
 - **docs/GRAFANA-LOGGING.md** — Schema, volume budget, LogQL, housekeeping.
 - **docs/observability-local.md** — Local stack quick start.
 - Grafana: [Label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Query best practices](https://grafana.com/docs/loki/latest/query/bp-query/).
