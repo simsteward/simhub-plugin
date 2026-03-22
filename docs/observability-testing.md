@@ -8,8 +8,8 @@ Grafana/Loki **test harness** (CI/local) plus **manual LogQL validation** in Exp
 
 ### Overview
 
-1. Emit structured events (`action_result`, `incident_detected`, `session_digest`) with `testing="true"` and `test_tag` (e.g. `grafana-harness`).
-2. Assert via Loki HTTP API or MCP that expected fields exist.
+1. Emit structured events (`action_result`, `incident_detected`, `session_digest`, **`replay_incident_index_detection`**) with `testing="true"` and `test_tag` (e.g. `grafana-harness`). Detection rows use TR-020 v1 fingerprints from `ReplayIncidentIndexFingerprint` (see **harness/SimSteward.GrafanaTestHarness**).
+2. Assert via Loki HTTP API or MCP that expected fields exist. **`tests/observability/AssertLokiQueries`** fails (non-zero exit) unless Loki returns the expected lines—including **`replay_incident_index_detection`** with a 64-char `fields.fingerprint`.
 
 ### Harness only (Loki already running)
 
@@ -30,7 +30,20 @@ dotnet run --project tests\observability\AssertLokiQueries\AssertLokiQueries.csp
 
 ### MCP assertions
 
-After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"`. Expect ≥2 `action_result`, ≥1 `incident_detected`, ≥1 `session_digest` with required fields.
+After harness run, query e.g. `{app="sim-steward"} | json | testing = "true" | test_tag = "grafana-harness"`. Expect ≥2 `action_result`, ≥1 `incident_detected`, ≥1 `session_digest`, ≥1 **`replay_incident_index_detection`** with required fields (including `fields.fingerprint`).
+
+### xUnit: Loki query (replay incident index)
+
+With local Loki ingesting harness output, enable the integration test that **queries Grafana/Loki** (same LogQL idea as **AssertLokiQueries**):
+
+```powershell
+$env:RUN_REPLAY_INDEX_LOKI_ASSERT = "1"
+$env:LOKI_QUERY_URL = "http://localhost:3100"
+$env:TEST_TAG = "grafana-harness"
+dotnet test src\SimSteward.Plugin.Tests\SimSteward.Plugin.Tests.csproj -c Release --filter FullyQualifiedName~ReplayIncidentIndexLokiIntegrationTests
+```
+
+Without `RUN_REPLAY_INDEX_LOKI_ASSERT=1`, that test is **skipped** so default `dotnet test` stays green without a stack. If `RUN_REPLAY_INDEX_LOKI_ASSERT=1` but Loki has no matching lines, the test **fails** (strict verification).
 
 ### LogQL: test vs production
 

@@ -301,7 +301,7 @@ Milestones **M8** and **M9** are **Complete** for the current shipped surface (M
 | Item | Evidence |
 |------|----------|
 | **TR-041** | This subsection is the M8/M9 milestone summary (scope, requirement mapping, evidence pointers). |
-| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3, M5 event constants / TR-028 taxonomy); `ReplayIncidentIndexDetectionTests` (TR-012–TR-018 / §4.4); M4: `ReplayIncidentIndexFingerprintTests`, `ReplayIncidentIndexDocumentBuilderTests`, `ReplayIncidentIndexResultsYamlTests`, `ReplayIncidentIndexValidationComparerTests`, `ReplayIncidentIndexOutputPathsTests` (TR-019–TR-024, fingerprint §4.5). Test classes reference the spec in XML docs. |
+| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3, M5 event constants / TR-028 taxonomy); `ReplayIncidentIndexDetectionTests` (TR-012–TR-018 / §4.4); M4: `ReplayIncidentIndexFingerprintTests`, `ReplayIncidentIndexDocumentBuilderTests`, `ReplayIncidentIndexResultsYamlTests`, `ReplayIncidentIndexValidationComparerTests`, `ReplayIncidentIndexOutputPathsTests` (TR-019–TR-024, fingerprint §4.5); M5 Loki: `AssertLokiQueries` + optional `ReplayIncidentIndexLokiIntegrationTests` with `RUN_REPLAY_INDEX_LOKI_ASSERT` ([observability-testing.md](observability-testing.md)). Test classes reference the spec in XML docs. |
 | **TR-043** | `dotnet test` for `SimSteward.Plugin.Tests` (net48) passes with zero failures; project policy: resolve failures by fixing implementation or updating this document—not by weakening tests. Same suite is enforced by deploy scripts per SimHub development rules. |
 
 ### M1 acceptance review (completed)
@@ -388,7 +388,7 @@ Milestone **M5** is **Complete**; TR-026–TR-030, TR-041, and per-detection obs
 | **TR-029** | Validation outcomes remain on `replay_incident_index_validation_summary` (M4); no split events required. |
 | **TR-030** | Per-detection `Structured` calls wrapped in try/catch so logging failures do not abort the build; Loki optional per existing pipeline. |
 
-**Code:** `ReplayIncidentIndexBuild.cs` (`EventDetection`), `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (`LogReplayIncidentIndexDetectionsLocked`). **Tests:** `ReplayIncidentIndexBuildTests` (event name constants). Fingerprint parity with JSON rows: `ReplayIncidentIndexDocumentBuilderTests.Fingerprint_MatchesPerRowCanonicalDigest`. **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_detection`).
+**Code:** `ReplayIncidentIndexBuild.cs` (`EventDetection`), `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (`LogReplayIncidentIndexDetectionsLocked`). **Tests:** `ReplayIncidentIndexBuildTests` (event name constants). Fingerprint parity with JSON rows: `ReplayIncidentIndexDocumentBuilderTests.Fingerprint_MatchesPerRowCanonicalDigest`. **Grafana/Loki verification:** `harness/SimSteward.GrafanaTestHarness` emits harness `replay_incident_index_detection` lines (TR-020 fingerprints); `tests/observability/AssertLokiQueries` **fails** unless Loki returns those events; optional `ReplayIncidentIndexLokiIntegrationTests` queries Loki when `RUN_REPLAY_INDEX_LOKI_ASSERT=1` (see [observability-testing.md](observability-testing.md)). **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_detection`).
 
 ---
 

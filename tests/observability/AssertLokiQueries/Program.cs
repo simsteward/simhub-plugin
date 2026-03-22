@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using Newtonsoft.Json.Linq;
+using SimSteward.Observability;
 
 namespace AssertLokiQueries
 {
@@ -62,7 +61,7 @@ namespace AssertLokiQueries
 
             // Query: all test-tagged lines in last 10 minutes
             var query = $"{{app=\"sim-steward\"}} | json | testing = \"true\" | test_tag = \"{testTag}\"";
-            if (!QueryLoki(baseUrl, query, client, out var lines, out var queryError))
+            if (!LokiQueryRangeClient.TryQueryRange(baseUrl, query, client, TimeSpan.FromMinutes(10), out var lines, out var queryError))
             {
                 error = queryError;
                 return false;
@@ -74,7 +73,7 @@ namespace AssertLokiQueries
                 return false;
             }
 
-            int actionResult = 0, incidentDetected = 0, sessionDigest = 0;
+            int actionResult = 0, incidentDetected = 0, sessionDigest = 0, replayIncidentIndexDetection = 0;
             foreach (var line in lines)
             {
                 try
@@ -84,6 +83,7 @@ namespace AssertLokiQueries
                     if (ev == "action_result") actionResult++;
                     if (ev == "incident_detected") incidentDetected++;
                     if (ev == "session_digest") sessionDigest++;
+                    if (ev == "replay_incident_index_detection") replayIncidentIndexDetection++;
                 }
                 catch
                 {
@@ -104,6 +104,11 @@ namespace AssertLokiQueries
             if (sessionDigest < 1)
             {
                 error = $"Expected at least 1 session_digest line; got {sessionDigest}.";
+                return false;
+            }
+            if (replayIncidentIndexDetection < 1)
+            {
+                error = $"Expected at least 1 replay_incident_index_detection line (M5 TR-028 harness); got {replayIncidentIndexDetection}.";
                 return false;
             }
 
@@ -131,16 +136,41 @@ namespace AssertLokiQueries
                 return false;
             }
 
+            // TR-028: fingerprint v1 hex on replay_incident_index_detection
+            var hasValidFingerprint = false;
+            foreach (var line in lines)
+            {
+                try
+                {
+                    var j = JObject.Parse(line);
+                    if (j["event"]?.ToString() != "replay_incident_index_detection") continue;
+                    var fields = j["fields"] as JObject;
+                    var fp = fields?["fingerprint"]?.ToString();
+                    if (!string.IsNullOrEmpty(fp) && fp.Length == 64)
+                    {
+                        hasValidFingerprint = true;
+                        break;
+                    }
+                }
+                catch { }
+            }
+            if (!hasValidFingerprint)
+            {
+                error = "No replay_incident_index_detection line had fields.fingerprint (64-char hex).";
+                return false;
+            }
+
             // LogQL smoke queries (typical panel queries, filtered to test data)
             var logqlSmokeChecks = new[]
             {
                 ("action_result", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"action_result\" | testing = \"true\" | test_tag = \"{testTag}\""),
                 ("incident_detected", $"{{app=\"sim-steward\", component=\"tracker\"}} | json | event = \"incident_detected\" | testing = \"true\" | test_tag = \"{testTag}\""),
-                ("session_digest", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"session_digest\" | testing = \"true\" | test_tag = \"{testTag}\"")
+                ("session_digest", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"session_digest\" | testing = \"true\" | test_tag = \"{testTag}\""),
+                ("replay_incident_index_detection", $"{{app=\"sim-steward\", component=\"simhub-plugin\"}} | json | event = \"replay_incident_index_detection\" | testing = \"true\" | test_tag = \"{testTag}\"")
             };
             foreach (var (name, logql) in logqlSmokeChecks)
             {
-                if (!QueryLoki(baseUrl, logql, client, out var panelLines, out var panelErr))
+                if (!LokiQueryRangeClient.TryQueryRange(baseUrl, logql, client, TimeSpan.FromMinutes(10), out var panelLines, out var panelErr))
                 {
                     error = $"[{name}] {panelErr}";
                     return false;
@@ -149,56 +179,6 @@ namespace AssertLokiQueries
                 {
                     error = $"[{name}] Expected at least 1 row for LogQL smoke query; got {panelLines.Count}.";
                     return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool QueryLoki(string baseUrl, string logql, HttpClient client, out List<string> logLines, out string error)
-        {
-            logLines = new List<string>();
-            error = null;
-
-            var endNs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() * 1_000_000;
-            var startNs = (DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeMilliseconds()) * 1_000_000L;
-
-            var url = $"{baseUrl}/loki/api/v1/query_range?query={Uri.EscapeDataString(logql)}&start={startNs}&end={endNs}&limit=500";
-            var response = client.GetAsync(url).GetAwaiter().GetResult();
-            if (!response.IsSuccessStatusCode)
-            {
-                error = $"Loki query_range returned {response.StatusCode}.";
-                return false;
-            }
-
-            var json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            var root = JObject.Parse(json);
-            var status = root["status"]?.ToString();
-            if (status != "success")
-            {
-                error = "Loki returned status != success.";
-                return false;
-            }
-
-            var result = root["data"]?["result"];
-            if (result == null || !(result is JArray arr))
-            {
-                error = "Loki data.result missing or not array.";
-                return false;
-            }
-
-            foreach (var item in arr)
-            {
-                var values = item["values"] as JArray;
-                if (values == null) continue;
-                foreach (var v in values)
-                {
-                    if (v is JArray pair && pair.Count >= 2)
-                    {
-                        var line = pair[1]?.ToString();
-                        if (!string.IsNullOrEmpty(line))
-                            logLines.Add(line);
-                    }
                 }
             }
 
