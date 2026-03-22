@@ -18,6 +18,7 @@ A **SimHub plugin + browser dashboard** for structured iRacing replay review. In
 | **Telemetry strip** | Throttle, brake, steering wheel (real data from plugin) |
 | **Selected Incident Panel** | Camera group dropdown (`cameraGroups` from plugin), ▶ Capture (`capture_incident`: pre-roll, optional camera, 1× speed), prev/next within filtered list |
 | **Observability** | Structured logs → Grafana Loki (`SIMSTEWARD_LOKI_URL`); `capture_incident` includes correlation fields on `action_result`; re-capture confirms before sending (Loki is append-only) |
+| **Replay incident index (iRacing replay)** | WebSocket action `replay_incident_index_build` (`start` / `cancel`): IRSDKSharper 60Hz poll, 16× fast-forward, repair/furled/player incident detection → chronological JSON on disk (`%LocalAppData%\SimSteward\replay-incident-index\{subSessionId}.json`, fingerprint v1 rows per [docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md)), YAML `ResultsPositions` cross-check, optional per-row `ReplaySearchSessionTime` + `CamCarIdx` validation, then restore pre-build `ReplayFrameNum`. Emits `replay_incident_index_*` lifecycle logs and `replay_incident_index_validation_summary`. **Dashboard UI for this index is not shipped yet** (M6 in the spec). |
 
 **North-star / gaps still open:** true plugin-side **YAML scan** (session walk still uses the leaderboard frame list), **scrub bar** seek (PoC / toast only), **plugin-owned `suggestedCamera`**, **dual-view** capture, **OBS** integration. See [docs/PRODUCT-FLOW.md](docs/PRODUCT-FLOW.md) and [docs/DATA-ROUTING-OBSERVABILITY.md](docs/DATA-ROUTING-OBSERVABILITY.md) for what belongs in Loki vs a future metrics path.
 
@@ -58,6 +59,7 @@ docs/                         Documentation (start with docs/README.md)
   USER-FLOWS.md               Step-by-step user journeys + flow diagrams
   USER-FEATURES-PM.md         PM-style feature descriptions
   GRAFANA-LOGGING.md          Loki labels, events, LogQL
+  IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md  SDK fast-forward incident index (milestones, TR IDs)
   DATA-ROUTING-OBSERVABILITY.md  Events vs high-rate telemetry (Loki vs OTel/metrics)
   TROUBLESHOOTING.md          Runtime issues, deploy, logs
 
@@ -114,5 +116,6 @@ Starts Grafana + Loki via Docker. See [docs/observability-local.md](docs/observa
 | [docs/PRODUCT-FLOW.md](docs/PRODUCT-FLOW.md) | Understanding the vision, feature maturity, open PM issues |
 | [docs/USER-FLOWS.md](docs/USER-FLOWS.md) | How each feature actually works as a user (flow diagrams) |
 | [docs/GRAFANA-LOGGING.md](docs/GRAFANA-LOGGING.md) | Structured logging, Loki labels, LogQL queries |
+| [docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md) | Replay incident index build (SDK-only), JSON output, validation, milestone status |
 | [docs/DATA-ROUTING-OBSERVABILITY.md](docs/DATA-ROUTING-OBSERVABILITY.md) | What ships to Loki vs metrics at scale |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Runtime issues, WebSocket, deploy failures |
