@@ -29,6 +29,7 @@ These paths should be represented in the indexed project (titles are historical 
 | `docs/GRAFANA-LOGGING.md` | Grafana Loki Structured Logging | `spec` |
 | `docs/DATA-ROUTING-OBSERVABILITY.md` | Sim Steward — Data Routing (OTel / Loki / Prometheus) | `spec` |
 | `docs/IRACING-TELEMETRY.md` | iRacing Telemetry — SDK Variable Reference | `spec` |
+| `docs/IRACING-DATA-AVAILABILITY.md` | iRacing Data Availability Reference | `spec` |
 | `docs/RULES-ActionCoverage.md` | Action Coverage — 100% Log Rule | `spec` |
 | `docs/DATA-API-DEPLOY.md` | Data API — Local vs Production | `spec` |
 | `docs/observability-local.md` | Observability — Local Stack | `spec` |

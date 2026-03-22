@@ -59,6 +59,8 @@ If the in-dashboard log stream stays empty when you click Play, capture, or othe
 
 If you run a replay and incidents are not captured or signaled:
 
+**What iRacing exposes when:** See [docs/IRACING-DATA-AVAILABILITY.md](IRACING-DATA-AVAILABILITY.md). Live race vs replay vs post-results differ (especially for **per-car** incidents and **YAML results** fields). Do not assume a field populated in replay is populated the same way during a live race.
+
 ### Required checks
 
 1. **iRacing shared memory enabled** — Edit `%USERPROFILE%\Documents\iRacing\app.ini` and ensure `irsdkEnableMem=1`. (Some iRacing versions expose this under Options > Graphics.) Without this, the plugin cannot connect.
@@ -78,7 +80,7 @@ If you run a replay and incidents are not captured or signaled:
 ### Incident point accuracy
 
 - For the **player/focused car**, the plugin uses `PlayerCarMyIncidentCount` at 60 Hz. The **delta is the incident type** (1=off-track, 2=wall/spin, 4=heavy contact). Values should match iRacing.
-- For **other drivers**, data comes from `ResultsPositions[].Incidents` in the session YAML. At high replay speeds (e.g. 16x), iRacing batches updates — you may see a single +6x event instead of separate 2x+2x+2x. The total is correct; the per-incident breakdown is approximated.
+- For **other drivers**, the plugin compares **per-driver `CurDriverIncidentCount`** from the session YAML (`DriverInfo`) on each `SessionInfoUpdate` — not `ResultsPositions` directly (see **IRACING-DATA-AVAILABILITY.md** Group 5 for when **final** `ResultsPositions[].Incidents` is meaningful). **Live race:** no per-car telemetry incident count for others; YAML/session-info behavior may still differ from replay — see the availability doc. At high replay speeds (e.g. 16x), iRacing batches updates — you may see a single +6x event instead of separate 2x+2x+2x. The total is correct; the per-incident breakdown is approximated.
 - iRacing's **quick-succession rule**: multiple incidents in rapid succession can be merged. A 2x spin followed by 4x contact may show as +4x only (highest counts).
 
 ---

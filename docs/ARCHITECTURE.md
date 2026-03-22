@@ -226,6 +226,8 @@ sequenceDiagram
 
 How iRacing incidents flow from SDK shared memory to the dashboard leaderboard and Loki.
 
+**Platform availability** (what YAML exposes per car in live vs replay vs post-results) is documented in [docs/IRACING-DATA-AVAILABILITY.md](IRACING-DATA-AVAILABILITY.md). The plugin reads **`DriverInfo.Drivers[].CurDriverIncidentCount`** from the session YAML on `SessionInfoUpdate` and compares to a per-car baseline.
+
 ```mermaid
 sequenceDiagram
   participant IR as iRacing shared memory
@@ -236,7 +238,7 @@ sequenceDiagram
   participant D as Dashboard (JS)
 
   loop DataUpdate() ~60 Hz
-    IR->>P: CurDriverIncidentCount per car (YAML / telemetry)
+    IR->>P: Session YAML per driver CurDriverIncidentCount on SessionInfoUpdate
     P->>T: OnSessionInfoUpdate() / tick
     T->>T: Compare delta vs baseline per car
     alt delta > 0 detected

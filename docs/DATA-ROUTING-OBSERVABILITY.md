@@ -1,6 +1,6 @@
 # Data routing: OTel vs Loki vs Prometheus (and scale at ~1k users)
 
-**Purpose:** Single place for *what data goes to which backend*, *why*, and *rough sizing* when many users share one Grafana stack. Detail on Loki labels and events: **docs/GRAFANA-LOGGING.md**. Scaling patterns: **docs/observability-scaling.md**. SDK variable names: **docs/IRACING-TELEMETRY.md**.
+**Purpose:** Single place for *what data goes to which backend*, *why*, and *rough sizing* when many users share one Grafana stack. Detail on Loki labels and events: **docs/GRAFANA-LOGGING.md**. Scaling patterns: **docs/observability-scaling.md**. SDK variable names: **docs/IRACING-TELEMETRY.md**. **When/where iRacing exposes data** (live vs replay vs post-results): **docs/IRACING-DATA-AVAILABILITY.md**.
 
 ---
 
@@ -91,7 +91,7 @@ flowchart TB
 
 **Candidate signals** (names are illustrative; align with OTel semantic conventions when implementing):
 
-| Category | SDK variables (see **docs/IRACING-TELEMETRY.md**) | Notes |
+| Category | SDK variables (see **docs/IRACING-TELEMETRY.md**; availability **docs/IRACING-DATA-AVAILABILITY.md**) | Notes |
 |----------|-----------------------------------------------------|--------|
 | **Motion / driver** | `Speed`, `RPM`, `Throttle`, `Brake`, `Clutch`, `Gear`, `SteeringWheelAngle`, `LatAccel`, `LongAccel`, `VertAccel`, `Yaw`/`Pitch`/`Roll`/`YawRate`… | Export **aggregated** or **downsampled** (e.g. 1–5 Hz) with **low-cardinality** labels only. |
 | **Tires** | `LFtempCL/CM/CR`, …, `{c}pressure`, `{c}wear*`, `{c}rideHeight` | Per-corner; avoid per-session labels on every series. |
@@ -135,6 +135,7 @@ These stay **events or throttled snapshots** in structured logs — **not** a mi
 - **docs/GRAFANA-LOGGING.md** — Loki schema, volume table, events.
 - **docs/observability-scaling.md** — Many users, central Loki, label rules.
 - **docs/IRACING-TELEMETRY.md** — SDK variables and categories.
+- **docs/IRACING-DATA-AVAILABILITY.md** — when/where data exists (telemetry vs YAML vs REST).
 - Grafana: [Loki label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Prometheus cardinality](https://grafana.com/docs/grafana-cloud/send-data/metrics/metricsCardinality/).
 
 ---
@@ -146,5 +147,6 @@ These stay **events or throttled snapshots** in structured logs — **not** a mi
 | Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
 | Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
 | iRacing Telemetry — SDK Variable Reference | `42ab06d4-9ed3-43a1-996c-bd0250ecdf6e` |
+| iRacing Data Availability Reference | TBD after ContextStream `project(ingest_local)` — update this row with doc ID from index |
 | Architecture & Data Structures | `c453dd83-dfd9-4002-b8a2-2e0c8a4d032c` |
 | Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |
