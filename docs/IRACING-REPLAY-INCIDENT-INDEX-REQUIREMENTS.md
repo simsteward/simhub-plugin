@@ -1,6 +1,6 @@
 # Technical Requirements
 ## iRacing Replay Incident Index Capture via SDK Fast-Forward Sampling
-**Version 0.4 — Draft**
+**Version 0.5 — Draft**
 
 ---
 
@@ -283,6 +283,13 @@ This implementation is broken down into the following milestones (tracked in Con
 | **M5: Observability Logging** | TR-026 – TR-030 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
 | **M6: SimHub Web Dashboard** | TR-031 – TR-038 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
 | **M7: Grafana Insights Dashboard** | TR-039 – TR-040 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
+| **M8: Test suite construction** | Cross-cutting (TR/NFR per tests as added) | Implement the **automated test suite** for the replay incident index: unit tests with mocks/fixtures where the SDK is unavailable, integration or golden-data tests where appropriate, and coverage aligned with this document’s acceptance criteria. Tests encode **expected behavior from the spec**, not ad-hoc behavior. | ⏳ Not Started |
+| **M9: Tests passing (implementation alignment)** | Cross-cutting (same) | **All** tests for this feature pass locally and in CI. **Pass criteria:** failures are resolved by correcting **implementation** or, when the spec is wrong, by **explicitly updating this document** with rationale—not by weakening assertions, deleting cases, broadening tolerances without justification, or changing expectations to match incorrect behavior. Outcomes must align with implementation and the written requirements. | ⏳ Not Started |
+
+### M8 / M9 acceptance
+
+- **M8** delivers existence and quality of the test suite: structure, determinism, and explicit linkage to requirements in this document.
+- **M9** delivers a green test run. **Anti-pattern:** editing tests to paper over bugs. **Allowed:** fix implementation; or amend the spec with rationale and then update tests to match the corrected spec.
 
 ### M1 acceptance review (completed)
 
@@ -300,4 +307,4 @@ Milestone **M1** is **Complete**; TR-001–TR-003, NFR-005, and raw session YAML
 
 ---
 
-*iRacing Replay Incident Index — Technical Requirements v0.4 — Draft*
+*iRacing Replay Incident Index — Technical Requirements v0.5 — Draft*
