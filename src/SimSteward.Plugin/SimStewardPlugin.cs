@@ -789,6 +789,11 @@ namespace SimSteward.Plugin
                 }
             }
 
+            if (string.Equals(action, "replay_incident_index_build", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchReplayIncidentIndexBuild(arg, correlationId);
+            }
+
             LogActionResult(action, arg, correlationId, false, "not_supported");
             return (false, null, "not_supported");
         }
@@ -970,10 +975,12 @@ namespace SimSteward.Plugin
                 };
                 _irsdk.OnDisconnected += () =>
                 {
+                    ReplayIncidentIndexOnIracingDisconnected();
                     _replayIncidentIndexPrereqLogKey = "";
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_disconnected", "iRacing disconnected.", null, "lifecycle", null);
                 };
                 _irsdk.OnSessionInfo += OnIrsdkSessionInfo;
+                _irsdk.OnTelemetryData += OnIrsdkTelemetryDataForReplayIndex;
                 _irsdk.Start();
                 _logger.Structured("INFO", "simhub-plugin", "irsdk_started", "iRacing SDK started.", null, "lifecycle", null);
             }
@@ -1176,6 +1183,7 @@ namespace SimSteward.Plugin
             {
                 try
                 {
+                    _irsdk.OnTelemetryData -= OnIrsdkTelemetryDataForReplayIndex;
                     _irsdk.OnSessionInfo -= OnIrsdkSessionInfo;
                     _irsdk.Stop();
                 }
