@@ -1056,9 +1056,13 @@ function useSuggestedCamera() {
 
 function captureSelectedIncident() {
   if (!selectedIncident) return;
+  const dup = capturedIncidents.some(function (r) { return r.frame === selectedIncident.frame; });
+  if (dup && !confirm('You have already captured this incident. Re-capture anyway? Older rows stay in Loki until retention; use latest timestamp in Grafana.')) {
+    return;
+  }
   const sel = document.getElementById('camera-sel');
   const camera = sel ? sel.value : '';
-  const arg = JSON.stringify({ frame: selectedIncident.frame, camera });
+  const arg = JSON.stringify({ frame: selectedIncident.frame, camera, car: selectedIncident.car });
   sendDashboardUiEvent({ element_id: 'capture-btn', event_type: 'click', message: 'Capture incident', value: String(selectedIncident.frame) });
   if (!send('capture_incident', arg)) toast('[PoC] capture_incident not connected', undefined, 'capture_incident');
   log('events', 'INFO ', 'capture_incident', 'frame:' + selectedIncident.frame + '  camera:' + camera);

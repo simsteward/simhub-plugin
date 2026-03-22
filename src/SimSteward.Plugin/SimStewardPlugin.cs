@@ -406,7 +406,7 @@ namespace SimSteward.Plugin
             _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, carPos, groupNum, 0);
         }
 
-        private void LogActionResult(string action, string arg, string correlationId, bool success, string error)
+        private void LogActionResult(string action, string arg, string correlationId, bool success, string error, System.Collections.Generic.Dictionary<string, object> supplementalFields = null)
         {
             var resultFields = new System.Collections.Generic.Dictionary<string, object>
             {
@@ -417,6 +417,11 @@ namespace SimSteward.Plugin
                 ["error"] = error ?? ""
             };
             MergeSessionAndRoutingFields(resultFields);
+            if (supplementalFields != null)
+            {
+                foreach (var kv in supplementalFields)
+                    resultFields[kv.Key] = kv.Value;
+            }
             var summary = success
                 ? $"{action} -> ok"
                 : $"{action} -> {error ?? "failed"}";
@@ -427,6 +432,80 @@ namespace SimSteward.Plugin
         {
             [JsonProperty("frame")] public int frame { get; set; } = -1;
             [JsonProperty("camera")] public string camera { get; set; }
+            /// <summary>Incident car number from dashboard (for Loki fingerprint / CustID lookup).</summary>
+            [JsonProperty("car")] public int? car { get; set; }
+        }
+
+        /// <summary>
+        /// Fills <c>unique_user_id</c>, <c>driver_name</c>, <c>car_number</c> for capture_incident logs.
+        /// Resolves by car number when provided; else uses replay camera / focus car index.
+        /// </summary>
+        private void TryFillDriverIdentityForCapture(string carNumberStr, System.Collections.Generic.Dictionary<string, object> target)
+        {
+            target["car_number"] = carNumberStr ?? "";
+            target["unique_user_id"] = "unknown";
+            target["driver_name"] = "";
+            if (_irsdk?.Data?.SessionInfo?.DriverInfo?.Drivers is not IList list)
+                return;
+
+            object match = null;
+            if (!string.IsNullOrWhiteSpace(carNumberStr))
+            {
+                var want = carNumberStr.Trim();
+                foreach (var o in list)
+                {
+                    if (o == null) continue;
+                    var t = o.GetType();
+                    var num = t.GetProperty("CarNumber")?.GetValue(o)?.ToString()?.Trim() ?? "";
+                    if (string.Equals(num, want, StringComparison.OrdinalIgnoreCase))
+                    {
+                        match = o;
+                        break;
+                    }
+                }
+            }
+
+            if (match == null)
+            {
+                int cam = ResolveFocusCarIdx();
+                if (cam >= 0)
+                {
+                    foreach (var o in list)
+                    {
+                        if (o == null) continue;
+                        var t = o.GetType();
+                        var carIdxObj = t.GetProperty("CarIdx")?.GetValue(o);
+                        var idx = carIdxObj is int ci ? ci : System.Convert.ToInt32(carIdxObj ?? -1);
+                        if (idx == cam)
+                        {
+                            match = o;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (match == null) return;
+            var mt = match.GetType();
+            target["driver_name"] = mt.GetProperty("UserName")?.GetValue(match)?.ToString() ?? "";
+            var uidObj = mt.GetProperty("UserID")?.GetValue(match) ?? mt.GetProperty("CustID")?.GetValue(match);
+            if (uidObj != null)
+                target["unique_user_id"] = uidObj.ToString();
+            if (string.IsNullOrWhiteSpace(carNumberStr))
+                target["car_number"] = mt.GetProperty("CarNumber")?.GetValue(match)?.ToString() ?? "";
+        }
+
+        private System.Collections.Generic.Dictionary<string, object> BuildCaptureIncidentSupplement(CaptureIncidentArg parsed, long durationMs)
+        {
+            var d = new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["replay_frame"] = parsed.frame,
+                ["capture_camera"] = parsed.camera ?? "",
+                ["duration_ms"] = durationMs
+            };
+            var carNumStr = parsed.car != null ? parsed.car.Value.ToString() : null;
+            TryFillDriverIdentityForCapture(carNumStr, d);
+            return d;
         }
 
         private (bool success, string result, string error) DispatchAction(string action, string arg, string correlationId)
@@ -678,9 +757,11 @@ namespace SimSteward.Plugin
                 }
                 if (_irsdk == null || !_irsdk.IsConnected)
                 {
-                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    var supOff = BuildCaptureIncidentSupplement(parsed, 0);
+                    LogActionResult(action, arg, correlationId, false, "not_connected", supOff);
                     return (false, null, "not_connected");
                 }
+                var sw = Stopwatch.StartNew();
                 try
                 {
                     int seekFrame = Math.Max(0, parsed.frame - CapturePreRollFrames);
@@ -691,12 +772,14 @@ namespace SimSteward.Plugin
                         if (g >= 0) SwitchCameraToGroup(g);
                     }
                     _irsdk.ReplaySetPlaySpeed(1, false);
-                    LogActionResult(action, arg, correlationId, true, "");
+                    sw.Stop();
+                    LogActionResult(action, arg, correlationId, true, "", BuildCaptureIncidentSupplement(parsed, sw.ElapsedMilliseconds));
                     return (true, "ok", null);
                 }
                 catch (Exception ex)
                 {
-                    LogActionResult(action, arg, correlationId, false, ex.Message);
+                    sw.Stop();
+                    LogActionResult(action, arg, correlationId, false, ex.Message, BuildCaptureIncidentSupplement(parsed, sw.ElapsedMilliseconds));
                     return (false, null, ex.Message);
                 }
             }
