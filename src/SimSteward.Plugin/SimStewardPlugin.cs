@@ -79,6 +79,11 @@ namespace SimSteward.Plugin
         private volatile string _logCtxTrack = SessionLogging.NotInSession;
         /// <summary>CarIdxLap for focus car (CamCarIdx if valid, else PlayerCarIdx); -1 if unknown.</summary>
         private volatile int _logCtxLap = SessionLogging.LapUnknown;
+
+        /// <summary>SHA-256 prefix of <c>SessionInfoYaml</c> when available; merged into structured logs via <see cref="MergeSessionAndRoutingFields"/>.</summary>
+        private volatile string _logCtxSessionYamlFingerprint = "";
+
+        private int _lastSessionInfoUpdateForYamlFingerprint = -1;
 #endif
 
 #if SIMHUB_SDK
@@ -816,6 +821,9 @@ namespace SimSteward.Plugin
             fields["session_num"] = _logCtxSessionNum;
             fields["track_display_name"] = _logCtxTrack;
             fields["lap"] = _logCtxLap;
+            var fp = _logCtxSessionYamlFingerprint;
+            if (!string.IsNullOrEmpty(fp))
+                fields["session_yaml_fingerprint_sha256_16"] = fp;
             SessionLogging.AppendRoutingAndDestination(fields);
         }
 
@@ -1061,6 +1069,21 @@ namespace SimSteward.Plugin
                 _logCtxTrack = string.IsNullOrEmpty(trackName) ? SessionLogging.NotInSession : trackName;
                 int focusCar = ResolveFocusCarIdx();
                 _logCtxLap = focusCar >= 0 ? SafeGetCarIdxLap(focusCar) : SessionLogging.LapUnknown;
+
+                try
+                {
+                    int siu = _irsdk.Data?.SessionInfoUpdate ?? 0;
+                    if (siu != _lastSessionInfoUpdateForYamlFingerprint)
+                    {
+                        _lastSessionInfoUpdateForYamlFingerprint = siu;
+                        string yaml = _irsdk.Data?.SessionInfoYaml;
+                        _logCtxSessionYamlFingerprint = ReplayIncidentIndexPrerequisites.ComputeSessionYamlFingerprint(yaml ?? "");
+                    }
+                }
+                catch
+                {
+                    _logCtxSessionYamlFingerprint = "";
+                }
             }
             else
             {
@@ -1075,6 +1098,8 @@ namespace SimSteward.Plugin
                 _logCtxSessionNum = SessionLogging.NotInSession;
                 _logCtxTrack = SessionLogging.NotInSession;
                 _logCtxLap = SessionLogging.LapUnknown;
+                _logCtxSessionYamlFingerprint = "";
+                _lastSessionInfoUpdateForYamlFingerprint = -1;
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);

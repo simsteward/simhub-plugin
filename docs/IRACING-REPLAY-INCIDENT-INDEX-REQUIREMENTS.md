@@ -62,6 +62,7 @@ While SimSteward generally standardises telemetry capture through SimHub, this f
 - **Raw frame counters:** `ReplayFrameNum` / `ReplayFrameNumEnd`.
 - **Live high-frequency arrays:** `CarIdxRPM`, `CarIdxGear`, `CarIdxSteer` for all 63 cars at 60Hz during fast-forward (SimHub's opponent model filters this to nearby cars and may not be reliable at 16x speed).
 - **Raw YAML session string:** Needed to extract unmapped fields like `ResultsPositions` entries during a replay.
+- **Session YAML fingerprint in structured logs:** When `IRacingSdk.Data.SessionInfoYaml` is available, the plugin computes `session_yaml_fingerprint_sha256_16` (SHA-256 prefix; same helper as replay-incident index events) and merges it into logs that call `MergeSessionAndRoutingFields` (e.g. `action_dispatched`, `action_result`, `incident_detected`, dashboard bridge events). The fingerprint is recomputed when `SessionInfoUpdate` changes, not every `DataUpdate` tick.
 - **`PlayerCarMyIncidentCount`:** Polled directly to ensure delta signals are not missed during fast-forward playback.
 
 **SimHub is used for everything else:** Plugin lifecycle, WebSocket server, HTML dashboard hosting, YAML `DriverInfo` enrichment (where sufficient), and exposing our built index/channels back out as SimHub properties.
@@ -292,7 +293,7 @@ Milestone **M1** is **Complete**; TR-001–TR-003, NFR-005, and raw session YAML
 | **TR-001** | `IRacingSdk` (IRSDKSharper) in plugin; structured event `replay_incident_index_sdk_ready` on iRacing connect (`irsdk_connected`, `update_interval_ms`). |
 | **TR-002** | Event `replay_incident_index_session_context` logs `sim_mode` / `is_replay_mode` from parsed session YAML (`WeekendInfo`); **WARN** when a subsession is active but mode is not replay. |
 | **TR-003** | Same event logs `subsession_id` (string, same convention as other plugin logs) for use as the index reference key. |
-| **§2.6 raw YAML** | `IRacingSdk.Data.SessionInfoYaml` fingerprint: `session_yaml_fingerprint_sha256_16` (SHA-256 prefix), `session_yaml_length`, `session_info_update` (`SessionInfoUpdate`). |
+| **§2.6 raw YAML** | `IRacingSdk.Data.SessionInfoYaml` fingerprint: `session_yaml_fingerprint_sha256_16` (SHA-256 prefix), `session_yaml_length`, `session_info_update` (`SessionInfoUpdate`). Same fingerprint key merged into **all** spine/routing logs when YAML is available (`MergeSessionAndRoutingFields` in `DataUpdate`). |
 | **NFR-005** | SimHub C# plugin targeting .NET Framework 4.8 with IRSDKSharper (NuGet). |
 
 **Code:** `ReplayIncidentIndexPrerequisites.cs`, `SimStewardPlugin.ReplayIncidentIndex.cs`, `SimStewardPlugin.cs` / `OnIrsdkSessionInfo`. **Tests:** `ReplayIncidentIndexPrerequisitesTests`. **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_*`).
