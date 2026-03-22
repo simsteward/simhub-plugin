@@ -1,6 +1,6 @@
 # Data routing: OTel vs Loki vs Prometheus (and scale at ~1k users)
 
-**Purpose:** Single place for *what data goes to which backend*, *why*, and *rough sizing* when many users share one Grafana stack. Detail on Loki labels and events: **docs/GRAFANA-LOGGING.md**. Scaling patterns: **docs/observability-scaling.md**. SDK variable names: **docs/IRACING-TELEMETRY.md**. **When/where iRacing exposes data** (live vs replay vs post-results): **docs/IRACING-DATA-AVAILABILITY.md**.
+**Purpose:** Single place for *what data goes to which backend*, *why*, and *rough sizing* when many users share one Grafana stack. Detail on Loki labels and events: **docs/GRAFANA-LOGGING.md**. Scaling patterns: **docs/observability-scaling.md**. SDK variable names: **docs/IRACING-TELEMETRY.md**. **When/where iRacing exposes data** (live vs replay vs post-results): **docs/IRACING-DATA-AVAILABILITY.md**. iRacing SDK specific metrics vs events schema: **docs/IRACING-OBSERVABILITY-STRATEGY.md**.
 
 ---
 
@@ -133,6 +133,7 @@ These stay **events or throttled snapshots** in structured logs — **not** a mi
 ## References
 
 - **docs/GRAFANA-LOGGING.md** — Loki schema, volume table, events.
+- **docs/IRACING-OBSERVABILITY-STRATEGY.md** — iRacing SDK telemetry mapping to Prometheus metrics & Loki events.
 - **docs/observability-scaling.md** — Many users, central Loki, label rules.
 - **docs/IRACING-TELEMETRY.md** — SDK variables and categories.
 - **docs/IRACING-DATA-AVAILABILITY.md** — when/where data exists (telemetry vs YAML vs REST).
@@ -144,6 +145,7 @@ These stay **events or throttled snapshots** in structured logs — **not** a mi
 
 | Spec | Doc ID |
 |------|--------|
+| iRacing Observability Strategy | `c54019c3-4e79-461a-a9b6-eb533a2c5e44` |
 | Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
 | Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
 | iRacing Telemetry — SDK Variable Reference | `42ab06d4-9ed3-43a1-996c-bd0250ecdf6e` |
