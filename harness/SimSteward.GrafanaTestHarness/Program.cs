@@ -81,12 +81,16 @@ namespace SimSteward.GrafanaTestHarness
                 ["session_num"] = 0,
                 ["replay_frame"] = 1000,
                 ["replay_frame_end"] = 1020,
+                ["start_frame"] = 1000,
+                ["end_frame"] = 1020,
                 ["cause"] = "heavy_contact",
                 ["lap"] = 2,
-                ["cam_car_idx"] = 5
+                ["cam_car_idx"] = 5,
+                ["camera_group"] = "Chase",
+                ["camera_view"] = "cam_car_idx=5;group=Chase"
             };
             AddHarnessSessionAndRouting(inc1);
-            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 4x #42 Test Driver", inc1, testTag));
+            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 4x #42 Test Driver", inc1, testTag, "iracing"));
             var inc2 = new Dictionary<string, object>
             {
                 ["incident_type"] = "1x",
@@ -98,12 +102,16 @@ namespace SimSteward.GrafanaTestHarness
                 ["session_num"] = 0,
                 ["replay_frame"] = 2000,
                 ["replay_frame_end"] = 2005,
+                ["start_frame"] = 2000,
+                ["end_frame"] = 2005,
                 ["cause"] = "off_track",
                 ["lap"] = 3,
-                ["cam_car_idx"] = 2
+                ["cam_car_idx"] = 2,
+                ["camera_group"] = "Helicopter",
+                ["camera_view"] = "cam_car_idx=2;group=Helicopter"
             };
             AddHarnessSessionAndRouting(inc2);
-            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 1x #7 Other", inc2, testTag));
+            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 1x #7 Other", inc2, testTag, "iracing"));
 
             // session_digest
             var sessionId = "test-session-" + Guid.NewGuid().ToString("N").Substring(0, 8);
@@ -146,7 +154,7 @@ namespace SimSteward.GrafanaTestHarness
         }
 
         private static LogEntry MakeEntry(string component, string level, string eventType, string message,
-            Dictionary<string, object> fields, string testTag)
+            Dictionary<string, object> fields, string testTag, string domain = null)
         {
             return new LogEntry
             {
@@ -156,6 +164,7 @@ namespace SimSteward.GrafanaTestHarness
                 Event = eventType,
                 Message = message,
                 Fields = fields,
+                Domain = domain,
                 Testing = "true",
                 TestTag = testTag
             };

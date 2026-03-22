@@ -22,10 +22,10 @@ namespace SimSteward.Plugin
     [PluginName("Sim Steward")]
     [PluginDescription("Sim Steward: HTML dashboard bridge via WebSocket")]
     [PluginAuthor("Sim Steward")]
-    public class SimStewardPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
+    public partial class SimStewardPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
 #else
 #pragma warning disable CS0169, CS0649
-    public class SimStewardPlugin
+    public partial class SimStewardPlugin
 #endif
     {
         private const int DefaultPort = 19847;
@@ -958,6 +958,7 @@ namespace SimSteward.Plugin
                 {
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_disconnected", "iRacing disconnected.", null, "lifecycle", null);
                 };
+                _irsdk.OnSessionInfo += OnIrsdkSessionInfo;
                 _irsdk.Start();
                 _logger.Structured("INFO", "simhub-plugin", "irsdk_started", "iRacing SDK started.", null, "lifecycle", null);
             }
@@ -1070,7 +1071,7 @@ namespace SimSteward.Plugin
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
-            pluginManager.SetPropertyValue("SimSteward.IncidentCount", GetType(), 0);
+            pluginManager.SetPropertyValue("SimSteward.IncidentCount", GetType(), _yamlIncidentCount);
             pluginManager.SetPropertyValue("SimSteward.ClientCount", GetType(), clientCount);
 
             if (_bridge == null) return;
@@ -1141,7 +1142,11 @@ namespace SimSteward.Plugin
 
             if (_irsdk != null)
             {
-                try { _irsdk.Stop(); }
+                try
+                {
+                    _irsdk.OnSessionInfo -= OnIrsdkSessionInfo;
+                    _irsdk.Stop();
+                }
                 catch (Exception ex)
                 {
                     _logger?.Warn($"iRacing SDK Stop failed: {ex.Message}");
