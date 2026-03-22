@@ -27,11 +27,22 @@ namespace SimSteward.Plugin
         private readonly int[] _replayIndexScratchCarIdxSessionFlags = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _replayIndexScratchCarIdxFastRepairsUsed = new int[ReplayIncidentIndexBuild.CarSlotCount];
 
+        private Stopwatch _replayIndexBuildTotalWallClock;
+        private int _replayIndexSessionNum;
+        private ReplayIncidentIndexValidationBlock _replayIndexLastValidationBlock;
+        private List<ReplayIncidentIndexIncidentRow> _replayIndexCamRows;
+        private int _replayIndexCamIdx;
+        private bool _replayIndexCamNeedSeek;
+        private int _replayIndexCamCooldownRemaining;
+        private int _replayIndexCamMatches;
+        private int _replayIndexCamAttempted;
+
         private enum ReplayIndexBuildPhase
         {
             Idle,
             SeekingStart,
-            FastForwarding
+            FastForwarding,
+            CameraValidating
         }
 
         private void OnIrsdkTelemetryDataForReplayIndex()
@@ -64,6 +75,8 @@ namespace SimSteward.Plugin
                         _irsdk.ReplaySetPlaySpeed(1, false);
                 }
                 catch { /* ignored */ }
+                TryRestoreReplayIndexSavedFrameLocked();
+                ClearReplayIndexBuildTransientLocked();
                 _replayIndexBuildPhase = ReplayIndexBuildPhase.Idle;
             }
         }
@@ -94,12 +107,15 @@ namespace SimSteward.Plugin
                             _replayIndexActivePlaySpeed = 1;
                         }
 
+                        TryRestoreReplayIndexSavedFrameLocked();
+
                         var f = new Dictionary<string, object> { ["reason"] = "cancel_requested" };
                         MergeSessionAndRoutingFields(f);
                         _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventBuildCancelled,
                             "Replay incident index build cancelled.", f, "lifecycle", null);
                     }
 
+                    ClearReplayIndexBuildTransientLocked();
                     _replayIndexBuildPhase = ReplayIndexBuildPhase.Idle;
                     _replayIndexStartRequested = false;
                     return;
@@ -128,6 +144,12 @@ namespace SimSteward.Plugin
                 if (_replayIndexBuildPhase == ReplayIndexBuildPhase.FastForwarding)
                 {
                     ProcessFastForwardingLocked();
+                    return;
+                }
+
+                if (_replayIndexBuildPhase == ReplayIndexBuildPhase.CameraValidating)
+                {
+                    ProcessCameraValidatingLocked();
                 }
             }
         }
@@ -149,6 +171,7 @@ namespace SimSteward.Plugin
             _replayIndexSeekTelemetryTicks = 0;
             _replayIndexActivePlaySpeed = 1;
             _replayIndexIncidentSamples.Clear();
+            _replayIndexBuildTotalWallClock = Stopwatch.StartNew();
 
             var started = new Dictionary<string, object>
             {
@@ -166,6 +189,8 @@ namespace SimSteward.Plugin
             catch (Exception ex)
             {
                 error = ex.Message ?? "replay_search_failed";
+                TryRestoreReplayIndexSavedFrameLocked();
+                ClearReplayIndexBuildTransientLocked();
                 return false;
             }
 
@@ -187,6 +212,8 @@ namespace SimSteward.Plugin
                 MergeSessionAndRoutingFields(ef);
                 _logger.Structured("WARN", "simhub-plugin", ReplayIncidentIndexBuild.EventBuildError,
                     "Replay incident index: timeout waiting for ReplayFrameNum==0 (TR-004).", ef, "lifecycle", null);
+                TryRestoreReplayIndexSavedFrameLocked();
+                ClearReplayIndexBuildTransientLocked();
                 _replayIndexBuildPhase = ReplayIndexBuildPhase.Idle;
                 return;
             }
@@ -203,6 +230,7 @@ namespace SimSteward.Plugin
 
         private void CaptureBaselineAndStartFastForwardLocked()
         {
+            _replayIndexSessionNum = SafeGetInt("SessionNum");
             _replayIndexReplayFrameNumEndSnapshot = SafeGetInt("ReplayFrameNumEnd");
             for (int i = 0; i < _replayIndexBaselineCarIdxSessionFlags.Length; i++)
             {
@@ -265,6 +293,8 @@ namespace SimSteward.Plugin
                 MergeSessionAndRoutingFields(ef);
                 _logger.Structured("WARN", "simhub-plugin", ReplayIncidentIndexBuild.EventBuildError,
                     "Replay incident index: failed to set fast-forward speed (TR-008).", ef, "lifecycle", null);
+                TryRestoreReplayIndexSavedFrameLocked();
+                ClearReplayIndexBuildTransientLocked();
                 _replayIndexBuildPhase = ReplayIndexBuildPhase.Idle;
                 return;
             }
@@ -411,8 +441,201 @@ namespace SimSteward.Plugin
             _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventFastForwardComplete,
                 "Replay incident index: fast-forward complete (TR-010/011).", done, "lifecycle", null);
 
-            _replayIndexBuildPhase = ReplayIndexBuildPhase.Idle;
             _replayIndexFfWallClock = null;
+
+            int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+            var draft = ReplayIncidentIndexDocumentBuilder.Build(
+                subSessionId,
+                _replayIndexBuildTotalWallClock?.ElapsedMilliseconds ?? 0,
+                _replayIndexIncidentSamples,
+                null,
+                null);
+            _replayIndexCamRows = draft.Incidents;
+            _replayIndexLastValidationBlock = BuildReplayIndexValidationBlockLocked(_replayIndexCamRows);
+            _replayIndexCamIdx = 0;
+            _replayIndexCamNeedSeek = true;
+            _replayIndexCamCooldownRemaining = 0;
+            _replayIndexCamMatches = 0;
+            _replayIndexCamAttempted = 0;
+
+            if (_replayIndexCamRows != null && _replayIndexCamRows.Count > 0)
+                _replayIndexBuildPhase = ReplayIndexBuildPhase.CameraValidating;
+            else
+                FinalizeReplayIndexBuildLocked();
+        }
+
+        private void TryRestoreReplayIndexSavedFrameLocked()
+        {
+            if (_irsdk == null || !_irsdk.IsConnected)
+                return;
+            try
+            {
+                int f = Math.Max(0, _replayIndexSavedReplayFrame);
+                _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, f);
+                _irsdk.ReplaySetPlaySpeed(1, false);
+                _replayIndexActivePlaySpeed = 1;
+            }
+            catch
+            {
+                /* ignored */
+            }
+        }
+
+        private void ClearReplayIndexBuildTransientLocked()
+        {
+            _replayIndexFfWallClock = null;
+            _replayIndexBuildTotalWallClock = null;
+            _replayIndexIncidentSamples.Clear();
+            _replayIndexCamRows = null;
+            _replayIndexLastValidationBlock = null;
+            _replayIndexCamIdx = 0;
+            _replayIndexCamNeedSeek = true;
+            _replayIndexCamCooldownRemaining = 0;
+            _replayIndexCamMatches = 0;
+            _replayIndexCamAttempted = 0;
+        }
+
+        private ReplayIncidentIndexValidationBlock BuildReplayIndexValidationBlockLocked(
+            IReadOnlyList<ReplayIncidentIndexIncidentRow> rows)
+        {
+            var detectedByCar = new Dictionary<int, int>();
+            if (rows != null)
+            {
+                foreach (ReplayIncidentIndexIncidentRow r in rows)
+                {
+                    if (!detectedByCar.TryGetValue(r.CarIdx, out int c))
+                        c = 0;
+                    detectedByCar[r.CarIdx] = c + 1;
+                }
+            }
+
+            string yaml = _irsdk.Data?.SessionInfoYaml ?? "";
+            var vb = new ReplayIncidentIndexValidationBlock();
+
+            if (ReplayIncidentIndexResultsYaml.TryParseOfficialIncidentsByCarIdx(
+                    yaml,
+                    _replayIndexSessionNum,
+                    out Dictionary<int, int> official,
+                    out int sessUsed,
+                    out string err))
+            {
+                vb.YamlResultsAvailable = true;
+                vb.YamlSessionNumUsed = sessUsed;
+                vb.Discrepancies = ReplayIncidentIndexValidationComparer.BuildDiscrepancies(detectedByCar, official);
+            }
+            else
+            {
+                vb.YamlResultsAvailable = false;
+                vb.YamlParseError = err;
+                vb.Discrepancies = new List<ReplayIncidentIndexDiscrepancyRow>();
+            }
+
+            return vb;
+        }
+
+        private void ProcessCameraValidatingLocked()
+        {
+            if (_replayIndexCamRows == null || _replayIndexCamIdx >= _replayIndexCamRows.Count)
+            {
+                FinalizeReplayIndexBuildLocked();
+                return;
+            }
+
+            if (_replayIndexCamNeedSeek)
+            {
+                ReplayIncidentIndexIncidentRow row = _replayIndexCamRows[_replayIndexCamIdx];
+                try
+                {
+                    _irsdk.ReplaySearchSessionTime(_replayIndexSessionNum, row.SessionTimeMs);
+                }
+                catch
+                {
+                    /* ignored */
+                }
+
+                _replayIndexCamNeedSeek = false;
+                _replayIndexCamCooldownRemaining = ReplayIncidentIndexBuild.CameraValidationCooldownTelemetryTicks;
+                return;
+            }
+
+            if (_replayIndexCamCooldownRemaining > 0)
+            {
+                _replayIndexCamCooldownRemaining--;
+                return;
+            }
+
+            int cam = SafeGetInt("CamCarIdx");
+            int expected = _replayIndexCamRows[_replayIndexCamIdx].CarIdx;
+            _replayIndexCamAttempted++;
+            if (cam == expected)
+                _replayIndexCamMatches++;
+
+            _replayIndexCamIdx++;
+            _replayIndexCamNeedSeek = true;
+        }
+
+        private void FinalizeReplayIndexBuildLocked()
+        {
+            int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+            long totalMs = _replayIndexBuildTotalWallClock?.ElapsedMilliseconds ?? 0;
+
+            if (_replayIndexLastValidationBlock != null)
+            {
+                _replayIndexLastValidationBlock.CameraSeekAttempted = _replayIndexCamAttempted;
+                _replayIndexLastValidationBlock.CameraSeekMatches = _replayIndexCamMatches;
+                if (_replayIndexCamAttempted > 0)
+                {
+                    _replayIndexLastValidationBlock.CameraSeekMatchPercent =
+                        Math.Round(100.0 * _replayIndexCamMatches / _replayIndexCamAttempted, 2);
+                }
+            }
+
+            string path = ReplayIncidentIndexOutputPaths.GetFilePathForSubSession(subSessionId);
+            try
+            {
+                var root = ReplayIncidentIndexDocumentBuilder.Build(
+                    subSessionId,
+                    totalMs,
+                    _replayIndexIncidentSamples,
+                    _replayIndexLastValidationBlock,
+                    path);
+                string json = ReplayIncidentIndexDocumentBuilder.Serialize(root);
+                ReplayIncidentIndexOutputPaths.WriteJsonAtomic(path, json);
+            }
+            catch (Exception ex)
+            {
+                var wf = new Dictionary<string, object>
+                {
+                    ["error"] = ex.Message ?? "json_write_failed",
+                    ["path"] = path
+                };
+                MergeSessionAndRoutingFields(wf);
+                _logger.Structured("WARN", "simhub-plugin", ReplayIncidentIndexBuild.EventBuildError,
+                    "Replay incident index: failed to write JSON index (TR-019).", wf, "lifecycle", null);
+            }
+
+            var summary = new Dictionary<string, object>
+            {
+                ["output_path"] = path,
+                ["index_build_time_ms_total"] = totalMs,
+                ["detected_incident_rows"] = _replayIndexIncidentSamples.Count,
+                ["yaml_results_available"] = _replayIndexLastValidationBlock?.YamlResultsAvailable == true,
+                ["yaml_session_num_used"] = _replayIndexLastValidationBlock?.YamlSessionNumUsed,
+                ["discrepancy_count"] = _replayIndexLastValidationBlock?.Discrepancies?.Count ?? 0,
+                ["camera_seek_attempted"] = _replayIndexCamAttempted,
+                ["camera_seek_matches"] = _replayIndexCamMatches,
+                ["camera_seek_match_percent"] = _replayIndexLastValidationBlock?.CameraSeekMatchPercent
+            };
+            if (_replayIndexLastValidationBlock?.YamlParseError != null)
+                summary["yaml_parse_error"] = _replayIndexLastValidationBlock.YamlParseError;
+
+            MergeSessionAndRoutingFields(summary);
+            _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventValidationSummary,
+                "Replay incident index: validation summary (TR-023–TR-025).", summary, "lifecycle", null);
+
+            TryRestoreReplayIndexSavedFrameLocked();
+            ClearReplayIndexBuildTransientLocked();
+            _replayIndexBuildPhase = ReplayIndexBuildPhase.Idle;
         }
 
         private (bool success, string result, string error) DispatchReplayIncidentIndexBuild(string arg, string correlationId)

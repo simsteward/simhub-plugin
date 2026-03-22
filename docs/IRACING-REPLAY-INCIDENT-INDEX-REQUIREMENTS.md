@@ -287,7 +287,7 @@ This implementation is broken down into the following milestones (tracked in Con
 | **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005, TR-041 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | Complete |
 | **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008, TR-041 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | Complete |
 | **M3: Incident Detection Logic** | TR-012 – TR-018, TR-041 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | Complete |
-| **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004, TR-041 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | ⏳ Not Started |
+| **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004, TR-041 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | Complete |
 | **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
 | **M6: SimHub Web Dashboard** | TR-031 – TR-038, TR-041 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
 | **M7: Grafana Insights Dashboard** | TR-039 – TR-040, TR-041 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
@@ -296,12 +296,12 @@ This implementation is broken down into the following milestones (tracked in Con
 
 ### M8 / M9 acceptance review (completed)
 
-Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M3 code paths). **TR-042** coverage MUST expand as **M4+** lands (JSON output, validation, dashboard, etc.).
+Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M4 code paths). **TR-042** coverage MUST expand as **M5+** lands (full M5 Loki taxonomy, dashboard, etc.).
 
 | Item | Evidence |
 |------|----------|
 | **TR-041** | This subsection is the M8/M9 milestone summary (scope, requirement mapping, evidence pointers). |
-| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3); `ReplayIncidentIndexDetectionTests` (TR-012–TR-018 / §4.4). Test classes reference the spec in XML docs. |
+| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3); `ReplayIncidentIndexDetectionTests` (TR-012–TR-018 / §4.4); M4: `ReplayIncidentIndexFingerprintTests`, `ReplayIncidentIndexDocumentBuilderTests`, `ReplayIncidentIndexResultsYamlTests`, `ReplayIncidentIndexValidationComparerTests`, `ReplayIncidentIndexOutputPathsTests` (TR-019–TR-024, fingerprint §4.5). Test classes reference the spec in XML docs. |
 | **TR-043** | `dotnet test` for `SimSteward.Plugin.Tests` (net48) passes with zero failures; project policy: resolve failures by fixing implementation or updating this document—not by weakening tests. Same suite is enforced by deploy scripts per SimHub development rules. |
 
 ### M1 acceptance review (completed)
@@ -353,9 +353,27 @@ Milestone **M3** is **Complete**; TR-012–TR-018 and TR-041 are implemented as 
 | **TR-017** | `CarIdxFastRepairsUsed` increments append to `ReplayIncidentIndexDetector.FastRepairDeltas` (separate from primary `IncidentSample` list, not TR-020 rows). Baseline captured at frame 0 with flags/player count. |
 | **TR-018** | Rising edges after bit clear handled by per-frame comparison; `PrimaryDebounceSessionTimeSec` (1s) on replay session time per car × primary source (`repair` / `furled` / `player`) via `TryTakePrimarySlot`. |
 
-**Runtime wiring:** After baseline (`CaptureBaselineAndStartFastForwardLocked`), the plugin calls `ReplayIncidentIndexDetector.Reset` with baseline `CarIdxSessionFlags`, `PlayerCarMyIncidentCount`, `PlayerCarIdx`, and per-slot `CarIdxFastRepairsUsed`. Each `OnTelemetryData` tick in **FastForwarding** (`ProcessFastForwardingLocked` while `IsReplayPlaying`) invokes `Process`; primary rows accumulate in `_replayIndexIncidentSamples` (in-memory until M4 persists TR-019 JSON). **Completion log:** `replay_incident_index_fast_forward_complete` includes `detected_incident_samples` and `fast_repair_delta_events`.
+**Runtime wiring:** After baseline (`CaptureBaselineAndStartFastForwardLocked`), the plugin calls `ReplayIncidentIndexDetector.Reset` with baseline `CarIdxSessionFlags`, `PlayerCarMyIncidentCount`, `PlayerCarIdx`, and per-slot `CarIdxFastRepairsUsed`. Each `OnTelemetryData` tick in **FastForwarding** (`ProcessFastForwardingLocked` while `IsReplayPlaying`) invokes `Process`; primary rows accumulate in `_replayIndexIncidentSamples`, then M4 persists TR-019 JSON and runs validation (see M4 acceptance review). **Completion log:** `replay_incident_index_fast_forward_complete` includes `detected_incident_samples` and `fast_repair_delta_events`.
 
 **Code:** `ReplayIncidentIndexDetection.cs` (`IncidentSample`, `FastRepairDelta`, bitmasks), `ReplayIncidentIndexDetector.cs`, `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (baseline fast-repair snapshot, `Reset`, per-tick `Process`). **Tests:** `ReplayIncidentIndexDetectionTests`.
+
+### M4 acceptance review (completed)
+
+Milestone **M4** is **Complete**; TR-019–TR-025, NFR-004, and TR-041 are implemented as follows.
+
+| Item | Evidence |
+|------|----------|
+| **TR-041** | This subsection is the M4 milestone summary (scope, requirement mapping, evidence pointers). |
+| **TR-019** | UTF-8 JSON written under `%LocalAppData%\SimSteward\replay-incident-index\{subSessionId}.json` via `ReplayIncidentIndexOutputPaths` (atomic temp + replace). |
+| **TR-020** | `ReplayIncidentIndexFingerprint` (v1 canonical string + SHA-256 hex); rows in `ReplayIncidentIndexDocumentModel` / `ReplayIncidentIndexDocumentBuilder`. |
+| **TR-021** | `ReplayIncidentIndexDocumentBuilder.Build` sorts by `sessionTimeMs`, then `carIdx`, then `detectionSource` (ordinal). |
+| **TR-022** | Root object includes `subSessionId`, `indexBuildTimeMs` (wall clock for full build including post-FF), `totalRaceIncidents`, `incidentCountByCarIdx`, `incidents`; optional `validation` and `outputPath`. |
+| **TR-023** | `ReplayIncidentIndexResultsYaml.TryParseOfficialIncidentsByCarIdx` reads `ResultsPositions` from raw `SessionInfoYaml` (prefers telemetry `SessionNum` captured at baseline; falls back to last non-empty block). |
+| **TR-024** | `ReplayIncidentIndexValidationComparer.BuildDiscrepancies` compares per-car **detected event counts** (TR-020 row counts) to YAML `Incidents`; list stored in JSON `validation.discrepancies`. |
+| **TR-025** | After fast-forward, `CameraValidating` phase: `ReplaySearchSessionTime(SessionNum, sessionTimeMs)` per sorted row, `CameraValidationCooldownTelemetryTicks` (150 ≈ 2.5s @ 60Hz), then `CamCarIdx` vs expected `carIdx`; `camera_seek_match_percent` in JSON and `replay_incident_index_validation_summary`. |
+| **NFR-004** | `TryRestoreReplayIndexSavedFrameLocked`: `ReplaySetPlayPosition(Begin, saved frame)` + 1× speed after finalize, cancel, disconnect, seek timeout, fast-forward speed failure, and `ReplaySearch(ToStart)` failure. |
+
+**Code:** `ReplayIncidentIndexFingerprint.cs`, `ReplayIncidentIndexDocumentModel.cs`, `ReplayIncidentIndexOutputPaths.cs`, `ReplayIncidentIndexResultsYaml.cs`, `ReplayIncidentIndexValidationComparer.cs`, `ReplayIncidentIndexBuild.cs` (`EventValidationSummary`, cooldown constant), `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (post-FF pipeline, `FinalizeReplayIndexBuildLocked`, `ProcessCameraValidatingLocked`). **Tests:** `ReplayIncidentIndexFingerprintTests`, `ReplayIncidentIndexDocumentBuilderTests`, `ReplayIncidentIndexResultsYamlTests`, `ReplayIncidentIndexValidationComparerTests`, `ReplayIncidentIndexOutputPathsTests`. **Structured log:** `replay_incident_index_validation_summary` ([GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)); JSON write failure → `replay_incident_index_build_error` (`json_write_failed`).
 
 ---
 

@@ -26,6 +26,10 @@ namespace SimSteward.Plugin
         public const string EventFastForwardComplete = "replay_incident_index_fast_forward_complete";
         public const string EventBuildError = "replay_incident_index_build_error";
         public const string EventBuildCancelled = "replay_incident_index_build_cancelled";
+        public const string EventValidationSummary = "replay_incident_index_validation_summary";
+
+        /// <summary>~2.5s at 60Hz telemetry between <c>ReplaySearchSessionTime</c> and <c>CamCarIdx</c> read (TR-025).</summary>
+        public const int CameraValidationCooldownTelemetryTicks = 150;
 
         /// <summary>
         /// Effective SDK sample rate relative to <strong>replay session time</strong> when replay plays at
