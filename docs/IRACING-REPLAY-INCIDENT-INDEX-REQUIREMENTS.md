@@ -1,6 +1,6 @@
 # Technical Requirements
 ## iRacing Replay Incident Index Capture via SDK Fast-Forward Sampling
-**Version 0.6 — Draft**
+**Version 0.7 — Draft**
 
 ---
 
@@ -291,8 +291,18 @@ This implementation is broken down into the following milestones (tracked in Con
 | **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
 | **M6: SimHub Web Dashboard** | TR-031 – TR-038, TR-041 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
 | **M7: Grafana Insights Dashboard** | TR-039 – TR-040, TR-041 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
-| **M8: Test suite construction** | TR-041, TR-042 | Automated tests for the replay incident index (mocks/fixtures, golden data as needed); expectations trace to this spec. | ⏳ Not Started |
-| **M9: Tests passing (implementation alignment)** | TR-041, TR-043 | All feature tests pass locally and in CI; fix implementation or spec—not tests—to resolve failures. | ⏳ Not Started |
+| **M8: Test suite construction** | TR-041, TR-042 | Automated tests for the replay incident index (mocks/fixtures, golden data as needed); expectations trace to this spec. | Complete |
+| **M9: Tests passing (implementation alignment)** | TR-041, TR-043 | All feature tests pass locally and in CI; fix implementation or spec—not tests—to resolve failures. | Complete |
+
+### M8 / M9 acceptance review (completed)
+
+Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M2 code paths). **TR-042** coverage MUST expand as **M3+** lands (incident detection, JSON, dashboard, etc.).
+
+| Item | Evidence |
+|------|----------|
+| **TR-041** | This subsection is the M8/M9 milestone summary (scope, requirement mapping, evidence pointers). |
+| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3). Test classes reference the spec in XML docs. |
+| **TR-043** | `dotnet test` for `SimSteward.Plugin.Tests` (net48) passes with zero failures; project policy: resolve failures by fixing implementation or updating this document—not by weakening tests. Same suite is enforced by deploy scripts per SimHub development rules. |
 
 ### M1 acceptance review (completed)
 
@@ -330,4 +340,4 @@ Milestone **M2** is **Complete**; TR-004–TR-011, NFR-008, and TR-041 are imple
 
 ---
 
-*iRacing Replay Incident Index — Technical Requirements v0.6 — Draft*
+*iRacing Replay Incident Index — Technical Requirements v0.7 — Draft*

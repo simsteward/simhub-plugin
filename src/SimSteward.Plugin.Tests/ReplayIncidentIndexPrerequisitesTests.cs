@@ -2,6 +2,10 @@ using Xunit;
 
 namespace SimSteward.Plugin.Tests
 {
+    /// <summary>
+    /// TR-042 / TR-001–TR-003: unit tests for <see cref="ReplayIncidentIndexPrerequisites"/>.
+    /// Spec: docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md §4.1.
+    /// </summary>
     public class ReplayIncidentIndexPrerequisitesTests
     {
         [Fact]
