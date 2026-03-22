@@ -286,7 +286,7 @@ This implementation is broken down into the following milestones (tracked in Con
 |---|---|---|---|
 | **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005, TR-041 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | Complete |
 | **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008, TR-041 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | Complete |
-| **M3: Incident Detection Logic** | TR-012 – TR-018, TR-041 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | ⏳ Not Started |
+| **M3: Incident Detection Logic** | TR-012 – TR-018, TR-041 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | Complete |
 | **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004, TR-041 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | ⏳ Not Started |
 | **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
 | **M6: SimHub Web Dashboard** | TR-031 – TR-038, TR-041 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
@@ -296,12 +296,12 @@ This implementation is broken down into the following milestones (tracked in Con
 
 ### M8 / M9 acceptance review (completed)
 
-Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M2 code paths). **TR-042** coverage MUST expand as **M3+** lands (incident detection, JSON, dashboard, etc.).
+Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M3 code paths). **TR-042** coverage MUST expand as **M4+** lands (JSON output, validation, dashboard, etc.).
 
 | Item | Evidence |
 |------|----------|
 | **TR-041** | This subsection is the M8/M9 milestone summary (scope, requirement mapping, evidence pointers). |
-| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3). Test classes reference the spec in XML docs. |
+| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3); `ReplayIncidentIndexDetectionTests` (TR-012–TR-018 / §4.4). Test classes reference the spec in XML docs. |
 | **TR-043** | `dotnet test` for `SimSteward.Plugin.Tests` (net48) passes with zero failures; project policy: resolve failures by fixing implementation or updating this document—not by weakening tests. Same suite is enforced by deploy scripts per SimHub development rules. |
 
 ### M1 acceptance review (completed)
@@ -337,6 +337,25 @@ Milestone **M2** is **Complete**; TR-004–TR-011, NFR-008, and TR-041 are imple
 | **NFR-008** | `effective_sample_hz_vs_session_time` (= 60 / play speed) on FF start/complete logs; play speed 16× documented in telemetry fields. |
 
 **Code:** `ReplayIncidentIndexBuild.cs` (helpers/constants), `SimStewardPlugin.ReplayIncidentIndexBuild.cs`, `SimStewardPlugin.cs` (`OnTelemetryData` subscribe/unsubscribe, `DispatchAction` → `replay_incident_index_build`, `ReplayIncidentIndexOnIracingDisconnected`). **Tests:** `ReplayIncidentIndexBuildTests`. **Actions:** WebSocket `replay_incident_index_build` args `start` \| `cancel`. **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_started`, `replay_incident_index_baseline_ready`, `replay_incident_index_fast_forward_started`, `replay_incident_index_fast_forward_complete`, `replay_incident_index_build_error`, `replay_incident_index_build_cancelled`).
+
+### M3 acceptance review (completed)
+
+Milestone **M3** is **Complete**; TR-012–TR-018 and TR-041 are implemented as follows.
+
+| Item | Evidence |
+|------|----------|
+| **TR-041** | This subsection is the M3 milestone summary (scope, requirement mapping, evidence pointers). |
+| **TR-012** | `ReplayIncidentIndexDetection.IsRisingEdge` / `RepairSessionFlag` (`0x100000`); `ReplayIncidentIndexDetector.Process` compares each tick vs previous `CarIdxSessionFlags` after `Reset` with TR-005 baseline. |
+| **TR-013** | Same for `FurledSessionFlag` (`0x80000`); independent of repair (same tick can emit both). |
+| **TR-014** | Positive delta on `PlayerCarMyIncidentCount` vs previous sample → `IncidentSample` with `detectionSource` `player_incident_count`; `incidentPoints` set when delta is 1, 2, or 4, else null. |
+| **TR-015** | `Process(replaySessionTimeSec, …)` uses **`ReplaySessionTime`** (seconds) with `SessionTime` fallback; `IncidentSample.SessionTimeMs` via `ToSessionTimeMs`. |
+| **TR-016** | `carIdx` from affected slot (flags) or `PlayerCarIdx` for player channel. |
+| **TR-017** | `CarIdxFastRepairsUsed` increments append to `ReplayIncidentIndexDetector.FastRepairDeltas` (separate from primary `IncidentSample` list, not TR-020 rows). Baseline captured at frame 0 with flags/player count. |
+| **TR-018** | Rising edges after bit clear handled by per-frame comparison; `PrimaryDebounceSessionTimeSec` (1s) on replay session time per car × primary source (`repair` / `furled` / `player`) via `TryTakePrimarySlot`. |
+
+**Runtime wiring:** After baseline (`CaptureBaselineAndStartFastForwardLocked`), the plugin calls `ReplayIncidentIndexDetector.Reset` with baseline `CarIdxSessionFlags`, `PlayerCarMyIncidentCount`, `PlayerCarIdx`, and per-slot `CarIdxFastRepairsUsed`. Each `OnTelemetryData` tick in **FastForwarding** (`ProcessFastForwardingLocked` while `IsReplayPlaying`) invokes `Process`; primary rows accumulate in `_replayIndexIncidentSamples` (in-memory until M4 persists TR-019 JSON). **Completion log:** `replay_incident_index_fast_forward_complete` includes `detected_incident_samples` and `fast_repair_delta_events`.
+
+**Code:** `ReplayIncidentIndexDetection.cs` (`IncidentSample`, `FastRepairDelta`, bitmasks), `ReplayIncidentIndexDetector.cs`, `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (baseline fast-repair snapshot, `Reset`, per-tick `Process`). **Tests:** `ReplayIncidentIndexDetectionTests`.
 
 ---
 

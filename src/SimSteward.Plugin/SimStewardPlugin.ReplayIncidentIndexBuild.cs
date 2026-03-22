@@ -21,6 +21,11 @@ namespace SimSteward.Plugin
         private Stopwatch _replayIndexFfWallClock;
         private long _replayIndexFfTelemetrySampleCount;
         private int _replayIndexActivePlaySpeed = ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed;
+        private readonly ReplayIncidentIndexDetector _replayIndexDetector = new ReplayIncidentIndexDetector();
+        private readonly List<IncidentSample> _replayIndexIncidentSamples = new List<IncidentSample>();
+        private readonly int[] _replayIndexBaselineFastRepairsUsed = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxSessionFlags = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxFastRepairsUsed = new int[ReplayIncidentIndexBuild.CarSlotCount];
 
         private enum ReplayIndexBuildPhase
         {
@@ -143,6 +148,7 @@ namespace SimSteward.Plugin
             _replayIndexFrameZeroConsecutive = 0;
             _replayIndexSeekTelemetryTicks = 0;
             _replayIndexActivePlaySpeed = 1;
+            _replayIndexIncidentSamples.Clear();
 
             var started = new Dictionary<string, object>
             {
@@ -219,6 +225,25 @@ namespace SimSteward.Plugin
                 _replayIndexBaselinePlayerCarMyIncidentCount = 0;
             }
 
+            for (int i = 0; i < _replayIndexBaselineFastRepairsUsed.Length; i++)
+            {
+                try
+                {
+                    _replayIndexBaselineFastRepairsUsed[i] = _irsdk.Data.GetInt("CarIdxFastRepairsUsed", i);
+                }
+                catch
+                {
+                    _replayIndexBaselineFastRepairsUsed[i] = 0;
+                }
+            }
+
+            int playerCarIdxBaseline = SafeGetInt("PlayerCarIdx");
+            _replayIndexDetector.Reset(
+                _replayIndexBaselineCarIdxSessionFlags,
+                _replayIndexBaselinePlayerCarMyIncidentCount,
+                playerCarIdxBaseline,
+                _replayIndexBaselineFastRepairsUsed);
+
             var baselineFields = new Dictionary<string, object>
             {
                 ["replay_frame_num_end"] = _replayIndexReplayFrameNumEndSnapshot,
@@ -277,7 +302,69 @@ namespace SimSteward.Plugin
             }
 
             if (playing)
+            {
+                double replaySessionTimeSec = 0;
+                try
+                {
+                    replaySessionTimeSec = _irsdk.Data.GetDouble("ReplaySessionTime");
+                }
+                catch
+                {
+                    try
+                    {
+                        replaySessionTimeSec = _irsdk.Data.GetDouble("SessionTime");
+                    }
+                    catch
+                    {
+                        replaySessionTimeSec = 0;
+                    }
+                }
+
+                for (int i = 0; i < ReplayIncidentIndexBuild.CarSlotCount; i++)
+                {
+                    try
+                    {
+                        _replayIndexScratchCarIdxSessionFlags[i] = _irsdk.Data.GetInt("CarIdxSessionFlags", i);
+                    }
+                    catch
+                    {
+                        _replayIndexScratchCarIdxSessionFlags[i] = 0;
+                    }
+
+                    try
+                    {
+                        _replayIndexScratchCarIdxFastRepairsUsed[i] = _irsdk.Data.GetInt("CarIdxFastRepairsUsed", i);
+                    }
+                    catch
+                    {
+                        _replayIndexScratchCarIdxFastRepairsUsed[i] = 0;
+                    }
+                }
+
+                int playerIncidents = 0;
+                try
+                {
+                    playerIncidents = _irsdk.Data.GetInt("PlayerCarMyIncidentCount");
+                }
+                catch
+                {
+                    playerIncidents = 0;
+                }
+
+                int playerCarIdx = SafeGetInt("PlayerCarIdx");
+                int replayFrame = SafeGetInt("ReplayFrameNum");
+                var tick = _replayIndexDetector.Process(
+                    replaySessionTimeSec,
+                    _replayIndexScratchCarIdxSessionFlags,
+                    playerIncidents,
+                    playerCarIdx,
+                    _replayIndexScratchCarIdxFastRepairsUsed,
+                    replayFrame);
+                if (tick.Count > 0)
+                    _replayIndexIncidentSamples.AddRange(tick);
+
                 return;
+            }
 
             int rfn = SafeGetInt("ReplayFrameNum");
             int rfe = SafeGetInt("ReplayFrameNumEnd");
@@ -316,7 +403,9 @@ namespace SimSteward.Plugin
                 ["effective_sample_hz_vs_session_time"] = Math.Round(effectiveHz, 4),
                 ["replay_frame_num_at_end"] = rfn,
                 ["replay_frame_num_end"] = rfe,
-                ["replay_session_time"] = Math.Round(rst, 3)
+                ["replay_session_time"] = Math.Round(rst, 3),
+                ["detected_incident_samples"] = _replayIndexIncidentSamples.Count,
+                ["fast_repair_delta_events"] = _replayIndexDetector.FastRepairDeltas.Count
             };
             MergeSessionAndRoutingFields(done);
             _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventFastForwardComplete,
