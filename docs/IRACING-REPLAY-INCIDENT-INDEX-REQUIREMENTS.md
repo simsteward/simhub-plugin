@@ -283,6 +283,20 @@ This implementation is broken down into the following milestones (tracked in Con
 | **M6: SimHub Web Dashboard** | TR-031 – TR-038 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
 | **M7: Grafana Insights Dashboard** | TR-039 – TR-040 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
 
+### M1 acceptance review (completed)
+
+Milestone **M1** is **Complete**; TR-001–TR-003, NFR-005, and raw session YAML fingerprinting for §2.6 are implemented as follows.
+
+| Item | Evidence |
+|------|----------|
+| **TR-001** | `IRacingSdk` (IRSDKSharper) in plugin; structured event `replay_incident_index_sdk_ready` on iRacing connect (`irsdk_connected`, `update_interval_ms`). |
+| **TR-002** | Event `replay_incident_index_session_context` logs `sim_mode` / `is_replay_mode` from parsed session YAML (`WeekendInfo`); **WARN** when a subsession is active but mode is not replay. |
+| **TR-003** | Same event logs `subsession_id` (string, same convention as other plugin logs) for use as the index reference key. |
+| **§2.6 raw YAML** | `IRacingSdk.Data.SessionInfoYaml` fingerprint: `session_yaml_fingerprint_sha256_16` (SHA-256 prefix), `session_yaml_length`, `session_info_update` (`SessionInfoUpdate`). |
+| **NFR-005** | SimHub C# plugin targeting .NET Framework 4.8 with IRSDKSharper (NuGet). |
+
+**Code:** `ReplayIncidentIndexPrerequisites.cs`, `SimStewardPlugin.ReplayIncidentIndex.cs`, `SimStewardPlugin.cs` / `OnIrsdkSessionInfo`. **Tests:** `ReplayIncidentIndexPrerequisitesTests`. **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_*`).
+
 ---
 
 *iRacing Replay Incident Index — Technical Requirements v0.4 — Draft*
