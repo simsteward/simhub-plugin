@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace SimSteward.Plugin
 {
@@ -36,6 +38,25 @@ namespace SimSteward.Plugin
             return new Evaluation(isConnected, subSessionId > 0, replay);
         }
 
+        /// <summary>
+        /// First 16 hex chars of SHA-256(UTF-8 session YAML) for log correlation; empty if YAML missing.
+        /// Does not embed raw YAML (size, PII).
+        /// </summary>
+        public static string ComputeSessionYamlFingerprint(string sessionInfoYaml)
+        {
+            if (string.IsNullOrEmpty(sessionInfoYaml))
+                return "";
+
+            using (var sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(sessionInfoYaml));
+                var sb = new StringBuilder(16);
+                for (int i = 0; i < 8 && i < hash.Length; i++)
+                    sb.AppendFormat("{0:x2}", hash[i]);
+                return sb.ToString();
+            }
+        }
+
         public static Dictionary<string, object> BuildSdkReadyFields(bool irsdkConnected, int updateIntervalMs)
         {
             var f = new Dictionary<string, object>
@@ -54,16 +75,22 @@ namespace SimSteward.Plugin
             int parentSessionId,
             int sessionNum,
             string trackDisplayName,
-            bool isReplayMode)
+            bool isReplayMode,
+            string sessionInfoYaml,
+            int sessionInfoUpdate)
         {
+            string fp = ComputeSessionYamlFingerprint(sessionInfoYaml);
             var f = new Dictionary<string, object>
             {
                 ["sim_mode"] = simMode ?? "",
                 ["subsession_id"] = subSessionId > 0 ? subSessionId.ToString() : SessionLogging.NotInSession,
                 ["parent_session_id"] = parentSessionId > 0 ? parentSessionId.ToString() : SessionLogging.NotInSession,
-                ["session_num"] = sessionNum,
+                ["session_num"] = sessionNum.ToString(),
                 ["track_display_name"] = trackDisplayName ?? "",
-                ["is_replay_mode"] = isReplayMode
+                ["is_replay_mode"] = isReplayMode,
+                ["session_yaml_fingerprint_sha256_16"] = fp,
+                ["session_yaml_length"] = sessionInfoYaml?.Length ?? 0,
+                ["session_info_update"] = sessionInfoUpdate
             };
             SessionLogging.AppendRoutingAndDestination(f);
             return f;

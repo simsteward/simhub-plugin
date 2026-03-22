@@ -69,10 +69,33 @@ namespace SimSteward.Plugin.Tests
         [Fact]
         public void BuildSessionContextFields_SubsessionStrings()
         {
-            var f = ReplayIncidentIndexPrerequisites.BuildSessionContextFields("replay", 42, 7, 2, "Test Track", true);
+            const string yaml = "WeekendInfo:\n  SubSessionID: 42\n";
+            var f = ReplayIncidentIndexPrerequisites.BuildSessionContextFields("replay", 42, 7, 2, "Test Track", true, yaml, 3);
             Assert.Equal("42", f["subsession_id"]);
             Assert.Equal("7", f["parent_session_id"]);
+            Assert.Equal("2", f["session_num"]);
             Assert.Equal(true, f["is_replay_mode"]);
+            Assert.Equal(3, f["session_info_update"]);
+            Assert.Equal(yaml.Length, f["session_yaml_length"]);
+            var fp = (string)f["session_yaml_fingerprint_sha256_16"];
+            Assert.Equal(16, fp.Length);
+            Assert.Equal(ReplayIncidentIndexPrerequisites.ComputeSessionYamlFingerprint(yaml), fp);
+        }
+
+        [Fact]
+        public void ComputeSessionYamlFingerprint_Empty_YieldsEmpty()
+        {
+            Assert.Equal("", ReplayIncidentIndexPrerequisites.ComputeSessionYamlFingerprint(null));
+            Assert.Equal("", ReplayIncidentIndexPrerequisites.ComputeSessionYamlFingerprint(""));
+        }
+
+        [Fact]
+        public void ComputeSessionYamlFingerprint_Deterministic()
+        {
+            const string y = "---\nSessionInfo:\n  Sessions: []\n";
+            Assert.Equal(
+                ReplayIncidentIndexPrerequisites.ComputeSessionYamlFingerprint(y),
+                ReplayIncidentIndexPrerequisites.ComputeSessionYamlFingerprint(y));
         }
     }
 }

@@ -43,6 +43,18 @@ namespace SimSteward.Plugin
                     // ignored
                 }
 
+                string sessionYaml = null;
+                int sessionInfoUpdate = 0;
+                try
+                {
+                    sessionYaml = _irsdk.Data?.SessionInfoYaml;
+                    sessionInfoUpdate = _irsdk.Data?.SessionInfoUpdate ?? 0;
+                }
+                catch
+                {
+                    // ignored
+                }
+
                 var eval = ReplayIncidentIndexPrerequisites.Evaluate(true, simMode, subId);
                 var fields = ReplayIncidentIndexPrerequisites.BuildSessionContextFields(
                     simMode,
@@ -50,7 +62,9 @@ namespace SimSteward.Plugin
                     parentId,
                     sessionNum,
                     trackName,
-                    eval.IsReplayMode);
+                    eval.IsReplayMode,
+                    sessionYaml,
+                    sessionInfoUpdate);
 
                 bool warn = ReplayIncidentIndexPrerequisites.SessionContextShouldWarn(subId, eval.IsReplayMode);
                 string level = warn ? "WARN" : "INFO";

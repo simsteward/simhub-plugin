@@ -69,7 +69,7 @@ Every log line has an `event` field. Key events:
 | `log_streaming_subscribed` | simhub-plugin | — | Dashboard log streaming attached. |
 | `irsdk_started` | simhub-plugin | — | iRacing SDK started. |
 | `replay_incident_index_sdk_ready` | simhub-plugin | `irsdk_connected`, `update_interval_ms`, `log_env`, `loki_push_target` | Milestone 1 (TR-001): IRSDK memory map connected; emitted on `OnConnected` after `iracing_connected`. |
-| `replay_incident_index_session_context` | simhub-plugin | `sim_mode`, `subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, `is_replay_mode`, `log_env`, `loki_push_target` | Milestone 1 (TR-002/003): parsed `WeekendInfo` from session YAML on `OnSessionInfo`; throttled per `(SubSessionID, SessionNum, SimMode)`. **WARN** when `subsession_id` is set and `is_replay_mode` is false (loaded session but not replay). |
+| `replay_incident_index_session_context` | simhub-plugin | `sim_mode`, `subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, `is_replay_mode`, `session_yaml_fingerprint_sha256_16` (first 16 hex chars of SHA-256 of raw `SessionInfoYaml`), `session_yaml_length`, `session_info_update` (IRSDK `SessionInfoUpdate`), `log_env`, `loki_push_target` | Milestone 1 (TR-002/003): parsed `WeekendInfo` from session YAML on `OnSessionInfo`; throttled per `(SubSessionID, SessionNum, SimMode)`. **WARN** when `subsession_id` is set and `is_replay_mode` is false (loaded session but not replay). |
 | `plugin_stopped` | simhub-plugin | — | Emitted from `End()`. |
 | `iracing_connected` / `iracing_disconnected` | simhub-plugin | — | IRSDK connection state. |
 | `ws_client_connected` / `ws_client_disconnected` | bridge | `client_ip`, `client_count` | Each connect/disconnect. |
