@@ -8,7 +8,7 @@
 
 This document defines the technical requirements for a test implementation that constructs a complete incident index from an iRacing replay file, operating without any iRacing `/data` REST API calls or iRacing account registration. Telemetry and replay control use the local SDK only.
 
-The approach exploits the iRacing SDK broadcast command system to fast-forward a loaded replay at maximum speed while sampling the memory-mapped telemetry at 60Hz, detecting incident events in real time and recording their session timestamps and associated car indices.
+The approach exploits the iRacing SDK broadcast command system to fast-forward a loaded replay at maximum speed while sampling the raw memory-mapped telemetry at 60Hz natively (bypassing SimHub's throttled update loops), detecting incident events in real time and recording their session timestamps and associated car indices.
 
 **Grafana / Loki:** When the implementation runs as the SimSteward SimHub plugin (or reuses its logging stack), structured logs SHOULD be emitted to the same **Loki → Grafana** pipeline documented in [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) so index-build phases, detections, and validation outcomes are visible in Grafana Explore and dashboards. Loki push is **optional** and **off** unless `SIMSTEWARD_LOKI_URL` is configured; it does not replace the on-disk JSON index (TR-019).
 
@@ -40,13 +40,35 @@ The iRacing `/data` REST API provides per-lap incident flags server-side, but re
 | `ReplaySessionTime` | Replay state | Current playback position in session seconds. Recorded at moment of detection. |
 | `CamCarIdx` | Replay camera | Car the camera switches to after `NextIncident` seek. Used for post-seek car identification. |
 
-### 2.4 Observability (Grafana)
+### 2.4 Observability (Grafana) & Data Finding Mission
 
-Index-build telemetry for operators and research SHOULD appear in Grafana via **structured logs** ingested by Loki, using the project’s four-label schema and JSON body fields ([GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)). **Do not** log every 60Hz poll; log **event-driven** milestones and each detected incident (similar volume to existing `incident_detected` guidance). Local stack setup: [observability-local.md](observability-local.md).
+**CRITICAL:** We are currently on a **data finding mission** to understand how the SDK behaves during accelerated replay playback. Because we do not yet know the limits of the SDK or the precise behavior of specific variables (see §7 Open Questions), **verbose logging is highly desirable** during the initial implementation.
+* When in doubt, **log it**.
+* When in doubt about what to include in the payload, **expand and log it**.
+
+Index-build telemetry for operators and research SHOULD appear in Grafana via **structured logs** ingested by Loki, using the project’s four-label schema and JSON body fields ([GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)). While you should not spam Loki with logs on *every single* 60Hz poll for the entire run, you should aggressively log **event-driven** milestones, state transitions, unexpected variable behaviors, and each detected incident (with as much context as possible) to help us answer the open questions. Local stack setup: [observability-local.md](observability-local.md).
 
 ### 2.5 SimHub web dashboard
 
 Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plugin exposes data and commands through the **Fleck** WebSocket server and optional broadcast messages; static assets live under SimHub `Web/` per project conventions (see `.cursor/rules/SimHub.mdc`). Grafana remains optional; the new page is the primary local UX for the replay incident index when shipped inside SimSteward.
+
+### 2.6 Data Capture Layer (Hybrid Approach Decision)
+
+While SimSteward generally standardises telemetry capture through SimHub, this fast-forward incident indexing test requires a **hybrid approach**. SimHub abstracts away or fails to expose several critical pieces of raw SDK data needed for this specific task. 
+
+**Direct SDK access MUST be used for:**
+- **Replay control broadcast commands:** `BroadcastReplaySearch`, `BroadcastReplaySetPlaySpeed`, `BroadcastReplaySearchSessionTime` (SimHub does not expose these).
+- **Raw `CarIdxSessionFlags` bitfields:** Needed for per-car incident detection (SimHub only exposes flag state for the player, not the raw `repair`/`furled` bits for all cars).
+- **Raw frame counters:** `ReplayFrameNum` / `ReplayFrameNumEnd`.
+- **Live high-frequency arrays:** `CarIdxRPM`, `CarIdxGear`, `CarIdxSteer` for all 63 cars at 60Hz during fast-forward (SimHub's opponent model filters this to nearby cars and may not be reliable at 16x speed).
+- **Raw YAML session string:** Needed to extract unmapped fields like `ResultsPositions` entries during a replay.
+- **`PlayerCarMyIncidentCount`:** Polled directly to ensure delta signals are not missed during fast-forward playback.
+
+**SimHub is used for everything else:** Plugin lifecycle, WebSocket server, HTML dashboard hosting, YAML `DriverInfo` enrichment (where sufficient), and exposing our built index/channels back out as SimHub properties.
+
+### 2.7 Effective sampling vs. session time at fast-forward (Decision)
+
+The SDK memory map updates at **60Hz real time**. During replay fast-forward at **16×**, each real-time tick advances ~16× session time, so the **effective sample rate relative to replay session time** is approximately **60 ÷ 16 ≈ 3.75 Hz**. **This is acceptable** for building the incident index at that speed: we do not require a higher effective session-time sampling rate than this combination yields.
 
 ---
 
@@ -68,9 +90,9 @@ Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plug
 
 | Req ID | Priority | Requirement | Acceptance Criteria |
 |---|---|---|---|
-| TR-001 | MUST | Connect to the iRacing memory-mapped file (`Local\IRSDKMemMapFileName`) and verify `IsConnected` before beginning any replay operations. | SDK connection confirmed, `IsConnected = true`, session string readable. |
-| TR-002 | MUST | Confirm the session is in replay mode by reading `WeekendInfo.SimMode = 'replay'` from the YAML session string before proceeding. | `SimMode` value logged and asserted as `'replay'`. |
-| TR-003 | MUST | Read and store the `SubSessionID` from the YAML session string for use as a reference key for the resulting index. | `SubSessionID` logged and present in output. |
+| TR-001 | MUST | Establish a direct connection to the iRacing memory-mapped file (`Local\IRSDKMemMapFileName`) using a raw SDK reader (e.g., `IRSDKSharper` or `iRacingSdkWrapper`). Do NOT rely solely on SimHub's `DataUpdate` cycle for telemetry, as SimHub does not expose the raw arrays needed for this specific feature. | Raw SDK connection established within the SimHub plugin context; `IsConnected = true` verified. |
+| TR-002 | MUST | Confirm the session is in replay mode by reading `WeekendInfo.SimMode = 'replay'` from the raw YAML session string before proceeding. | `SimMode` value logged and asserted as `'replay'`. |
+| TR-003 | MUST | Read and store the `SubSessionID` from the raw YAML session string for use as a reference key for the resulting index. | `SubSessionID` logged and present in output. |
 
 ### 4.2 Baseline State Capture
 
@@ -86,7 +108,7 @@ Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plug
 | Req ID | Priority | Requirement | Acceptance Criteria |
 |---|---|---|---|
 | TR-008 | MUST | Initiate fast-forward by sending `BroadcastReplaySetPlaySpeed` with the maximum speed multiplier. Start at 16x and increase empirically to find the reliable ceiling. | Replay begins advancing at faster than real-time confirmed by `ReplaySessionTime` increasing. |
-| TR-009 | MUST | Poll the SDK at the native 60Hz update rate for the duration of the fast-forward. Do not throttle the polling interval. | Polling confirmed at 60Hz, no frames skipped. |
+| TR-009 | MUST | Collect data via the direct SDK connection at its native 60Hz update frequency for the duration of the fast-forward. Do not artificially throttle or rely on SimHub's UI thread `DataUpdate` interval, as frames will be missed at 16x speed. | High-frequency polling loop established natively to the memory-mapped file. |
 | TR-010 | MUST | Monitor `IsReplayPlaying`. When it transitions to `false`, treat the replay as complete and stop sampling. | Completion correctly detected. No polling after replay ends. |
 | TR-011 | SHOULD | Log elapsed wall-clock time from fast-forward start to completion for performance measurement. | Elapsed time recorded in test output. |
 
@@ -94,9 +116,9 @@ Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plug
 
 | Req ID | Priority | Requirement | Acceptance Criteria |
 |---|---|---|---|
-| TR-012 | MUST | On each 60Hz sample, compare current `CarIdxSessionFlags[n]` against previous frame for all car indices. Detect any frame where the `repair` bit (0x100000) transitions from 0 to 1. | Rising edge correctly detected. No false positives on pre-existing flags from baseline. |
-| TR-013 | MUST | On each 60Hz sample, detect any frame where the `furled`/meatball bit (0x80000) transitions from 0 to 1 for any car index. | Rising edge correctly detected independently of repair bit detection. |
-| TR-014 | MUST | On each 60Hz sample, compare current `PlayerCarMyIncidentCount` against previous value. Detect any frame where the count increments. | All increments detected. Delta value (1, 2, or 4 points) recorded. |
+| TR-012 | MUST | On each native 60Hz SDK sample, compare current raw `CarIdxSessionFlags[n]` against the previous frame for all 63 car indices. Detect any frame where the `repair` bit (0x100000) transitions from 0 to 1. | Rising edge correctly detected. No false positives on pre-existing flags from baseline. |
+| TR-013 | MUST | On each native 60Hz SDK sample, detect any frame where the `furled`/meatball bit (0x80000) transitions from 0 to 1 for any car index. | Rising edge correctly detected independently of repair bit detection. |
+| TR-014 | MUST | On each native 60Hz SDK sample, compare the current raw `PlayerCarMyIncidentCount` against the previous value. Detect any frame where the count increments. | All increments detected. Delta value (1, 2, or 4 points) recorded. |
 | TR-015 | MUST | At the moment of any detection, record the current `ReplaySessionTime` as the incident timestamp. | Timestamp within one frame (1/60s ≈ 16.7ms) of the actual incident moment. |
 | TR-016 | MUST | At the moment of any detection, record the `carIdx` of the affected car. | `carIdx` correctly identifies the car involved in each incident. |
 | TR-017 | SHOULD | Detect `CarIdxFastRepairsUsed[n]` increments as a secondary confirmation signal. Record separately and cross-reference with flag-based detections. | Fast repair increments logged and correlated with flag events where applicable. |
@@ -139,7 +161,7 @@ Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plug
 
 | Req ID | Priority | Requirement | Acceptance Criteria |
 |---|---|---|---|
-| TR-023 | MUST | After index build, read `ResultsPositions` from the YAML session string and extract the final `Incidents` value per driver. | Per-driver final incident totals extracted correctly from YAML. |
+| TR-023 | MUST | After index build, read the final driver `Incidents` value from `ResultsPositions` in the raw YAML session string. | Per-driver final incident totals extracted correctly from YAML. |
 | TR-024 | MUST | Cross-reference incident events detected per `carIdx` against final `ResultsPositions.Incidents` count. Log any discrepancies. | Discrepancy report produced. Zero discrepancies is the pass condition, but discrepancies are research data not an automatic failure. |
 | TR-025 | SHOULD | Seek to each detected incident timestamp using `BroadcastReplaySearchSessionTime` and confirm via `CamCarIdx` that iRacing's camera switches to the expected car. Allow 2.5 seconds per seek. | Camera car matches expected `carIdx`. Match rate logged as a percentage. |
 
@@ -150,7 +172,7 @@ Requirements align with [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md): **four labels 
 | Req ID | Priority | Requirement | Acceptance Criteria |
 |---|---|---|---|
 | TR-026 | SHOULD | When using the SimSteward plugin logging path, emit structured log lines for replay incident index build: at minimum `replay_incident_index_started` (or equivalent `event` name), `replay_incident_index_baseline_ready`, `replay_incident_index_fast_forward_started`, `replay_incident_index_fast_forward_complete`, `replay_incident_index_validation_summary`. | Corresponding events appear in Loki (if push enabled) and in `plugin-structured.jsonl` per project pipeline. |
-| TR-027 | MUST | Do **not** emit structured logs on every 60Hz SDK sample. Sampling loops remain silent in Loki except for explicit detections and phase boundaries. | Zero per-tick log lines; volume consistent with § Volume budget in GRAFANA-LOGGING. |
+| TR-027 | SHOULD | While we are on a data finding mission, do not blindly emit logs on every single 60Hz SDK cycle across a 45-minute race (to avoid overwhelming the sink). However, **verbose logging of state transitions, unexpected values, and key intervals is highly desired**. When in doubt, log. | Flexible volume suitable for debugging and answering Open Questions without causing OOM or Loki rejections. |
 | TR-028 | SHOULD | For each incident detected during fast-forward, emit one structured line with `event` discriminating replay index build (e.g. `replay_incident_index_detection`) including `car_idx`, `session_time_ms` or `replay_session_time`, `detection_source` (`repair_flag` \| `furled_flag` \| `player_incident_count`), `incident_points` when known, `subsession_id`, `replay_frame` when available, and the same session spine fields used elsewhere (`track_display_name`, `log_env`, `loki_push_target` where applicable). | Each JSON index entry has a traceable log line in Grafana for debugging and cross-check. |
 | TR-029 | SHOULD | Log validation outcomes (TR-023–TR-025): discrepancy counts, camera seek match rate, and `index_build_time_ms` / `total_detected` summary fields in the body of `replay_incident_index_validation_summary` (or split events if size limits require). | Grafana Explore can filter by `subsession_id` in JSON and compare to file output. |
 | TR-030 | MUST | If Loki URL is unset or push fails, the index build MUST still complete and write TR-019 JSON; logging failures MUST NOT abort the test. | Graceful degradation; behaviour matches existing Loki sink semantics. |
@@ -165,11 +187,21 @@ Deliver a **dedicated** dashboard page (separate HTML entry or clearly named sub
 |---|---|---|---|
 | TR-031 | MUST | Add a new web dashboard surface that displays the latest completed index **summary** (`subSessionId`, `indexBuildTimeMs`, `totalRaceIncidents`, per-`carIdx` counts per TR-022) when available. | Summary fields visible after a successful build; empty/disabled state when no index exists for the current context. |
 | TR-032 | MUST | Display the **incidents** array in a sortable, scannable table (or equivalent list UI) with columns matching TR-020: `carIdx`, `sessionTimeMs`, `detectionSource`, `incidentPoints`. | All four fields shown for every row; chronological default sort matches TR-021. |
-| TR-033 | SHOULD | Show **in-progress** index-build status: phase (e.g. baseline, fast-forward, validation), elapsed time, and non–60Hz progress hints (e.g. `ReplaySessionTime` or frame-derived estimate) without spamming the UI or WebSocket. | User can tell build is running vs idle vs failed. |
+| TR-033 | SHOULD | Show **in-progress** index-build status: phase (e.g. baseline, fast-forward, validation), elapsed time, and non-high-frequency progress hints (e.g. `ReplaySessionTime` or frame-derived estimate) without spamming the UI or WebSocket. | User can tell build is running vs idle vs failed. |
 | TR-034 | SHOULD | Provide navigation from the existing SimSteward dashboard to this page (link, tab, or menu entry) and a stable document URL path in the spec/README once chosen. | Discoverable entry point without typing a raw path from memory. |
 | TR-035 | MUST | Load index payload from the plugin via the **existing WebSocket** bridge (broadcast snapshot and/or action request/response JSON). Do not require a second HTTP server inside the plugin. | Data matches TR-019/TR-020 semantics on the wire; one bridge connection model. |
 | TR-036 | SHOULD | Allow **seek/jump** to a selected incident from the table (plugin action calling `BroadcastReplaySearchSessionTime` or equivalent) when replay mode is active, with clear feedback if seek is unavailable. | Row action triggers seek; errors surfaced in UI. |
 | TR-037 | MUST | If the iRacing SDK is disconnected or `SimMode` is not `replay`, the dashboard MUST show a clear message and MUST NOT imply an index is being built. | Same guardrails as TR-001/TR-002, reflected in UI. |
+| TR-038 | MUST | Provide a large "Record" button. When clicked, it activates high-frequency (60Hz) telemetry logging for deep data collection (the "data finding mission"). When clicked again, it stops logging. | Button exists, toggles state visually, and controls the plugin's raw high-frequency logging output. |
+
+### 4.9 Grafana Insights Dashboard
+
+Since this implementation is a data finding mission, we need a dedicated Grafana dashboard to visualize the results, measure success rates, and identify SDK limits across multiple test runs.
+
+| Req ID | Priority | Requirement | Acceptance Criteria |
+|---|---|---|---|
+| TR-039 | MUST | Create a Grafana Dashboard JSON model (`docs/dashboards/replay-insights.json` or similar) dedicated to these tests. | Dashboard file is committed to the repository and can be imported into a local Grafana instance. |
+| TR-040 | MUST | The dashboard MUST include panels visualizing: index build times vs. replay length (to deduce max fast-forward speed limits), discrepancy counts (detected vs. actual incidents), and high-frequency logging volume when the "Record" mode is active. | Panels correctly query Loki using the `replay_incident_index_*` events and display meaningful aggregations. |
 
 ---
 
@@ -182,8 +214,9 @@ Deliver a **dedicated** dashboard page (separate HTML entry or clearly named sub
 | NFR-003 | SHOULD | Total index build time for a 45-minute race replay must be measured and documented. Target is under 120 seconds — observation not a pass/fail criterion. | Build time recorded in output regardless of duration. |
 | NFR-004 | SHOULD | After completion, restore the replay to its original position using the saved `ReplayFrameNum` from before fast-forward began. | Replay position restored to pre-test position. |
 | NFR-005 | MUST | Implement as a SimHub C# plugin OR standalone C# console application using IRSDKSharper or iRacingSdkWrapper. | Executable runs on Windows without additional runtime dependencies beyond .NET and iRacing. |
-| NFR-006 | SHOULD | Document or reuse LogQL examples for the new `replay_incident_index_*` events (filter by `component`, `level`, and JSON `event` / `subsession_id` in line filters). | Queries reproducible from Grafana Explore; cross-ref [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) § LogQL. |
+| NFR-006 | SHOULD | Document or reuse LogQL examples for the new `replay_incident_index_*` events. Since this is a data finding mission, ensure logging payloads are expansive enough to answer questions about flag reliability and speed limits. | Queries reproducible from Grafana Explore; cross-ref [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) § LogQL. |
 | NFR-007 | SHOULD | The new dashboard page should remain usable on a LAN client (WebSocket host derived from `window.location.hostname`, same pattern as the main SimSteward dash). | Remote browser on the same network can open the page and receive data. |
+| NFR-008 | MUST | Treat **~3.75 Hz effective sampling vs. session time** (60Hz real-time SDK polls at **16×** replay speed) as **acceptable** for incident detection and index build. Document the chosen play-speed multiplier and implied effective rate in test output when reporting build methodology. | Spec and run logs state multiplier; no requirement to exceed SDK real-time 60Hz or to add synthetic higher session-time sampling. |
 
 ---
 
@@ -200,7 +233,7 @@ Deliver a **dedicated** dashboard page (separate HTML entry or clearly named sub
 
 ## 7. Open Questions
 
-- What is the maximum reliable play speed multiplier before the SDK starts dropping frames or returning stale `CarIdxSessionFlags` values?
+- **Resolved (sampling):** At **16×** with **60Hz** real-time SDK polling, **~3.75 Hz** effective vs. session time is **acceptable** for this project (see §2.7, NFR-008). What is the maximum reliable play speed multiplier before the SDK starts dropping frames or returning stale `CarIdxSessionFlags` values?
 - Does iRacing emit `repair`/`furled` flag bits reliably at high playback speeds, or are flag transitions dropped if the relevant frame is not rendered?
 - Is `CarIdxSessionFlags` populated correctly during replay, or are these bits only set during real-time sessions? **Must be confirmed empirically.**
 - How does `ReplaySessionTime` relate to `SessionTime` in the `/data` API lap records — same time base and units?
@@ -217,6 +250,22 @@ To maximise test value, use a replay that satisfies the following:
 - At least one driver with multiple incidents on the same lap (validates deduplication logic)
 - At least one DNF driver (`ReasonOutStr` populated)
 - Ideally a race you participated in, so `PlayerCarMyIncidentCount` provides a second validation channel
+
+---
+
+## 9. Implementation Milestones
+
+This implementation is broken down into the following milestones (tracked in ContextStream):
+
+| Milestone | Requirements | Description | Status |
+|---|---|---|---|
+| **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | ⏳ Not Started |
+| **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | ⏳ Not Started |
+| **M3: Incident Detection Logic** | TR-012 – TR-018 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | ⏳ Not Started |
+| **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | ⏳ Not Started |
+| **M5: Observability Logging** | TR-026 – TR-030 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
+| **M6: SimHub Web Dashboard** | TR-031 – TR-038 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
+| **M7: Grafana Insights Dashboard** | TR-039 – TR-040 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
 
 ---
 
