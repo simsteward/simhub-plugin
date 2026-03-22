@@ -285,7 +285,7 @@ This implementation is broken down into the following milestones (tracked in Con
 | Milestone | Requirements | Description | Status |
 |---|---|---|---|
 | **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005, TR-041 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | Complete |
-| **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008, TR-041 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | ⏳ Not Started |
+| **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008, TR-041 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | Complete |
 | **M3: Incident Detection Logic** | TR-012 – TR-018, TR-041 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | ⏳ Not Started |
 | **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004, TR-041 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | ⏳ Not Started |
 | **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
@@ -308,6 +308,25 @@ Milestone **M1** is **Complete**; TR-001–TR-003, NFR-005, TR-041, and raw sess
 | **NFR-005** | SimHub C# plugin targeting .NET Framework 4.8 with IRSDKSharper (NuGet). |
 
 **Code:** `ReplayIncidentIndexPrerequisites.cs`, `SimStewardPlugin.ReplayIncidentIndex.cs`, `SimStewardPlugin.cs` / `OnIrsdkSessionInfo`. **Tests:** `ReplayIncidentIndexPrerequisitesTests`. **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_*`).
+
+### M2 acceptance review (completed)
+
+Milestone **M2** is **Complete**; TR-004–TR-011, NFR-008, and TR-041 are implemented as follows.
+
+| Item | Evidence |
+|------|----------|
+| **TR-041** | This subsection is the M2 milestone summary (scope, requirement mapping, evidence pointers). Milestone status synced in ContextStream when marked complete. |
+| **TR-004** | `ReplaySearch(ToStart)` from `TryBeginReplayIncidentIndexBuildLocked`; `ReplayFrameNum` stabilized at 0 (`FrameZeroStableConsecutiveSamples` consecutive `OnTelemetryData` ticks); seek failure → `replay_incident_index_build_error` (`seek_start_timeout`). **Code:** `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (`ProcessSeekingStartLocked`). |
+| **TR-005** | Baseline `CarIdxSessionFlags` for all **64** slots via `Data.GetInt("CarIdxSessionFlags", i)`; emitted on `replay_incident_index_baseline_ready` as `car_idx_session_flags` (full array). |
+| **TR-006** | `PlayerCarMyIncidentCount` at baseline as `player_car_my_incident_count_baseline` on `replay_incident_index_baseline_ready`. |
+| **TR-007** | `ReplayFrameNumEnd` recorded as `replay_frame_num_end` on baseline and completion events. |
+| **TR-008** | `ReplaySetPlaySpeed(16, false)`; requested vs telemetry `ReplayPlaySpeed` on `replay_incident_index_fast_forward_started`. |
+| **TR-009** | Native IRSDKSharper `OnTelemetryData` handler (`OnIrsdkTelemetryDataForReplayIndex`); `UpdateInterval = 1` (60Hz); not SimHub `DataUpdate`. |
+| **TR-010** | Fast-forward loop ends when `IsReplayPlaying` is false; `completion_reason` (`replay_finished` \| `paused_or_stopped`) via `InferCompletionReason`; playback restored to 1×. |
+| **TR-011** | Wall-clock `index_build_time_ms` on `replay_incident_index_fast_forward_complete` (`Stopwatch` from fast-forward start); `fast_forward_telemetry_samples` counted per `OnTelemetryData` tick in FF phase. |
+| **NFR-008** | `effective_sample_hz_vs_session_time` (= 60 / play speed) on FF start/complete logs; play speed 16× documented in telemetry fields. |
+
+**Code:** `ReplayIncidentIndexBuild.cs` (helpers/constants), `SimStewardPlugin.ReplayIncidentIndexBuild.cs`, `SimStewardPlugin.cs` (`OnTelemetryData` subscribe/unsubscribe, `DispatchAction` → `replay_incident_index_build`, `ReplayIncidentIndexOnIracingDisconnected`). **Tests:** `ReplayIncidentIndexBuildTests`. **Actions:** WebSocket `replay_incident_index_build` args `start` \| `cancel`. **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_started`, `replay_incident_index_baseline_ready`, `replay_incident_index_fast_forward_started`, `replay_incident_index_fast_forward_complete`, `replay_incident_index_build_error`, `replay_incident_index_build_cancelled`).
 
 ---
 
