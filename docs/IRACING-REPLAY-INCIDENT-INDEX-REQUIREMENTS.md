@@ -1,6 +1,6 @@
 # Technical Requirements
 ## iRacing Replay Incident Index Capture via SDK Fast-Forward Sampling
-**Version 0.2 — Draft**
+**Version 0.3 — Draft**
 
 ---
 
@@ -11,6 +11,8 @@ This document defines the technical requirements for a test implementation that 
 The approach exploits the iRacing SDK broadcast command system to fast-forward a loaded replay at maximum speed while sampling the memory-mapped telemetry at 60Hz, detecting incident events in real time and recording their session timestamps and associated car indices.
 
 **Grafana / Loki:** When the implementation runs as the SimSteward SimHub plugin (or reuses its logging stack), structured logs SHOULD be emitted to the same **Loki → Grafana** pipeline documented in [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) so index-build phases, detections, and validation outcomes are visible in Grafana Explore and dashboards. Loki push is **optional** and **off** unless `SIMSTEWARD_LOKI_URL` is configured; it does not replace the on-disk JSON index (TR-019).
+
+**SimHub web dashboard:** The built incident index and validation summary MUST be **surfaceable in a new HTML/JavaScript page** served by SimHub’s built-in HTTP server (same model as the existing SimSteward dashboard under `Web/sim-steward-dash/`), communicating with the plugin over the existing WebSocket bridge so users can inspect results **without** Grafana. Full requirements: §4.8.
 
 ---
 
@@ -42,6 +44,10 @@ The iRacing `/data` REST API provides per-lap incident flags server-side, but re
 
 Index-build telemetry for operators and research SHOULD appear in Grafana via **structured logs** ingested by Loki, using the project’s four-label schema and JSON body fields ([GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)). **Do not** log every 60Hz poll; log **event-driven** milestones and each detected incident (similar volume to existing `incident_detected` guidance). Local stack setup: [observability-local.md](observability-local.md).
 
+### 2.5 SimHub web dashboard
+
+Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plugin exposes data and commands through the **Fleck** WebSocket server and optional broadcast messages; static assets live under SimHub `Web/` per project conventions (see `.cursor/rules/SimHub.mdc`). Grafana remains optional; the new page is the primary local UX for the replay incident index when shipped inside SimSteward.
+
 ---
 
 ## 3. Test Objectives
@@ -52,6 +58,7 @@ Index-build telemetry for operators and research SHOULD appear in Grafana via **
 4. The resulting incident index matches the known incident record for the session (validated against final `Incidents` count from the YAML session string)
 5. Total time to build a complete index for a full race replay is measured and recorded
 6. When integrated with SimSteward logging, index-build lifecycle and incident detections are queryable in Grafana (Loki) without exceeding project volume and cardinality rules
+7. The same index and validation summary are visible and usable from a **new SimHub-hosted web dashboard** (table, summary, and build status) without requiring Grafana
 
 ---
 
@@ -150,6 +157,20 @@ Requirements align with [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md): **four labels 
 
 **Taxonomy note:** Register new `event` names in [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) when implemented so LogQL and dashboards stay canonical.
 
+### 4.8 SimHub web dashboard (new page)
+
+Deliver a **dedicated** dashboard page (separate HTML entry or clearly named sub-view) so the replay incident index is not buried-only in logs or disk files. Follow SimHub dashboard rules: **HTML/CSS/JavaScript** in `Web/sim-steward-dash/` (or an adjacent path documented in deploy), loaded via SimHub’s HTTP port (e.g. `http://<host>:8888/Web/...`).
+
+| Req ID | Priority | Requirement | Acceptance Criteria |
+|---|---|---|---|
+| TR-031 | MUST | Add a new web dashboard surface that displays the latest completed index **summary** (`subSessionId`, `indexBuildTimeMs`, `totalRaceIncidents`, per-`carIdx` counts per TR-022) when available. | Summary fields visible after a successful build; empty/disabled state when no index exists for the current context. |
+| TR-032 | MUST | Display the **incidents** array in a sortable, scannable table (or equivalent list UI) with columns matching TR-020: `carIdx`, `sessionTimeMs`, `detectionSource`, `incidentPoints`. | All four fields shown for every row; chronological default sort matches TR-021. |
+| TR-033 | SHOULD | Show **in-progress** index-build status: phase (e.g. baseline, fast-forward, validation), elapsed time, and non–60Hz progress hints (e.g. `ReplaySessionTime` or frame-derived estimate) without spamming the UI or WebSocket. | User can tell build is running vs idle vs failed. |
+| TR-034 | SHOULD | Provide navigation from the existing SimSteward dashboard to this page (link, tab, or menu entry) and a stable document URL path in the spec/README once chosen. | Discoverable entry point without typing a raw path from memory. |
+| TR-035 | MUST | Load index payload from the plugin via the **existing WebSocket** bridge (broadcast snapshot and/or action request/response JSON). Do not require a second HTTP server inside the plugin. | Data matches TR-019/TR-020 semantics on the wire; one bridge connection model. |
+| TR-036 | SHOULD | Allow **seek/jump** to a selected incident from the table (plugin action calling `BroadcastReplaySearchSessionTime` or equivalent) when replay mode is active, with clear feedback if seek is unavailable. | Row action triggers seek; errors surfaced in UI. |
+| TR-037 | MUST | If the iRacing SDK is disconnected or `SimMode` is not `replay`, the dashboard MUST show a clear message and MUST NOT imply an index is being built. | Same guardrails as TR-001/TR-002, reflected in UI. |
+
 ---
 
 ## 5. Non-Functional Requirements
@@ -162,6 +183,7 @@ Requirements align with [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md): **four labels 
 | NFR-004 | SHOULD | After completion, restore the replay to its original position using the saved `ReplayFrameNum` from before fast-forward began. | Replay position restored to pre-test position. |
 | NFR-005 | MUST | Implement as a SimHub C# plugin OR standalone C# console application using IRSDKSharper or iRacingSdkWrapper. | Executable runs on Windows without additional runtime dependencies beyond .NET and iRacing. |
 | NFR-006 | SHOULD | Document or reuse LogQL examples for the new `replay_incident_index_*` events (filter by `component`, `level`, and JSON `event` / `subsession_id` in line filters). | Queries reproducible from Grafana Explore; cross-ref [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) § LogQL. |
+| NFR-007 | SHOULD | The new dashboard page should remain usable on a LAN client (WebSocket host derived from `window.location.hostname`, same pattern as the main SimSteward dash). | Remote browser on the same network can open the page and receive data. |
 
 ---
 
@@ -198,4 +220,4 @@ To maximise test value, use a replay that satisfies the following:
 
 ---
 
-*iRacing Replay Incident Index — Technical Requirements v0.2 — Draft*
+*iRacing Replay Incident Index — Technical Requirements v0.3 — Draft*
