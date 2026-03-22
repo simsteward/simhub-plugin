@@ -1,6 +1,6 @@
 # Technical Requirements
 ## iRacing Replay Incident Index Capture via SDK Fast-Forward Sampling
-**Version 0.3 — Draft**
+**Version 0.4 — Draft**
 
 ---
 
@@ -126,10 +126,22 @@ The SDK memory map updates at **60Hz real time**. During replay fast-forward at 
 
 ### 4.5 Output Format
 
+Each **data point** (incident index row) MUST carry a **`fingerprint`** so the same logical detection can be correlated across JSON on disk, structured logs (§4.7), the web dashboard (§4.8), and downstream storage without relying on row order. The fingerprint is a **deterministic id** derived only from stable fields (not wall-clock or build id).
+
+**Fingerprint (v1) — canonical string**
+
+1. Let `points` be the JSON literal for `incidentPoints`: either a decimal integer string, or the two-character sequence `null` when the value is unknown.
+2. Build a single UTF-8 string (exact separators, no spaces):  
+   `v1|{subSessionId}|{carIdx}|{sessionTimeMs}|{detectionSource}|{points}`  
+   where `subSessionId` is the same integer as the file summary, `detectionSource` is one of `repair_flag`, `furled_flag`, `player_incident_count`.
+3. Set **`fingerprint`** to the **lowercase hexadecimal** SHA-256 digest of that UTF-8 string (64 hex characters).
+
+If a future format needs to change inputs, bump the leading `v1` token and document a new version (analogous to `fingerprint_version` in the broader Sim Steward data model).
+
 | Req ID | Priority | Requirement | Acceptance Criteria |
 |---|---|---|---|
 | TR-019 | MUST | Produce a structured incident index as a JSON array upon completion. | Valid JSON file written to disk at test completion. |
-| TR-020 | MUST | Each entry must contain: `carIdx` (int), `sessionTimeMs` (int), `detectionSource` (string: `repair_flag` \| `furled_flag` \| `player_incident_count`), `incidentPoints` (int or null). | All four fields present and correctly typed in every entry. |
+| TR-020 | MUST | Each entry must contain: `fingerprint` (string, 64-char lowercase hex SHA-256 per **Fingerprint (v1)** above), `carIdx` (int), `sessionTimeMs` (int), `detectionSource` (string: `repair_flag` \| `furled_flag` \| `player_incident_count`), `incidentPoints` (int or null). | All five fields present and correctly typed in every entry; `fingerprint` matches the v1 digest of that row’s other fields plus `subSessionId`. |
 | TR-021 | MUST | Entries must be sorted ascending by `sessionTimeMs`. | Output array is in chronological order. |
 | TR-022 | SHOULD | Include a summary block: `subSessionId`, `totalRaceIncidents`, `incidentCountByCarIdx`, `indexBuildTimeMs`. | Summary block present and values correct. |
 
@@ -142,12 +154,14 @@ The SDK memory map updates at **60Hz real time**. During replay fast-forward at 
   "incidentCountByCarIdx": { "3": 2, "7": 1, "12": 4 },
   "incidents": [
     {
+      "fingerprint": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
       "carIdx": 3,
       "sessionTimeMs": 184320,
       "detectionSource": "repair_flag",
       "incidentPoints": null
     },
     {
+      "fingerprint": "fedcba098765432109876543210fedcba098765432109876543210fedcba09",
       "carIdx": 0,
       "sessionTimeMs": 312800,
       "detectionSource": "player_incident_count",
@@ -156,6 +170,8 @@ The SDK memory map updates at **60Hz real time**. During replay fast-forward at 
   ]
 }
 ```
+
+*(Example `fingerprint` values are placeholders; implementations MUST emit the real SHA-256 hex for each row.)*
 
 ### 4.6 Validation
 
@@ -173,7 +189,7 @@ Requirements align with [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md): **four labels 
 |---|---|---|---|
 | TR-026 | SHOULD | When using the SimSteward plugin logging path, emit structured log lines for replay incident index build: at minimum `replay_incident_index_started` (or equivalent `event` name), `replay_incident_index_baseline_ready`, `replay_incident_index_fast_forward_started`, `replay_incident_index_fast_forward_complete`, `replay_incident_index_validation_summary`. | Corresponding events appear in Loki (if push enabled) and in `plugin-structured.jsonl` per project pipeline. |
 | TR-027 | SHOULD | While we are on a data finding mission, do not blindly emit logs on every single 60Hz SDK cycle across a 45-minute race (to avoid overwhelming the sink). However, **verbose logging of state transitions, unexpected values, and key intervals is highly desired**. When in doubt, log. | Flexible volume suitable for debugging and answering Open Questions without causing OOM or Loki rejections. |
-| TR-028 | SHOULD | For each incident detected during fast-forward, emit one structured line with `event` discriminating replay index build (e.g. `replay_incident_index_detection`) including `car_idx`, `session_time_ms` or `replay_session_time`, `detection_source` (`repair_flag` \| `furled_flag` \| `player_incident_count`), `incident_points` when known, `subsession_id`, `replay_frame` when available, and the same session spine fields used elsewhere (`track_display_name`, `log_env`, `loki_push_target` where applicable). | Each JSON index entry has a traceable log line in Grafana for debugging and cross-check. |
+| TR-028 | SHOULD | For each incident detected during fast-forward, emit one structured line with `event` discriminating replay index build (e.g. `replay_incident_index_detection`) including **`fingerprint`** (same value as TR-020 / **Fingerprint (v1)**), `car_idx`, `session_time_ms` or `replay_session_time`, `detection_source` (`repair_flag` \| `furled_flag` \| `player_incident_count`), `incident_points` when known, `subsession_id`, `replay_frame` when available, and the same session spine fields used elsewhere (`track_display_name`, `log_env`, `loki_push_target` where applicable). | Each JSON index entry has a traceable log line in Grafana for debugging and cross-check; log `fingerprint` matches the on-disk row. |
 | TR-029 | SHOULD | Log validation outcomes (TR-023–TR-025): discrepancy counts, camera seek match rate, and `index_build_time_ms` / `total_detected` summary fields in the body of `replay_incident_index_validation_summary` (or split events if size limits require). | Grafana Explore can filter by `subsession_id` in JSON and compare to file output. |
 | TR-030 | MUST | If Loki URL is unset or push fails, the index build MUST still complete and write TR-019 JSON; logging failures MUST NOT abort the test. | Graceful degradation; behaviour matches existing Loki sink semantics. |
 
@@ -186,7 +202,7 @@ Deliver a **dedicated** dashboard page (separate HTML entry or clearly named sub
 | Req ID | Priority | Requirement | Acceptance Criteria |
 |---|---|---|---|
 | TR-031 | MUST | Add a new web dashboard surface that displays the latest completed index **summary** (`subSessionId`, `indexBuildTimeMs`, `totalRaceIncidents`, per-`carIdx` counts per TR-022) when available. | Summary fields visible after a successful build; empty/disabled state when no index exists for the current context. |
-| TR-032 | MUST | Display the **incidents** array in a sortable, scannable table (or equivalent list UI) with columns matching TR-020: `carIdx`, `sessionTimeMs`, `detectionSource`, `incidentPoints`. | All four fields shown for every row; chronological default sort matches TR-021. |
+| TR-032 | MUST | Display the **incidents** array in a sortable, scannable table (or equivalent list UI) with columns matching TR-020: `fingerprint`, `carIdx`, `sessionTimeMs`, `detectionSource`, `incidentPoints`. | All five fields shown for every row (fingerprint may use truncation + tooltip/copy affordance if space is tight); chronological default sort matches TR-021. |
 | TR-033 | SHOULD | Show **in-progress** index-build status: phase (e.g. baseline, fast-forward, validation), elapsed time, and non-high-frequency progress hints (e.g. `ReplaySessionTime` or frame-derived estimate) without spamming the UI or WebSocket. | User can tell build is running vs idle vs failed. |
 | TR-034 | SHOULD | Provide navigation from the existing SimSteward dashboard to this page (link, tab, or menu entry) and a stable document URL path in the spec/README once chosen. | Discoverable entry point without typing a raw path from memory. |
 | TR-035 | MUST | Load index payload from the plugin via the **existing WebSocket** bridge (broadcast snapshot and/or action request/response JSON). Do not require a second HTTP server inside the plugin. | Data matches TR-019/TR-020 semantics on the wire; one bridge connection model. |
@@ -269,4 +285,4 @@ This implementation is broken down into the following milestones (tracked in Con
 
 ---
 
-*iRacing Replay Incident Index — Technical Requirements v0.3 — Draft*
+*iRacing Replay Incident Index — Technical Requirements v0.4 — Draft*
