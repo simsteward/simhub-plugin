@@ -1,6 +1,6 @@
 # Technical Requirements
 ## iRacing Replay Incident Index Capture via SDK Fast-Forward Sampling
-**Version 0.5 — Draft**
+**Version 0.6 — Draft**
 
 ---
 
@@ -220,6 +220,14 @@ Since this implementation is a data finding mission, we need a dedicated Grafana
 | TR-039 | MUST | Create a Grafana Dashboard JSON model (`docs/dashboards/replay-insights.json` or similar) dedicated to these tests. | Dashboard file is committed to the repository and can be imported into a local Grafana instance. |
 | TR-040 | MUST | The dashboard MUST include panels visualizing: index build times vs. replay length (to deduce max fast-forward speed limits), discrepancy counts (detected vs. actual incidents), and high-frequency logging volume when the "Record" mode is active. | Panels correctly query Loki using the `replay_incident_index_*` events and display meaningful aggregations. |
 
+### 4.10 Milestone documentation & automated tests
+
+| Req ID | Priority | Requirement | Acceptance Criteria |
+|---|---|---|---|
+| TR-041 | MUST | For each milestone **M1–M9**, when the milestone is marked **complete**, add a **milestone summary** in §9 (same pattern as *M1 acceptance review*): what shipped, which requirement IDs are satisfied, and evidence (source paths, test class names, structured log `event` names). | Every completed milestone has a dated summary block under §9; claims map to verifiable artifacts. |
+| TR-042 | MUST | Build the **automated test suite** for the replay incident index: unit tests with mocks/fixtures where the SDK is unavailable, integration or golden-data tests where appropriate; expectations MUST trace to this document, not ad-hoc behavior. | Tests exist, run via CI or a documented local command, and cover the behaviors implied by the linked TR/NFR IDs for M8. |
+| TR-043 | MUST | **All** feature tests for the replay incident index **pass** locally and in CI. Resolve failures by fixing **implementation** or, when the written spec was wrong, by **updating this document** with rationale—**not** by weakening assertions, deleting cases, broadening tolerances without justification, or matching expectations to incorrect behavior. | Green suite; test edits only alongside corrected spec or post-fix tightened assertions. |
+
 ---
 
 ## 5. Non-Functional Requirements
@@ -272,31 +280,27 @@ To maximise test value, use a replay that satisfies the following:
 
 ## 9. Implementation Milestones
 
-This implementation is broken down into the following milestones (tracked in ContextStream):
+This implementation is broken down into the following milestones (tracked in ContextStream). **TR-041** applies to **every** milestone when marked complete (milestone summary in §9). Full criteria: §4.10.
 
 | Milestone | Requirements | Description | Status |
 |---|---|---|---|
-| **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | Complete |
-| **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | ⏳ Not Started |
-| **M3: Incident Detection Logic** | TR-012 – TR-018 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | ⏳ Not Started |
-| **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | ⏳ Not Started |
-| **M5: Observability Logging** | TR-026 – TR-030 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
-| **M6: SimHub Web Dashboard** | TR-031 – TR-038 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
-| **M7: Grafana Insights Dashboard** | TR-039 – TR-040 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
-| **M8: Test suite construction** | Cross-cutting (TR/NFR per tests as added) | Implement the **automated test suite** for the replay incident index: unit tests with mocks/fixtures where the SDK is unavailable, integration or golden-data tests where appropriate, and coverage aligned with this document’s acceptance criteria. Tests encode **expected behavior from the spec**, not ad-hoc behavior. | ⏳ Not Started |
-| **M9: Tests passing (implementation alignment)** | Cross-cutting (same) | **All** tests for this feature pass locally and in CI. **Pass criteria:** failures are resolved by correcting **implementation** or, when the spec is wrong, by **explicitly updating this document** with rationale—not by weakening assertions, deleting cases, broadening tolerances without justification, or changing expectations to match incorrect behavior. Outcomes must align with implementation and the written requirements. | ⏳ Not Started |
-
-### M8 / M9 acceptance
-
-- **M8** delivers existence and quality of the test suite: structure, determinism, and explicit linkage to requirements in this document.
-- **M9** delivers a green test run. **Anti-pattern:** editing tests to paper over bugs. **Allowed:** fix implementation; or amend the spec with rationale and then update tests to match the corrected spec.
+| **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005, TR-041 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | Complete |
+| **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008, TR-041 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | ⏳ Not Started |
+| **M3: Incident Detection Logic** | TR-012 – TR-018, TR-041 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | ⏳ Not Started |
+| **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004, TR-041 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | ⏳ Not Started |
+| **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
+| **M6: SimHub Web Dashboard** | TR-031 – TR-038, TR-041 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
+| **M7: Grafana Insights Dashboard** | TR-039 – TR-040, TR-041 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
+| **M8: Test suite construction** | TR-041, TR-042 | Automated tests for the replay incident index (mocks/fixtures, golden data as needed); expectations trace to this spec. | ⏳ Not Started |
+| **M9: Tests passing (implementation alignment)** | TR-041, TR-043 | All feature tests pass locally and in CI; fix implementation or spec—not tests—to resolve failures. | ⏳ Not Started |
 
 ### M1 acceptance review (completed)
 
-Milestone **M1** is **Complete**; TR-001–TR-003, NFR-005, and raw session YAML fingerprinting for §2.6 are implemented as follows.
+Milestone **M1** is **Complete**; TR-001–TR-003, NFR-005, TR-041, and raw session YAML fingerprinting for §2.6 are implemented as follows.
 
 | Item | Evidence |
 |------|----------|
+| **TR-041** | This subsection is the M1 milestone summary (scope, requirement mapping, evidence pointers). |
 | **TR-001** | `IRacingSdk` (IRSDKSharper) in plugin; structured event `replay_incident_index_sdk_ready` on iRacing connect (`irsdk_connected`, `update_interval_ms`). |
 | **TR-002** | Event `replay_incident_index_session_context` logs `sim_mode` / `is_replay_mode` from parsed session YAML (`WeekendInfo`); **WARN** when a subsession is active but mode is not replay. |
 | **TR-003** | Same event logs `subsession_id` (string, same convention as other plugin logs) for use as the index reference key. |
@@ -307,4 +311,4 @@ Milestone **M1** is **Complete**; TR-001–TR-003, NFR-005, and raw session YAML
 
 ---
 
-*iRacing Replay Incident Index — Technical Requirements v0.5 — Draft*
+*iRacing Replay Incident Index — Technical Requirements v0.6 — Draft*
