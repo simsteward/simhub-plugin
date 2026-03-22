@@ -156,6 +156,7 @@ User then watches it play and OBS records. They press **Next →** when done.
 |---|---|
 | Add `suggestedCamera` on server-owned incidents | When incidents come from plugin/YAML, pre-fill View 1 without heuristics |
 | Replace leaderboard walk with true YAML scan | Full discovery; today’s walk only revisits frames already in the list |
+| Update logging to match new Observability Strategy | Implement Loki events and Prometheus metrics per `IRACING-OBSERVABILITY-STRATEGY.md` standard |
 
 ### Dashboard (JS)
 
