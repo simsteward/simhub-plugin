@@ -1,5 +1,7 @@
 # Sim Steward — Gap Closure Plan
 
+**Status: implemented in repo** (plugin + dashboard). Keep for history and verification; feature maturity lives in [`PRODUCT-FLOW.md`](PRODUCT-FLOW.md).
+
 Closes all ⚠️ and ❌ items from `PRODUCT-FLOW.md`.
 **Deferred:** true YAML scan, scrub-bar seek, dual-view, OBS.
 

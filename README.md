@@ -16,9 +16,10 @@ A **SimHub plugin + browser dashboard** for structured iRacing replay review. In
 | **Captured incidents** | Visited incidents list with group-by-driver accordion |
 | **Driver standings** | Position/car/driver/incident count, collapsible |
 | **Telemetry strip** | Throttle, brake, steering wheel (real data from plugin) |
-| **Observability** | All actions and iRacing events logged as structured JSONL → Grafana Loki |
+| **Selected Incident Panel** | Camera group dropdown (`cameraGroups` from plugin), ▶ Capture (`capture_incident`: pre-roll, optional camera, 1× speed), prev/next within filtered list |
+| **Observability** | Structured logs → Grafana Loki (`SIMSTEWARD_LOKI_URL`); `capture_incident` includes correlation fields on `action_result`; re-capture confirms before sending (Loki is append-only) |
 
-**North-star features not yet shipped:** camera selector, `capture_incident` atomic action (pre-roll + camera + 1× speed), YAML scan (true plugin-side incident discovery), OBS integration. See [docs/PRODUCT-FLOW.md](docs/PRODUCT-FLOW.md).
+**North-star / gaps still open:** true plugin-side **YAML scan** (session walk still uses the leaderboard frame list), **scrub bar** seek (PoC / toast only), **plugin-owned `suggestedCamera`**, **dual-view** capture, **OBS** integration. See [docs/PRODUCT-FLOW.md](docs/PRODUCT-FLOW.md) and [docs/DATA-ROUTING-OBSERVABILITY.md](docs/DATA-ROUTING-OBSERVABILITY.md) for what belongs in Loki vs a future metrics path.
 
 ---
 
@@ -57,6 +58,7 @@ docs/                         Documentation (start with docs/README.md)
   USER-FLOWS.md               Step-by-step user journeys + flow diagrams
   USER-FEATURES-PM.md         PM-style feature descriptions
   GRAFANA-LOGGING.md          Loki labels, events, LogQL
+  DATA-ROUTING-OBSERVABILITY.md  Events vs high-rate telemetry (Loki vs OTel/metrics)
   TROUBLESHOOTING.md          Runtime issues, deploy, logs
 
 observability/local/          Local Grafana + Loki Docker stack
@@ -112,4 +114,5 @@ Starts Grafana + Loki via Docker. See [docs/observability-local.md](docs/observa
 | [docs/PRODUCT-FLOW.md](docs/PRODUCT-FLOW.md) | Understanding the vision, feature maturity, open PM issues |
 | [docs/USER-FLOWS.md](docs/USER-FLOWS.md) | How each feature actually works as a user (flow diagrams) |
 | [docs/GRAFANA-LOGGING.md](docs/GRAFANA-LOGGING.md) | Structured logging, Loki labels, LogQL queries |
+| [docs/DATA-ROUTING-OBSERVABILITY.md](docs/DATA-ROUTING-OBSERVABILITY.md) | What ships to Loki vs metrics at scale |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Runtime issues, WebSocket, deploy failures |
