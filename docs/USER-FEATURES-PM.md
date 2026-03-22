@@ -183,3 +183,15 @@ flowchart LR
 ## One-line product narrative
 
 **Sim Steward today** is a **replay-aware incident console**: connect (**WS**), **navigate** the session (**replay + seek**), **focus** a driver (**live car dropdown + lists**), **inspect** details (**meta strip** + **Selected Incident Panel** with camera + **`capture_incident`**), **batch-record** scan snapshots into **Captured** with optional **grouping/accordion**, and stream structured logs to **Loki**—while **telemetry** and **logs** explain what the car and app are doing. **PRODUCT-FLOW** tracks remaining gaps (**YAML scan**, **scrub seek**, **OBS**, richer **suggestedCamera**).
+
+---
+
+## ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Sim Steward — Product Flow | `4f3c6370-0bfc-4f54-9848-9946745ac3d4` |
+| Sim Steward — User Flows | `3eb2ceb5-f859-417b-a7e4-8dde05493d55` |
+| Sim Steward — Architecture and Data Structures | `c453dd83-dfd9-4002-b8a2-2e0c8a4d032c` |
+| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |

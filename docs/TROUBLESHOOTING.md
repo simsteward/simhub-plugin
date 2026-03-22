@@ -148,6 +148,15 @@ See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL exam
 - **`ingest` fails with "not a terminal"`** — From repo root (with `.env`): `powershell -ExecutionPolicy Bypass -File scripts/contextstream-ingest.ps1` (spawns `cmd` so the CLI sees a console). Or run `contextstream-mcp.exe ingest --path <repo>` manually in Windows Terminal / `cmd`. The MCP server uses the same key via Cursor env.
 - **Search says index freshness `missing`** — After a successful ingest from step above, keyword search still works; semantic/index metadata syncs once ingestion completes.
 
+### ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Observability — Local Stack | `25ed8579-c142-4040-b9a2-87b14523475f` |
+| Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
+| Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |
+
 ---
 
 **Note:** "Memory bank" (file-based state sync, MCP server, `memory-bank/` directory) is **not** a project feature. It is only for the developer's personal Cursor/vibe coding. Do not treat it as a feature, task, or reference. It is expected to be missing.

@@ -70,3 +70,14 @@ Same as Part A: chunked `session_end_datapoints_results` lines; **docs/GRAFANA-L
 - **docs/GRAFANA-LOGGING.md** — Schema, volume budget, LogQL, housekeeping.
 - **docs/observability-local.md** — Local stack quick start.
 - Grafana: [Label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Query best practices](https://grafana.com/docs/loki/latest/query/bp-query/).
+
+---
+
+## ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |
+| Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
+| Observability — Local Stack | `25ed8579-c142-4040-b9a2-87b14523475f` |
+| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |

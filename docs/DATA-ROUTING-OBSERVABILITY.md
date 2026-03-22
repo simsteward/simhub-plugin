@@ -136,3 +136,15 @@ These stay **events or throttled snapshots** in structured logs — **not** a mi
 - **docs/observability-scaling.md** — Many users, central Loki, label rules.
 - **docs/IRACING-TELEMETRY.md** — SDK variables and categories.
 - Grafana: [Loki label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Prometheus cardinality](https://grafana.com/docs/grafana-cloud/send-data/metrics/metricsCardinality/).
+
+---
+
+## ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
+| Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
+| iRacing Telemetry — SDK Variable Reference | `42ab06d4-9ed3-43a1-996c-bd0250ecdf6e` |
+| Architecture & Data Structures | `c453dd83-dfd9-4002-b8a2-2e0c8a4d032c` |
+| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |

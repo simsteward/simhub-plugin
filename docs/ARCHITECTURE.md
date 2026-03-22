@@ -282,3 +282,15 @@ classDiagram
   note for SessionContext "Merged into every action and iracing log.\nSource: _logCtxSubsession, _logCtxParent,\n_logCtxSessionNum, _logCtxTrack, _logCtxLap"
   note for IncidentFingerprint "Combined: parent_session_id + subsession_id\n+ session_num + unique_user_id + replay_frame\nuniquely identify an incident across sessions"
 ```
+
+---
+
+## ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |
+| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |
+| Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
+| Sim Steward — User Flows | `3eb2ceb5-f859-417b-a7e4-8dde05493d55` |
+| Sim Steward — User Features (PM) | `c5157521-3681-4432-9c44-a49d8ee3a955` |

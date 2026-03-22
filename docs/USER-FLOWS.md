@@ -292,3 +292,15 @@ flowchart TD
 | 5 | UX gap | Meta strip expands in bottom dock; no feedback near clicked card in left column |
 | 6 | Product decision | "This driver's incidents" is NOT redundant with Mine chip — keep it (steward opponent review) |
 | 7 | Clarity gap | "Find driver's incidents" label implies discovery; it walks already-known frames — consider renaming |
+
+---
+
+## ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Sim Steward — Product Flow | `4f3c6370-0bfc-4f54-9848-9946745ac3d4` |
+| Sim Steward — User Features (PM) | `c5157521-3681-4432-9c44-a49d8ee3a955` |
+| Sim Steward — Architecture and Data Structures | `c453dd83-dfd9-4002-b8a2-2e0c8a4d032c` |
+| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |
