@@ -317,6 +317,53 @@ namespace SimSteward.Plugin
             _replayIndexBuildPhase = ReplayIndexBuildPhase.FastForwarding;
         }
 
+        /// <summary>TR-028: one structured log per primary detection; fingerprint matches TR-020 / <see cref="ReplayIncidentIndexDocumentBuilder"/>.</summary>
+        private void LogReplayIncidentIndexDetectionsLocked(IReadOnlyList<IncidentSample> samples, double replaySessionTimeSec)
+        {
+            if (_logger == null || samples == null || samples.Count == 0)
+                return;
+
+            int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+
+            foreach (IncidentSample s in samples)
+            {
+                try
+                {
+                    string fp = ReplayIncidentIndexFingerprint.ComputeHexV1(
+                        subSessionId,
+                        s.CarIdx,
+                        s.SessionTimeMs,
+                        s.DetectionSource,
+                        s.IncidentPoints);
+
+                    var fields = new Dictionary<string, object>
+                    {
+                        ["fingerprint"] = fp,
+                        ["car_idx"] = s.CarIdx,
+                        ["session_time_ms"] = s.SessionTimeMs,
+                        ["detection_source"] = s.DetectionSource,
+                        ["replay_frame"] = s.ReplayFrame,
+                        ["replay_session_time"] = Math.Round(replaySessionTimeSec, 6),
+                        ["incident_points"] = s.IncidentPoints.HasValue ? (object)s.IncidentPoints.Value : null
+                    };
+
+                    MergeSessionAndRoutingFields(fields);
+                    _logger.Structured(
+                        "INFO",
+                        "simhub-plugin",
+                        ReplayIncidentIndexBuild.EventDetection,
+                        "Replay incident index: detection during fast-forward (TR-028).",
+                        fields,
+                        "lifecycle",
+                        null);
+                }
+                catch
+                {
+                    // TR-030: logging must not abort index build
+                }
+            }
+        }
+
         private void ProcessFastForwardingLocked()
         {
             _replayIndexFfTelemetrySampleCount++;
@@ -391,7 +438,10 @@ namespace SimSteward.Plugin
                     _replayIndexScratchCarIdxFastRepairsUsed,
                     replayFrame);
                 if (tick.Count > 0)
+                {
                     _replayIndexIncidentSamples.AddRange(tick);
+                    LogReplayIncidentIndexDetectionsLocked(tick, replaySessionTimeSec);
+                }
 
                 return;
             }

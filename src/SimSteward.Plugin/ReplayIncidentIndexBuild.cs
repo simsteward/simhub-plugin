@@ -26,6 +26,8 @@ namespace SimSteward.Plugin
         public const string EventFastForwardComplete = "replay_incident_index_fast_forward_complete";
         public const string EventBuildError = "replay_incident_index_build_error";
         public const string EventBuildCancelled = "replay_incident_index_build_cancelled";
+        /// <summary>TR-028: one structured line per primary detection during fast-forward (same fingerprint as TR-020 JSON rows).</summary>
+        public const string EventDetection = "replay_incident_index_detection";
         public const string EventValidationSummary = "replay_incident_index_validation_summary";
 
         /// <summary>~2.5s at 60Hz telemetry between <c>ReplaySearchSessionTime</c> and <c>CamCarIdx</c> read (TR-025).</summary>

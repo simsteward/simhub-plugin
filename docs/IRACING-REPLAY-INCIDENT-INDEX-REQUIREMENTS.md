@@ -288,7 +288,7 @@ This implementation is broken down into the following milestones (tracked in Con
 | **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008, TR-041 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | Complete |
 | **M3: Incident Detection Logic** | TR-012 – TR-018, TR-041 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | Complete |
 | **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004, TR-041 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | Complete |
-| **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | ⏳ Not Started |
+| **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | Complete |
 | **M6: SimHub Web Dashboard** | TR-031 – TR-038, TR-041 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
 | **M7: Grafana Insights Dashboard** | TR-039 – TR-040, TR-041 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
 | **M8: Test suite construction** | TR-041, TR-042 | Automated tests for the replay incident index (mocks/fixtures, golden data as needed); expectations trace to this spec. | Complete |
@@ -296,12 +296,12 @@ This implementation is broken down into the following milestones (tracked in Con
 
 ### M8 / M9 acceptance review (completed)
 
-Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M4 code paths). **TR-042** coverage MUST expand as **M5+** lands (full M5 Loki taxonomy, dashboard, etc.).
+Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M5 code paths). **TR-042** coverage MUST expand as **M6+** lands (dashboard, Grafana JSON, etc.).
 
 | Item | Evidence |
 |------|----------|
 | **TR-041** | This subsection is the M8/M9 milestone summary (scope, requirement mapping, evidence pointers). |
-| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3); `ReplayIncidentIndexDetectionTests` (TR-012–TR-018 / §4.4); M4: `ReplayIncidentIndexFingerprintTests`, `ReplayIncidentIndexDocumentBuilderTests`, `ReplayIncidentIndexResultsYamlTests`, `ReplayIncidentIndexValidationComparerTests`, `ReplayIncidentIndexOutputPathsTests` (TR-019–TR-024, fingerprint §4.5). Test classes reference the spec in XML docs. |
+| **TR-042** | `ReplayIncidentIndexPrerequisitesTests` (TR-001–TR-003 / §4.1); `ReplayIncidentIndexBuildTests` (TR-004–TR-011, NFR-008 / §4.2–§4.3, M5 event constants / TR-028 taxonomy); `ReplayIncidentIndexDetectionTests` (TR-012–TR-018 / §4.4); M4: `ReplayIncidentIndexFingerprintTests`, `ReplayIncidentIndexDocumentBuilderTests`, `ReplayIncidentIndexResultsYamlTests`, `ReplayIncidentIndexValidationComparerTests`, `ReplayIncidentIndexOutputPathsTests` (TR-019–TR-024, fingerprint §4.5). Test classes reference the spec in XML docs. |
 | **TR-043** | `dotnet test` for `SimSteward.Plugin.Tests` (net48) passes with zero failures; project policy: resolve failures by fixing implementation or updating this document—not by weakening tests. Same suite is enforced by deploy scripts per SimHub development rules. |
 
 ### M1 acceptance review (completed)
@@ -374,6 +374,21 @@ Milestone **M4** is **Complete**; TR-019–TR-025, NFR-004, and TR-041 are imple
 | **NFR-004** | `TryRestoreReplayIndexSavedFrameLocked`: `ReplaySetPlayPosition(Begin, saved frame)` + 1× speed after finalize, cancel, disconnect, seek timeout, fast-forward speed failure, and `ReplaySearch(ToStart)` failure. |
 
 **Code:** `ReplayIncidentIndexFingerprint.cs`, `ReplayIncidentIndexDocumentModel.cs`, `ReplayIncidentIndexOutputPaths.cs`, `ReplayIncidentIndexResultsYaml.cs`, `ReplayIncidentIndexValidationComparer.cs`, `ReplayIncidentIndexBuild.cs` (`EventValidationSummary`, cooldown constant), `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (post-FF pipeline, `FinalizeReplayIndexBuildLocked`, `ProcessCameraValidatingLocked`). **Tests:** `ReplayIncidentIndexFingerprintTests`, `ReplayIncidentIndexDocumentBuilderTests`, `ReplayIncidentIndexResultsYamlTests`, `ReplayIncidentIndexValidationComparerTests`, `ReplayIncidentIndexOutputPathsTests`. **Structured log:** `replay_incident_index_validation_summary` ([GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)); JSON write failure → `replay_incident_index_build_error` (`json_write_failed`).
+
+### M5 acceptance review (completed)
+
+Milestone **M5** is **Complete**; TR-026–TR-030, TR-041, and per-detection observability are implemented as follows.
+
+| Item | Evidence |
+|------|----------|
+| **TR-041** | This subsection is the M5 milestone summary (scope, requirement mapping, evidence pointers). |
+| **TR-026** | Lifecycle events (M2–M3) plus M4 `replay_incident_index_validation_summary`; M5 adds `replay_incident_index_detection` so the minimum SHOULD set in §4.7 is satisfied. |
+| **TR-027** | Detection logs are **event-driven** (one line per accepted primary incident), not per 60Hz tick. |
+| **TR-028** | `ReplayIncidentIndexBuild.EventDetection`; `LogReplayIncidentIndexDetectionsLocked` in `SimStewardPlugin.ReplayIncidentIndexBuild.cs` emits `fingerprint` via `ReplayIncidentIndexFingerprint.ComputeHexV1` (same inputs as `ReplayIncidentIndexDocumentBuilder`), `car_idx`, `session_time_ms`, `detection_source`, `incident_points`, `replay_frame`, `replay_session_time`, and `MergeSessionAndRoutingFields` spine. |
+| **TR-029** | Validation outcomes remain on `replay_incident_index_validation_summary` (M4); no split events required. |
+| **TR-030** | Per-detection `Structured` calls wrapped in try/catch so logging failures do not abort the build; Loki optional per existing pipeline. |
+
+**Code:** `ReplayIncidentIndexBuild.cs` (`EventDetection`), `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (`LogReplayIncidentIndexDetectionsLocked`). **Tests:** `ReplayIncidentIndexBuildTests` (event name constants). Fingerprint parity with JSON rows: `ReplayIncidentIndexDocumentBuilderTests.Fingerprint_MatchesPerRowCanonicalDigest`. **Log taxonomy:** [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md) (`replay_incident_index_detection`).
 
 ---
 
