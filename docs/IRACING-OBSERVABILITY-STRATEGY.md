@@ -20,10 +20,10 @@ The split is determined by one question: *is this a measurement or an event?*
 **Correlation key** across both systems:
 
 ```
-subsession_id  +  car_idx  +  session_time_ms
+subsession_id  +  car_idx  +  session_time_ms  +  camera_angle_id
 ```
 
-This three-field tuple is sufficient to join any Prometheus metric to any Loki log line for the same car at the same moment. `subsession_id` is the race identity, `car_idx` is the driver identity within that race, `session_time_ms` is the timestamp in the session's own clock (not wall clock, avoiding replay/live discrepancy).
+This four-field tuple is sufficient to join any Prometheus metric to any Loki log line for the same car at the same moment. `subsession_id` is the race identity, `car_idx` is the driver identity within that race, `session_time_ms` is the timestamp in the session's own clock (not wall clock, avoiding replay/live discrepancy), and `camera_angle_id` (or equivalent view identifier like `camera_group`) captures the perspective.
 
 ---
 
@@ -170,6 +170,7 @@ All log lines are structured JSON. The correlation key fields are present in eve
   "car_idx": 3,
   "cust_id": 987654,
   "driver_name": "J. Verstappen",
+  "camera_angle_id": "TV2",
   "source": "sdk_replay"
 }
 ```
@@ -188,6 +189,7 @@ Emitted when `CarIdxSessionFlags` repair or furled bit rises, or `PlayerCarMyInc
   "car_idx": 3,
   "cust_id": 987654,
   "driver_name": "J. Verstappen",
+  "camera_angle_id": "TV2",
   "session_time_ms": 184320,
   "subsession_id": 12345678,
   "session_num": 0,
@@ -367,7 +369,7 @@ Use `session_time_ms` from the log as the annotation timestamp (after offset con
 | `incident_points` is null for all non-player cars | Cannot determine 1x/2x/4x for other drivers | Unavoidable SDK limitation. Document clearly. `player_incident_count` delta is the only source. |
 | `driver_name` and `cust_id` not available during fast-forward replay | Logs may lack driver identity for non-player cars if YAML hasn't loaded | Cross-reference `car_idx` against `DriverInfo` from session YAML after index build. Enrich log lines in post-processing. |
 | REST API incident data (per-lap) and SDK fast-forward data (per-frame) may show different timestamps | Confusion when joining the two sources | Always prefer SDK fast-forward timestamp for precision. REST API lap-level data is only for validation and gap-fill when replay is unavailable. |
-| Event deduplication during replay seek | If replay jumps backward, incident events may fire again | Include `source: sdk_replay` label. Filter or deduplicate by `subsession_id + car_idx + session_time_ms` at ingest. |
+| Event deduplication during replay seek | If replay jumps backward, incident events may fire again | Include `source: sdk_replay` label. Filter or deduplicate by `subsession_id + car_idx + session_time_ms + camera_angle_id` at ingest. |
 
 ### General
 
