@@ -17,7 +17,8 @@ Use only when the ContextStream MCP is enabled; otherwise skip and use local too
 
 ## Operations
 - **Plans:** ALWAYS `session(action="capture_plan")` + `memory(action="create_task")`. NO markdown files.
-- **Docs:** Populate via `project(action="index")`.
+- **Repo ↔ ContextStream sync:** Use MCP **`project(action="index")`** or **`project(action="ingest_local", path="…")`** — the server-side ingest/index task. Do **not** sync via custom HTTP/API scripts, committed JSON arg files, or non-MCP CLI automation (see `docs/CONTEXTSTREAM-UPLOAD-PLAN.md`). After a sync, log with **`session(action="capture", event_type="operation", …)`**.
+- **Optional Memory mirror:** `memory(create_doc|update_doc)` only through MCP in Cursor when you intentionally duplicate a spec in Memory — not via external API clients.
 - **Todos:** `memory(action="create_todo")`.
 - **Memory/Notes:** `session(action="capture", event_type="decision|note|lesson")`.
 

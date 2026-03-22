@@ -140,6 +140,8 @@ See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL exam
 
 ## 9. ContextStream MCP (index / search / 401)
 
+**Default workflow:** Keep the repo in sync with ContextStream using the **ContextStream MCP** **`project` tool** — `project(action="index")` or `project(action="ingest_local", path="<repo>")` — then log the run with `session(action="capture", event_type="operation", …)` per **docs/CONTEXTSTREAM-UPLOAD-PLAN.md**. Do **not** use ad-hoc HTTP/API scripts for routine sync. The CLI steps below are **troubleshooting only** when MCP or env is misconfigured.
+
 - **401 on ingest or `verify-key`** — The ContextStream API key must be in `.env` (`CONTEXTSTREAM_API_KEY`, etc.) and loaded for CLI commands. From the repo root:  
   `npx -y envmcp --env-file .env cmd /c "%LocalAppData%\ContextStream\contextstream-mcp.exe verify-key"`  
   If that fails, rotate the key in the ContextStream account and update `.env` (do not commit real secrets).
