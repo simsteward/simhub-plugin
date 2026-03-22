@@ -953,9 +953,16 @@ namespace SimSteward.Plugin
                 _irsdk.OnConnected += () =>
                 {
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_connected", "iRacing connected.", null, "lifecycle", null);
+                    if (_irsdk != null && _logger != null)
+                    {
+                        var sdkReady = ReplayIncidentIndexPrerequisites.BuildSdkReadyFields(_irsdk.IsConnected, _irsdk.UpdateInterval);
+                        _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexPrerequisites.EventSdkReady,
+                            "Replay incident index: IRSDK memory map ready (TR-001).", sdkReady, "lifecycle", null);
+                    }
                 };
                 _irsdk.OnDisconnected += () =>
                 {
+                    _replayIncidentIndexPrereqLogKey = "";
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_disconnected", "iRacing disconnected.", null, "lifecycle", null);
                 };
                 _irsdk.OnSessionInfo += OnIrsdkSessionInfo;

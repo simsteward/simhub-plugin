@@ -25,6 +25,8 @@ namespace SimSteward.Plugin
             if (_logger == null || _irsdk == null || !_irsdk.IsConnected)
                 return;
 
+            MaybeLogReplayIncidentIndexSessionContext();
+
             try
             {
                 int subId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;

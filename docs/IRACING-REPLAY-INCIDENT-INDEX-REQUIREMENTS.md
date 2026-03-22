@@ -259,7 +259,7 @@ This implementation is broken down into the following milestones (tracked in Con
 
 | Milestone | Requirements | Description | Status |
 |---|---|---|---|
-| **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | ⏳ Not Started |
+| **M1: Project Setup & SDK Connection** | TR-001 – TR-003, NFR-005 | Setup plugin structure, connect SDK, verify replay mode, extract `SubSessionID`. | Complete |
 | **M2: Fast-Forward & Baseline Capture** | TR-004 – TR-011, NFR-008 | Seek to start, capture baseline flags, trigger 16× fast-forward, hook raw native 60Hz polling (~3.75 Hz vs. session time acceptable per §2.7), handle completion. | ⏳ Not Started |
 | **M3: Incident Detection Logic** | TR-012 – TR-018 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | ⏳ Not Started |
 | **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | ⏳ Not Started |
