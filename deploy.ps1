@@ -1,18 +1,23 @@
 # Deploy Sim Steward plugin (skeleton) to local SimHub.
-# Run from plugin/:  .\deploy.ps1
+# Run from plugin/:  .\deploy.ps1 [-EnvFile path\to\secrets.env]
 # Requires: SimHub installed; place SimHub.Plugins.dll and GameReaderCommon.dll in lib\SimHub\ (or script copies from SimHub path).
+
+param(
+    [string]$EnvFile = ""
+)
 
 $ErrorActionPreference = "Stop"
 $PluginRoot = $PSScriptRoot
 
-# Load repo .env (+ optional observability stack secrets) so SIMSTEWARD_LOKI_URL, LOKI_PUSH_TOKEN, etc. apply to deploy + Loki marker.
+# Load env: default .env + optional observability merge, or -EnvFile (absolute or repo-relative) + same merge.
 $loadDotenv = Join-Path $PluginRoot "scripts\load-dotenv.ps1"
 if (Test-Path $loadDotenv) {
     . $loadDotenv
-    Import-DotEnv @(
-        (Join-Path $PluginRoot ".env"),
-        (Join-Path $PluginRoot "observability\local\.env.observability.local")
-    )
+    $dotPaths = Resolve-SimStewardEnvPaths -RepoRoot $PluginRoot -EnvFile $EnvFile
+    Import-DotEnv $dotPaths
+    if (-not [string]::IsNullOrWhiteSpace($EnvFile)) {
+        Write-Host "Loaded secrets from -EnvFile $EnvFile (+ observability local merge if present)."
+    }
 }
 
 # Deploy marker → Grafana Explore (Loki). Default local stack when unset; avoid template Cloud URL without creds (530).
@@ -283,6 +288,6 @@ if (-not $skipTests) {
 }
 
 Write-Host "Recording deploy in Loki (Grafana Explore: {app=`"sim-steward`",env=`"$($env:SIMSTEWARD_LOG_ENV)`"} | json | event=`"deploy_marker`") ..."
-& (Join-Path $PluginRoot "scripts\send-deploy-loki-marker.ps1") -Status ok -PostDeployWarning:$postDeployFailed -Detail "deploy.ps1 finished"
+& (Join-Path $PluginRoot "scripts\send-deploy-loki-marker.ps1") -Status ok -PostDeployWarning:$postDeployFailed -Detail "deploy.ps1 finished" -EnvFile $EnvFile
 
 Write-Host "Deploy complete."

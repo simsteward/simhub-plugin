@@ -36,3 +36,25 @@ function Import-DotEnv {
         }
     }
 }
+
+# Primary env file: use -EnvFile path (absolute or repo-relative) instead of default repo .env; then merge observability/local/.env.observability.local if present.
+function Resolve-SimStewardEnvPaths {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [string]$EnvFile = ''
+    )
+    $list = [System.Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($EnvFile)) {
+        $resolved = if ([System.IO.Path]::IsPathRooted($EnvFile)) { $EnvFile } else { Join-Path $RepoRoot $EnvFile }
+        if (-not (Test-Path -LiteralPath $resolved)) {
+            throw "Env file not found: $resolved"
+        }
+        [void]$list.Add($resolved)
+    } else {
+        $def = Join-Path $RepoRoot '.env'
+        if (Test-Path -LiteralPath $def) { [void]$list.Add($def) }
+    }
+    $obs = Join-Path $RepoRoot 'observability\local\.env.observability.local'
+    if (Test-Path -LiteralPath $obs) { [void]$list.Add($obs) }
+    return ,$list.ToArray()
+}

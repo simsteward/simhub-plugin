@@ -1,6 +1,8 @@
 # Start SimHub with env vars set for local Loki (plugin pushes to local Grafana stack).
-# Run from plugin repo root:  .\scripts\run-simhub-local-observability.ps1
+# Run from plugin repo root:  .\scripts\run-simhub-local-observability.ps1 [-EnvFile path\to\secrets.env]
 # See docs/observability-local.md and docs/GRAFANA-LOGGING.md.
+
+param([string]$EnvFile = "")
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
@@ -10,11 +12,12 @@ $PluginRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 $loadDotenv = Join-Path $ScriptDir "load-dotenv.ps1"
 if (Test-Path $loadDotenv) {
     . $loadDotenv
-    Import-DotEnv @(
-        (Join-Path $PluginRoot ".env"),
-        (Join-Path $PluginRoot "observability\local\.env.observability.local")
-    )
-    Write-Host "Loaded env from .env / .env.observability.local (if present)"
+    Import-DotEnv (Resolve-SimStewardEnvPaths -RepoRoot $PluginRoot -EnvFile $EnvFile)
+    if (-not [string]::IsNullOrWhiteSpace($EnvFile)) {
+        Write-Host "Loaded env from -EnvFile $EnvFile (+ observability local merge if present)"
+    } else {
+        Write-Host "Loaded env from .env / .env.observability.local (if present)"
+    }
 }
 
 # Debug log for agent sessions (writes to workspace so we can read after run)

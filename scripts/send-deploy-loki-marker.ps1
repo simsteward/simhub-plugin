@@ -6,7 +6,8 @@ param(
     [ValidateSet('ok', 'failed')]
     [string]$Status = 'ok',
     [switch]$PostDeployWarning,
-    [string]$Detail = ''
+    [string]$Detail = '',
+    [string]$EnvFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,10 +16,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $loadDotenv = Join-Path $repoRoot 'scripts\load-dotenv.ps1'
 if (Test-Path $loadDotenv) {
     . $loadDotenv
-    Import-DotEnv @(
-        (Join-Path $repoRoot '.env'),
-        (Join-Path $repoRoot 'observability\local\.env.observability.local')
-    )
+    Import-DotEnv (Resolve-SimStewardEnvPaths -RepoRoot $repoRoot -EnvFile $EnvFile)
 }
 
 $url = $env:SIMSTEWARD_LOKI_URL
