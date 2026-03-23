@@ -13,6 +13,7 @@
     "obs:poll:grafana:env": "dotenv -e .env -- pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana",
     "obs:wipe": "pwsh -NoProfile -File scripts/obs-wipe-local-data.ps1",
     "obs:poll:prometheus": "pwsh -NoProfile -File scripts/poll-prometheus.ps1",
+    "obs:ports": "pwsh -NoProfile -File scripts/check-obs-ports.ps1",
     "loki:query": "dotenv -e .env -- node scripts/query-loki-once.mjs"
   },
   "devDependencies": {

@@ -64,7 +64,7 @@ The repo stack includes **Grafana**, **Loki**, and **loki-gateway** (nginx). The
 | loki-gateway (push) | http://localhost:3500 |
 | OpenTelemetry Collector (OTLP gRPC) | `http://127.0.0.1:4317` (host → container) |
 | OpenTelemetry Collector (OTLP HTTP) | `http://127.0.0.1:4318` |
-| Collector Prometheus exporter (scrape) | `http://127.0.0.1:8889/metrics` |
+| Collector Prometheus exporter (host curl / debug) | `http://127.0.0.1:18889/metrics` (mapped from container **8889**; Prometheus scrapes `otel-collector:8889` inside compose) |
 | Prometheus (UI / API) | http://localhost:9090 |
 | Collector health_check | http://127.0.0.1:13133 |
 
@@ -77,6 +77,27 @@ Files under `observability/local/`. Security: `LOKI_PUSH_TOKEN` required for `PO
 **Validate:** Grafana datasource `loki_local`; LogQL `{app="sim-steward",env="local"}` once the plugin is pushing to Loki (or your configured `SIMSTEWARD_LOKI_URL`). MCP: `list_datasources`, `query_loki_logs`.
 
 **Troubleshooting:** Token format `Bearer <token>`; ensure `plugin-structured.jsonl` is actually ingested (see **docs/TROUBLESHOOTING.md** §8).
+
+### Port collisions (Docker bind errors)
+
+The stack publishes these **host** ports together; any other process (or second compose project) using the same port will prevent `docker compose up`:
+
+| Host port | Service |
+|-----------|---------|
+| 3000 | Grafana |
+| 3100 | Loki |
+| 3500 | loki-gateway |
+| 4317, 4318 | OpenTelemetry Collector (OTLP) |
+| 8080 | data-api |
+| 9090 | Prometheus |
+| 13133 | Collector `health_check` |
+| 18889 | Collector Prometheus exporter (host; container listens on 8889) |
+
+**SimHub** (separate from Docker) commonly uses **8888** (HTTP) and **19847** (Sim Steward WebSocket default). Those can collide with unrelated tools, not usually with this compose file.
+
+**Audit script:** from repo root run `pwsh -NoProfile -File scripts/check-obs-ports.ps1` to see what is already listening on these ports (and owning process name).
+
+**Typical conflicts:** **3000** (other Grafana, React dev server), **8080** (many dev backends), **9090** (another Prometheus), **4317/4318** (another OTel collector or agent). **8889:** On some setups **SimHub (`SimHubWPF.exe`)** also listens on **8889** alongside **8888** — that blocks mapping collector **8889** to the host, which is why compose publishes **`18889:8889`** (Prometheus still scrapes `otel-collector:8889` inside Docker).
 
 ### Metrics / OTLP troubleshooting
 
