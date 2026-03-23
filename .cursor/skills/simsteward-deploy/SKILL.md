@@ -7,6 +7,7 @@ description: Deploy/Watch commands for SimHub plugins.
 ## Quick start
 - **Manual deploy:** `pwsh -File .\deploy.ps1` — optional **`-EnvFile`** `C:\path\to\secrets.env` or repo-relative (`.env.prod`); merges `observability/local/.env.observability.local` after.
 - **Watch deploy:** `pwsh -File .\scripts\watch-deploy.ps1` — same **`-EnvFile`** passthrough to deploy.
+- **Agent reply:** After deploy, tell the user the **plugin version** printed by the script (`=== SimSteward plugin version (deployed): … ===` and `Deploy complete. Plugin version: …`). Matches SimHub dashboard / WebSocket `pluginVersion`.
 
 ## Locations
 - **Plugin:** `C:\Program Files (x86)\SimHub\` (or `$env:SIMHUB_PATH`)

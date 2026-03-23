@@ -37,6 +37,10 @@ Use only when the ContextStream MCP is enabled; otherwise skip and use local too
 - **`search`:** Prefer **`output_format`** `minimal` or `paths`; default **`limit`** **3–5** unless you need exhaustive hits. Lower **`content_max_chars`** when you only need locations; add **`context_lines`** when you need local snippet context around matches.
 - **Long threads:** Keep **`session(action="compress")`** after 30+ turns or milestones (see Maintenance).
 
+## Deploy + plugin version (agents)
+- When the user asks to **run deploy** (`deploy.ps1`), run it and **quote the plugin version** from script output: the cyan line `=== SimSteward plugin version (deployed): … ===` and/or the final `Deploy complete. Plugin version: …`. Same value is WebSocket `state.pluginVersion` and Loki `deploy_marker` JSON `detail` suffix `pluginVersion=…`.
+- **Memory (semantic):** Prefer `memory(action="create_node", node_type="fact", …)` for durable deploy/testing facts; tag `simsteward`, `deploy`, `testing` when relevant.
+
 ## Operations
 - **Plans:** ALWAYS `session(action="capture_plan")` + `memory(action="create_task")`. NO markdown files.
 - **Repo ↔ ContextStream sync:** Use MCP **`project(action="index")`** or **`project(action="ingest_local", path="…")`** — the server-side ingest/index task. Prefer **`npm run contextstream:ingest[:force]`** for CLI ingest with `.env` via envmcp. Do **not** sync via ad-hoc HTTP clients or committed JSON payload dumps. After a sync, log with **`session(action="capture", event_type="operation", …)`**.

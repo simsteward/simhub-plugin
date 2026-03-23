@@ -46,6 +46,20 @@ $PluginDlls = @(
     "YamlDotNet.dll"
 )
 
+function Read-PluginDllProductVersion {
+    param([string]$DllPath)
+    try {
+        if (-not (Test-Path -LiteralPath $DllPath)) { return $null }
+        $full = (Resolve-Path -LiteralPath $DllPath).Path
+        return ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($full)).ProductVersion
+    } catch {
+        return $null
+    }
+}
+
+# Populated after DLL copy + verify (AssemblyInformationalVersion → PE ProductVersion)
+$script:SimStewardPluginVersionDeployed = $null
+
 # ── Locate SimHub install path ───────────────────────────────────────────────
 $SimHubPath = $null
 if ($env:SIMHUB_PATH -and (Test-Path $env:SIMHUB_PATH)) {
@@ -228,6 +242,16 @@ if (-not (Test-DeploySuccess)) {
 }
 Write-Host "Deploy verified."
 
+$deployedPluginDll = Join-Path $SimHubPath "SimSteward.Plugin.dll"
+$script:SimStewardPluginVersionDeployed = Read-PluginDllProductVersion $deployedPluginDll
+Write-Host ""
+if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) {
+    Write-Host "=== SimSteward plugin version (deployed): $($script:SimStewardPluginVersionDeployed) ===" -ForegroundColor Cyan
+} else {
+    Write-Warning "Could not read ProductVersion from SimSteward.Plugin.dll after deploy."
+}
+Write-Host ""
+
 # ── 5. Re-launch SimHub ─────────────────────────────────────────────────────
 $skipLaunch = $env:SIMHUB_SKIP_LAUNCH -eq "1"
 if ($skipLaunch) {
@@ -288,6 +312,11 @@ if (-not $skipTests) {
 }
 
 Write-Host "Recording deploy in Loki (Grafana Explore: {app=`"sim-steward`",env=`"$($env:SIMSTEWARD_LOG_ENV)`"} | json | event=`"deploy_marker`") ..."
-& (Join-Path $PluginRoot "scripts\send-deploy-loki-marker.ps1") -Status ok -PostDeployWarning:$postDeployFailed -Detail "deploy.ps1 finished" -EnvFile $EnvFile
+$markerDetail = "deploy.ps1 finished"
+if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) {
+    $markerDetail += "; pluginVersion=$($script:SimStewardPluginVersionDeployed)"
+}
+& (Join-Path $PluginRoot "scripts\send-deploy-loki-marker.ps1") -Status ok -PostDeployWarning:$postDeployFailed -Detail $markerDetail -EnvFile $EnvFile
 
-Write-Host "Deploy complete."
+$pvOut = if ([string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) { "(unknown)" } else { $script:SimStewardPluginVersionDeployed }
+Write-Host "Deploy complete. Plugin version: $pvOut"

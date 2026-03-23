@@ -63,6 +63,7 @@ alwaysApply: false
 - **Linter checks** (`ReadLints`) on edited files must show 0 new errors before committing or deploying.
 - Tests include: `dotnet build` (0 errors), `dotnet test` (0 failures), `tests/*.ps1` scripts (exit 0, `PASS:` lines only), and linter checks on changed files.
 - See `.cursor/skills/simsteward-deploy/SKILL.md` for the full deploy workflow and test phase details.
+- **`deploy.ps1` prints plugin build id** (`=== SimSteward plugin version (deployed): … ===`, then `Deploy complete. Plugin version: …`). When the user asks the agent to run deploy, **repeat that version in the reply** (same string as WebSocket `state.pluginVersion`).
 
 ## Community References
 
