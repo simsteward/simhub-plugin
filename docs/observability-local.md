@@ -24,7 +24,7 @@ Quick start for plugin logs in local Grafana/Loki and the **loki-gateway** push 
 
 **Storage override:** Set `GRAFANA_STORAGE_PATH` in `.env.observability.local`; compose uses `${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}`.
 
-**Terminal tail:** `npm run obs:poll` or `.\scripts\poll-loki.ps1`.
+**Terminal tail:** `npm run obs:poll` (direct Loki :3100) or `npm run obs:poll:grafana` / `.\scripts\poll-loki.ps1 -ViaGrafana` using **GRAFANA_API_TOKEN** (or admin user/password) in repo `.env` — same path Grafana Explore uses (`loki_local` datasource).
 
 ---
 
@@ -43,7 +43,7 @@ Equivalent: `.\scripts\obs-wipe-local-data.ps1 -Force` (same switches).
 
 ## Loki gateway (token-protected push)
 
-The repo stack includes **Grafana**, **Loki**, and **loki-gateway** (nginx). The plugin still writes only to **`plugin-structured.jsonl`**; **nothing in this compose tails that file automatically**. You must run your own ingestion (e.g. ship NDJSON lines to Loki, Grafana Cloud agent, or `POST` to the gateway with `Authorization: Bearer <LOKI_PUSH_TOKEN>`). **Direct plugin HTTP** to Grafana Cloud/local Loki is documented in **docs/GRAFANA-LOGGING.md**.
+The repo stack includes **Grafana**, **Loki**, and **loki-gateway** (nginx). The plugin writes **`plugin-structured.jsonl`** and **POSTs** batches to **`SIMSTEWARD_LOKI_URL`** (no separate log agent). For this compose, set that URL to `http://localhost:3100` (Loki) or `http://localhost:3500` (gateway) and use `Authorization: Bearer <LOKI_PUSH_TOKEN>` when using the gateway — see **docs/GRAFANA-LOGGING.md**.
 
 | Service | URL |
 |---------|-----|
@@ -57,7 +57,7 @@ Files under `observability/local/`. Security: `LOKI_PUSH_TOKEN` required for `PO
 
 `docker compose --env-file .env.observability.local -f observability/local/docker-compose.yml up -d`
 
-**Validate:** Grafana datasource `loki_local`; LogQL `{app="sim-steward",env="local"}` once your shipper is pushing. MCP: `list_datasources`, `query_loki_logs`.
+**Validate:** Grafana datasource `loki_local`; LogQL `{app="sim-steward",env="local"}` once the plugin is pushing to Loki (or your configured `SIMSTEWARD_LOKI_URL`). MCP: `list_datasources`, `query_loki_logs`.
 
 **Troubleshooting:** Token format `Bearer <token>`; ensure `plugin-structured.jsonl` is actually ingested (see **docs/TROUBLESHOOTING.md** §8).
 

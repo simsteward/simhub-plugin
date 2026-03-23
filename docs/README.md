@@ -15,6 +15,14 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 
 ---
 
+## Tier A+ — architecture (data structures + flows)
+
+| Doc | Use when |
+|-----|----------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Class diagrams (PluginSnapshot, LogEntry, WS messages), ER diagram (data API), sequence diagrams (action dispatch, incident pipeline) |
+
+---
+
 ## Tier B — topic hubs (open when needed)
 
 | Doc | Use when |
@@ -23,7 +31,9 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 | [USER-FLOWS.md](USER-FLOWS.md) | Step-by-step user journeys through today's UI (mermaid diagrams); PM issues and flow gaps |
 | [observability-local.md](observability-local.md) | Local Grafana/Loki stack, npm scripts, loki-gateway |
 | [observability-scaling.md](observability-scaling.md) | Many users, large grids, Loki cardinality |
+| [DATA-ROUTING-OBSERVABILITY.md](DATA-ROUTING-OBSERVABILITY.md) | OTel vs Loki vs Prometheus, ~1k-user sizing, car telemetry taxonomy |
 | [observability-testing.md](observability-testing.md) | Harness, AssertLokiQueries, Explore validation |
+| [IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md) | Replay-only incident index (SDK), TR-019 JSON, WebSocket actions, `Web/sim-steward-dash/replay-incident-index.html` |
 | [DATA-API-DEPLOY.md](DATA-API-DEPLOY.md) | Data API env (local vs prod) |
 | [REDEPLOY-CONCEPT.md](REDEPLOY-CONCEPT.md) | Redeploy mental model |
 

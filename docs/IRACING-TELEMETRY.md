@@ -1,6 +1,6 @@
 # iRacing Telemetry — SDK Variable Reference
 
-This document describes the telemetry data available from the iRacing SDK (via IRSDKSharper) and how it maps to this plugin's data pipeline.
+This document describes **how** telemetry is accessed from the iRacing SDK (via IRSDKSharper) and common variable names used in this plugin's pipeline. **When and where each class of data exists** (live vs replay vs post-results; player vs all cars; YAML vs REST) is defined in **[docs/IRACING-DATA-AVAILABILITY.md](IRACING-DATA-AVAILABILITY.md)** — the source of truth for availability. **Where high-rate data should go (OTel metrics vs Loki)** is defined in **docs/DATA-ROUTING-OBSERVABILITY.md** §5.
 
 ---
 
@@ -121,9 +121,13 @@ Example: `LFtempCL` = left-front tire inner surface temp.
 | `SessionState` | int | State enum (practice / qual / race) |
 | `SessionFlags` | bitField | Green / yellow / checkered / etc. |
 | `PaceMode` | int | Pace mode enum |
+| `IsReplayPlaying` | bool | Replay playback active (replay context only) |
 | `ReplayFrameNum` | int | Current replay frame |
 | `ReplayFrameNumEnd` | int | Total replay frames (length) |
 | `ReplayPlaySpeed` | int | Replay playback speed multiplier |
+| `ReplayPlaySlowMotion` | int | Slow-motion state (replay) |
+| `ReplaySessionTime` | double | Playback position in session time (replay; key for seeks) |
+| `ReplaySessionNum` | int | Session index within replay |
 | `CamCarIdx` | int | Car index currently on camera |
 | `PlayerCarIdx` | int | Player's own car index |
 
@@ -147,10 +151,18 @@ These use `GetFloat(name, carIdx)` / `GetInt(name, carIdx)`:
 | `CarIdxTrackSurfaceMaterial` | int | Surface material enum |
 | `CarIdxOnPitRoad` | bool | On pit road flag |
 | `CarIdxSteer` | float | Steering angle per car |
-| `CarIdxThrottle` | float | Throttle per car |
-| `CarIdxBrake` | float | Brake per car |
 | `CarIdxP2P_Status` | bool | Push-to-pass active |
 | `CarIdxP2P_Count` | int | Push-to-pass activations remaining |
+
+> **Per-car pedals removed:** iRacing deliberately removed `CarIdxThrottlePct`, `CarIdxBrakePct`, and `CarIdxClutchPct` from the SDK. Do not assume per-car throttle/brake/clutch arrays exist. Player-only `Throttle` / `Brake` / `Clutch` remain. See [IRACING-DATA-AVAILABILITY.md](IRACING-DATA-AVAILABILITY.md) Group 2 (gaps) and Group 7.
+
+### Availability quick reference (see IRACING-DATA-AVAILABILITY.md for full detail)
+
+| Window | Examples |
+|--------|----------|
+| **Live race only** | `PlayerCarMyIncidentCount`, `ChanLatency`, … |
+| **Replay only** | `IsReplayPlaying`, `ReplaySessionTime`, `ReplaySessionNum`, `ReplayPlaySpeed`, `ReplayPlaySlowMotion`; frame fields under **Session state** below |
+| **Player car only** | `Throttle`, `Brake`, `Speed`, tire/suspension channels, … — not valid for the spectated car when the camera follows someone else |
 
 ### IRSDKSharper calculated events (event system)
 

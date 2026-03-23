@@ -1,6 +1,6 @@
 # Observability scaling (Loki / many users / large sessions)
 
-How SimSteward logging scales in Grafana Loki: **many drivers per session**, **many plugin instances**, and **collecting logs from many users** without a heavy stack on each PC. Label rules and volume: **docs/GRAFANA-LOGGING.md**.
+How SimSteward logging scales in Grafana Loki: **many drivers per session**, **many plugin instances**, and **collecting logs from many users** without a heavy stack on each PC. Label rules and volume: **docs/GRAFANA-LOGGING.md**. **What goes to Loki vs OTel/metrics** and rough **~1k-user** math: **docs/DATA-ROUTING-OBSERVABILITY.md**.
 
 ---
 
@@ -11,7 +11,7 @@ How SimSteward logging scales in Grafana Loki: **many drivers per session**, **m
 | Dimension | Meaning | How it’s supported |
 |-----------|--------|---------------------|
 | **Many drivers per session** | 100–200+ cars in session-end results (not 64-car live telemetry cap). | Chunked `session_end_datapoints_results` (35 drivers per line). See **docs/GRAFANA-LOGGING.md** (chunked session results). |
-| **Many SimSteward users** | 100–200+ instances → one central Loki. | Lightweight forwarder per user + central Loki (**Part B** below). |
+| **Many SimSteward users** | 100–200+ instances → one central Loki. | Plugin pushes directly to central Loki (see **Part B** below). |
 
 ### Labels and streams (must stay bounded)
 
@@ -42,21 +42,17 @@ Local Docker + Loki per developer does **not** scale to ~120 users each running 
 
 ### Current pipeline (local, single-user)
 
-Plugin → `plugin-structured.jsonl` → your Loki ingestion path → Loki. No in-plugin network I/O on the hot path.
+Plugin → `plugin-structured.jsonl` (durability) → batched **HTTPS POST** to `SIMSTEWARD_LOKI_URL` → Loki. **No** separate agent on the user machine; push runs in-process (batching keeps `DataUpdate()` off the hot path).
 
 
-### Option A — Optional plugin push to central URL (recommended)
+### Implementation
 
-Background thread batches to central Loki when `SIMSTEWARD_LOKI_URL` points at central; trade-off vs file-only simplicity.
-
-### Option D — Hybrid / Fallback
-
-Always write file; optionally also push when central URL configured.
+Always write **`plugin-structured.jsonl`**. When **`SIMSTEWARD_LOKI_URL`** is set, batch and **POST** NDJSON to that **single** Loki HTTP endpoint (central or Grafana Cloud). No separate forwarder process.
 
 ### Recommendation
 
-- **Default:** file → local tailer → Loki (current).
-- **Many users:** central Loki + per-user lightweight forwarder with auth token; no full stack on user PCs.
+- **Default:** Plugin writes **plugin-structured.jsonl** locally and **POSTs** batched NDJSON to **one** Loki HTTP endpoint (`SIMSTEWARD_LOKI_URL`) from inside the plugin — **no** separate log shipper or forwarder on user machines.
+- **Many users:** Same pattern: many plugin instances → one central Loki; scale ingestion/retention to `users × volume per session`.
 
 ### Central Loki / Grafana Cloud
 
@@ -70,6 +66,18 @@ Same as Part A: chunked `session_end_datapoints_results` lines; **docs/GRAFANA-L
 
 ## References
 
+- **docs/DATA-ROUTING-OBSERVABILITY.md** — Routing decisions (events → Loki; high-rate telemetry → OTel → Prometheus/Mimir), sizing, car telemetry taxonomy.
 - **docs/GRAFANA-LOGGING.md** — Schema, volume budget, LogQL, housekeeping.
 - **docs/observability-local.md** — Local stack quick start.
 - Grafana: [Label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Query best practices](https://grafana.com/docs/loki/latest/query/bp-query/).
+
+---
+
+## ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |
+| Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
+| Observability — Local Stack | `25ed8579-c142-4040-b9a2-87b14523475f` |
+| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |

@@ -33,9 +33,9 @@ $lokiUrl = $lokiUrl.Trim().TrimEnd('/')
 $lokiUser = [System.Environment]::GetEnvironmentVariable("SIMSTEWARD_LOKI_USER", "Process")?.Trim()
 $lokiToken = [System.Environment]::GetEnvironmentVariable("SIMSTEWARD_LOKI_TOKEN", "Process")?.Trim()
 
-$endSec = [long]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
-$startSec = $endSec - $LookbackSeconds
-$url = "$lokiUrl/loki/api/v1/query_range?query=" + [Uri]::EscapeDataString($Query) + "&limit=500&start=$startSec&end=$endSec"
+$endNs = [long]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() * 1000000)
+$startNs = $endNs - ([long]$LookbackSeconds * 1000000000)
+$url = "$lokiUrl/loki/api/v1/query_range?query=" + [Uri]::EscapeDataString($Query) + "&limit=500&start=$startNs&end=$endNs"
 
 $payload = @{
     sessionId   = "2291d4"

@@ -59,6 +59,8 @@ If the in-dashboard log stream stays empty when you click Play, capture, or othe
 
 If you run a replay and incidents are not captured or signaled:
 
+**What iRacing exposes when:** See [docs/IRACING-DATA-AVAILABILITY.md](IRACING-DATA-AVAILABILITY.md). Live race vs replay vs post-results differ (especially for **per-car** incidents and **YAML results** fields). Do not assume a field populated in replay is populated the same way during a live race.
+
 ### Required checks
 
 1. **iRacing shared memory enabled** — Edit `%USERPROFILE%\Documents\iRacing\app.ini` and ensure `irsdkEnableMem=1`. (Some iRacing versions expose this under Options > Graphics.) Without this, the plugin cannot connect.
@@ -78,7 +80,7 @@ If you run a replay and incidents are not captured or signaled:
 ### Incident point accuracy
 
 - For the **player/focused car**, the plugin uses `PlayerCarMyIncidentCount` at 60 Hz. The **delta is the incident type** (1=off-track, 2=wall/spin, 4=heavy contact). Values should match iRacing.
-- For **other drivers**, data comes from `ResultsPositions[].Incidents` in the session YAML. At high replay speeds (e.g. 16x), iRacing batches updates — you may see a single +6x event instead of separate 2x+2x+2x. The total is correct; the per-incident breakdown is approximated.
+- For **other drivers**, the plugin compares **per-driver `CurDriverIncidentCount`** from the session YAML (`DriverInfo`) on each `SessionInfoUpdate` — not `ResultsPositions` directly (see **IRACING-DATA-AVAILABILITY.md** Group 5 for when **final** `ResultsPositions[].Incidents` is meaningful). **Live race:** no per-car telemetry incident count for others; YAML/session-info behavior may still differ from replay — see the availability doc. At high replay speeds (e.g. 16x), iRacing batches updates — you may see a single +6x event instead of separate 2x+2x+2x. The total is correct; the per-incident breakdown is approximated.
 - iRacing's **quick-succession rule**: multiple incidents in rapid succession can be merged. A 2x spin followed by 4x contact may show as +4x only (highest counts).
 
 ---
@@ -127,12 +129,12 @@ For a step-by-step to get plugin data into **local** Grafana, see **docs/observa
 
 If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 
-1. **Plugin output** — The plugin writes **plugin-structured.jsonl** only; it does not POST to Loki. You need a **Loki ingestion** path (Grafana Cloud agent, your shipper, `POST` to **loki-gateway** with `LOKI_PUSH_TOKEN`, etc.). See **docs/observability-local.md** and **docs/GRAFANA-LOGGING.md**.
+1. **Plugin output** — The plugin writes **plugin-structured.jsonl** and **POSTs** batched lines to **`SIMSTEWARD_LOKI_URL`** (one Loki push endpoint; no separate agent on the PC). For local stacks, point that URL at `http://localhost:3100` or your **loki-gateway** push URL with `LOKI_PUSH_TOKEN` as documented in **docs/observability-local.md** and **docs/GRAFANA-LOGGING.md**.
 2. **Env metadata** — Set `SIMSTEWARD_LOKI_URL` and `SIMSTEWARD_LOG_ENV` before SimHub starts (e.g. via `.env` loaded by your launcher) so log lines include `loki_push_target` / `log_env`; this does not replace ingestion.
 3. **Local stack** — Start observability from `observability/local/` (`docker compose up -d`) so Loki (3100) and Grafana (3000) run; compose does **not** tail `plugin-structured.jsonl` for you.
-4. **Auth (Grafana Cloud)** — For Grafana Cloud direct push from *your* agent, use your stack’s credentials; wrong tokens show up in that agent’s logs, not as a built-in “LokiSink” in this plugin.
+4. **Auth (Grafana Cloud)** — Use your stack’s credentials on the **in-process** push to Grafana Cloud; wrong tokens show up as push failures in **plugin.log**, not in a separate agent’s logs.
 5. **Data source in Grafana** — Point the Loki data source at your Loki URL (e.g. `http://localhost:3100` for local). Explore: `{app="sim-steward"}`.
-6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `state_broadcast_summary`, `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
+6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
 
 See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL examples.
 
@@ -140,11 +142,22 @@ See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL exam
 
 ## 9. ContextStream MCP (index / search / 401)
 
+**Default workflow:** Keep the repo in sync with ContextStream using the **ContextStream MCP** **`project` tool** — `project(action="index")` or `project(action="ingest_local", path="<repo>")` — then log the run with `session(action="capture", event_type="operation", …)` per **docs/CONTEXTSTREAM-UPLOAD-PLAN.md**. Do **not** use ad-hoc HTTP/API scripts for routine sync. The CLI steps below are **troubleshooting only** when MCP or env is misconfigured.
+
 - **401 on ingest or `verify-key`** — The ContextStream API key must be in `.env` (`CONTEXTSTREAM_API_KEY`, etc.) and loaded for CLI commands. From the repo root:  
   `npx -y envmcp --env-file .env cmd /c "%LocalAppData%\ContextStream\contextstream-mcp.exe verify-key"`  
   If that fails, rotate the key in the ContextStream account and update `.env` (do not commit real secrets).
 - **`ingest` fails with "not a terminal"`** — From repo root (with `.env`): `powershell -ExecutionPolicy Bypass -File scripts/contextstream-ingest.ps1` (spawns `cmd` so the CLI sees a console). Or run `contextstream-mcp.exe ingest --path <repo>` manually in Windows Terminal / `cmd`. The MCP server uses the same key via Cursor env.
 - **Search says index freshness `missing`** — After a successful ingest from step above, keyword search still works; semantic/index metadata syncs once ingestion completes.
+
+### ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Observability — Local Stack | `25ed8579-c142-4040-b9a2-87b14523475f` |
+| Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
+| Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |
 
 ---
 

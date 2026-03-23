@@ -8,6 +8,7 @@ namespace SimSteward.GrafanaTestHarness
 {
     /// <summary>
     /// Emits representative structured log events (NDJSON) for the Grafana observability test harness.
+    /// Includes <c>replay_incident_index_detection</c> (M5 TR-028) with TR-020 v1 fingerprints for Loki/AssertLokiQueries.
     /// Writes to plugin-structured.jsonl (same format as plugin) for Loki ingestion outside the plugin.
     /// Env: SIMSTEWARD_DATA_PATH or SIMSTEWARD_STRUCTURED_LOG_PATH (output dir or full path); TEST_TAG (default grafana-harness).
     /// Args: --count N (number of action_result events to emit per type; default 3).
@@ -81,12 +82,16 @@ namespace SimSteward.GrafanaTestHarness
                 ["session_num"] = 0,
                 ["replay_frame"] = 1000,
                 ["replay_frame_end"] = 1020,
+                ["start_frame"] = 1000,
+                ["end_frame"] = 1020,
                 ["cause"] = "heavy_contact",
                 ["lap"] = 2,
-                ["cam_car_idx"] = 5
+                ["cam_car_idx"] = 5,
+                ["camera_group"] = "Chase",
+                ["camera_view"] = "cam_car_idx=5;group=Chase"
             };
             AddHarnessSessionAndRouting(inc1);
-            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 4x #42 Test Driver", inc1, testTag));
+            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 4x #42 Test Driver", inc1, testTag, "iracing"));
             var inc2 = new Dictionary<string, object>
             {
                 ["incident_type"] = "1x",
@@ -98,12 +103,58 @@ namespace SimSteward.GrafanaTestHarness
                 ["session_num"] = 0,
                 ["replay_frame"] = 2000,
                 ["replay_frame_end"] = 2005,
+                ["start_frame"] = 2000,
+                ["end_frame"] = 2005,
                 ["cause"] = "off_track",
                 ["lap"] = 3,
-                ["cam_car_idx"] = 2
+                ["cam_car_idx"] = 2,
+                ["camera_group"] = "Helicopter",
+                ["camera_view"] = "cam_car_idx=2;group=Helicopter"
             };
             AddHarnessSessionAndRouting(inc2);
-            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 1x #7 Other", inc2, testTag));
+            entries.Add(MakeEntry("tracker", "INFO", "incident_detected", "Incident detected: 1x #7 Other", inc2, testTag, "iracing"));
+
+            // replay_incident_index_detection (M5 TR-028) — fingerprints match TR-020 v1 / ReplayIncidentIndexDocumentBuilder
+            const int harnessSubSessionId = 42700101;
+            string fpRepair = ReplayIncidentIndexFingerprint.ComputeHexV1(
+                harnessSubSessionId,
+                3,
+                184320,
+                ReplayIncidentIndexDetection.SourceRepairFlag,
+                null);
+            var detRepair = new Dictionary<string, object>
+            {
+                ["fingerprint"] = fpRepair,
+                ["car_idx"] = 3,
+                ["session_time_ms"] = 184320,
+                ["detection_source"] = ReplayIncidentIndexDetection.SourceRepairFlag,
+                ["replay_frame"] = 9001,
+                ["replay_session_time"] = 184.32,
+                ["incident_points"] = null
+            };
+            AddHarnessSessionAndRouting(detRepair);
+            entries.Add(MakeEntry("simhub-plugin", "INFO", "replay_incident_index_detection",
+                "Replay incident index: detection during fast-forward (TR-028 harness).", detRepair, testTag));
+
+            string fpPlayer = ReplayIncidentIndexFingerprint.ComputeHexV1(
+                harnessSubSessionId,
+                0,
+                312800,
+                ReplayIncidentIndexDetection.SourcePlayerIncidentCount,
+                2);
+            var detPlayer = new Dictionary<string, object>
+            {
+                ["fingerprint"] = fpPlayer,
+                ["car_idx"] = 0,
+                ["session_time_ms"] = 312800,
+                ["detection_source"] = ReplayIncidentIndexDetection.SourcePlayerIncidentCount,
+                ["replay_frame"] = 9002,
+                ["replay_session_time"] = 312.8,
+                ["incident_points"] = 2
+            };
+            AddHarnessSessionAndRouting(detPlayer);
+            entries.Add(MakeEntry("simhub-plugin", "INFO", "replay_incident_index_detection",
+                "Replay incident index: detection during fast-forward (TR-028 harness).", detPlayer, testTag));
 
             // session_digest
             var sessionId = "test-session-" + Guid.NewGuid().ToString("N").Substring(0, 8);
@@ -146,7 +197,7 @@ namespace SimSteward.GrafanaTestHarness
         }
 
         private static LogEntry MakeEntry(string component, string level, string eventType, string message,
-            Dictionary<string, object> fields, string testTag)
+            Dictionary<string, object> fields, string testTag, string domain = null)
         {
             return new LogEntry
             {
@@ -156,6 +207,7 @@ namespace SimSteward.GrafanaTestHarness
                 Event = eventType,
                 Message = message,
                 Fields = fields,
+                Domain = domain,
                 Testing = "true",
                 TestTag = testTag
             };

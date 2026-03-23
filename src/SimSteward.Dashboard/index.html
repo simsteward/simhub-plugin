@@ -295,7 +295,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   display: flex;
   gap: 8px;
   min-height: 0;
-  height: 420px;
+  height: 300px;
 }
 .log-section--telemetry {
   width: 300px;
@@ -307,8 +307,27 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   padding: 8px 12px 6px;
   border-bottom: 1px solid var(--border);
 }
+.log-section--telemetry .log-section-head { padding: 6px 10px 4px; }
 .log-section-head .panel-title { margin-bottom: 0; }
-.log-section-body--telem { flex: 1; min-height: 0; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+.log-section-body--telem {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 8px 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.log-section--telemetry .input-rows {
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.log-section--telemetry .input-lbl { margin-bottom: 2px; }
+.log-section--telemetry .bar-track { height: 6px; border-radius: 3px; }
+.log-section--telemetry .bar-fill { border-radius: 3px; }
+.log-section--telemetry .steer-wrap { gap: 2px; }
+.log-section--telemetry .steer-lbl { font-size: 0.62rem; }
+.log-section--telemetry .steer-svg { max-width: 150px; }
 .log-section--streams {
   flex: 1;
   min-width: 0;
@@ -445,9 +464,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 /* ── Toast ── */
 .toast {
-  position: fixed; bottom: 18px; right: 18px; padding: 9px 15px;
+  position: fixed; bottom: 18px; right: 18px; max-width: min(420px, calc(100vw - 36px)); padding: 9px 15px;
   background: rgba(18,18,22,0.97); border: 1px solid var(--border); border-radius: 8px;
-  font-size: 0.8rem; color: var(--text); opacity: 0; transform: translateY(6px);
+  font-size: 0.8rem; line-height: 1.35; color: var(--text); opacity: 0; transform: translateY(6px);
   transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 100;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
@@ -470,6 +489,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
       <span class="diag-item"><span class="d-dot" id="d-steam"></span>Steam</span>
       <span class="diag-item"><span class="d-dot" id="d-simhub"></span>SimHub</span>
     </div>
+    <a href="replay-incident-index.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Replay incident index (TR-031–TR-038)">Replay index →</a>
     <span class="ws-badge disconnected" id="ws-badge">WS ○</span>
   </header>
 
@@ -493,15 +513,15 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
           </div>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn" title="Jump to start" onclick="ra('replay_jump','start')">⏮</button>
-          <button type="button" class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4')">⏪</button>
+          <button type="button" class="btn" title="Jump to start" onclick="ra('replay_jump','start','replay-jump-start')">⏮</button>
+          <button type="button" class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4','replay-rewind')">⏪</button>
           <button type="button" class="btn" id="replay-play-pause-btn" title="Pause replay" onclick="toggleReplayPlayPause()">⏸</button>
-          <button type="button" class="btn" title="Forward 4×"   onclick="ra('replay_speed','4')">⏩</button>
-          <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end')">⏭</button>
+          <button type="button" class="btn" title="Forward 4×"   onclick="ra('replay_speed','4','replay-forward')">⏩</button>
+          <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end','replay-jump-end')">⏭</button>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
-          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev','replay-seek-prev')">Prev replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next','replay-seek-next')">Next replay incident</button>
         </div>
         <div class="speed-pills" id="speed-pills">
           <button class="spill" data-s="0.25" onclick="setSpeed(this)">0.25×</button>
@@ -523,27 +543,38 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
         </div>
       </div>
 
+      <!-- Selected Incident Panel -->
+      <div class="panel" id="selected-inc-panel" hidden>
+        <div class="panel-title">Selected Incident</div>
+        <div id="selected-inc-meta" style="font-size:0.82rem;margin-bottom:10px"></div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:4px">Incident View</label>
+          <select class="car-sel" id="camera-sel" onchange="onCameraSel()" title="Camera for capture"></select>
+          <button type="button" id="use-suggested-btn" hidden onclick="useSuggestedCamera()"
+            style="font-size:0.68rem;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0;margin-top:3px">
+            use suggested view ↗
+          </button>
+        </div>
+        <div class="btn-row" style="margin-bottom:0">
+          <button type="button" class="btn label-inc" id="selected-inc-prev" onclick="selectPrevIncident()">← Prev</button>
+          <button type="button" class="btn cap label-inc" id="capture-btn" onclick="captureSelectedIncident()">▶ Capture</button>
+          <button type="button" class="btn label-inc" id="selected-inc-next" onclick="selectNextIncident()">Next →</button>
+        </div>
+      </div>
+
       <!-- Incident navigation -->
       <div class="panel">
         <div class="panel-title">Incident navigation</div>
         <div class="panel-sub">
           <div class="panel-sub-title">Telemetry car</div>
           <select class="car-sel" id="car-sel" onchange="onCarSel()" title="Telemetry and incident list below use this car">
-            <option value="0" data-car="99">#99 J. Smith (You)</option>
-            <option value="1" data-car="12">#12 A. Jones</option>
-            <option value="2" data-car="42">#42 B. Lee</option>
-            <option value="3" data-car="7">#7 M. Wilson</option>
           </select>
-        </div>
-        <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev')">Prev replay incident</button>
-          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next')">Next replay incident</button>
         </div>
         <div class="cap-row">
           <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
-            title="Seek to each incident for the selected telemetry car only and capture metadata (max 200 steps, or stop)">Find selected driver’s incidents</button>
+            title="Walk frames already on the leaderboard for the selected car (does not scan YAML for new incidents). Max 200 steps.">Walk this car’s listed incidents</button>
           <button type="button" class="btn cap btn-scan btn-scan-session" id="cap-btn-session" onclick="startCaptureSessionClick()"
-            title="All drivers: seek every incident in the session and capture metadata. Asks for confirmation before starting.">Find all incidents for all drivers</button>
+            title="Walk every leaderboard frame in the session (does not discover new incidents from YAML). Confirms before start.">Walk all listed incidents (session)</button>
           <span class="cap-status" id="cap-status">—</span>
         </div>
       </div>
@@ -708,6 +739,12 @@ let lastReplaySpeed = '1';
 let lastLap = -1;
 /** @type {{ kind:'session', frame:number } | { kind:'capture', seq:number } | null} */
 let incidentMetaSelection = null;
+let selectedIncident = null;
+let cameraGroups = [];
+/** Latest telemetry object from plugin state (throttle, brake, steeringWheelAngle); null before first state. */
+let lastPluginTelemetry = null;
+/** Last replay frame number from plugin state (for capture walk handshake). */
+let lastPluginFrame = 0;
 
 // ── WebSocket ────────────────────────────────────────────
 function connectWs() {
@@ -718,6 +755,14 @@ function connectWs() {
     ws.onopen = () => {
       setWs('connected');
       mockPaused = true;
+      incidents = [];
+      drivers = [];
+      selectedIncident = null;
+      hideSelectedIncidentPanel();
+      cameraGroups = [];
+      lastPluginTelemetry = null;
+      renderInc();
+      renderStd();
       log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
     };
     ws.onclose = () => {
@@ -760,7 +805,18 @@ function onMsg(m) {
   else if (m.type === 'incidents')  { incidents = m.entries || []; renderInc(); }
   else if (m.type === 'iracingEvent') log('events','EVENT', m.event||'event', m.data||JSON.stringify(m));
   else if (m.type === 'telemetryData') log('telem','DATA ', 'telemetry', fmtTelem(m));
+  else if (m.type === 'actionResult') onActionResult(m);
   else if (m.type === 'pong') {}
+}
+
+/** Plugin ack for dashboard actions (see DashboardBridge.SendActionResult). */
+function onActionResult(m) {
+  if (m.success) return;
+  const err = m.error || '';
+  if (err === 'not_connected') {
+    const a = m.action || 'unknown';
+    toast('Not connected — iRacing isn’t running or has no active session for this plugin. Open the sim or load a replay, then try again.', 4200, 'actionResult:not_connected:' + a);
+  }
 }
 
 // ── State update ─────────────────────────────────────────
@@ -775,7 +831,26 @@ function onState(m) {
   setDot('d-steam',  d.steamRunning);
   setDot('d-simhub', d.simHubHttpListening);
   if (m.telemetry) setTelem(m.telemetry.throttle||0, m.telemetry.brake||0, m.telemetry.steeringWheelAngle||0);
-  if (m.drivers)   { drivers = m.drivers; renderStd(); }
+  if (m.drivers && Array.isArray(m.drivers)) {
+    drivers = m.drivers.map((d, ix) => ({
+      pos: ix + 1,
+      car: d.carNum,
+      name: d.name,
+      inc: 0,
+      player: !!d.isPlayer
+    }));
+    renderStd();
+    populateCarDropdown(m.drivers);
+  }
+  if (Array.isArray(m.cameraGroups) && m.cameraGroups.length) {
+    cameraGroups = m.cameraGroups;
+    populateCameraDropdown();
+  } else if (Array.isArray(m.cameraGroups) && m.cameraGroups.length === 0) {
+    cameraGroups = [];
+    const csel = document.getElementById('camera-sel');
+    if (csel) csel.innerHTML = '';
+  }
+  if (m.telemetry) lastPluginTelemetry = m.telemetry;
   if (typeof m.lap === 'number' && !Number.isNaN(m.lap)) lastLap = m.lap;
   else lastLap = -1;
   if (m.frame !== undefined) setFrame(m.frame, m.frameEnd);
@@ -819,6 +894,28 @@ function getFilteredIncidents() {
   });
 }
 
+/** Heuristic suggested camera group from incident cause + names from plugin (client-only until server emits field). */
+function pickSuggestedCamera(inc) {
+  if (!cameraGroups.length) return undefined;
+  const names = cameraGroups.map(String);
+  const pick = function (pred) {
+    for (let i = 0; i < names.length; i++) if (pred(names[i])) return names[i];
+    return null;
+  };
+  const c = String(inc.cause || '').toLowerCase();
+  if (c.includes('contact') || c.includes('heavy')) return pick(function (n) { return /chase|tv|helicopter/i.test(n); }) || names[0];
+  if (c.includes('wall') || c.includes('spin')) return pick(function (n) { return /helicopter|tv|tower/i.test(n); }) || names[0];
+  if (c.includes('off') || c.includes('track')) return pick(function (n) { return /chase|cockpit/i.test(n); }) || names[0];
+  return names[0];
+}
+
+function applySuggestedCamerasToIncidents() {
+  if (!cameraGroups.length) return;
+  for (let i = 0; i < incidents.length; i++) {
+    if (!incidents[i].suggestedCamera) incidents[i].suggestedCamera = pickSuggestedCamera(incidents[i]);
+  }
+}
+
 function incidentCardHtml(i) {
   const lapStr = (typeof i.lap === 'number' && i.lap >= 0) ? ` · L${i.lap}` : '';
   return `
@@ -832,6 +929,7 @@ function incidentCardHtml(i) {
 }
 
 function renderInc() {
+  applySuggestedCamerasToIncidents();
   const filtered = getFilteredIncidents();
   const count = '(' + filtered.length + ')';
   const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No incidents</div>';
@@ -867,6 +965,140 @@ function renderDriverIncidents() {
   const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:12px 0">No incidents for this car</div>';
   el.innerHTML = !forCar.length ? empty : forCar.map(incidentCardHtml).join('');
   refreshIncidentMetaHighlight();
+}
+
+function populateCarDropdown(driversArr) {
+  const sel = document.getElementById('car-sel');
+  if (!sel || !Array.isArray(driversArr)) return;
+  if (!driversArr.length) {
+    sel.innerHTML = '';
+    renderDriverIncidents();
+    return;
+  }
+  const prevCar = getSelectedCarNumber();
+  sel.innerHTML = driversArr.map(d =>
+    `<option value="${d.carIdx}" data-car="${escapeHtmlForCaptured(String(d.carNum ?? ''))}"${d.isPlayer ? ' data-player="1"' : ''}>` +
+    `#${escapeHtmlForCaptured(String(d.carNum ?? ''))} ${escapeHtmlForCaptured(String(d.name ?? ''))}${d.isPlayer ? ' (You)' : ''}</option>`
+  ).join('');
+  let restored = false;
+  for (let i = 0; i < sel.options.length; i++) {
+    const dc = sel.options[i].getAttribute('data-car');
+    if (dc !== null && +dc === +prevCar) { sel.selectedIndex = i; restored = true; break; }
+  }
+  if (!restored) {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].getAttribute('data-player') === '1') { sel.selectedIndex = i; break; }
+    }
+  }
+  renderDriverIncidents();
+}
+
+function populateCameraDropdown() {
+  const sel = document.getElementById('camera-sel');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = cameraGroups.map(n =>
+    `<option value="${escapeHtmlForCaptured(n)}">${escapeHtmlForCaptured(n)}</option>`
+  ).join('');
+  if (prev && cameraGroups.includes(prev)) sel.value = prev;
+}
+
+function showSelectedIncidentPanel(i) {
+  const panel = document.getElementById('selected-inc-panel');
+  if (!panel) return;
+  panel.hidden = false;
+  const meta = document.getElementById('selected-inc-meta');
+  if (meta) {
+    const causeRaw = String(i.cause || '');
+    const causeDisp = causeRaw.replace(/-/g, ' ');
+    const causeClass = causeRaw.replace(/[^a-z-]/gi, '') || 'unknown';
+    const carEsc = escapeHtmlForCaptured(String(i.car != null ? i.car : ''));
+    const drvEsc = escapeHtmlForCaptured(String(i.driver || ''));
+    const causeEsc = escapeHtmlForCaptured(causeDisp);
+    const timeEsc = escapeHtmlForCaptured(String(i.time || ''));
+    const sev = [1, 2, 4].includes(+i.sev) ? +i.sev : 1;
+    meta.innerHTML =
+      `<strong>#${carEsc}</strong> ${drvEsc}&nbsp;` +
+      `<span class="sev-badge s${sev}">${sev}×</span>&nbsp;` +
+      `<span class="cause-tag ${causeClass}">${causeEsc}</span>&nbsp;` +
+      `<span style="color:var(--muted)">${timeEsc}</span>`;
+  }
+  populateCameraDropdown();
+  const sugBtn = document.getElementById('use-suggested-btn');
+  if (sugBtn) sugBtn.hidden = !i.suggestedCamera;
+  if (i.suggestedCamera && cameraGroups.includes(i.suggestedCamera)) {
+    const sel = document.getElementById('camera-sel');
+    if (sel) sel.value = i.suggestedCamera;
+  }
+}
+
+function hideSelectedIncidentPanel() {
+  const panel = document.getElementById('selected-inc-panel');
+  if (panel) panel.hidden = true;
+  document.querySelectorAll('.inc-card-expanded').forEach(el => el.classList.remove('inc-card-expanded'));
+}
+
+function onCameraSel() {
+  const sel = document.getElementById('camera-sel');
+  const v = sel ? sel.value : '';
+  sendDashboardUiEvent({ element_id: 'camera-sel', event_type: 'change', message: 'Camera selected', value: v });
+  if (v) send('set_camera', v);
+}
+
+function useSuggestedCamera() {
+  if (!selectedIncident || !selectedIncident.suggestedCamera) return;
+  const sel = document.getElementById('camera-sel');
+  if (sel && cameraGroups.includes(selectedIncident.suggestedCamera)) {
+    sel.value = selectedIncident.suggestedCamera;
+    send('set_camera', selectedIncident.suggestedCamera);
+  }
+  sendDashboardUiEvent({ element_id: 'use-suggested-btn', event_type: 'click', message: 'Use suggested camera', value: selectedIncident.suggestedCamera });
+}
+
+function captureSelectedIncident() {
+  if (!selectedIncident) return;
+  const dup = capturedIncidents.some(function (r) { return r.frame === selectedIncident.frame; });
+  if (dup && !confirm('You have already captured this incident. Re-capture anyway? Older rows stay in Loki until retention; use latest timestamp in Grafana.')) {
+    return;
+  }
+  const sel = document.getElementById('camera-sel');
+  const camera = sel ? sel.value : '';
+  const arg = JSON.stringify({ frame: selectedIncident.frame, camera, car: selectedIncident.car });
+  sendDashboardUiEvent({ element_id: 'capture-btn', event_type: 'click', message: 'Capture incident', value: String(selectedIncident.frame) });
+  if (!send('capture_incident', arg)) toast('[PoC] capture_incident not connected', undefined, 'capture_incident');
+  log('events', 'INFO ', 'capture_incident', 'frame:' + selectedIncident.frame + '  camera:' + camera);
+}
+
+function selectPrevIncident() {
+  if (!selectedIncident) return;
+  const filtered = getFilteredIncidents();
+  const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
+  if (idx < 0) {
+    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200, 'selected-inc-prev-filter');
+    selectedIncident = null;
+    incidentMetaSelection = null;
+    hideSelectedIncidentPanel();
+    collapseIncidentMetaStrip();
+    return;
+  }
+  sendDashboardUiEvent({ element_id: 'selected-inc-prev', event_type: 'click', message: 'Selected incident prev' });
+  if (idx > 0) onSessionIncidentClick(filtered[idx - 1].frame);
+}
+
+function selectNextIncident() {
+  if (!selectedIncident) return;
+  const filtered = getFilteredIncidents();
+  const idx = filtered.findIndex(i => i.frame === selectedIncident.frame);
+  if (idx < 0) {
+    toast('Current incident is not in the filtered list — pick another filter or reselect.', 3200, 'selected-inc-next-filter');
+    selectedIncident = null;
+    incidentMetaSelection = null;
+    hideSelectedIncidentPanel();
+    collapseIncidentMetaStrip();
+    return;
+  }
+  sendDashboardUiEvent({ element_id: 'selected-inc-next', event_type: 'click', message: 'Selected incident next' });
+  if (idx >= 0 && idx < filtered.length - 1) onSessionIncidentClick(filtered[idx + 1].frame);
 }
 
 function parseFrameFromLabel(frameText) {
@@ -1093,25 +1325,29 @@ function refreshIncidentMetaHighlight() {
 function onSessionIncidentClick(frame) {
   const i = incidents.find(x => x.frame === frame);
   if (!i) return;
-  if (incidentMetaSelection && incidentMetaSelection.kind === 'session' && incidentMetaSelection.frame === frame) {
+  if (selectedIncident && selectedIncident.frame === frame) {
+    selectedIncident = null;
     incidentMetaSelection = null;
+    hideSelectedIncidentPanel();
     collapseIncidentMetaStrip();
     sendDashboardUiEvent({
       element_id: 'incident-meta-strip',
       event_type: 'ui_interaction',
-      message: 'Session incident meta collapsed',
+      message: 'Session incident deselected',
       value: String(frame)
     });
     return;
   }
+  selectedIncident = i;
   incidentMetaSelection = { kind: 'session', frame };
   seekInc(frame);
+  showSelectedIncidentPanel(i);
   expandIncidentMetaStrip(formatIncidentMetaHtml(i));
   highlightIncidentCards(frame, null);
   sendDashboardUiEvent({
     element_id: 'incident-meta-strip',
     event_type: 'ui_interaction',
-    message: 'Session incident meta expanded',
+    message: 'Session incident selected',
     value: String(frame)
   });
 }
@@ -1154,10 +1390,22 @@ function onCapturedIncidentClick(seq) {
   });
 }
 
+function clearSelectionIfNotInFilter() {
+  if (!selectedIncident) return;
+  const filtered = getFilteredIncidents();
+  if (filtered.some(i => i.frame === selectedIncident.frame)) return;
+  selectedIncident = null;
+  incidentMetaSelection = null;
+  hideSelectedIncidentPanel();
+  collapseIncidentMetaStrip();
+  toast('Selection cleared — not visible with this filter.', 2800, 'filter-clear-selection');
+}
+
 function setFilter(el) {
   incFilter = el.dataset.f;
   document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.f === incFilter));
   renderInc();
+  clearSelectionIfNotInFilter();
   sendDashboardUiEvent({
     element_id: 'inc-filter-chip',
     event_type: 'click',
@@ -1230,29 +1478,40 @@ function arcPath(cx,cy,r,a0,a1) {
 
 function onCarSel() {
   const sel = document.getElementById('car-sel');
-  const idx = +sel.value;
+  const carIdx = +sel.value;
   const opt = sel.options[sel.selectedIndex];
-  const m = MOCK_CAR_TELEM[idx] || MOCK_CAR_TELEM[0];
-  mockTelem = m;
-  setTelem(m.t, m.b, m.s);
+  if (ws && ws.readyState === WebSocket.OPEN && mockPaused && lastPluginTelemetry) {
+    const t = lastPluginTelemetry;
+    mockTelem = {
+      t: t.throttle != null ? t.throttle : 0,
+      b: t.brake != null ? t.brake : 0,
+      s: t.steeringWheelAngle != null ? t.steeringWheelAngle : 0
+    };
+    setTelem(mockTelem.t, mockTelem.b, mockTelem.s);
+  } else {
+    const ix = sel.selectedIndex >= 0 ? sel.selectedIndex % MOCK_CAR_TELEM.length : 0;
+    const m = MOCK_CAR_TELEM[ix];
+    mockTelem = m;
+    setTelem(m.t, m.b, m.s);
+  }
   renderDriverIncidents();
   sendDashboardUiEvent({
     element_id: 'telemetry-car-sel',
     event_type: 'change',
     message: 'Telemetry car: ' + (opt ? opt.textContent.trim() : ''),
-    value: String(idx)
+    value: String(carIdx)
   });
 }
 
 // ── Replay ───────────────────────────────────────────────
-function ra(action, arg) {
+function ra(action, arg, elementId) {
   sendDashboardUiEvent({
-    element_id: 'replay-control',
+    element_id: elementId || 'replay-control',
     event_type: 'click',
     message: 'Replay ' + action + (arg !== undefined && arg !== '' ? ' ' + arg : ''),
     value: arg != null ? String(arg) : ''
   });
-  if (!send(action, arg)) toast('[PoC] ' + action + ' ' + arg + ' — not yet wired');
+  if (!send(action, arg)) toast('[PoC] ' + action + ' ' + arg + ' — not yet wired', undefined, 'replay:' + action + ':' + String(arg ?? ''));
   log('events','INFO ','replay_action', action + ' arg=' + arg);
 }
 
@@ -1264,7 +1523,7 @@ function replaySessionStep(dir) {
     message: prev ? 'Replay previous session' : 'Replay next session',
     value: dir
   });
-  if (!send('replay_session', dir)) toast('[PoC] replay_session ' + dir + ' — not yet wired');
+  if (!send('replay_session', dir)) toast('[PoC] replay_session ' + dir + ' — not yet wired', undefined, 'replay_session:' + dir);
   log('events', 'INFO ', 'replay_action', 'replay_session arg=' + dir);
 }
 function updatePlayPauseBtn() {
@@ -1277,18 +1536,12 @@ function updatePlayPauseBtn() {
 function toggleReplayPlayPause() {
   if (replayPaused) {
     replayPaused = false;
-    ra('replay_speed', lastReplaySpeed);
+    ra('replay_speed', lastReplaySpeed, 'replay-play-pause');
   } else {
     replayPaused = true;
-    ra('replay_speed', '0');
+    ra('replay_speed', '0', 'replay-play-pause');
   }
   updatePlayPauseBtn();
-  sendDashboardUiEvent({
-    element_id: 'replay-play-pause',
-    event_type: 'click',
-    message: replayPaused ? 'Replay paused' : 'Replay playing',
-    value: replayPaused ? 'paused' : 'playing'
-  });
 }
 
 function setSpeed(el) {
@@ -1306,7 +1559,7 @@ function seekInc(frame) {
     message: 'Seek to incident frame',
     value: String(frame)
   });
-  if (!send('seek_to_incident', String(frame))) toast('[PoC] Seek to frame ' + frame);
+  if (!send('seek_to_incident', String(frame))) toast('[PoC] Seek to frame ' + frame, undefined, 'seek_to_incident:' + frame);
   log('events','INFO ','seek_requested','frame=' + frame);
 }
 // ── Capture incidents ────────────────────────────────────
@@ -1314,6 +1567,32 @@ function seekInc(frame) {
 // Session: seek every incident frame for all drivers in the session; confirms before start.
 const CAPTURE_STEP_MS = 600;
 const CAPTURE_MAX_QUEUE = 200;
+
+/** Wait until plugin state frame is near target (from WS state / setFrame), or timeout. */
+function waitForFrameApprox(targetFrame, opts) {
+  const tol = opts && opts.tolerance != null ? opts.tolerance : 120;
+  const timeoutMs = opts && opts.timeoutMs != null ? opts.timeoutMs : 5000;
+  const pollMs = opts && opts.pollMs != null ? opts.pollMs : 50;
+  const start = Date.now();
+  return new Promise(function (resolve) {
+    function tick() {
+      if (!capturing) {
+        resolve({ ok: false, reason: 'stopped', frame: lastPluginFrame });
+        return;
+      }
+      if (Math.abs(lastPluginFrame - targetFrame) <= tol) {
+        resolve({ ok: true, frame: lastPluginFrame });
+        return;
+      }
+      if (Date.now() - start >= timeoutMs) {
+        resolve({ ok: false, reason: 'timeout', frame: lastPluginFrame });
+        return;
+      }
+      setTimeout(tick, pollMs);
+    }
+    tick();
+  });
+}
 
 let capturing = false;
 let captureKind = 'driver';
@@ -1360,7 +1639,7 @@ function toggleCaptureDriver() {
 function startCaptureDriver() {
   captureQueue = buildDriverCaptureQueue();
   if (!captureQueue.length) {
-    toast('No incidents for the selected driver in the current session list.');
+    toast('No incidents for the selected driver in the current session list.', undefined, 'walk-driver-empty');
     sendDashboardUiEvent({
       element_id: 'find-selected-driver-incidents',
       event_type: 'ui_interaction',
@@ -1409,7 +1688,7 @@ function startCaptureSessionClick() {
 function startCaptureSession() {
   captureQueue = buildSessionCaptureQueue();
   if (!captureQueue.length) {
-    toast('No incidents in the current session list.');
+    toast('No incidents in the current session list.', undefined, 'walk-session-empty');
     sendDashboardUiEvent({
       element_id: 'find-all-drivers-incidents',
       event_type: 'ui_interaction',
@@ -1461,25 +1740,28 @@ function captureStep() {
   if (captureKind === 'session') selectCarInDropdownForFrame(frame);
   const sent = send('seek_to_incident', String(frame));
 
-  captureTimer = setTimeout(() => {
+  waitForFrameApprox(frame, { tolerance: 120, timeoutMs: 5000, pollMs: 40 }).then(function (res) {
     if (!capturing) return;
     const frameEl = document.getElementById('frame-cur').textContent;
     const timeEl = document.getElementById('session-time').textContent;
     const lapPart = (lastLap >= 0 ? '  lap:' + lastLap : '  lap:—');
     log('events', 'EVENT', 'capture_incident',
       '#' + String(captureCount).padStart(2, '0') + '  frame:' + frameEl.replace('Frame ', '') +
-      '  session:' + timeEl + lapPart + (sent ? '' : '  [PoC-mock]'));
+      '  session:' + timeEl + lapPart + (sent ? '' : '  [PoC-mock]') +
+      (res.ok ? '' : '  handshake:' + (res.reason || 'miss')));
 
-    const frameNum = parseFrameFromLabel(frameEl);
+    const frameNum = res.ok ? res.frame : parseFrameFromLabel(frameEl);
     capturedIncidents.push(enrichCaptureRecord(frameNum, timeEl, captureCount));
     renderCaptured();
 
     const total = captureQueue.length;
     const prefix = captureKind === 'session' ? 'Session ' : 'Driver ';
-    document.getElementById('cap-status').textContent = prefix + captureCount + '/' + total + '…';
+    let status = prefix + captureCount + '/' + total + '…';
+    if (!res.ok) status += ' (sync ' + (res.reason || 'miss') + ')';
+    document.getElementById('cap-status').textContent = status;
 
     captureTimer = setTimeout(captureStep, CAPTURE_STEP_MS);
-  }, CAPTURE_STEP_MS);
+  });
 }
 
 function setCaptureUI(active) {
@@ -1491,8 +1773,8 @@ function setCaptureUI(active) {
   btnS.classList.toggle('active', active && captureKind === 'session');
   btnD.disabled = active && captureKind === 'session';
   btnS.disabled = active && captureKind === 'driver';
-  btnD.textContent = active && captureKind === 'driver' ? 'Stop scan' : 'Find selected driver’s incidents';
-  btnS.textContent = active && captureKind === 'session' ? 'Stop scan' : 'Find all incidents for all drivers';
+  btnD.textContent = active && captureKind === 'driver' ? 'Stop walk' : 'Walk this car’s listed incidents';
+  btnS.textContent = active && captureKind === 'session' ? 'Stop walk' : 'Walk all listed incidents (session)';
   lbl.className = 'cap-status' + (active ? ' running' : '');
   if (!active) {
     lbl.textContent = captureCount ? 'Done (' + captureCount + ' found)' : '—';
@@ -1509,10 +1791,13 @@ function scrubClick(e) {
     message: 'Replay scrub bar click',
     value: String(pct)
   });
-  toast('[PoC] Scrub to ' + pct + '%');
+  toast('[PoC] Scrub to ' + pct + '%', undefined, 'replay-scrub');
 }
 function setFrame(cur, end) {
-  if (cur !== undefined) document.getElementById('frame-cur').textContent = 'Frame ' + cur.toLocaleString();
+  if (cur !== undefined) {
+    lastPluginFrame = cur;
+    document.getElementById('frame-cur').textContent = 'Frame ' + cur.toLocaleString();
+  }
   if (end !== undefined) document.getElementById('frame-end').textContent = '/ ' + end.toLocaleString();
   if (cur !== undefined && end && end > 0)
     document.getElementById('scrub-fill').style.width = (cur/end*100).toFixed(1)+'%';
@@ -1562,11 +1847,21 @@ function fmtTelem(m) {
 }
 
 // ── Toast ────────────────────────────────────────────────
+/** Suppress repeat toasts for the same control within this window; a different debounceKey always shows. */
+const TOAST_DEBOUNCE_MS = 800;
+let lastToastDebounceKey = null;
+let lastToastDebounceAt = 0;
 let toastT = null;
-function toast(msg) {
+function toast(msg, durationMs, debounceKey) {
+  const now = Date.now();
+  if (debounceKey != null && debounceKey !== '') {
+    if (debounceKey === lastToastDebounceKey && (now - lastToastDebounceAt) < TOAST_DEBOUNCE_MS) return;
+    lastToastDebounceKey = debounceKey;
+    lastToastDebounceAt = now;
+  }
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
-  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2600);
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), durationMs != null ? durationMs : 2600);
 }
 
 // ── Mock animation ───────────────────────────────────────
@@ -1623,6 +1918,12 @@ function seedLogs() {
 
 // ── Init ─────────────────────────────────────────────────
 function init() {
+  populateCarDropdown(MOCK_DRV.map((d, ix) => ({
+    carIdx: ix,
+    carNum: String(d.car),
+    name: d.name,
+    isPlayer: !!d.player
+  })));
   renderInc();
   renderCaptured();
   renderStd();

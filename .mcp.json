@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "ollama": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\winth\\AppData\\Roaming\\npm\\node_modules\\@muhammadmehdi\\ollama-mcp-server\\dist\\index.js"
+      ],
+      "env": {
+        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "OLLAMA_NUM_CTX": "131072"
+      }
+    },
+    "contextstream": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "envmcp",
+        "--env-file",
+        ".env",
+        "cmd",
+        "/c",
+        "contextstream-mcp"
+      ],
+      "env": {
+        "CONTEXTSTREAM_ALLOW_HEADER_AUTH": "false",
+        "CONTEXTSTREAM_API_URL": "https://api.contextstream.io",
+        "CONTEXTSTREAM_AUTO_HIDE_INTEGRATIONS": "true",
+        "CONTEXTSTREAM_CONSOLIDATED": "true",
+        "CONTEXTSTREAM_CONTEXT_PACK": "true",
+        "CONTEXTSTREAM_HOOK_TRANSCRIPTS_ENABLED": "false",
+        "CONTEXTSTREAM_INCLUDE_STRUCTURED_CONTENT": "true",
+        "CONTEXTSTREAM_LOG_LEVEL": "quiet",
+        "CONTEXTSTREAM_OUTPUT_FORMAT": "compact",
+        "CONTEXTSTREAM_PROGRESSIVE_MODE": "false",
+        "CONTEXTSTREAM_ROUTER_MODE": "false",
+        "CONTEXTSTREAM_SEARCH_LIMIT": "16",
+        "CONTEXTSTREAM_SEARCH_MAX_CHARS": "1024",
+        "CONTEXTSTREAM_SHOW_TIMING": "false",
+        "CONTEXTSTREAM_TOOLSET": "standard",
+        "CONTEXTSTREAM_TRANSCRIPTS_ENABLED": "false",
+        "CONTEXTSTREAM_USER_AGENT": "contextstream-mcp-rust/0.1.74"
+      }
+    }
+  }
+}

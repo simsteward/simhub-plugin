@@ -11,6 +11,7 @@ namespace SimSteward.Plugin.Tests
             var d = new PluginDiagnostics();
             Assert.False(d.IrsdkStarted);
             Assert.Equal("—", d.DashboardPing);
+            Assert.Equal(-1, d.ResourceSampleAgeSec);
         }
 
         [Fact]

@@ -22,13 +22,14 @@ namespace SimSteward.Plugin
     [PluginName("Sim Steward")]
     [PluginDescription("Sim Steward: HTML dashboard bridge via WebSocket")]
     [PluginAuthor("Sim Steward")]
-    public class SimStewardPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
+    public partial class SimStewardPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
 #else
 #pragma warning disable CS0169, CS0649
-    public class SimStewardPlugin
+    public partial class SimStewardPlugin
 #endif
     {
         private const int DefaultPort = 19847;
+        private const int CapturePreRollFrames = 180;
         private const double BroadcastThrottleMs = 200;
         private const int DependencyCheckIntervalTicks = 60;
         private const double DashboardPingIntervalSec = 5;
@@ -57,6 +58,10 @@ namespace SimSteward.Plugin
         private volatile string _dashboardPingStatus = "—";
         private DateTime _lastDashboardPingUtc = DateTime.MinValue;
         private int _dataUpdateTick;
+        private SystemMetricsSampler _resourceSampler;
+        private DateTime _nextResourceSampleUtc = DateTime.MaxValue;
+        private int _resourceSampleIntervalSec = 60;
+        private SystemMetricsSample _lastResourceSample;
 
 #if SIMHUB_SDK
         private IRacingSdk _irsdk;
@@ -74,6 +79,11 @@ namespace SimSteward.Plugin
         private volatile string _logCtxTrack = SessionLogging.NotInSession;
         /// <summary>CarIdxLap for focus car (CamCarIdx if valid, else PlayerCarIdx); -1 if unknown.</summary>
         private volatile int _logCtxLap = SessionLogging.LapUnknown;
+
+        /// <summary>SHA-256 prefix of <c>SessionInfoYaml</c> when available; merged into structured logs via <see cref="MergeSessionAndRoutingFields"/>.</summary>
+        private volatile string _logCtxSessionYamlFingerprint = "";
+
+        private int _lastSessionInfoUpdateForYamlFingerprint = -1;
 #endif
 
 #if SIMHUB_SDK
@@ -91,7 +101,10 @@ namespace SimSteward.Plugin
                 replaySessionCount = snapshot.ReplaySessionCount,
                 replaySessionNum = snapshot.ReplaySessionNum,
                 replaySessionName = snapshot.ReplaySessionName,
-                diagnostics = snapshot.Diagnostics
+                drivers = BuildDriverList(),
+                cameraGroups = GetCameraGroupNames(),
+                diagnostics = snapshot.Diagnostics,
+                replayIncidentIndex = snapshot.ReplayIncidentIndex
             };
             return JsonConvert.SerializeObject(state);
         }
@@ -162,6 +175,34 @@ namespace SimSteward.Plugin
             }
         }
 
+        private void OnLogWriteError(string eventType, Exception ex)
+        {
+            // Write directly to plugin.log to avoid re-entering PluginLogger
+            var logPath = _logger?.LogPath;
+            if (!string.IsNullOrEmpty(logPath))
+            {
+                var line = $"{DateTime.UtcNow:o} [ERROR] {eventType}: {ex?.Message}{Environment.NewLine}";
+                try { File.AppendAllText(logPath, line, System.Text.Encoding.UTF8); } catch { }
+            }
+
+            // Surface in App Health tab
+            var entry = new LogEntry
+            {
+                Level = "ERROR",
+                Component = "simhub-plugin",
+                Event = eventType,
+                Message = $"Log write failed: {ex?.Message}",
+                Timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                Domain = "health"
+            };
+            try
+            {
+                var msg = new { type = "logEvents", entries = new[] { entry } };
+                _bridge?.Broadcast(JsonConvert.SerializeObject(msg), "logEvents");
+            }
+            catch { }
+        }
+
         private void WriteBroadcastError(string context, Exception ex)
         {
             if (string.IsNullOrEmpty(_pluginDataPath)) return;
@@ -216,18 +257,39 @@ namespace SimSteward.Plugin
                 ReplaySessionCount = replaySessionCount,
                 ReplaySessionNum = replaySessionNum,
                 ReplaySessionName = replaySessionName,
-                Diagnostics = new PluginDiagnostics
-                {
-                    IrsdkStarted = _irsdk != null,
-                    IrsdkConnected = irConnected,
-                    WsRunning = _bridge != null,
-                    WsPort = _wsPort,
-                    WsClients = clientCount,
-                    SteamRunning = _steamRunning,
-                    SimHubHttpListening = _simHubHttpListening,
-                    DashboardPing = _dashboardPingStatus
-                }
+                Diagnostics = BuildDiagnostics(clientCount),
+                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot()
             };
+        }
+
+        private PluginDiagnostics BuildDiagnostics(int clientCount)
+        {
+            var d = new PluginDiagnostics
+            {
+                IrsdkStarted = _irsdk != null,
+                IrsdkConnected = _irsdk?.IsConnected ?? false,
+                WsRunning = _bridge != null,
+                WsPort = _wsPort,
+                WsClients = clientCount,
+                SteamRunning = _steamRunning,
+                SimHubHttpListening = _simHubHttpListening,
+                DashboardPing = _dashboardPingStatus
+            };
+            if (_lastResourceSample != null)
+            {
+                var s = _lastResourceSample;
+                d.ResourceSampleAgeSec = Math.Max(0, (DateTime.UtcNow - s.TimestampUtc).TotalSeconds);
+                d.ProcessCpuPct = s.ProcessCpuPct;
+                d.ProcessWorkingSetMb = s.ProcessWorkingSetMb;
+                d.ProcessPrivateMb = s.ProcessPrivateMb;
+                d.GcHeapMb = s.GcHeapMb;
+                d.DiskRoot = s.DiskRoot ?? "";
+                d.DiskUsedPct = s.DiskUsedPct;
+                d.DiskFreeGb = s.DiskFreeGb;
+            }
+            else
+                d.ResourceSampleAgeSec = -1;
+            return d;
         }
 
         private static int SafeSessionListCount(IRacingSdkSessionInfo sessionInfo)
@@ -269,7 +331,89 @@ namespace SimSteward.Plugin
             return "—";
         }
 
-        private void LogActionResult(string action, string arg, string correlationId, bool success, string error)
+        private object[] BuildDriverList()
+        {
+            try
+            {
+                var drivers = _irsdk?.Data?.SessionInfo?.DriverInfo?.Drivers as IList;
+                if (drivers == null)
+                    return Array.Empty<object>();
+                var playerIdx = SafeGetInt("PlayerCarIdx");
+                var list = new System.Collections.Generic.List<object>();
+                foreach (var d in drivers)
+                {
+                    if (d == null) continue;
+                    var t = d.GetType();
+                    var carIdxObj = t.GetProperty("CarIdx")?.GetValue(d);
+                    var carIdx = carIdxObj is int ci ? ci : Convert.ToInt32(carIdxObj ?? -1);
+                    var carNum = t.GetProperty("CarNumber")?.GetValue(d)?.ToString() ?? "";
+                    var name = t.GetProperty("UserName")?.GetValue(d)?.ToString() ?? "";
+                    var isPlayer = carIdx == playerIdx;
+                    list.Add(new { carIdx, carNum, name, isPlayer });
+                }
+                return list.ToArray();
+            }
+            catch
+            {
+                return Array.Empty<object>();
+            }
+        }
+
+        private string[] GetCameraGroupNames()
+        {
+            try
+            {
+                var groups = _irsdk?.Data?.SessionInfo?.CameraInfo?.Groups as IList;
+                if (groups == null) return Array.Empty<string>();
+                var names = new System.Collections.Generic.List<string>();
+                foreach (var g in groups)
+                {
+                    var n = g?.GetType().GetProperty("GroupName")?.GetValue(g)?.ToString();
+                    if (!string.IsNullOrEmpty(n)) names.Add(n);
+                }
+                return names.ToArray();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        private int ResolveCameraGroupNum(string groupName)
+        {
+            try
+            {
+                var groups = _irsdk?.Data?.SessionInfo?.CameraInfo?.Groups as IList;
+                if (groups == null) return -1;
+                int idx = 0;
+                foreach (var g in groups)
+                {
+                    var t = g?.GetType();
+                    var n = t?.GetProperty("GroupName")?.GetValue(g)?.ToString();
+                    if (string.Equals(n, groupName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var numProp = t.GetProperty("GroupNum");
+                        return numProp != null ? Convert.ToInt32(numProp.GetValue(g)) : idx;
+                    }
+                    idx++;
+                }
+            }
+            catch
+            {
+                // ignored
+            }
+            return -1;
+        }
+
+        private void SwitchCameraToGroup(int groupNum)
+        {
+            if (groupNum < 0 || _irsdk == null || !_irsdk.IsConnected) return;
+            int carPos = ResolveFocusCarIdx();
+            if (carPos < 0) carPos = SafeGetInt("PlayerCarIdx");
+            _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, carPos, groupNum, 0);
+        }
+
+        private void LogActionResult(string action, string arg, string correlationId, bool success, string error, System.Collections.Generic.Dictionary<string, object> supplementalFields = null)
         {
             var resultFields = new System.Collections.Generic.Dictionary<string, object>
             {
@@ -280,10 +424,95 @@ namespace SimSteward.Plugin
                 ["error"] = error ?? ""
             };
             MergeSessionAndRoutingFields(resultFields);
+            if (supplementalFields != null)
+            {
+                foreach (var kv in supplementalFields)
+                    resultFields[kv.Key] = kv.Value;
+            }
             var summary = success
                 ? $"{action} -> ok"
                 : $"{action} -> {error ?? "failed"}";
             _logger?.Structured("INFO", "simhub-plugin", "action_result", summary, resultFields, "action", null);
+        }
+
+        private class CaptureIncidentArg
+        {
+            [JsonProperty("frame")] public int frame { get; set; } = -1;
+            [JsonProperty("camera")] public string camera { get; set; }
+            /// <summary>Incident car number from dashboard (for Loki fingerprint / CustID lookup).</summary>
+            [JsonProperty("car")] public int? car { get; set; }
+        }
+
+        /// <summary>
+        /// Fills <c>unique_user_id</c>, <c>driver_name</c>, <c>car_number</c> for capture_incident logs.
+        /// Resolves by car number when provided; else uses replay camera / focus car index.
+        /// </summary>
+        private void TryFillDriverIdentityForCapture(string carNumberStr, System.Collections.Generic.Dictionary<string, object> target)
+        {
+            target["car_number"] = carNumberStr ?? "";
+            target["unique_user_id"] = "unknown";
+            target["driver_name"] = "";
+            if (_irsdk?.Data?.SessionInfo?.DriverInfo?.Drivers is not IList list)
+                return;
+
+            object match = null;
+            if (!string.IsNullOrWhiteSpace(carNumberStr))
+            {
+                var want = carNumberStr.Trim();
+                foreach (var o in list)
+                {
+                    if (o == null) continue;
+                    var t = o.GetType();
+                    var num = t.GetProperty("CarNumber")?.GetValue(o)?.ToString()?.Trim() ?? "";
+                    if (string.Equals(num, want, StringComparison.OrdinalIgnoreCase))
+                    {
+                        match = o;
+                        break;
+                    }
+                }
+            }
+
+            if (match == null)
+            {
+                int cam = ResolveFocusCarIdx();
+                if (cam >= 0)
+                {
+                    foreach (var o in list)
+                    {
+                        if (o == null) continue;
+                        var t = o.GetType();
+                        var carIdxObj = t.GetProperty("CarIdx")?.GetValue(o);
+                        var idx = carIdxObj is int ci ? ci : System.Convert.ToInt32(carIdxObj ?? -1);
+                        if (idx == cam)
+                        {
+                            match = o;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (match == null) return;
+            var mt = match.GetType();
+            target["driver_name"] = mt.GetProperty("UserName")?.GetValue(match)?.ToString() ?? "";
+            var uidObj = mt.GetProperty("UserID")?.GetValue(match) ?? mt.GetProperty("CustID")?.GetValue(match);
+            if (uidObj != null)
+                target["unique_user_id"] = uidObj.ToString();
+            if (string.IsNullOrWhiteSpace(carNumberStr))
+                target["car_number"] = mt.GetProperty("CarNumber")?.GetValue(match)?.ToString() ?? "";
+        }
+
+        private System.Collections.Generic.Dictionary<string, object> BuildCaptureIncidentSupplement(CaptureIncidentArg parsed, long durationMs)
+        {
+            var d = new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["replay_frame"] = parsed.frame,
+                ["capture_camera"] = parsed.camera ?? "",
+                ["duration_ms"] = durationMs
+            };
+            var carNumStr = parsed.car != null ? parsed.car.Value.ToString() : null;
+            TryFillDriverIdentityForCapture(carNumStr, d);
+            return d;
         }
 
         private (bool success, string result, string error) DispatchAction(string action, string arg, string correlationId)
@@ -333,6 +562,250 @@ namespace SimSteward.Plugin
                 }
             }
 
+            if (string.Equals(action, "replay_speed", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!double.TryParse((arg ?? "").Trim(),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var speed))
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    int multiplier;
+                    bool slowMotion;
+                    if (speed == 0.0)
+                    {
+                        multiplier = 0; slowMotion = false;
+                    }
+                    else if (speed > 0.0 && speed < 1.0)
+                    {
+                        multiplier = (int)Math.Round(1.0 / speed);
+                        slowMotion = true;
+                    }
+                    else if (speed >= 1.0)
+                    {
+                        multiplier = (int)speed; slowMotion = false;
+                    }
+                    else
+                    {
+                        // negative: rewind at magnitude (e.g. -4 → 4x reverse)
+                        multiplier = (int)Math.Abs(speed); slowMotion = false;
+                    }
+                    _irsdk.ReplaySetPlaySpeed(multiplier, slowMotion);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "replay_speed_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_seek", StringComparison.OrdinalIgnoreCase))
+            {
+                var dir = (arg ?? "").Trim().ToLowerInvariant();
+                if (dir != "prev" && dir != "next")
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    var mode = dir == "prev"
+                        ? IRacingSdkEnum.RpySrchMode.PrevIncident
+                        : IRacingSdkEnum.RpySrchMode.NextIncident;
+                    _irsdk.ReplaySearch(mode);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "replay_seek_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_jump", StringComparison.OrdinalIgnoreCase))
+            {
+                var target = (arg ?? "").Trim().ToLowerInvariant();
+                if (target != "start" && target != "end")
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    var mode = target == "start"
+                        ? IRacingSdkEnum.RpySrchMode.ToStart
+                        : IRacingSdkEnum.RpySrchMode.ToEnd;
+                    _irsdk.ReplaySearch(mode);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "replay_jump_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "seek_to_incident", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!int.TryParse((arg ?? "").Trim(), out var frame) || frame < 0)
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+
+                try
+                {
+                    _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, frame);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message ?? "seek_to_incident_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "set_camera", StringComparison.OrdinalIgnoreCase))
+            {
+                var groupName = (arg ?? "").Trim();
+                if (string.IsNullOrEmpty(groupName))
+                {
+                    LogActionResult(action, arg, correlationId, false, "bad_arg");
+                    return (false, null, "bad_arg");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                try
+                {
+                    int g = ResolveCameraGroupNum(groupName);
+                    if (g < 0)
+                    {
+                        LogActionResult(action, arg, correlationId, false, "group_not_found");
+                        return (false, null, "group_not_found");
+                    }
+                    SwitchCameraToGroup(g);
+                    LogActionResult(action, arg, correlationId, true, "");
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    LogActionResult(action, arg, correlationId, false, ex.Message);
+                    return (false, null, ex.Message);
+                }
+            }
+
+            if (string.Equals(action, "capture_incident", StringComparison.OrdinalIgnoreCase))
+            {
+                CaptureIncidentArg parsed;
+                try
+                {
+                    parsed = JsonConvert.DeserializeObject<CaptureIncidentArg>(arg ?? "");
+                }
+                catch
+                {
+                    LogActionResult(action, arg, correlationId, false, "bad_arg");
+                    return (false, null, "bad_arg");
+                }
+                if (parsed == null || parsed.frame < 0)
+                {
+                    LogActionResult(action, arg, correlationId, false, "bad_arg");
+                    return (false, null, "bad_arg");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    var supOff = BuildCaptureIncidentSupplement(parsed, 0);
+                    LogActionResult(action, arg, correlationId, false, "not_connected", supOff);
+                    return (false, null, "not_connected");
+                }
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    int seekFrame = Math.Max(0, parsed.frame - CapturePreRollFrames);
+                    _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, seekFrame);
+                    if (!string.IsNullOrEmpty(parsed.camera))
+                    {
+                        int g = ResolveCameraGroupNum(parsed.camera);
+                        if (g >= 0) SwitchCameraToGroup(g);
+                    }
+                    _irsdk.ReplaySetPlaySpeed(1, false);
+                    sw.Stop();
+                    LogActionResult(action, arg, correlationId, true, "", BuildCaptureIncidentSupplement(parsed, sw.ElapsedMilliseconds));
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    sw.Stop();
+                    LogActionResult(action, arg, correlationId, false, ex.Message, BuildCaptureIncidentSupplement(parsed, sw.ElapsedMilliseconds));
+                    return (false, null, ex.Message);
+                }
+            }
+
+            if (string.Equals(action, "replay_incident_index_seek", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchReplayIncidentIndexSeek(arg, correlationId);
+            }
+
+            if (string.Equals(action, "replay_incident_index_record", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchReplayIncidentIndexRecord(arg, correlationId);
+            }
+
+            if (string.Equals(action, "replay_incident_index_build", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchReplayIncidentIndexBuild(arg, correlationId);
+            }
+
             LogActionResult(action, arg, correlationId, false, "not_supported");
             return (false, null, "not_supported");
         }
@@ -365,6 +838,9 @@ namespace SimSteward.Plugin
             fields["session_num"] = _logCtxSessionNum;
             fields["track_display_name"] = _logCtxTrack;
             fields["lap"] = _logCtxLap;
+            var fp = _logCtxSessionYamlFingerprint;
+            if (!string.IsNullOrEmpty(fp))
+                fields["session_yaml_fingerprint_sha256_16"] = fp;
             SessionLogging.AppendRoutingAndDestination(fields);
         }
 
@@ -426,6 +902,7 @@ namespace SimSteward.Plugin
             _debugMode = Environment.GetEnvironmentVariable("SIMSTEWARD_LOG_DEBUG") == "1";
             _logger = new PluginLogger(_pluginDataPath, isDebugMode: _debugMode);
             _logger.SetSpineProvider(() => (_currentSessionId ?? "", _currentSessionSeq ?? "", _replayFrameNumEnd));
+            _logger.WriteError += OnLogWriteError;
             _logger.Structured("INFO", "simhub-plugin", "logging_ready", "Logging pipeline ready; init continuing.", null, "lifecycle", null);
 
             var structuredPath = _logger.StructuredLogPath;
@@ -501,11 +978,21 @@ namespace SimSteward.Plugin
                 _irsdk.OnConnected += () =>
                 {
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_connected", "iRacing connected.", null, "lifecycle", null);
+                    if (_irsdk != null && _logger != null)
+                    {
+                        var sdkReady = ReplayIncidentIndexPrerequisites.BuildSdkReadyFields(_irsdk.IsConnected, _irsdk.UpdateInterval);
+                        _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexPrerequisites.EventSdkReady,
+                            "Replay incident index: IRSDK memory map ready (TR-001).", sdkReady, "lifecycle", null);
+                    }
                 };
                 _irsdk.OnDisconnected += () =>
                 {
+                    ReplayIncidentIndexOnIracingDisconnected();
+                    _replayIncidentIndexPrereqLogKey = "";
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_disconnected", "iRacing disconnected.", null, "lifecycle", null);
                 };
+                _irsdk.OnSessionInfo += OnIrsdkSessionInfo;
+                _irsdk.OnTelemetryData += OnIrsdkTelemetryDataForReplayIndex;
                 _irsdk.Start();
                 _logger.Structured("INFO", "simhub-plugin", "irsdk_started", "iRacing SDK started.", null, "lifecycle", null);
             }
@@ -516,6 +1003,19 @@ namespace SimSteward.Plugin
             }
 
             _logger?.Info($"SimSteward ready. WebSocket on :{_wsPort}.");
+
+            _resourceSampleIntervalSec = 60;
+            var resIntv = Environment.GetEnvironmentVariable("SIMSTEWARD_RESOURCE_SAMPLE_SEC");
+            if (!string.IsNullOrWhiteSpace(resIntv) &&
+                int.TryParse(resIntv, out var ri) &&
+                ri >= 15 && ri <= 3600)
+            {
+                _resourceSampleIntervalSec = ri;
+            }
+
+            _resourceSampler = new SystemMetricsSampler();
+            _nextResourceSampleUtc = DateTime.UtcNow.AddSeconds(_resourceSampleIntervalSec);
+
             RefreshDependencyChecks();
         }
 
@@ -526,6 +1026,18 @@ namespace SimSteward.Plugin
                 RefreshDependencyChecks();
 
             int clientCount = _bridge != null ? _bridge.ClientCount : 0;
+
+            if (_logger != null && _resourceSampler != null && DateTime.UtcNow >= _nextResourceSampleUtc)
+            {
+                _nextResourceSampleUtc = DateTime.UtcNow.AddSeconds(_resourceSampleIntervalSec);
+                var sample = _resourceSampler.TrySample(_pluginDataPath, clientCount, _resourceSampleIntervalSec);
+                if (sample != null)
+                {
+                    _lastResourceSample = sample;
+                    _logger.Structured("INFO", "simhub-plugin", "host_resource_sample", "Periodic host/process resource sample",
+                        SystemMetricsSampler.ToLogFields(sample), "lifecycle", null);
+                }
+            }
 
             if (_irsdk != null && _irsdk.IsConnected)
             {
@@ -576,6 +1088,21 @@ namespace SimSteward.Plugin
                 _logCtxTrack = string.IsNullOrEmpty(trackName) ? SessionLogging.NotInSession : trackName;
                 int focusCar = ResolveFocusCarIdx();
                 _logCtxLap = focusCar >= 0 ? SafeGetCarIdxLap(focusCar) : SessionLogging.LapUnknown;
+
+                try
+                {
+                    int siu = _irsdk.Data?.SessionInfoUpdate ?? 0;
+                    if (siu != _lastSessionInfoUpdateForYamlFingerprint)
+                    {
+                        _lastSessionInfoUpdateForYamlFingerprint = siu;
+                        string yaml = _irsdk.Data?.SessionInfoYaml;
+                        _logCtxSessionYamlFingerprint = ReplayIncidentIndexPrerequisites.ComputeSessionYamlFingerprint(yaml ?? "");
+                    }
+                }
+                catch
+                {
+                    _logCtxSessionYamlFingerprint = "";
+                }
             }
             else
             {
@@ -590,10 +1117,12 @@ namespace SimSteward.Plugin
                 _logCtxSessionNum = SessionLogging.NotInSession;
                 _logCtxTrack = SessionLogging.NotInSession;
                 _logCtxLap = SessionLogging.LapUnknown;
+                _logCtxSessionYamlFingerprint = "";
+                _lastSessionInfoUpdateForYamlFingerprint = -1;
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
-            pluginManager.SetPropertyValue("SimSteward.IncidentCount", GetType(), 0);
+            pluginManager.SetPropertyValue("SimSteward.IncidentCount", GetType(), _yamlIncidentCount);
             pluginManager.SetPropertyValue("SimSteward.ClientCount", GetType(), clientCount);
 
             if (_bridge == null) return;
@@ -612,16 +1141,6 @@ namespace SimSteward.Plugin
 
             var snapshot = BuildPluginSnapshot();
             _bridge.BroadcastState(BuildStateJson(snapshot));
-
-            if (_logger.IsDebugMode)
-            {
-                _logger.Debug("state broadcast", "simhub-plugin", "state_broadcast_summary",
-                    new System.Collections.Generic.Dictionary<string, object>
-                    {
-                        ["mode"] = snapshot.PluginMode,
-                        ["client_count"] = clientCount
-                    });
-            }
         }
 
         private int SafeGetInt(string name)
@@ -665,12 +1184,23 @@ namespace SimSteward.Plugin
         {
             _logger?.Structured("INFO", "simhub-plugin", "plugin_stopped", "SimSteward plugin End.", null, "lifecycle", null);
 
+            StopReplayIncidentIndexRecordModeLocked("plugin_end");
+
             if (_logger != null)
+            {
                 _logger.LogWritten -= OnLogWritten;
+                _logger.WriteError -= OnLogWriteError;
+                _logger.FlushAndStop();
+            }
 
             if (_irsdk != null)
             {
-                try { _irsdk.Stop(); }
+                try
+                {
+                    _irsdk.OnTelemetryData -= OnIrsdkTelemetryDataForReplayIndex;
+                    _irsdk.OnSessionInfo -= OnIrsdkSessionInfo;
+                    _irsdk.Stop();
+                }
                 catch (Exception ex)
                 {
                     _logger?.Warn($"iRacing SDK Stop failed: {ex.Message}");

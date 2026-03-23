@@ -2,7 +2,7 @@
 
 ## Scope
 
-This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.html`](../src/SimSteward.Dashboard/index.html)) plus implied **plugin WebSocket** behavior (replay/incidents/telemetry). [PRODUCT-FLOW.md](PRODUCT-FLOW.md) still lists several **target** features (Selected Incident Panel, camera dropdown, atomic capture, YAML scan) as **not shipped**—below calls out what is **actually in the UI today** vs that north-star.
+This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.html`](../src/SimSteward.Dashboard/index.html)) plus implied **plugin WebSocket** behavior (replay/incidents/telemetry). [PRODUCT-FLOW.md](PRODUCT-FLOW.md) is the source of truth for **shipped vs gap**: the **Selected Incident Panel** (camera + `capture_incident`), **live car list**, and **`set_camera`** are **shipped**; **true YAML scan**, **scrub-bar seek**, **plugin-owned `suggestedCamera`**, **dual-view**, and **OBS** remain **future / partial**. Below still describes how features connect in the UI.
 
 ---
 
@@ -22,7 +22,7 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 **Flow:** Use transport buttons → `replay_*` actions over WebSocket → logs in iRacing Events / App Health as implemented → frame label and scrub fill update from `state`. When `replaySessionCount > 1` in `state`, the session row appears and sends `replay_session` (`prev` / `next`) to the plugin.
 
-**Connects to:** **Incident navigation** (duplicate prev/next **replay** incident), **capture scans** (seek to frames), and **leaderboard** (seek when clicking an incident). Same replay “surface,” different entry points.
+**Connects to:** **Incident navigation** (telemetry car + scan buttons), **capture scans** (seek to frames), and **leaderboard** (seek when clicking an incident). Session-wide **prev/next replay incident** lives only under **Replay Controls**. Same replay surface, different entry points.
 
 ---
 
@@ -30,7 +30,7 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 **User story:** I pick which car the **telemetry strip** and **“This driver’s incidents”** list represent.
 
-**Flow:** Change **Telemetry car** dropdown → mock telemetry in PoC updates; driver incident list filters by `car`; session-scan capture can rotate this dropdown per incident when scanning the whole session.
+**Flow:** Change **Telemetry car** dropdown → options come from plugin `state.drivers` when connected (mock path when disconnected); driver incident list filters by `car`; session-scan capture can rotate this dropdown per incident when scanning the whole session.
 
 **Connects to:** **This driver’s incidents** (left), **Find selected driver’s incidents** (queue built from plugin incident list for **that selected car only**), and **Find all incidents for all drivers** (UI follows each incident’s car during the session scan).
 
@@ -40,9 +40,9 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 **User story:** I see all incidents from the plugin, filter by severity / mine, and use this as the main review list.
 
-**Flow:** Receive `incidents` over WS → list + count refresh → chips filter → click row → **seek** + optional **incident meta strip** (expand/collapse).
+**Flow:** Receive `incidents` over WS → list + count refresh → chips filter → click row → **seek** + optional **incident meta strip** (expand/collapse). A second click on the same session incident opens the **Selected Incident Panel** (camera + Capture + prev/next in filtered list).
 
-**Connects to:** **Plugin incident feed** (source of truth); **meta strip** (detail on selection); **capture** flows (same incident objects, different purpose—capture builds a **second** list of snapshots).
+**Connects to:** **Plugin incident feed** (source of truth); **meta strip** and **Selected Incident Panel** (detail + camera + atomic capture); **capture** flows (same incident objects, different purpose—scan walks build a **second** list in **Captured**; **▶ Capture** uses `capture_incident`).
 
 ---
 
@@ -124,25 +124,74 @@ This describes the **browser dashboard** ([`../src/SimSteward.Dashboard/index.ht
 
 **Connects to:** **Capture scans** (producer); **meta strip** (inspection); **group-by-driver** + **accordion** for dense sessions.
 
+**Loki / re-capture:** Each **▶ Capture** on the Selected Incident Panel logs structured **`action_result`** data to Loki (including frame / subsession-style correlation fields). **Loki is append-only**—re-capturing the same frame adds a new line; the dashboard prompts for confirmation before sending again. In Grafana, prefer **latest timestamp** or aggregation for “current” capture per fingerprint; older lines age out with retention.
+
 ---
 
 ## How the pillars fit together (mermaid)
 
-[diagrams/features-pm-pillars.mmd](diagrams/features-pm-pillars.mmd)
+```mermaid
+flowchart LR
+  subgraph entry [Entry]
+    Status[Status bar]
+    WS[WebSocket plugin]
+  end
+  subgraph review [Incident review]
+    LB[Leaderboard plus chips]
+    DrvList[This driver incidents]
+    Meta[Incident meta strip]
+  end
+  subgraph transport [Replay]
+    Replay[Replay controls]
+    Seek[seek_to_incident]
+  end
+  subgraph capture [Capture]
+    DrvCap[Find selected driver incidents]
+    SessCap[Find all incidents all drivers]
+    SelCap[Selected Incident Capture]
+    CapList[Captured incidents tab]
+  end
+  WS --> Status
+  WS --> LB
+  WS --> DrvList
+  LB --> Seek
+  DrvList --> Seek
+  CapList --> Seek
+  DrvCap --> CapList
+  SessCap --> CapList
+  SelCap --> CapList
+  SelCap --> Seek
+  Seek --> Meta
+  DrvCap --> Seek
+  SessCap --> Seek
+  Replay --> Seek
+```
 
 ---
 
 ## Vision vs shipped (from PRODUCT-FLOW)
 
-| Area | Today (dashboard) | North-star in doc |
+| Area | Today (dashboard) | North-star / gap |
 |------|---------------------|-------------------|
 | Incident list + seek + filters | Shipped | Aligned |
-| Selected detail | Meta strip (not full “panel” with cameras) | Selected Incident Panel + cameras |
-| Capture | Metadata snapshots to **Captured** list | Atomic `capture_incident` + OBS |
-| Scan | Queue seeks from incident list + confirm for session | YAML scan in plugin |
+| Selected detail | Meta strip **and** Selected Incident Panel (camera + Capture) | Dual-view, plugin `suggestedCamera` |
+| Capture | Scan walks → **Captured** list; **▶ Capture** → `capture_incident` + Loki fingerprint on `action_result` | OBS integration |
+| Scan | Queue seeks from incident list + confirm for session | True YAML scan in plugin |
 
 ---
 
 ## One-line product narrative
 
-**Sim Steward today** is a **replay-aware incident console**: connect (**WS**), **navigate** the session (**replay + seek**), **focus** a driver (**car + lists**), **inspect** details (**meta strip**), and **batch-record** incident snapshots into **Captured** with optional **grouping/accordion**—while **telemetry** and **logs** explain what the car and app are doing. The **PRODUCT-FLOW** doc describes the next leap to **camera-directed capture** and **OBS**; that path is not yet the shipped UI.
+**Sim Steward today** is a **replay-aware incident console**: connect (**WS**), **navigate** the session (**replay + seek**), **focus** a driver (**live car dropdown + lists**), **inspect** details (**meta strip** + **Selected Incident Panel** with camera + **`capture_incident`**), **batch-record** scan snapshots into **Captured** with optional **grouping/accordion**, and stream structured logs to **Loki**—while **telemetry** and **logs** explain what the car and app are doing. **PRODUCT-FLOW** tracks remaining gaps (**YAML scan**, **scrub seek**, **OBS**, richer **suggestedCamera**).
+
+---
+
+## ContextStream KB links
+
+| Spec | Doc ID |
+|------|--------|
+| Sim Steward — Product Flow | `4f3c6370-0bfc-4f54-9848-9946745ac3d4` |
+| Sim Steward — User Flows | `3eb2ceb5-f859-417b-a7e4-8dde05493d55` |
+| Sim Steward — Architecture and Data Structures | `c453dd83-dfd9-4002-b8a2-2e0c8a4d032c` |
+| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |
+| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |

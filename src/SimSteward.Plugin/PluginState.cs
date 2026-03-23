@@ -28,6 +28,32 @@ namespace SimSteward.Plugin
 
         [JsonProperty("dashboardPing")]
         public string DashboardPing { get; set; } = "—";
+
+        /// <summary>Seconds since last <c>host_resource_sample</c>; <c>-1</c> if none yet.</summary>
+        [JsonProperty("resourceSampleAgeSec")]
+        public double ResourceSampleAgeSec { get; set; } = -1;
+
+        /// <summary>SimHub process CPU % (all logical processors), last sample.</summary>
+        [JsonProperty("processCpuPct")]
+        public double ProcessCpuPct { get; set; }
+
+        [JsonProperty("processWorkingSetMb")]
+        public double ProcessWorkingSetMb { get; set; }
+
+        [JsonProperty("processPrivateMb")]
+        public double ProcessPrivateMb { get; set; }
+
+        [JsonProperty("gcHeapMb")]
+        public double GcHeapMb { get; set; }
+
+        [JsonProperty("diskRoot")]
+        public string DiskRoot { get; set; } = "";
+
+        [JsonProperty("diskUsedPct")]
+        public double DiskUsedPct { get; set; }
+
+        [JsonProperty("diskFreeGb")]
+        public double DiskFreeGb { get; set; }
     }
 
     /// <summary>Minimal snapshot for WebSocket state push.</summary>
@@ -68,5 +94,49 @@ namespace SimSteward.Plugin
 
         [JsonProperty("diagnostics")]
         public PluginDiagnostics Diagnostics { get; set; } = new PluginDiagnostics();
+
+        /// <summary>M6 dashboard: replay incident index build status and last TR-019 index for current subsession.</summary>
+        [JsonProperty("replayIncidentIndex")]
+        public ReplayIncidentIndexDashboardSnapshot ReplayIncidentIndex { get; set; }
+    }
+
+    /// <summary>WebSocket <c>state.replayIncidentIndex</c> (TR-031–TR-033, TR-037–TR-038).</summary>
+    public sealed class ReplayIncidentIndexDashboardSnapshot
+    {
+        [JsonProperty("phase")]
+        public string Phase { get; set; } = "idle";
+
+        [JsonProperty("buildElapsedMs")]
+        public long BuildElapsedMs { get; set; }
+
+        [JsonProperty("replaySessionTime")]
+        public double ReplaySessionTime { get; set; }
+
+        [JsonProperty("replayFrameNum")]
+        public int ReplayFrameNum { get; set; }
+
+        [JsonProperty("replayFrameEnd")]
+        public int ReplayFrameEnd { get; set; }
+
+        [JsonProperty("sessionNum")]
+        public int SessionNum { get; set; }
+
+        [JsonProperty("subSessionId")]
+        public int SubSessionId { get; set; }
+
+        [JsonProperty("isReplayMode")]
+        public bool IsReplayMode { get; set; }
+
+        [JsonProperty("irsdkConnected")]
+        public bool IrsdkConnected { get; set; }
+
+        [JsonProperty("recordMode")]
+        public bool RecordMode { get; set; }
+
+        [JsonProperty("recordSamplePath")]
+        public string RecordSamplePath { get; set; }
+
+        [JsonProperty("index")]
+        public ReplayIncidentIndexFileRoot Index { get; set; }
     }
 }

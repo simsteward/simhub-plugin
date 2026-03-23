@@ -14,7 +14,59 @@ Sim Steward eliminates that. It turns a replay session into a structured review 
 
 ## User Flow Diagram
 
-[diagrams/product-flow-user-flow.mmd](diagrams/product-flow-user-flow.mmd)
+```mermaid
+flowchart TD
+
+  %% ── Entry ─────────────────────────────────────────────────
+  A([User opens iRacing\nand loads a replay]) --> B[SimHub plugin detects\nReplay mode]
+  B --> C[User opens Sim Steward\ndashboard in browser]
+  C --> D{Incidents already\nscanned?}
+
+  D -- No --> E[User clicks\nFind All Incidents]
+  D -- Yes --> L
+
+  %% ── Scan ──────────────────────────────────────────────────
+  E --> F[Plugin scrubs replay YAML\nfor CurDriverIncidentCount deltas\nacross all cars all frames]
+  F --> G[Authoritative incident list sent\nto dashboard via WS incidents message\nfields: driver · type · time · frame · suggestedCamera]
+  G --> L
+
+  %% ── Review queue ──────────────────────────────────────────
+  L([Incident List\nshown in leaderboard]) --> M{Any incidents?}
+  M -- No --> N([No incidents found\nSession clean])
+  M -- Yes --> O[User clicks incident row\nin list]
+
+  %% ── Selected Incident Panel ───────────────────────────────
+  O --> P[Selected Incident Panel activates\n───────────────────────\nDriver · car · type · session time\nIncident View 1 dropdown\n↳ use suggested view link\nPrev · Capture · Next]
+
+  P --> Q{Camera OK?}
+  Q -- No  --> R[User picks camera\nfrom View 1 dropdown]
+  Q -- Yes --> S
+  R --> S
+
+  %% ── Capture sequence ──────────────────────────────────────
+  S[User clicks Capture] --> T[Plugin: seek to\nstart_frame − pre-roll buffer]
+  T --> U[Plugin: set iRacing camera\nto selected Incident View 1]
+  U --> V[Plugin: set playback speed → 1×]
+  V --> W[OBS records the clip\nmanual trigger today]
+  W --> X{More incidents?}
+
+  X -- Yes --> Y[User clicks Next →\nor selects from list]
+  Y --> O
+  X -- No  --> Z([Session review complete])
+
+  %% ── Dual-view future path ─────────────────────────────────
+  P -.-> DV[Future: 2-view mode toggle]
+  DV -.-> DV2[View 1 + View 2 selectors\nboth with suggested view links]
+  DV2 -.-> DV3[Capture: play View 1\nthen auto-switch to View 2]
+  DV3 -.-> W
+
+  %% ── OBS future path ───────────────────────────────────────
+  W -.-> OBS[Future: OBS integration\nauto start · stop · name clip]
+
+  %% ── Styles ────────────────────────────────────────────────
+  classDef future stroke-dasharray:5 5,color:#888
+  class DV,DV2,DV3,OBS future
+```
 
 ---
 
@@ -31,24 +83,32 @@ Sim Steward eliminates that. It turns a replay session into a structured review 
 | Incident meta strip (selected detail) | ✅ shipped | Click-to-expand/collapse; frame · car · driver · sev · cause |
 | This driver's incidents (left panel) | ✅ shipped | Filters by selected car — **distinct from Mine filter** (see PM issues) |
 | Captured incidents tab + group-by-driver accordion | ✅ shipped | |
-| Find driver incidents (scan walk) | ✅ shipped | Walks already-known leaderboard frames; timing-based (600 ms); fragile |
+| Find driver incidents (scan walk) | ✅ shipped | Walks already-known leaderboard frames; frame handshake + step delay between seeks |
 | Find all session incidents (scan walk) | ✅ shipped | Same walk for all drivers; confirm dialog |
 | Driver standings (collapsible) | ✅ shipped | |
-| Telemetry strip (throttle / brake / steering) | ✅ shipped | Real telemetry from plugin state |
-| Telemetry car selection | ⚠️ partial | Dropdown hardcoded mock; incident filter works; telem is mock |
-| Duplicate prev/next replay incident buttons | ⚠️ UX debt | Same buttons in Replay Controls AND Incident Navigation panels |
+| Telemetry strip (throttle / brake / steering) | ✅ shipped | From plugin `state.telemetry` when present; else mock when disconnected |
+| Telemetry car selection | ✅ shipped | `drivers` in WS state; gauges follow live telemetry when connected |
+| Duplicate prev/next replay incident buttons | ✅ shipped | Duplicate row removed; only Replay Controls retains prev/next |
 | Scrub bar seek | ⚠️ PoC | Shows toast only; not wired to seek action |
-| Find All Incidents (true YAML scan) | ❌ missing | Current walks leaderboard frames, not a plugin-side YAML scan |
-| Selected Incident Panel (camera + capture UI) | ❌ missing | Meta strip ≠ full panel; no camera selector or capture action |
-| Camera list from plugin (`cameraGroups`) | ❌ missing | |
-| `suggestedCamera` field on incident | ❌ missing | Plugin does not emit this |
-| `set_camera` plugin action | ❌ missing | No WS action to change iRacing camera |
-| `capture_incident` atomic action | ❌ missing | Pre-roll seek + set camera + set 1× speed as one action |
-| Car dropdown from live plugin data | ❌ missing | Currently hardcoded mock options |
-| Pre-roll buffer on capture | ❌ missing | Seek goes directly to incident frame |
-| 1× playback enforced on capture | ❌ missing | Speed not set automatically |
+| Find All Incidents (true YAML scan) | ❌ missing | Walks leaderboard frames only, not a plugin-side YAML scan |
+| Selected Incident Panel (camera + capture UI) | ✅ shipped | Camera selector, capture, prev/next; meta strip still available |
+| Camera list from plugin (`cameraGroups`) | ✅ shipped | In WS state |
+| `suggestedCamera` field on incident | ⚠️ partial | Dashboard heuristic from `cause` + `cameraGroups`; not from plugin YAML |
+| `set_camera` plugin action | ✅ shipped | |
+| `capture_incident` atomic action | ✅ shipped | Pre-roll seek + optional camera + 1× speed |
+| Car dropdown from live plugin data | ✅ shipped | `drivers` in state |
+| Pre-roll buffer on capture | ✅ shipped | `CapturePreRollFrames` in plugin |
+| 1× playback enforced on capture | ✅ shipped | `ReplaySetPlaySpeed(1, false)` in `capture_incident` |
 | Dual-view capture (View 1 + View 2) | 🗓 future | Two selectors, auto-switch mid-clip |
 | OBS integration | 🗓 future | Auto record/stop/name per incident |
+
+### Remaining gaps (narrow follow-ups)
+
+- **True YAML scan:** Plugin-side scan of replay / session YAML for all incidents (replaces walking the leaderboard-only list).
+- **Scrub bar:** Wire seek to `seek_to_incident` or replay position (currently toast-only PoC).
+- **Plugin-owned `suggestedCamera`:** Emit per incident from telemetry/YAML instead of dashboard heuristic.
+- **Telemetry in state:** Ensure plugin broadcasts `telemetry` in every `state` message when iRacing connected so car changes always reflect live gauges (optional hardening).
+- **PM issues:** Meta strip vs left-column feedback (issue 5); Captured-tab value vs OBS (issue 4).
 
 ---
 
@@ -88,29 +148,21 @@ User then watches it play and OBS records. They press **Next →** when done.
 
 ---
 
-## What Needs to Change
+## What still needs to change (backlog)
 
 ### Plugin (C#)
 
 | Change | Why |
 |---|---|
-| Add `suggestedCamera` to incident log fields | Dashboard needs it to pre-fill View 1 selector and show "use suggested" link |
-| New WS message: `cameraGroups` | Sends available camera group names so dashboard can populate dropdowns |
-| New action: `set_camera` + arg = camera name | Changes iRacing camera group |
-| New action: `capture_incident` + arg = frame | Atomic: seek to pre-roll, set camera, set 1× speed |
-| Replace find-all polling with true YAML scan | Current 600ms-step loop is fragile; plugin should scan all frames and return full list |
+| Add `suggestedCamera` on server-owned incidents | When incidents come from plugin/YAML, pre-fill View 1 without heuristics |
+| Replace leaderboard walk with true YAML scan | Full discovery; today’s walk only revisits frames already in the list |
+| Update logging to match new Observability Strategy | Implement Loki events and Prometheus metrics per `IRACING-OBSERVABILITY-STRATEGY.md` standard |
 
 ### Dashboard (JS)
 
 | Change | Why |
 |---|---|
-| `selectedIncident` state | Track which incident is active |
-| Selected Incident Panel HTML | Dedicated area showing camera selector and capture controls |
-| Camera dropdown populated from `cameraGroups` message | Replaces hardcoded options |
-| "Use suggested view" link | Resets dropdown to `incident.suggestedCamera` |
-| `capture_incident` call replaces seek-only click | Single action does pre-roll + camera + speed |
-| Replace timing-based capture snapshot with frame-confirmed handshake | Wait for plugin `state.frame` to match seeked frame before recording — current 600 ms DOM read is unreliable |
-| Populate car dropdown from plugin `drivers` state | Currently hardcoded mock; must match live iRacing grid |
+| Optional: frame handshake tuning | `waitForFrameApprox` tolerance/timeouts per machine |
 | Keep "This driver's incidents" left-col panel | **Not redundant** — Mine chip = `player:true` (your car only); driver panel = any selected car; required for steward opponent review |
 
 ---
@@ -121,10 +173,10 @@ User then watches it play and OBS records. They press **Next →** when done.
 
 | # | Type | Issue |
 |---|------|-------|
-| 1 | UX debt | Duplicate prev/next replay incident buttons in both panels — same `replay_seek prev/next` (session-wide) twice |
-| 2 | Missing feature | Telemetry car dropdown is hardcoded mock; must be populated from plugin `drivers` state |
-| 3 | Data quality | Capture walk uses 600 ms DOM timeout to read frame#; unreliable under WS lag — needs frame-confirmed handshake |
-| 4 | Value gap | Captured incidents tab is leaderboard subset + `capturedAt` timestamp; value only clear once `capture_incident` atomic action + OBS exists |
-| 5 | UX gap | Meta strip expands in bottom dock; clicking a card in the left-column driver panel gives no visible feedback near the click point |
-| 6 | Product decision (resolved) | "This driver's incidents" is **not** equivalent to Mine chip — keep it; it is the primary flow for stewards reviewing opponent incidents |
-| 7 | Clarity gap | "Find driver's incidents" / "Find all session incidents" walk already-known frames; they do not discover new incidents — consider renaming |
+| 1 | Resolved | Duplicate replay prev/next removed from Incident navigation |
+| 2 | Resolved | Car dropdown populated from plugin `drivers` |
+| 3 | Mitigated | Capture walk waits for `state.frame` ≈ seek target (`waitForFrameApprox`); fallback on timeout |
+| 4 | Value gap | Captured tab is still leaderboard subset + timestamp until OBS workflow |
+| 5 | UX gap | Meta strip in bottom dock vs feedback near left-column driver clicks |
+| 6 | Product decision (resolved) | "This driver's incidents" is **not** equivalent to Mine chip — keep it |
+| 7 | Mitigated | Buttons renamed to “Walk … listed incidents” with tooltips clarifying no YAML discovery |

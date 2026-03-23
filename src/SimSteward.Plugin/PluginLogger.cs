@@ -47,6 +47,7 @@ namespace SimSteward.Plugin
 
     /// <summary>
     /// File-based logger. Writes plugin.log and plugin-structured.jsonl.
+    /// Disk writes are batched on a 500 ms timer to reduce I/O pressure.
     /// Thread-safe.
     /// </summary>
     public class PluginLogger
@@ -54,24 +55,33 @@ namespace SimSteward.Plugin
         private const int RingBufferCapacity = 10000;
         private const long MaxLogBytes = 5 * 1024 * 1024;
         private const int  MaxLogFiles = 3;
+        private const int  FlushIntervalMs = 500;
 
         private readonly string _logPath;
         private readonly string _jsonLogPath;
         private readonly object _lock = new object();
         private readonly Queue<LogEntry> _ring = new Queue<LogEntry>();
+        private readonly Queue<(string json, string text)> _writeBuffer = new Queue<(string, string)>();
+        private System.Threading.Timer _flushTimer;
         private Func<(string sessionId, string sessionSeq, int replayFrame)> _getSpine;
 
         public event Action<LogEntry> LogWritten;
+        /// <summary>Fired outside the write lock when a batch flush fails. Args: eventType, exception.</summary>
+        public event Action<string, Exception> WriteError;
 
         public PluginLogger(string basePath, bool isDebugMode = false)
         {
             _logPath = string.IsNullOrEmpty(basePath) ? null : Path.Combine(basePath, "plugin.log");
             _jsonLogPath = string.IsNullOrEmpty(basePath) ? null : Path.Combine(basePath, "plugin-structured.jsonl");
             IsDebugMode = isDebugMode;
+            if (!string.IsNullOrEmpty(basePath))
+                _flushTimer = new System.Threading.Timer(_ => Flush(), null, FlushIntervalMs, FlushIntervalMs);
         }
 
         public bool IsDebugMode { get; }
         public string StructuredLogPath => _jsonLogPath;
+        /// <summary>Path to plugin.log (null if constructed with empty base path).</summary>
+        public string LogPath => _logPath;
 
         public void SetSpineProvider(Func<(string sessionId, string sessionSeq, int replayFrame)> getSpine)
         {
@@ -140,32 +150,63 @@ namespace SimSteward.Plugin
                 catch { }
             }
 
-            WriteJsonLine(entry);
-
             lock (_lock)
             {
                 _ring.Enqueue(entry);
                 if (_ring.Count > RingBufferCapacity)
                     _ring.Dequeue();
-                WriteToFile($"{entry.Timestamp} [{entry.Level}] {entry.Message}{Environment.NewLine}");
+                _writeBuffer.Enqueue((
+                    JsonConvert.SerializeObject(entry) + "\n",
+                    $"{entry.Timestamp} [{entry.Level}] {entry.Message}{Environment.NewLine}"
+                ));
             }
 
             try { LogWritten?.Invoke(entry); } catch { }
         }
 
-        private void WriteToFile(string line)
+        private void Flush()
         {
-            if (string.IsNullOrEmpty(_logPath)) return;
-            try
+            (string json, string text)[] batch;
+            lock (_lock)
             {
-                var dir = Path.GetDirectoryName(_logPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                if (File.Exists(_logPath) && new FileInfo(_logPath).Length > MaxLogBytes)
-                    RotateLogs();
-                File.AppendAllText(_logPath, line, System.Text.Encoding.UTF8);
+                if (_writeBuffer.Count == 0) return;
+                batch = _writeBuffer.ToArray();
+                _writeBuffer.Clear();
             }
-            catch { }
+
+            var jsonSb = new System.Text.StringBuilder();
+            var textSb = new System.Text.StringBuilder();
+            foreach (var b in batch) { jsonSb.Append(b.json); textSb.Append(b.text); }
+
+            if (!string.IsNullOrEmpty(_jsonLogPath))
+            {
+                try { AppendToFile(_jsonLogPath, jsonSb.ToString(), () => RotateJsonLogs()); }
+                catch (Exception ex) { try { WriteError?.Invoke("jsonl_write_error", ex); } catch { } }
+            }
+
+            if (!string.IsNullOrEmpty(_logPath))
+            {
+                try { AppendToFile(_logPath, textSb.ToString(), () => RotateLogs()); }
+                catch (Exception ex) { try { WriteError?.Invoke("log_write_error", ex); } catch { } }
+            }
+        }
+
+        private void AppendToFile(string path, string content, Action rotate)
+        {
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            if (File.Exists(path) && new FileInfo(path).Length > MaxLogBytes)
+                rotate();
+            File.AppendAllText(path, content, System.Text.Encoding.UTF8);
+        }
+
+        /// <summary>Stops the flush timer and writes any remaining buffered entries to disk.</summary>
+        public void FlushAndStop()
+        {
+            _flushTimer?.Dispose();
+            _flushTimer = null;
+            Flush();
         }
 
         private void RotateLogs()
@@ -180,21 +221,6 @@ namespace SimSteward.Plugin
                         File.Copy(newer, older, overwrite: true);
                 }
                 File.WriteAllText(_logPath, string.Empty, System.Text.Encoding.UTF8);
-            }
-            catch { }
-        }
-
-        private void WriteJsonLine(LogEntry entry)
-        {
-            if (string.IsNullOrEmpty(_jsonLogPath) || entry == null) return;
-            try
-            {
-                var dir = Path.GetDirectoryName(_jsonLogPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                if (File.Exists(_jsonLogPath) && new FileInfo(_jsonLogPath).Length > MaxLogBytes)
-                    RotateJsonLogs();
-                File.AppendAllText(_jsonLogPath, JsonConvert.SerializeObject(entry) + "\n", System.Text.Encoding.UTF8);
             }
             catch { }
         }
