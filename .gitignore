@@ -12,6 +12,9 @@ obj/
 *.exe
 packages/
 
+# Claude Code — local overrides (committed: `.claude/settings.json`)
+.claude/settings.local.json
+
 # IDE / OS
 .idea/
 *.swp
@@ -41,7 +44,8 @@ debug-*.log
 
 # ContextStream local
 .contextstream/
-.mcp.json
+# Root `.mcp.json` is committed (no secrets; API key in `.env` via envmcp). Use `.mcp.local.json` for overrides if needed.
+.mcp.local.json
 
 # One-off MCP upload payload dumps (repo root)
 /_ctx_*.json

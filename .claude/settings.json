@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__contextstream__context",
+      "mcp__contextstream__graph",
+      "mcp__contextstream__help",
+      "mcp__contextstream__init",
+      "mcp__contextstream__instruct",
+      "mcp__contextstream__integration",
+      "mcp__contextstream__media",
+      "mcp__contextstream__memory",
+      "mcp__contextstream__project",
+      "mcp__contextstream__ram",
+      "mcp__contextstream__reminder",
+      "mcp__contextstream__search",
+      "mcp__contextstream__session",
+      "mcp__contextstream__skill",
+      "mcp__contextstream__workspace"
+    ]
+  }
+}
