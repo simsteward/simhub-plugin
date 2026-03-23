@@ -1,9 +1,10 @@
 {
   "mcpServers": {
     "ollama": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "C:\\Users\\winth\\AppData\\Roaming\\npm\\node_modules\\@muhammadmehdi\\ollama-mcp-server\\dist\\index.js"
+        "-y",
+        "@muhammadmehdi/ollama-mcp-server"
       ],
       "env": {
         "OLLAMA_BASE_URL": "http://localhost:11434",

@@ -14,9 +14,13 @@
     "obs:wipe": "pwsh -NoProfile -File scripts/obs-wipe-local-data.ps1",
     "obs:poll:prometheus": "pwsh -NoProfile -File scripts/poll-prometheus.ps1",
     "obs:ports": "pwsh -NoProfile -File scripts/check-obs-ports.ps1",
-    "loki:query": "dotenv -e .env -- node scripts/query-loki-once.mjs"
+    "loki:query": "dotenv -e .env -- node scripts/query-loki-once.mjs",
+    "secrets:lint": "secretlint \"**/*\"",
+    "secrets:gitleaks": "pwsh -NoProfile -File scripts/run-gitleaks-docker.ps1"
   },
   "devDependencies": {
-    "dotenv-cli": "^7.4.4"
+    "@secretlint/secretlint-rule-preset-recommend": "^11.4.0",
+    "dotenv-cli": "^7.4.4",
+    "secretlint": "^11.4.0"
   }
 }
