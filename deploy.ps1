@@ -5,6 +5,16 @@
 $ErrorActionPreference = "Stop"
 $PluginRoot = $PSScriptRoot
 
+# Load repo .env (+ optional observability stack secrets) so SIMSTEWARD_LOKI_URL, LOKI_PUSH_TOKEN, etc. apply to deploy + Loki marker.
+$loadDotenv = Join-Path $PluginRoot "scripts\load-dotenv.ps1"
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv @(
+        (Join-Path $PluginRoot ".env"),
+        (Join-Path $PluginRoot "observability\local\.env.observability.local")
+    )
+}
+
 $PluginDlls = @(
     "SimSteward.Plugin.dll",
     "Fleck.dll",

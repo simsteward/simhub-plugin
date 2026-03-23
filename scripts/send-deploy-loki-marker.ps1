@@ -10,6 +10,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$loadDotenv = Join-Path $repoRoot 'scripts\load-dotenv.ps1'
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv @(
+        (Join-Path $repoRoot '.env'),
+        (Join-Path $repoRoot 'observability\local\.env.observability.local')
+    )
+}
+
 $url = $env:SIMSTEWARD_LOKI_URL
 if ([string]::IsNullOrWhiteSpace($url)) { return }
 
