@@ -30,6 +30,9 @@ namespace SimSteward.Plugin
         public const string EventDetection = "replay_incident_index_detection";
         public const string EventValidationSummary = "replay_incident_index_validation_summary";
 
+        /// <summary>M6 TR-038 / TR-040: batched structured hint for 60Hz record mode (not per-tick).</summary>
+        public const string EventRecordWindow = "replay_incident_index_record_window";
+
         /// <summary>~2.5s at 60Hz telemetry between <c>ReplaySearchSessionTime</c> and <c>CamCarIdx</c> read (TR-025).</summary>
         public const int CameraValidationCooldownTelemetryTicks = 150;
 

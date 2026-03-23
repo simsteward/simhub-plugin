@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Sim Steward — Replay incident index</title>
+<style>
+:root {
+  --bg: #080808; --surface: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.08);
+  --accent: #1f9cff; --green: #0ef272; --red: #ff5f5f; --yellow: #ffc840;
+  --text: #f0f0f0; --muted: rgba(240,240,240,0.45);
+  --r: 10px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; background: var(--bg); color: var(--text); }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 12px 14px 28px; display: flex; flex-direction: column; gap: 10px; }
+.topnav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.78rem; }
+.topnav a { color: var(--accent); text-decoration: none; }
+.topnav a:hover { text-decoration: underline; }
+.ws-pill {
+  margin-left: auto; font-size: 0.68rem; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border);
+}
+.ws-pill.ok { color: var(--green); border-color: rgba(14,242,114,0.35); }
+.ws-pill.bad { color: var(--red); border-color: rgba(255,95,95,0.35); }
+.banner {
+  padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--border);
+  background: rgba(255,200,64,0.06); font-size: 0.82rem; line-height: 1.4;
+}
+.banner.err { border-color: rgba(255,95,95,0.4); background: rgba(255,95,95,0.07); }
+.panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px;
+}
+.panel-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.row:last-child { margin-bottom: 0; }
+.btn {
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04);
+  color: var(--text); font-size: 0.8rem; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
+.btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
+.btn.record { font-size: 1rem; font-weight: 700; padding: 12px 22px; border-width: 2px; }
+.btn.record.on { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.12); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.55} }
+.meta { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+.meta strong { color: var(--text); font-weight: 600; }
+.grid-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; font-size: 0.78rem; }
+.grid-summary div { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+.table-wrap { overflow: auto; max-height: min(520px, 55vh); border: 1px solid var(--border); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { position: sticky; top: 0; background: #121212; cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; }
+th:hover { color: var(--text); }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.mono { font-family: "Courier New", monospace; font-size: 0.68rem; }
+.fp { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast {
+  position: fixed; bottom: 16px; right: 16px; max-width: 400px; padding: 10px 14px;
+  background: rgba(18,18,22,0.97); border: 1px solid var(--border); border-radius: 8px; font-size: 0.78rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 50;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="topnav">
+    <a href="index.html">← Sim Steward dashboard</a>
+    <span style="color:var(--muted)">Replay incident index (M6)</span>
+    <span class="ws-pill bad" id="ws-pill">WS …</span>
+  </nav>
+
+  <div class="banner err" id="guard-banner" hidden></div>
+
+  <div class="panel">
+    <div class="panel-title">Build &amp; record</div>
+    <div class="row">
+      <button type="button" class="btn primary" id="btn-start" onclick="sendBuild('start')">Start index build</button>
+      <button type="button" class="btn danger" id="btn-cancel" onclick="sendBuild('cancel')">Cancel build</button>
+      <button type="button" class="btn record" id="btn-record" onclick="toggleRecord()">Record</button>
+    </div>
+    <div class="meta" id="build-meta"></div>
+    <div class="meta" id="record-path" style="margin-top:6px"></div>
+  </div>
+
+  <div class="panel" id="summary-panel">
+    <div class="panel-title">Summary (TR-022)</div>
+    <div class="grid-summary" id="summary-grid"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Incidents (TR-020 / TR-032)</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-k="fingerprint">fingerprint</th>
+            <th data-k="carIdx">carIdx</th>
+            <th data-k="sessionTimeMs">sessionTimeMs</th>
+            <th data-k="detectionSource">detectionSource</th>
+            <th data-k="incidentPoints">incidentPoints</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="meta" id="empty-hint" style="margin-top:8px">No index loaded for this subsession. Run a build or open a replay with an existing JSON index.</p>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const WS_PORT = 19847;
+function wsUrl() {
+  const h = window.location.hostname || 'localhost';
+  const p = new URLSearchParams(window.location.search);
+  const tok = p.get('token') || p.get('wsToken');
+  if (tok) return 'ws://' + h + ':' + WS_PORT + '/?token=' + encodeURIComponent(tok);
+  return 'ws://' + h + ':' + WS_PORT;
+}
+let ws = null;
+let lastIdx = null;
+let lastSessionNum = 0;
+let sortKey = 'sessionTimeMs';
+let sortDir = 1;
+
+function connectWs() {
+  const pill = document.getElementById('ws-pill');
+  try {
+    pill.textContent = 'WS …';
+    pill.className = 'ws-pill bad';
+    ws = new WebSocket(wsUrl());
+    ws.onopen = () => { pill.textContent = 'WS connected'; pill.className = 'ws-pill ok'; };
+    ws.onclose = () => {
+      ws = null;
+      pill.textContent = 'WS reconnecting…';
+      pill.className = 'ws-pill bad';
+      setTimeout(connectWs, 3000);
+    };
+    ws.onerror = () => {};
+    ws.onmessage = (e) => { try { onMsg(JSON.parse(e.data)); } catch (_) {} };
+  } catch (_) {
+    setTimeout(connectWs, 3000);
+  }
+}
+
+function send(action, arg) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    toast('WebSocket not connected.');
+    return false;
+  }
+  ws.send(JSON.stringify({ action, arg: arg ?? '' }));
+  return true;
+}
+
+function onMsg(m) {
+  if (!m || !m.type) return;
+  if (m.type === 'state') onState(m);
+  if (m.type === 'actionResult') onActionResult(m);
+}
+
+function onState(m) {
+  const rii = m.replayIncidentIndex;
+  lastSessionNum = m.replaySessionNum != null ? m.replaySessionNum : 0;
+  if (!rii) return;
+  lastIdx = rii;
+  renderGuard(rii, m.diagnostics);
+  renderBuild(rii);
+  renderSummary(rii);
+  renderTable(rii);
+  document.getElementById('btn-record').classList.toggle('on', !!rii.recordMode);
+  const rp = rii.recordSamplePath || '';
+  document.getElementById('record-path').textContent = rp ? ('Record file: ' + rp) : '';
+}
+
+function renderGuard(rii, diag) {
+  const el = document.getElementById('guard-banner');
+  const ir = diag && diag.irsdkConnected;
+  if (!ir) {
+    el.hidden = false;
+    el.className = 'banner err';
+    el.textContent = 'iRacing SDK not connected. Load iRacing with a replay; no index build runs in this state (TR-037).';
+    return;
+  }
+  if (!rii.isReplayMode) {
+    el.hidden = false;
+    el.className = 'banner err';
+    el.textContent = 'Session is not replay mode (SimMode ≠ replay). Index build and replay seeks are disabled (TR-037).';
+    return;
+  }
+  el.hidden = true;
+}
+
+function renderBuild(rii) {
+  const phase = rii.phase || 'idle';
+  const busy = phase !== 'idle';
+  document.getElementById('btn-start').disabled = busy;
+  document.getElementById('btn-cancel').disabled = !busy;
+  const elapsed = rii.buildElapsedMs != null ? rii.buildElapsedMs : 0;
+  const rst = rii.replaySessionTime != null ? rii.replaySessionTime.toFixed(2) : '—';
+  const fr = rii.replayFrameNum != null ? rii.replayFrameNum : 0;
+  const fe = rii.replayFrameEnd != null ? rii.replayFrameEnd : 0;
+  const prog = fe > 0 ? Math.round(100 * fr / fe) + '%' : '—';
+  document.getElementById('build-meta').innerHTML =
+    '<strong>Phase:</strong> ' + phase +
+    ' &nbsp;|&nbsp; <strong>Elapsed:</strong> ' + elapsed + ' ms' +
+    ' &nbsp;|&nbsp; <strong>ReplaySessionTime:</strong> ' + rst + ' s' +
+    ' &nbsp;|&nbsp; <strong>Frame:</strong> ' + fr + ' / ' + fe + ' (' + prog + ')' +
+    ' &nbsp;|&nbsp; <strong>SubSession:</strong> ' + (rii.subSessionId || 0) +
+    ' &nbsp;|&nbsp; <strong>SessionNum:</strong> ' + (rii.sessionNum != null ? rii.sessionNum : '—');
+}
+
+function renderSummary(rii) {
+  const g = document.getElementById('summary-grid');
+  const ix = rii.index;
+  if (!ix) {
+    g.innerHTML = '<div style="grid-column:1/-1;color:var(--muted)">No completed index for this context (build in progress or none yet).</div>';
+    return;
+  }
+  const byCar = ix.incidentCountByCarIdx || {};
+  const carBits = Object.keys(byCar).sort((a,b)=>+a-+b).map(k => '#' + k + ': ' + byCar[k]).join(' · ') || '—';
+  g.innerHTML =
+    '<div><span style="color:var(--muted)">subSessionId</span><br><strong>' + ix.subSessionId + '</strong></div>' +
+    '<div><span style="color:var(--muted)">indexBuildTimeMs</span><br><strong>' + ix.indexBuildTimeMs + '</strong></div>' +
+    '<div><span style="color:var(--muted)">totalRaceIncidents</span><br><strong>' + ix.totalRaceIncidents + '</strong></div>' +
+    '<div style="grid-column:1/-1"><span style="color:var(--muted)">incidentCountByCarIdx</span><br><strong style="font-size:0.74rem">' + carBits + '</strong></div>';
+}
+
+function fmtMs(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const r = ms % 1000;
+  return m + ':' + String(s % 60).padStart(2, '0') + '.' + String(r).padStart(3, '0');
+}
+
+function fpShort(fp) {
+  if (!fp || fp.length < 20) return fp || '—';
+  return fp.slice(0, 10) + '…' + fp.slice(-8);
+}
+
+function renderTable(rii) {
+  const tb = document.getElementById('tbody');
+  const empty = document.getElementById('empty-hint');
+  const rows = (rii.index && rii.index.incidents) ? rii.index.incidents.slice() : [];
+  if (!rows.length) {
+    tb.innerHTML = '';
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  rows.sort((a, b) => {
+    const av = a[sortKey];
+    const bv = b[sortKey];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+    return String(av).localeCompare(String(bv)) * sortDir;
+  });
+  tb.innerHTML = rows.map((r) => {
+    const pts = r.incidentPoints == null ? 'null' : String(r.incidentPoints);
+    const arg = JSON.stringify({ sessionTimeMs: r.sessionTimeMs, sessionNum: lastSessionNum });
+    return '<tr>' +
+      '<td class="mono fp" title="' + (r.fingerprint || '') + '">' + fpShort(r.fingerprint) + '</td>' +
+      '<td>' + r.carIdx + '</td>' +
+      '<td class="mono">' + r.sessionTimeMs + ' <span style="color:var(--muted)">(' + fmtMs(r.sessionTimeMs) + ')</span></td>' +
+      '<td>' + (r.detectionSource || '') + '</td>' +
+      '<td>' + pts + '</td>' +
+      '<td><button type="button" class="btn primary" style="padding:4px 8px;font-size:0.65rem" data-seek="' +
+      encodeURIComponent(arg) + '" onclick="window._riiSeek(this)">Seek</button></td></tr>';
+  }).join('');
+}
+
+window._riiSeek = function (btn) {
+  seekRow(decodeURIComponent(btn.getAttribute('data-seek')));
+};
+
+function seekRow(argJson) {
+  if (!lastIdx || !lastIdx.isReplayMode) {
+    toast('Seek unavailable (not replay mode).');
+    return;
+  }
+  send('replay_incident_index_seek', argJson);
+}
+
+function sendBuild(verb) {
+  send('replay_incident_index_build', verb);
+}
+
+function toggleRecord() {
+  const on = lastIdx && lastIdx.recordMode;
+  send('replay_incident_index_record', on ? 'off' : 'on');
+}
+
+function onActionResult(m) {
+  if (m.success) return;
+  const err = m.error || '';
+  const map = {
+    not_connected: 'Not connected to iRacing.',
+    not_replay_mode: 'Not in replay mode.',
+    build_in_progress: 'Index build already running.',
+    bad_arg: 'Bad request.',
+    no_subsession: 'No subsession id — load a replay session.',
+  };
+  toast(map[err] || err || 'Action failed');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._id);
+  toast._id = setTimeout(() => t.classList.remove('show'), 3800);
+}
+
+document.querySelectorAll('th[data-k]').forEach((th) => {
+  th.addEventListener('click', () => {
+    const k = th.getAttribute('data-k');
+    if (sortKey === k) sortDir = -sortDir;
+    else { sortKey = k; sortDir = 1; }
+    if (lastIdx) renderTable(lastIdx);
+  });
+});
+
+connectWs();
+</script>
+</body>
+</html>

@@ -94,6 +94,7 @@ namespace SimSteward.Plugin.Tests
             Assert.Equal("replay_incident_index_build_cancelled", ReplayIncidentIndexBuild.EventBuildCancelled);
             Assert.Equal("replay_incident_index_detection", ReplayIncidentIndexBuild.EventDetection);
             Assert.Equal("replay_incident_index_validation_summary", ReplayIncidentIndexBuild.EventValidationSummary);
+            Assert.Equal("replay_incident_index_record_window", ReplayIncidentIndexBuild.EventRecordWindow);
         }
 
         [Fact]

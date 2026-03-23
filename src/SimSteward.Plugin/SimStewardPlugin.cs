@@ -103,7 +103,8 @@ namespace SimSteward.Plugin
                 replaySessionName = snapshot.ReplaySessionName,
                 drivers = BuildDriverList(),
                 cameraGroups = GetCameraGroupNames(),
-                diagnostics = snapshot.Diagnostics
+                diagnostics = snapshot.Diagnostics,
+                replayIncidentIndex = snapshot.ReplayIncidentIndex
             };
             return JsonConvert.SerializeObject(state);
         }
@@ -256,7 +257,8 @@ namespace SimSteward.Plugin
                 ReplaySessionCount = replaySessionCount,
                 ReplaySessionNum = replaySessionNum,
                 ReplaySessionName = replaySessionName,
-                Diagnostics = BuildDiagnostics(clientCount)
+                Diagnostics = BuildDiagnostics(clientCount),
+                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot()
             };
         }
 
@@ -789,6 +791,16 @@ namespace SimSteward.Plugin
                 }
             }
 
+            if (string.Equals(action, "replay_incident_index_seek", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchReplayIncidentIndexSeek(arg, correlationId);
+            }
+
+            if (string.Equals(action, "replay_incident_index_record", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchReplayIncidentIndexRecord(arg, correlationId);
+            }
+
             if (string.Equals(action, "replay_incident_index_build", StringComparison.OrdinalIgnoreCase))
             {
                 return DispatchReplayIncidentIndexBuild(arg, correlationId);
@@ -1171,6 +1183,8 @@ namespace SimSteward.Plugin
         public void End(PluginManager pluginManager)
         {
             _logger?.Structured("INFO", "simhub-plugin", "plugin_stopped", "SimSteward plugin End.", null, "lifecycle", null);
+
+            StopReplayIncidentIndexRecordModeLocked("plugin_end");
 
             if (_logger != null)
             {

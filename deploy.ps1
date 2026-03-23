@@ -160,6 +160,11 @@ Write-Host "Copying dashboard to $DashboardTargetDir ..."
 $dashboardTargetFile = Join-Path $DashboardTargetDir "index.html"
 Copy-Item $DashboardSource $dashboardTargetFile -Force
 Write-Host "  index.html"
+$DashboardReplaySource = Join-Path $PluginRoot "src\SimSteward.Dashboard\replay-incident-index.html"
+if (Test-Path $DashboardReplaySource) {
+    Copy-Item $DashboardReplaySource (Join-Path $DashboardTargetDir "replay-incident-index.html") -Force
+    Write-Host "  replay-incident-index.html"
+}
 $readmeSource = Join-Path $PluginRoot "src\SimSteward.Dashboard\README.txt"
 if (Test-Path $readmeSource) {
     Copy-Item $readmeSource (Join-Path $DashboardTargetDir "README.txt") -Force

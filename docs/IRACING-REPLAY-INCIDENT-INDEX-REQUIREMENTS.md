@@ -289,14 +289,31 @@ This implementation is broken down into the following milestones (tracked in Con
 | **M3: Incident Detection Logic** | TR-012 – TR-018, TR-041 | Detect repair/furled bit rising edges, detect player incident increments, record timestamps and `carIdx` with 1-second debounce. | Complete |
 | **M4: Validation & JSON Output** | TR-019 – TR-025, NFR-004, TR-041 | Write chronological JSON index, validate against YAML final incidents, test camera seek matching, restore replay position. | Complete |
 | **M5: Observability Logging** | TR-026 – TR-030, TR-041 | Emit 4-label Loki structured logs for lifecycle phases, detections, and validation summary without tick spam. | Complete |
-| **M6: SimHub Web Dashboard** | TR-031 – TR-038, TR-041 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | ⏳ Not Started |
+| **M6: SimHub Web Dashboard** | TR-031 – TR-038, TR-041 | Create HTML/JS page under `Web/`, stream data via WebSocket, display summary/table, add row seek actions, implement the "Record" button toggle. | Complete |
 | **M7: Grafana Insights Dashboard** | TR-039 – TR-040, TR-041 | Create and commit a Grafana Dashboard JSON model specifically for analyzing test data (build speeds, discrepancies, log volumes). | ⏳ Not Started |
 | **M8: Test suite construction** | TR-041, TR-042 | Automated tests for the replay incident index (mocks/fixtures, golden data as needed); expectations trace to this spec. | Complete |
 | **M9: Tests passing (implementation alignment)** | TR-041, TR-043 | All feature tests pass locally and in CI; fix implementation or spec—not tests—to resolve failures. | Complete |
 
+### M6 acceptance review (completed)
+
+Milestone **M6** is **Complete**; TR-031–TR-038 and TR-041 are implemented as follows.
+
+| Item | Evidence |
+|------|----------|
+| **TR-041** | This subsection is the M6 milestone summary. |
+| **TR-031 / TR-032** | `src/SimSteward.Dashboard/replay-incident-index.html`: summary block (`subSessionId`, `indexBuildTimeMs`, `totalRaceIncidents`, `incidentCountByCarIdx`) and sortable table columns matching TR-020. |
+| **TR-033** | Plugin `state.replayIncidentIndex`: `phase` (`idle` / `seeking_start` / `fast_forward` / `camera_validating`), `buildElapsedMs`, `replaySessionTime`, `replayFrameNum`, `replayFrameEnd`. |
+| **TR-034** | Link from `src/SimSteward.Dashboard/index.html` header to `replay-incident-index.html`; deploy copies both to `Web/sim-steward-dash/`. |
+| **TR-035** | Same Fleck WebSocket as main dash; index payload embedded in throttled `state` broadcast (~200ms) via `BuildReplayIncidentIndexDashboardSnapshot` / `PluginSnapshot.ReplayIncidentIndex`. |
+| **TR-036** | WebSocket action `replay_incident_index_seek` with JSON arg `sessionTimeMs` and optional `sessionNum`; uses `ReplaySearchSessionTime`. Row **Seek** buttons on replay page. |
+| **TR-037** | Replay page guard banners when `!irsdkConnected` or `!isReplayMode`; build/seek actions return `not_connected` / `not_replay_mode` / `build_in_progress`. |
+| **TR-038** | Action `replay_incident_index_record` `on`/`off`; large **Record** toggle; 60Hz NDJSON lines under `%LocalAppData%\SimSteward\replay-incident-index\record-samples\`; structured `replay_incident_index_record_window` ~1/s (TR-040 hook). |
+
+**Code:** `SimStewardPlugin.ReplayIncidentIndexDashboard.cs`, `PluginState.cs` (`ReplayIncidentIndexDashboardSnapshot`), `ReplayIncidentIndexOutputPaths.TryReadIndexFile`, `SimStewardPlugin.cs` (`BuildStateJson` / `BuildPluginSnapshot` / `DispatchAction`), `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (`ReplayIncidentIndexDashboardNotifyIndexWritten`, `AppendReplayIncidentIndexRecordSampleIfEnabled`). **Tests:** `ReplayIncidentIndexOutputPathsTests`, `ReplayIncidentIndexBuildTests` (`EventRecordWindow`).
+
 ### M8 / M9 acceptance review (completed)
 
-Milestones **M8** and **M9** are **Complete** for the current shipped surface (M1–M5 code paths). **TR-042** coverage MUST expand as **M6+** lands (dashboard, Grafana JSON, etc.).
+Milestones **M8** and **M9** are **Complete** for the shipped replay index pipeline. **TR-042** SHOULD expand when **M7** (Grafana dashboard JSON) lands.
 
 | Item | Evidence |
 |------|----------|

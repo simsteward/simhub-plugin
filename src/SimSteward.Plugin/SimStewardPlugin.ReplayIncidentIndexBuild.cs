@@ -58,11 +58,21 @@ namespace SimSteward.Plugin
             {
                 _logger.Warn("replay_incident_index telemetry: " + ex.Message);
             }
+
+            try
+            {
+                AppendReplayIncidentIndexRecordSampleIfEnabled();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn("replay_incident_index record sample: " + ex.Message);
+            }
         }
 
         /// <summary>Reset fast-forward state when iRacing disconnects mid-build.</summary>
         private void ReplayIncidentIndexOnIracingDisconnected()
         {
+            StopReplayIncidentIndexRecordModeLocked("iracing_disconnected");
             lock (_replayIndexBuildLock)
             {
                 _replayIndexStartRequested = false;
@@ -651,6 +661,7 @@ namespace SimSteward.Plugin
                     path);
                 string json = ReplayIncidentIndexDocumentBuilder.Serialize(root);
                 ReplayIncidentIndexOutputPaths.WriteJsonAtomic(path, json);
+                ReplayIncidentIndexDashboardNotifyIndexWritten(subSessionId, root);
             }
             catch (Exception ex)
             {

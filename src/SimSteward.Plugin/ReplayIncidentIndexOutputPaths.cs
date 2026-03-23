@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Newtonsoft.Json;
 
 namespace SimSteward.Plugin
 {
@@ -15,9 +16,33 @@ namespace SimSteward.Plugin
             return dir;
         }
 
+        public static string GetRecordSamplesDirectory()
+        {
+            return Path.Combine(GetDirectory(), "record-samples");
+        }
+
         public static string GetFilePathForSubSession(int subSessionId)
         {
             return Path.Combine(GetDirectory(), subSessionId + ".json");
+        }
+
+        /// <summary>Read TR-019 JSON from disk if present (M6 dashboard refresh).</summary>
+        public static bool TryReadIndexFile(int subSessionId, out ReplayIncidentIndexFileRoot root)
+        {
+            root = null;
+            if (subSessionId <= 0) return false;
+            string path = GetFilePathForSubSession(subSessionId);
+            if (!File.Exists(path)) return false;
+            try
+            {
+                string json = File.ReadAllText(path, System.Text.Encoding.UTF8);
+                root = JsonConvert.DeserializeObject<ReplayIncidentIndexFileRoot>(json);
+                return root != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>UTF-8 atomic write (temp + replace).</summary>

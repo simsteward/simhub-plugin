@@ -78,6 +78,9 @@ Every log line has an `event` field. Key events:
 | `replay_incident_index_build_error` | simhub-plugin | `error` (`seek_start_timeout`, …), spine fields | Milestone 2: seek timeout or speed command failure (WARN). |
 | `replay_incident_index_build_cancelled` | simhub-plugin | `reason`, spine fields | Milestone 2: `replay_incident_index_build` `cancel` or disconnect during build. |
 | `replay_incident_index_validation_summary` | simhub-plugin | `output_path`, `index_build_time_ms_total`, `detected_incident_rows`, `yaml_results_available`, `yaml_session_num_used`, `yaml_parse_error` (when parse fails), `discrepancy_count`, `camera_seek_attempted`, `camera_seek_matches`, `camera_seek_match_percent`, spine fields | Milestone 4 (TR-023–TR-025): after fast-forward and optional per-row `ReplaySearchSessionTime` + cooldown, JSON index written (TR-019); YAML vs detection discrepancies; camera match rate. |
+| `replay_incident_index_record_started` | simhub-plugin | `record_file`, `subsession_id`, spine fields | Milestone 6 (TR-038): dashboard `replay_incident_index_record` `on`; 60Hz samples go to NDJSON (not per-tick Loki). |
+| `replay_incident_index_record_stopped` | simhub-plugin | `reason` (`user_off` \| `iracing_disconnected` \| `plugin_end`), spine fields | Record mode ended; writer closed. |
+| `replay_incident_index_record_window` | simhub-plugin | `telemetry_ticks` (=60), `record_file`, `subsession_id`, spine fields | **~1/s wall time** while record mode on: confirms high-frequency file writes for TR-040 volume panels (not 60Hz Loki lines). |
 | `plugin_stopped` | simhub-plugin | — | Emitted from `End()`. |
 | `iracing_connected` / `iracing_disconnected` | simhub-plugin | — | IRSDK connection state. |
 | `ws_client_connected` / `ws_client_disconnected` | bridge | `client_ip`, `client_count` | Each connect/disconnect. |
