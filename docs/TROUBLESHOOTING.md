@@ -26,6 +26,15 @@ If the dashboard or plugin "does not work", use this checklist to find the cause
 - **Check:** The page should show "Sim Steward" with connection status, mode, and replay controls. If the component stays blank or returns 404, the DashTemplate wasn’t deployed or SimHub cannot reach port 8888—run `deploy.ps1` again so `SimHub\Web\sim-steward-dash\` exists.
 - If you have configured `SIMSTEWARD_WS_TOKEN`, append `?token=<value>` (or `?wsToken=<value>`) to the URL in Dash Studio so the dashboard forwards the token when it opens the WebSocket.
 
+### 3b. Browser says connection refused on `localhost:8888` (or `127.0.0.1:8888`)
+
+**Deploy is not an HTTP server.** `deploy.ps1` copies HTML/CSS/JS into `SimHub\Web\sim-steward-dash\`. **SimHub** must run its **built-in web server** on the configured port (default **8888**) so those files are reachable.
+
+- **Smoke test:** With SimHub running, open **`http://127.0.0.1:8888/`** — you should see SimHub’s dash list (same check as [SimHub wiki: Dashstudio Web access](https://github.com/SHWotever/SimHub/wiki/Troubleshoot-Dashstudio-Web-access#check-is-simhub-server-is-running)). If that refuses, the problem is SimHub’s HTTP stack or port (not this plugin).
+- **Check:** SimHub **Settings** → confirm the **HTTP / web / Dash** port matches **8888** (or use your configured port in every URL). Try another port if something else owns 8888, then restart SimHub.
+- **Firewall / VPN:** Allow **SimHubWPF** (incoming **8888**). VPNs can block localhost routing on some setups.
+- **WebSocket vs HTTP:** The plugin can listen on **19847** while **8888** is still down — green WS in Dash Studio does not prove **8888** is up.
+
 ---
 
 ## 4. Plugin log
@@ -93,6 +102,7 @@ If you run a replay and incidents are not captured or signaled:
 | Red status, "Cannot reach plugin" | Plugin log; port 19847 free; firewall |
 | Incidents not detected in replay | Section 6: shared memory, connection, focused car, plugin.log |
 | Blank or 404 in Web Page | URL = `http://localhost:8888/Web/sim-steward-dash/index.html`; run deploy |
+| **Connection refused** on `:8888` | §3b: SimHub HTTP not listening — open `http://127.0.0.1:8888/`; Settings port/firewall |
 | Mode always "Unknown" | iRacing running and shared memory enabled |
 | No logs in Grafana / Loki | Section 8: SIMSTEWARD_LOKI_URL, local stack, auth, data source |
 | Log stream empty when clicking buttons | Section 4b: connection, broadcast-errors.log, browser console |

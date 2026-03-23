@@ -311,6 +311,22 @@ if (-not $skipTests) {
     }
 }
 
+# SimHub serves /Web/... on its own HTTP port (default 8888). Deploy only copies files; binding is SimHub's job.
+if (-not $skipLaunch) {
+    Start-Sleep -Seconds 6
+    if (@(Get-Process -Name "SimHubWPF" -ErrorAction SilentlyContinue).Count -gt 0) {
+        try {
+            $probe8888 = Test-NetConnection -ComputerName 127.0.0.1 -Port 8888 -WarningAction SilentlyContinue
+            if (-not $probe8888.TcpTestSucceeded) {
+                Write-Host ""
+                Write-Warning "Port 8888 is not accepting connections. HTML is deployed under SimHub\Web\sim-steward-dash\ but SimHub's built-in web server is not listening. In SimHub: check Settings for HTTP/web port (default 8888), open Dash Studio or http://127.0.0.1:8888/ after startup, firewall. See docs/TROUBLESHOOTING.md §3b."
+            }
+        } catch {
+            # ignore probe errors
+        }
+    }
+}
+
 Write-Host "Recording deploy in Loki (Grafana Explore: {app=`"sim-steward`",env=`"$($env:SIMSTEWARD_LOG_ENV)`"} | json | event=`"deploy_marker`") ..."
 $markerDetail = "deploy.ps1 finished"
 if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) {
