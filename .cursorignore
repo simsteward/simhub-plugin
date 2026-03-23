@@ -1,3 +1,53 @@
-# Reduce agent indexing noise
+# Reduce Cursor/agent indexing noise (semantic search quality).
+# Align with .gitignore where practical. ContextStream CLI ingest may use its own
+# filters; after changing this file, run npm run contextstream:ingest:force so
+# the remote index matches (see .cursor/skills/contextstream/SKILL.md).
+
 docs/marketing/
 
+# Plans and local IDE caches (high keyword noise, not runtime source)
+.cursor/plans/
+.cursor/worktrees/
+.cursor/debug-*.log
+
+# Claude Code local noise (committed .claude/*.json at repo root stay visible)
+.claude/projects/
+.claude/file-history/
+
+# Build and package outputs
+bin/
+obj/
+**/bin/
+**/obj/
+[Dd]ebug/
+[Rr]elease/
+packages/
+.vs/
+
+# Node and worker artifacts
+node_modules/
+scripts/obs-bridge/node_modules/
+worker/node_modules/
+worker/.wrangler/
+
+# ContextStream client-local (not indexed usefully)
+.contextstream/
+
+# Temp / one-off tooling
+temp-mcp-client/
+temp-rpc-docs/
+
+# Local observability Docker data
+observability/local/.storage/
+
+# One-off MCP payload dumps (repo root)
+/_ctx_*.json
+/_grafana_create.json
+/_mcp_memory_args.json
+/_mem_update_arch.json
+/_push_pf.json
+/_test_list.json
+/_tmp_arch.json
+
+# Logs
+debug-*.log

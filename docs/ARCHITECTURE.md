@@ -4,6 +4,22 @@ Diagrams covering C# data structures, WebSocket message contracts, data API sche
 
 ---
 
+## Code map (search anchor)
+
+`SimStewardPlugin` is a **partial class** split across several files (same type, compile-time merge). Use this table to jump from a concern to source.
+
+| Subsystem | Primary paths | Role |
+|-----------|---------------|------|
+| Plugin host, lifecycle, WebSocket server, action dispatch | `src/SimSteward.Plugin/SimStewardPlugin.cs` | `IPlugin` / `IDataPlugin` entry, Fleck WS, `DispatchAction`, snapshot broadcast |
+| Live + replay incident detection | `src/SimSteward.Plugin/SimStewardPlugin.Incidents.cs` | YAML deltas, incident logging, replay search hooks |
+| Replay incident index (data) | `src/SimSteward.Plugin/SimStewardPlugin.ReplayIncidentIndex.cs`, `SimStewardPlugin.ReplayIncidentIndexBuild.cs` | Index build, TR-019-style payloads |
+| Replay incident index (dashboard / WS actions) | `src/SimSteward.Plugin/SimStewardPlugin.ReplayIncidentIndexDashboard.cs` | WS actions for index UI |
+| Data capture suite (SDK / Loki verification) | `src/SimSteward.Plugin/SimStewardPlugin.DataCaptureSuite.cs` | Capture-suite actions and plumbing |
+| Dashboard UI (SimHub HTTP) | `src/SimSteward.Dashboard/index.html`, `replay-incident-index.html`, `data-capture-suite.html` | Browser ES6+ clients; WS to plugin on `SIMSTEWARD_WS_PORT` |
+| Structured logging / Loki | `SessionLogging`, sinks under `src/SimSteward.Plugin/` (see [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)) | JSONL + optional Loki push |
+
+---
+
 ## C# Plugin — Core Data Structures
 
 Classes that drive the WebSocket state broadcast and structured logging.
