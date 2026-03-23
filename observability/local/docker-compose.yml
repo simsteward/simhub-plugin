@@ -40,7 +40,8 @@ services:
     ports:
       - "4317:4317"
       - "4318:4318"
-      - "8889:8889"
+      # Host 18889 avoids conflict with other tools binding Windows :8889; Prometheus still scrapes otel-collector:8889 on the Docker network.
+      - "18889:8889"
       - "13133:13133"
 
   prometheus:
