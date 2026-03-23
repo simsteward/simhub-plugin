@@ -62,6 +62,7 @@ namespace SimSteward.Plugin
         private DateTime _nextResourceSampleUtc = DateTime.MaxValue;
         private int _resourceSampleIntervalSec = 60;
         private SystemMetricsSample _lastResourceSample;
+        private PluginMetricsTelemetry _metricsTelemetry;
 
 #if SIMHUB_SDK
         private IRacingSdk _irsdk;
@@ -104,7 +105,8 @@ namespace SimSteward.Plugin
                 drivers = BuildDriverList(),
                 cameraGroups = GetCameraGroupNames(),
                 diagnostics = snapshot.Diagnostics,
-                replayIncidentIndex = snapshot.ReplayIncidentIndex
+                replayIncidentIndex = snapshot.ReplayIncidentIndex,
+                dataCaptureSuite = snapshot.DataCaptureSuite
             };
             return JsonConvert.SerializeObject(state);
         }
@@ -258,7 +260,8 @@ namespace SimSteward.Plugin
                 ReplaySessionNum = replaySessionNum,
                 ReplaySessionName = replaySessionName,
                 Diagnostics = BuildDiagnostics(clientCount),
-                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot()
+                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot(),
+                DataCaptureSuite = BuildDataCaptureSuiteSnapshot()
             };
         }
 
@@ -791,6 +794,29 @@ namespace SimSteward.Plugin
                 }
             }
 
+            if (string.Equals(action, "data_capture_suite", StringComparison.OrdinalIgnoreCase))
+            {
+                var verb = (arg ?? "").Trim().ToLowerInvariant();
+                switch (verb)
+                {
+                    case "start":
+                        TryStartDataCaptureSuite();
+                        LogActionResult(action, arg, correlationId, true, "");
+                        return (true, "ok", null);
+                    case "cancel":
+                        _suiteCancelRequested = true;
+                        LogActionResult(action, arg, correlationId, true, "");
+                        return (true, "ok", null);
+                    case "verify":
+                        _suiteEmitCompleteUtc = DateTime.MinValue; // force re-verify on next tick
+                        LogActionResult(action, arg, correlationId, true, "");
+                        return (true, "ok", null);
+                    default:
+                        LogActionResult(action, arg, correlationId, false, "bad_arg");
+                        return (false, null, "bad_arg");
+                }
+            }
+
             if (string.Equals(action, "replay_incident_index_seek", StringComparison.OrdinalIgnoreCase))
             {
                 return DispatchReplayIncidentIndexSeek(arg, correlationId);
@@ -1016,6 +1042,8 @@ namespace SimSteward.Plugin
             _resourceSampler = new SystemMetricsSampler();
             _nextResourceSampleUtc = DateTime.UtcNow.AddSeconds(_resourceSampleIntervalSec);
 
+            _metricsTelemetry = PluginMetricsTelemetry.TryCreate(_logger, () => _lastResourceSample);
+
             RefreshDependencyChecks();
         }
 
@@ -1183,6 +1211,16 @@ namespace SimSteward.Plugin
         public void End(PluginManager pluginManager)
         {
             _logger?.Structured("INFO", "simhub-plugin", "plugin_stopped", "SimSteward plugin End.", null, "lifecycle", null);
+
+            try
+            {
+                _metricsTelemetry?.Dispose();
+            }
+            catch
+            {
+                // ignore
+            }
+            _metricsTelemetry = null;
 
             StopReplayIncidentIndexRecordModeLocked("plugin_end");
 

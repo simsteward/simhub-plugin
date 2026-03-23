@@ -36,6 +36,9 @@ $env:SIMSTEWARD_LOKI_TOKEN = ""
 $env:SIMSTEWARD_LOG_ENV = "local"
 if (-not $env:SIMSTEWARD_LOG_DEBUG) { $env:SIMSTEWARD_LOG_DEBUG = "1" }
 
+# OTLP → OpenTelemetry Collector (see docs/observability-local.md). Override in .env if needed.
+if (-not $env:OTEL_EXPORTER_OTLP_ENDPOINT) { $env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4317" }
+
 # Resolve SimHub path (same logic as deploy.ps1)
 $SimHubPath = $null
 if ($env:SIMHUB_PATH -and (Test-Path $env:SIMHUB_PATH)) {
@@ -59,6 +62,6 @@ if (-not (Test-Path $SimHubExe)) {
     Write-Error "SimHub not found at: $SimHubExe. Set SIMHUB_PATH to your SimHub folder."
 }
 
-Write-Host "Starting SimHub with local Loki (SIMSTEWARD_LOKI_URL=$env:SIMSTEWARD_LOKI_URL, SIMSTEWARD_LOG_ENV=$env:SIMSTEWARD_LOG_ENV)"
+Write-Host "Starting SimHub with local Loki + OTLP metrics (SIMSTEWARD_LOKI_URL=$env:SIMSTEWARD_LOKI_URL, OTEL_EXPORTER_OTLP_ENDPOINT=$env:OTEL_EXPORTER_OTLP_ENDPOINT, SIMSTEWARD_LOG_ENV=$env:SIMSTEWARD_LOG_ENV)"
 Write-Host "SimHub: $SimHubExe"
 & $SimHubExe

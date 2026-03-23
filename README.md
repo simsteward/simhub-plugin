@@ -17,7 +17,7 @@ A **SimHub plugin + browser dashboard** for structured iRacing replay review. In
 | **Driver standings** | Position/car/driver/incident count, collapsible |
 | **Telemetry strip** | Throttle, brake, steering wheel (real data from plugin) |
 | **Selected Incident Panel** | Camera group dropdown (`cameraGroups` from plugin), ▶ Capture (`capture_incident`: pre-roll, optional camera, 1× speed), prev/next within filtered list |
-| **Observability** | Structured logs → Grafana Loki (`SIMSTEWARD_LOKI_URL`); `capture_incident` includes correlation fields on `action_result`; re-capture confirms before sending (Loki is append-only) |
+| **Observability** | Structured logs → Grafana Loki (`SIMSTEWARD_LOKI_URL`); optional **OTLP metrics** → local OpenTelemetry Collector → **Prometheus** (`OTEL_EXPORTER_OTLP_ENDPOINT`, **docs/observability-local.md**); `capture_incident` includes correlation fields on `action_result`; re-capture confirms before sending (Loki is append-only) |
 | **Replay incident index (iRacing replay)** | WebSocket actions `replay_incident_index_build` (`start` / `cancel`), `replay_incident_index_seek` (JSON `sessionTimeMs`, optional `sessionNum`), `replay_incident_index_record` (`on` / `off` — 60Hz NDJSON under `%LocalAppData%\SimSteward\replay-incident-index\record-samples\`). IRSDKSharper 60Hz poll, 16× fast-forward, detection → JSON index on disk (`...\{subSessionId}.json`, TR-020 v1). **Dashboard:** `http://<host>:8888/Web/sim-steward-dash/replay-incident-index.html` (summary, sortable table, build/record, seeks); main dash links to it. Spec: [docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md). |
 
 **North-star / gaps still open:** true plugin-side **YAML scan** (session walk still uses the leaderboard frame list), **scrub bar** seek (PoC / toast only), **plugin-owned `suggestedCamera`**, **dual-view** capture, **OBS** integration. See [docs/PRODUCT-FLOW.md](docs/PRODUCT-FLOW.md) and [docs/DATA-ROUTING-OBSERVABILITY.md](docs/DATA-ROUTING-OBSERVABILITY.md) for what belongs in Loki vs a future metrics path.
@@ -42,6 +42,8 @@ SimSteward.Plugin (C# / .NET 4.8 / SimHub)
     │
     └──→ Grafana Loki (optional)
               plugin → HTTPS POST to SIMSTEWARD_LOKI_URL (single endpoint)
+    └──→ OTLP metrics (optional)
+              plugin → localhost:4317 → OpenTelemetry Collector → Prometheus (:9090)
               local Docker stack: observability/local/
 ```
 
@@ -64,7 +66,7 @@ docs/                         Documentation (start with docs/README.md)
   DATA-ROUTING-OBSERVABILITY.md  Events vs high-rate telemetry (Loki vs OTel/metrics)
   TROUBLESHOOTING.md          Runtime issues, deploy, logs
 
-observability/local/          Local Grafana + Loki Docker stack
+observability/local/          Local Grafana + Loki + Prometheus + OTel Collector Docker stack
 tests/                        PowerShell integration tests
 scripts/                      obs-bridge, Loki helpers, deploy utilities
 deploy.ps1                    Build + deploy to local SimHub

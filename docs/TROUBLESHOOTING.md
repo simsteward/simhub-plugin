@@ -140,7 +140,18 @@ See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL exam
 
 ---
 
-## 9. ContextStream MCP (index / search / 401)
+## 9. Prometheus / OTLP metrics (local stack)
+
+For the full pipeline (collector, ports, Grafana datasource URL), see **docs/observability-local.md** § Canonical path and § Metrics / OTLP troubleshooting.
+
+1. **Nothing in Explore (Prometheus Local)** — Confirm **`npm run obs:up`** is running and **`http://localhost:9090/-/healthy`** returns OK. Smoke: **`npm run obs:poll:prometheus`**.
+2. **No `simsteward_*` metrics** — OTLP is disabled unless **`OTEL_EXPORTER_OTLP_ENDPOINT`** or **`SIMSTEWARD_OTLP_ENDPOINT`** is set **before** SimHub starts (SimHub does not load `.env` automatically). Use **`scripts/run-simhub-local-observability.ps1`** or set env in the user/session environment.
+3. **`connection refused` to port 4317** — OpenTelemetry Collector is not up or ports are not mapped; restart compose from the repo root.
+4. **Wrong protocol** — gRPC defaults for **`http://127.0.0.1:4317`**. For HTTP/protobuf on **4318**, set **`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`** and point the endpoint at **4318**.
+
+---
+
+## 10. ContextStream MCP (index / search / 401)
 
 **Default workflow:** Keep the repo in sync with ContextStream using the **ContextStream MCP** **`project` tool** — `project(action="index")` or `project(action="ingest_local", path="<repo>")` — then log the run with `session(action="capture", event_type="operation", …)` per **docs/CONTEXTSTREAM-UPLOAD-PLAN.md**. Do **not** use ad-hoc HTTP/API scripts for routine sync. The CLI steps below are **troubleshooting only** when MCP or env is misconfigured.
 
