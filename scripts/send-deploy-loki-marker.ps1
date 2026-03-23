@@ -55,13 +55,30 @@ $payload = $root | ConvertTo-Json -Depth 20 -Compress
 
 $pushUri = $url.TrimEnd('/') + '/loki/api/v1/push'
 $headers = @{ 'Content-Type' = 'application/json' }
-$token = $env:LOKI_PUSH_TOKEN
-if (-not [string]::IsNullOrWhiteSpace($token)) {
-    $headers['Authorization'] = 'Bearer ' + $token.Trim()
+$lokiUser = $env:SIMSTEWARD_LOKI_USER
+$lokiPass = $env:SIMSTEWARD_LOKI_TOKEN
+$gatewayToken = $env:LOKI_PUSH_TOKEN
+if ($url -match 'grafana\.net' -and ([string]::IsNullOrWhiteSpace($lokiUser) -or [string]::IsNullOrWhiteSpace($lokiPass))) {
+    Write-Host "send-deploy-loki-marker: warn — SIMSTEWARD_LOKI_URL looks like Grafana Cloud but SIMSTEWARD_LOKI_USER / SIMSTEWARD_LOKI_TOKEN missing (Basic auth required)."
+}
+# Grafana Cloud Loki: Basic (instance user id + API token). Local loki-gateway: Bearer LOKI_PUSH_TOKEN. Local Loki :3100: often no auth.
+if (-not [string]::IsNullOrWhiteSpace($lokiUser) -and -not [string]::IsNullOrWhiteSpace($lokiPass)) {
+    $pair = [Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $lokiUser.Trim(), $lokiPass.Trim()))
+    $headers['Authorization'] = 'Basic ' + [Convert]::ToBase64String($pair)
+} elseif (-not [string]::IsNullOrWhiteSpace($gatewayToken)) {
+    $headers['Authorization'] = 'Bearer ' + $gatewayToken.Trim()
 }
 
 try {
     Invoke-RestMethod -Uri $pushUri -Method Post -Headers $headers -Body $payload -TimeoutSec 15 | Out-Null
+    $hostOnly = try { ([Uri]$url.Trim()).Host } catch { $url }
+    Write-Host "send-deploy-loki-marker: pushed OK ($hostOnly)"
 } catch {
-    Write-Host "send-deploy-loki-marker: push failed (non-fatal): $($_.Exception.Message)"
+    $code = ''
+    try {
+        $resp = $_.Exception.Response
+        if ($null -ne $resp -and $resp.StatusCode) { $code = ' HTTP {0}' -f [int]$resp.StatusCode }
+    } catch { }
+    Write-Host "send-deploy-loki-marker: push failed (non-fatal):$code $($_.Exception.Message)"
+    Write-Host "  Auth: Grafana Cloud -> set SIMSTEWARD_LOKI_USER + SIMSTEWARD_LOKI_TOKEN; local gateway :3500 -> LOKI_PUSH_TOKEN; local :3100 -> leave auth unset."
 }
