@@ -28,7 +28,7 @@ Quick start for plugin logs in local Grafana/Loki, **optional OTLP metrics** (Op
 
 3. **Configure the plugin** — SimHub does not load `.env` by default. Recommended: `.\scripts\run-simhub-local-observability.ps1` (sets `SIMSTEWARD_LOKI_URL=http://localhost:3100`, `SIMSTEWARD_LOG_ENV=local`, and OTLP for metrics — see script). Or set those in Windows user env and restart SimHub. See `.env.example` “Local Loki” and “OTLP / Prometheus (local metrics)” blocks.
 
-4. **Grafana** — http://localhost:3000 → Explore → Loki → `{app="sim-steward", env="local"}`.
+4. **Grafana** — http://localhost:3000 → Explore → Loki → `{app="sim-steward", env="local"}`. Provisioned dashboard **Sim Steward — Deploy health** (`simsteward-deploy-health`) correlates `deploy.ps1` markers (`event=deploy_marker`) with plugin bring-up and errors — set `SIMSTEWARD_LOKI_URL` before deploy so markers appear.
 
 5. **Metrics (optional)** — With the stack up, set **`OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317`** (or use `SIMSTEWARD_OTLP_ENDPOINT`) before starting SimHub. After the plugin loads, Explore → **Prometheus Local** → e.g. `simsteward_process_cpu_percent` or `up{job="otel-collector"}`. Smoke: `npm run obs:poll:prometheus` or `.\scripts\poll-prometheus.ps1`.
 
