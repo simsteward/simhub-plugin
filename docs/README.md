@@ -33,6 +33,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 | [observability-scaling.md](observability-scaling.md) | Many users, large grids, Loki cardinality |
 | [DATA-ROUTING-OBSERVABILITY.md](DATA-ROUTING-OBSERVABILITY.md) | OTel vs Loki vs Prometheus, ~1k-user sizing, car telemetry taxonomy |
 | [observability-testing.md](observability-testing.md) | Harness, AssertLokiQueries, Explore validation |
+| [IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md) | Replay-only incident index (SDK), TR-019 JSON, WebSocket actions, `Web/sim-steward-dash/replay-incident-index.html` |
 | [DATA-API-DEPLOY.md](DATA-API-DEPLOY.md) | Data API env (local vs prod) |
 | [REDEPLOY-CONCEPT.md](REDEPLOY-CONCEPT.md) | Redeploy mental model |
 

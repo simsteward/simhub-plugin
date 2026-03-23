@@ -37,7 +37,8 @@ SimSteward.Plugin (C# / .NET 4.8 / SimHub)
     │
     ├──→ Browser dashboard (HTML/JS)
     │         src/SimSteward.Dashboard/index.html
-    │         served by SimHub HTTP server
+    │         src/SimSteward.Dashboard/replay-incident-index.html (replay incident index / M6)
+    │         served by SimHub HTTP → Web/sim-steward-dash/
     │
     └──→ Grafana Loki (optional)
               plugin → HTTPS POST to SIMSTEWARD_LOKI_URL (single endpoint)
@@ -51,7 +52,7 @@ SimSteward.Plugin (C# / .NET 4.8 / SimHub)
 ```
 src/
   SimSteward.Plugin/          C# SimHub plugin (.NET 4.8)
-  SimSteward.Dashboard/       Browser dashboard (index.html, no build step)
+  SimSteward.Dashboard/       Browser dashboard (index.html, replay-incident-index.html; no build step)
   SimSteward.Plugin.Tests/    xUnit unit tests
 
 docs/                         Documentation (start with docs/README.md)
@@ -90,13 +91,19 @@ Builds the plugin, runs `dotnet test`, runs PowerShell integration tests, then c
 
 ### Open the dashboard
 
-With SimHub running and the plugin loaded, open:
+With SimHub running and the plugin loaded, open (SimHub default HTTP port is **8888**):
 
 ```
-http://localhost:<SimHub-HTTP-port>/pages/sim-steward-dash/index.html
+http://localhost:8888/Web/sim-steward-dash/index.html
 ```
 
-The dashboard connects to the plugin WebSocket on port `19847` automatically.
+**Replay incident index** (build status, TR-019 table, Record mode, seek-to-row): [docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md)
+
+```
+http://localhost:8888/Web/sim-steward-dash/replay-incident-index.html
+```
+
+Both pages connect to the plugin WebSocket on port **19847** (`window.location.hostname`, so LAN clients use the same host). Optional: `?token=` / `?wsToken=` when `SIMSTEWARD_WS_TOKEN` is set.
 
 ### Local observability (optional)
 
