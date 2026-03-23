@@ -18,6 +18,8 @@
 ## Detailed Rules
 **Read-only examples** (default: call `mcp__contextstream__context(...)` first; narrow bypass only for immediate read-only ContextStream calls when context is fresh and no state-changing tool has run): `mcp__contextstream__workspace(action="list"|"get"|"create")`, `mcp__contextstream__memory(action="list_docs"|"list_events"|"list_todos"|"list_tasks"|"list_transcripts"|"list_nodes"|"decisions"|"get_doc"|"get_event"|"get_task"|"get_todo"|"get_transcript")`, `mcp__contextstream__session(action="get_lessons"|"get_plan"|"list_plans"|"recall")`, `mcp__contextstream__help(action="version"|"tools"|"auth")`, `mcp__contextstream__project(action="list"|"get"|"index_status")`, `mcp__contextstream__reminder(action="list"|"active")`, any read-only data query
 
+**Team workflows in ContextStream:** For deploy, observability, ContextStream MCP usage, `/shell`, `/plan`, and Cursor meta skills, call `mcp__contextstream__skill(action="list", scope="team")` then `skill(action="get", skill_id=...)`; Memory doc *simhub-plugin: agents, commands, ContextStream skills* summarizes agents/commands and re-import cautions.
+
 **Common queries — use these exact tool calls:**
 - "list lessons" / "show lessons" → `mcp__contextstream__session(action="get_lessons")`
 - "list decisions" / "show decisions" / "how many decisions" → `mcp__contextstream__memory(action="decisions")`
