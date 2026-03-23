@@ -206,6 +206,7 @@ if ($skipLaunch) {
 }
 
 # ── 6. Post-deploy tests ───────────────────────────────────────────────────
+$postDeployFailed = $false
 if (-not $skipTests) {
     $testsDir = Join-Path $PluginRoot "tests"
     $testScripts = @()
@@ -225,7 +226,6 @@ if (-not $skipTests) {
         }
         if ($simHubRunning) {
             Write-Host "Running post-deploy tests ($($testScripts.Count) script(s))..."
-            $postDeployFailed = $false
             foreach ($ts in $testScripts) {
                 Write-Host "  Running: $($ts.Name)"
                 & pwsh -NoProfile -File $ts.FullName
@@ -253,5 +253,7 @@ if (-not $skipTests) {
         }
     }
 }
+
+& (Join-Path $PluginRoot "scripts\send-deploy-loki-marker.ps1") -Status ok -PostDeployWarning:$postDeployFailed -Detail "deploy.ps1 finished"
 
 Write-Host "Deploy complete."
