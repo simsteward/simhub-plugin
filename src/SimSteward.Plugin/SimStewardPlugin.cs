@@ -93,6 +93,7 @@ namespace SimSteward.Plugin
             var state = new
             {
                 type = "state",
+                pluginVersion = snapshot.PluginVersion,
                 pluginMode = snapshot.PluginMode,
                 currentSessionTime = snapshot.CurrentSessionTime,
                 currentSessionTimeFormatted = snapshot.CurrentSessionTimeFormatted,
@@ -116,6 +117,7 @@ namespace SimSteward.Plugin
             var state = new
             {
                 type = "state",
+                pluginVersion = PluginVersionInfo.Display,
                 pluginMode = "Unknown",
                 currentSessionTime = 0.0,
                 currentSessionTimeFormatted = "0:00",
@@ -250,6 +252,7 @@ namespace SimSteward.Plugin
 
             return new PluginSnapshot
             {
+                PluginVersion = PluginVersionInfo.Display,
                 PluginMode = _pluginMode,
                 CurrentSessionTime = _lastSessionTime,
                 CurrentSessionTimeFormatted = FormatSessionTime(_lastSessionTime),

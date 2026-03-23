@@ -483,6 +483,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   <header class="status-bar">
     <div class="mode-pill waiting" id="mode-pill"><span class="dot"></span><span id="mode-text">WAITING</span></div>
     <span class="session-time" id="session-time">—:——</span>
+    <span class="session-time" id="plugin-version" style="opacity:.7;font-size:0.68rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Sim Steward plugin build">v—</span>
     <div class="sb-spacer"></div>
     <div class="diag-row">
       <span class="diag-item"><span class="d-dot" id="d-irsdk"></span>iRacing</span>
@@ -490,6 +491,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
       <span class="diag-item"><span class="d-dot" id="d-simhub"></span>SimHub</span>
     </div>
     <a href="replay-incident-index.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Replay incident index (TR-031–TR-038)">Replay index →</a>
+    <a href="data-capture-suite.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="SDK Data Capture Suite — live integration tests">Capture suite →</a>
     <span class="ws-badge disconnected" id="ws-badge">WS ○</span>
   </header>
 
@@ -822,6 +824,12 @@ function onActionResult(m) {
 // ── State update ─────────────────────────────────────────
 function onState(m) {
   const mode = m.pluginMode || 'Unknown';
+  const pvEl = document.getElementById('plugin-version');
+  if (pvEl) {
+    const pv = m.pluginVersion ? String(m.pluginVersion) : '';
+    pvEl.textContent = pv ? ('v' + pv) : 'v—';
+    pvEl.title = pv ? ('Sim Steward plugin ' + pv) : 'Sim Steward plugin build';
+  }
   const pill = document.getElementById('mode-pill');
   pill.className = 'mode-pill ' + (mode==='Replay'?'replay':'waiting');
   document.getElementById('mode-text').textContent = mode.toUpperCase();

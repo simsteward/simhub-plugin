@@ -60,6 +60,15 @@ try {
         $obj = $json | ConvertFrom-Json
         if ($obj.type -eq "state") {
             Write-Host "PASS: Received state message (pluginMode=$($obj.pluginMode))"
+            if (-not $obj.PSObject.Properties["pluginVersion"]) {
+                Write-Host "FAIL: State missing pluginVersion"
+                exit 1
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$obj.pluginVersion)) {
+                Write-Host "FAIL: pluginVersion empty"
+                exit 1
+            }
+            Write-Host "PASS: pluginVersion=$($obj.pluginVersion)"
             if ($null -ne $obj.incidents) {
                 Write-Host "PASS: State contains incidents array (count=$($obj.incidents.Count))"
             }

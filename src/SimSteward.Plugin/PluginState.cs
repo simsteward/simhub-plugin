@@ -59,6 +59,10 @@ namespace SimSteward.Plugin
     /// <summary>Minimal snapshot for WebSocket state push.</summary>
     public class PluginSnapshot
     {
+        /// <summary>Plugin build id (semver + git from AssemblyInformationalVersion).</summary>
+        [JsonProperty("pluginVersion")]
+        public string PluginVersion { get; set; } = "";
+
         [JsonProperty("pluginMode")]
         public string PluginMode { get; set; } = "Unknown";
 
@@ -98,6 +102,10 @@ namespace SimSteward.Plugin
         /// <summary>M6 dashboard: replay incident index build status and last TR-019 index for current subsession.</summary>
         [JsonProperty("replayIncidentIndex")]
         public ReplayIncidentIndexDashboardSnapshot ReplayIncidentIndex { get; set; }
+
+        /// <summary>Data capture suite state (test harness).</summary>
+        [JsonProperty("dataCaptureSuite")]
+        public DataCaptureSuiteSnapshot DataCaptureSuite { get; set; }
     }
 
     /// <summary>WebSocket <c>state.replayIncidentIndex</c> (TR-031–TR-033, TR-037–TR-038).</summary>

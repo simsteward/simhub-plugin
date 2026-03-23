@@ -8,6 +8,7 @@
     <OutputPath>..\..\bin\Plugin\</OutputPath>
     <UseWPF>true</UseWPF>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>1.0.1</Version>
     <!-- SimHub SDK DLLs must be in lib/SimHub/ for build. When missing, build without plugin entry point. -->
   </PropertyGroup>
 
