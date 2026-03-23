@@ -11,7 +11,7 @@ description: Deploy/Watch commands for SimHub plugins.
 
 ## Locations
 - **Plugin:** `C:\Program Files (x86)\SimHub\` (or `$env:SIMHUB_PATH`)
-- **Dashboard:** `SimHub\Web\sim-steward-dash\` (served at `http://<host>:8888/Web/sim-steward-dash/index.html`)
+- **Dashboards (always part of deploy):** Every `*.html` in `src/SimSteward.Dashboard/` is copied to `SimHub\Web\sim-steward-dash\` plus `README.txt`. Verification fails if any source `.html` is missing or empty on disk after copy. Served when SimHub HTTP is up: `http://<host>:8888/Web/sim-steward-dash/<name>.html` (main: `index.html`).
 
 ## Testing Gate
 - Deploy MUST pass 100%. Pipeline enforces:

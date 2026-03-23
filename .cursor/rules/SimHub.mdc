@@ -58,7 +58,7 @@ alwaysApply: false
 
 ## Deployment & Testing
 
-- **No deploy without 100% passing tests.** The `deploy.ps1` script enforces this: build must succeed, `dotnet test` must pass (if test projects exist), and post-deploy scripts in `tests/` must exit 0.
+- **No deploy without 100% passing tests.** The `deploy.ps1` script enforces this: build must succeed, `dotnet test` must pass (if test projects exist), and post-deploy scripts in `tests/` must exit 0. **`deploy.ps1` always copies all dashboard `*.html` from `src/SimSteward.Dashboard/` to `SimHub\Web\sim-steward-dash\`** (verified after copy); “deploy” includes dashboards, not DLLs-only.
 - **Retry-once-then-stop rule**: when a test or build fails, the agent gets **one** additional attempt to fix and rerun. If it fails again, **hard stop** — do not keep iterating. Either halt the deploy entirely (if downstream work depends on it) or skip and move on to the next independent task.
 - **Linter checks** (`ReadLints`) on edited files must show 0 new errors before committing or deploying.
 - Tests include: `dotnet build` (0 errors), `dotnet test` (0 failures), `tests/*.ps1` scripts (exit 0, `PASS:` lines only), and linter checks on changed files.

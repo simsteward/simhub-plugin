@@ -1,4 +1,5 @@
-# Deploy Sim Steward plugin (skeleton) to local SimHub.
+# Deploy Sim Steward plugin to local SimHub.
+# Copies: plugin DLLs + every *.html (and README.txt) from src\SimSteward.Dashboard → SimHub\Web\sim-steward-dash\
 # Run from plugin/:  .\deploy.ps1 [-EnvFile path\to\secrets.env]
 # Requires: SimHub installed; place SimHub.Plugins.dll and GameReaderCommon.dll in lib\SimHub\ (or script copies from SimHub path).
 
@@ -230,6 +231,12 @@ function Test-DeploySuccess {
         $target = Join-Path $SimHubPath $d
         if (-not (Test-Path $target)) { Write-Host "  Missing: $d"; $ok = $false }
         elseif ((Get-Item $target).Length -eq 0) { Write-Host "  Empty: $d"; $ok = $false }
+    }
+    $dashSrc = Join-Path $PluginRoot "src\SimSteward.Dashboard"
+    foreach ($html in Get-ChildItem -Path $dashSrc -Filter "*.html" -File -ErrorAction SilentlyContinue) {
+        $t = Join-Path $DashboardTargetDir $html.Name
+        if (-not (Test-Path $t)) { Write-Host "  Missing dashboard: $($html.Name)"; $ok = $false }
+        elseif ((Get-Item $t).Length -eq 0) { Write-Host "  Empty dashboard: $($html.Name)"; $ok = $false }
     }
     return $ok
 }
