@@ -15,6 +15,24 @@ if (Test-Path $loadDotenv) {
     )
 }
 
+# Deploy marker → Grafana Explore (Loki). Default local stack when unset; avoid template Cloud URL without creds (530).
+$localLoki = "http://localhost:3100"
+$deployMarkerLocal = $false
+if ([string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOKI_URL)) {
+    $env:SIMSTEWARD_LOKI_URL = $localLoki
+    $deployMarkerLocal = $true
+    Write-Host "Loki deploy log: SIMSTEWARD_LOKI_URL was unset — using $localLoki (start stack: npm run obs:up)."
+} elseif ($env:SIMSTEWARD_LOKI_URL -match 'grafana\.net') {
+    $hasCloudBasic = -not [string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOKI_USER) -and -not [string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOKI_TOKEN)
+    if (-not $hasCloudBasic) {
+        Write-Warning "SIMSTEWARD_LOKI_URL is Grafana Cloud but SIMSTEWARD_LOKI_USER / SIMSTEWARD_LOKI_TOKEN missing — using $localLoki for deploy marker. Set both for Cloud."
+        $env:SIMSTEWARD_LOKI_URL = $localLoki
+        $deployMarkerLocal = $true
+    }
+}
+if ([string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOG_ENV)) { $env:SIMSTEWARD_LOG_ENV = "local" }
+if ($deployMarkerLocal) { $env:SIMSTEWARD_LOG_ENV = "local" }
+
 $PluginDlls = @(
     "SimSteward.Plugin.dll",
     "Fleck.dll",
@@ -264,6 +282,7 @@ if (-not $skipTests) {
     }
 }
 
+Write-Host "Recording deploy in Loki (Grafana Explore: {app=`"sim-steward`",env=`"$($env:SIMSTEWARD_LOG_ENV)`"} | json | event=`"deploy_marker`") ..."
 & (Join-Path $PluginRoot "scripts\send-deploy-loki-marker.ps1") -Status ok -PostDeployWarning:$postDeployFailed -Detail "deploy.ps1 finished"
 
 Write-Host "Deploy complete."
