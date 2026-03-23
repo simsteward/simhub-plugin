@@ -321,7 +321,7 @@ if (-not $skipLaunch) {
             $probe8888 = Test-NetConnection -ComputerName 127.0.0.1 -Port 8888 -WarningAction SilentlyContinue
             if (-not $probe8888.TcpTestSucceeded) {
                 Write-Host ""
-                Write-Warning "Port 8888 is not accepting connections. HTML is deployed under SimHub\Web\sim-steward-dash\ but SimHub's built-in web server is not listening. In SimHub: check Settings for HTTP/web port (default 8888), open Dash Studio or http://127.0.0.1:8888/ after startup, firewall. See docs/TROUBLESHOOTING.md §3b."
+                Write-Warning "Port 8888 is not accepting connections. HTML is deployed under SimHub\Web\sim-steward-dash\ but SimHub's built-in web server is not listening. In SimHub: check Settings for HTTP/web port (default 8888), open Dash Studio or http://127.0.0.1:8888/ after startup, firewall. See docs/TROUBLESHOOTING.md (section 3b)."
             }
         } catch {
             # ignore probe errors
