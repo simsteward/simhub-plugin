@@ -204,15 +204,17 @@ Copy-DeployDlls
 foreach ($d in $PluginDlls) { Write-Host "  $d" }
 
 Write-Host "Copying dashboard to $DashboardTargetDir ..."
+$dashboardSrcDir = Join-Path $PluginRoot "src\SimSteward.Dashboard"
 $dashboardTargetFile = Join-Path $DashboardTargetDir "index.html"
 Copy-Item $DashboardSource $dashboardTargetFile -Force
 Write-Host "  index.html"
-$DashboardReplaySource = Join-Path $PluginRoot "src\SimSteward.Dashboard\replay-incident-index.html"
-if (Test-Path $DashboardReplaySource) {
-    Copy-Item $DashboardReplaySource (Join-Path $DashboardTargetDir "replay-incident-index.html") -Force
-    Write-Host "  replay-incident-index.html"
+foreach ($f in Get-ChildItem -Path $dashboardSrcDir -File -ErrorAction SilentlyContinue) {
+    if ($f.Extension -eq ".html" -and $f.Name -ne "index.html") {
+        Copy-Item $f.FullName (Join-Path $DashboardTargetDir $f.Name) -Force
+        Write-Host "  $($f.Name)"
+    }
 }
-$readmeSource = Join-Path $PluginRoot "src\SimSteward.Dashboard\README.txt"
+$readmeSource = Join-Path $dashboardSrcDir "README.txt"
 if (Test-Path $readmeSource) {
     Copy-Item $readmeSource (Join-Path $DashboardTargetDir "README.txt") -Force
     Write-Host "  README.txt"

@@ -34,6 +34,7 @@ If the dashboard or plugin "does not work", use this checklist to find the cause
 - **Check:** SimHub **Settings** → confirm the **HTTP / web / Dash** port matches **8888** (or use your configured port in every URL). Try another port if something else owns 8888, then restart SimHub.
 - **Firewall / VPN:** Allow **SimHubWPF** (incoming **8888**). VPNs can block localhost routing on some setups.
 - **WebSocket vs HTTP:** The plugin can listen on **19847** while **8888** is still down — green WS in Dash Studio does not prove **8888** is up.
+- **404 on `data-capture-suite.html`:** Older `deploy.ps1` only copied `index.html` and `replay-incident-index.html`. Run **`.\deploy.ps1`** again so `data-capture-suite.html` is copied to `SimHub\Web\sim-steward-dash\`.
 
 ---
 
