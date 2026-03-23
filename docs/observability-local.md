@@ -55,7 +55,7 @@ Equivalent: `.\scripts\obs-wipe-local-data.ps1 -Force` (same switches).
 
 ## Loki gateway (token-protected push)
 
-The repo stack includes **Grafana**, **Loki**, and **loki-gateway** (nginx). The plugin writes **`plugin-structured.jsonl`** and **POSTs** batches to **`SIMSTEWARD_LOKI_URL`** (no separate log agent). For this compose, set that URL to `http://localhost:3100` (Loki) or `http://localhost:3500` (gateway) and use `Authorization: Bearer <LOKI_PUSH_TOKEN>` when using the gateway — see **docs/GRAFANA-LOGGING.md**.
+The repo stack includes **Grafana**, **Loki**, and **loki-gateway** (nginx). The plugin writes **`plugin-structured.jsonl`** on disk (and streams logs over WebSocket to the dashboard); **compose does not tail that file** — add Alloy/Promtail yourself, or rely on **`send-deploy-loki-marker.ps1`** (called from **`deploy.ps1`**) to **POST** deploy markers when **`SIMSTEWARD_LOKI_URL`** is set. For pushes, use `http://localhost:3100` (Loki) or `http://localhost:3500` (gateway) with `Authorization: Bearer <LOKI_PUSH_TOKEN>` on the gateway — see **docs/GRAFANA-LOGGING.md**.
 
 | Service | URL |
 |---------|-----|
