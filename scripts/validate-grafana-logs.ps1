@@ -11,18 +11,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = $PSScriptRoot | Split-Path -Parent
-$envFile = Join-Path $repoRoot ".env"
 $debugLog = if ([System.IO.Path]::IsPathRooted($DebugLogPath)) { $DebugLogPath } else { Join-Path $repoRoot $DebugLogPath }
 
-# Load .env
-if (Test-Path $envFile) {
-    Get-Content $envFile | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]*)=(.*)$') {
-            $name = $Matches[1].Trim()
-            $value = $Matches[2].Trim().Trim('"')
-            [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
-    }
+$loadDotenv = Join-Path $repoRoot "scripts\load-dotenv.ps1"
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv @(
+        (Join-Path $repoRoot ".env"),
+        (Join-Path $repoRoot "observability\local\.env.observability.local")
+    )
 }
 
 $lokiUrl = [System.Environment]::GetEnvironmentVariable("LOKI_QUERY_URL", "Process")
