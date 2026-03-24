@@ -24,8 +24,6 @@
         "envmcp",
         "--env-file",
         ".env",
-        "cmd",
-        "/c",
         "contextstream-mcp"
       ],
       "env": {
