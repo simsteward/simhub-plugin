@@ -10,6 +10,13 @@
         "OLLAMA_NUM_CTX": "131072"
       }
     },
+    "sentry": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@sentry/mcp-server@latest"
+      ]
+    },
     "contextstream": {
       "command": "npx",
       "args": [
