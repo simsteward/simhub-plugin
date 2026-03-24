@@ -171,10 +171,12 @@ Specialized agents live in `.claude/agents/`. Use the **orchestrator** to route 
 | `pr-reviewer` | Full PR review (build gate + coverage + architecture) |
 | `deployer` | Build → deploy → verify pipeline |
 | `observability` | Grafana/Loki/Prometheus stack management |
+| `babysit` | Persistent log/metrics monitoring, ad-hoc LogQL/PromQL, watch tasks from agents |
 
 ### Workflow Patterns
 
 **After code changes**: always run `test-runner`, then `log-compliance`
 **Before PRs**: run `test-runner` + `log-compliance` + `pr-reviewer`
-**After deploy**: run `grafana-poller` to verify log flow
-**Parallel-safe pairs**: `plugin-dev` + `dashboard-dev`, `test-runner` + `log-compliance`
+**After deploy**: run `grafana-poller` to verify log format, then `babysit` to watch for regressions
+**Log investigation**: run `babysit` for pattern analysis, metrics, and ad-hoc queries
+**Parallel-safe pairs**: `plugin-dev` + `dashboard-dev`, `test-runner` + `log-compliance`, `babysit` + `test-runner`
