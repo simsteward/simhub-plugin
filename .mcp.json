@@ -11,14 +11,21 @@
         "OLLAMA_NUM_CTX": "131072"
       }
     },
+    "sentry": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@sentry/mcp-server@latest"
+      ]
+    },
     "contextstream": {
       "command": "cmd",
       "args": [
-        "/c",
-        "npx",
-        "--prefer-online",
         "-y",
-        "@contextstream/mcp-server@latest"
+        "envmcp",
+        "--env-file",
+        ".env",
+        "contextstream-mcp"
       ],
       "env": {
         "CONTEXTSTREAM_API_URL": "https://api.contextstream.io",

@@ -1,0 +1,39 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL Analysis
+    runs-on: windows-latest
+
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      # github/codeql-action/init@v3
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@480db559a14342288b67e54bd959dd52dc3ee68f
+        with:
+          languages: csharp
+          queries: security-extended
+
+      # github/codeql-action/autobuild@v3
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@480db559a14342288b67e54bd959dd52dc3ee68f
+
+      # github/codeql-action/analyze@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@480db559a14342288b67e54bd959dd52dc3ee68f
+        with:
+          category: "/language:csharp"
