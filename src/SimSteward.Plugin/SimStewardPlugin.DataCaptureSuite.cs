@@ -108,6 +108,10 @@ namespace SimSteward.Plugin
         private int  _suiteT8PollTicks;
         private bool _suiteT8BuildWasRunning;
 
+        // Sentry performance tracing
+        private ITransactionTracer _sentryTx;
+        private ISpan              _sentryCurrentSpan;
+
         // ── Public entry points (called from DataUpdate / DispatchAction) ──────
 
         private void TryStartDataCaptureSuite(string[] skipIds = null)
@@ -184,6 +188,13 @@ namespace SimSteward.Plugin
                     _suite60HzRecorder = null;
                     StopReplayIncidentIndexRecordModeLocked("suite_cancel");
                     EmitSuiteLifecycleEvent("sdk_capture_suite_cancelled", "Suite cancelled.", "T_cancel");
+
+                    // Sentry: finish spans/transaction as cancelled
+                    _sentryCurrentSpan?.Finish(SpanStatus.Cancelled);
+                    _sentryCurrentSpan = null;
+                    _sentryTx?.Finish(SpanStatus.Cancelled);
+                    _sentryTx = null;
+
                     _suitePhase = DataCaptureSuitePhase.Cancelled;
                 }
                 return;
@@ -683,6 +694,12 @@ namespace SimSteward.Plugin
             _suiteStep  = SuiteInternalStep.T0_Rewind;
             _suitePhase = DataCaptureSuitePhase.Running;
 
+            // Sentry performance transaction for the entire suite run
+            _sentryTx = SentrySdk.StartTransaction("data-capture-suite", "test.run");
+            _sentryTx.SetExtra("test_run_id", _suiteTestRunId);
+            SentrySdk.ConfigureScope(scope => scope.Transaction = _sentryTx);
+            _sentryCurrentSpan = _sentryTx.StartChild("step", SuiteInternalStep.T0_Rewind.ToString());
+
             EmitSuiteLifecycleEvent(DataCaptureSuiteConstants.EventSuiteStarted,
                 $"Data capture suite started. test_run_id={_suiteTestRunId}", "T_start");
             SentrySdk.AddBreadcrumb("Data capture suite started", "lifecycle",
@@ -694,6 +711,8 @@ namespace SimSteward.Plugin
 
         private void TickSuiteRunning()
         {
+            var stepBefore = _suiteStep;
+
             switch (_suiteStep)
             {
                 case SuiteInternalStep.T0_Rewind:        TickT0_Rewind();        break;
@@ -722,6 +741,16 @@ namespace SimSteward.Plugin
                 case SuiteInternalStep.TDISC_Settle:   TickTDISC_Settle();   break;
                 case SuiteInternalStep.TDISC_Capture:  TickTDISC_Capture();  break;
                 case SuiteInternalStep.Done:           TransitionToLoki();   break;
+            }
+
+            // Sentry: finish previous span and start new one when step changes
+            if (_suiteStep != stepBefore && _sentryTx != null)
+            {
+                _sentryCurrentSpan?.Finish(SpanStatus.Ok);
+                if (_suiteStep != SuiteInternalStep.Done)
+                    _sentryCurrentSpan = _sentryTx.StartChild("step", _suiteStep.ToString());
+                else
+                    _sentryCurrentSpan = null;
             }
 
             // 60Hz recording: every tick while running
@@ -1637,6 +1666,12 @@ namespace SimSteward.Plugin
 
             _suiteEmitCompleteUtc = DateTime.UtcNow;
             _suitePhase = DataCaptureSuitePhase.AwaitingLoki;
+
+            // Sentry: finish any remaining span and the transaction
+            _sentryCurrentSpan?.Finish(SpanStatus.Ok);
+            _sentryCurrentSpan = null;
+            _sentryTx?.Finish(SpanStatus.Ok);
+            _sentryTx = null;
 
             var fields = BuildTestFields("T_done");
             fields["loki_wait_ms"] = DataCaptureSuiteConstants.LokiVerifyDelayMs;
