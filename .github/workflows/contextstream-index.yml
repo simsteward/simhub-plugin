@@ -1,0 +1,28 @@
+name: ContextStream Index Sync
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - ".github/**"
+      - "docs/**"
+
+jobs:
+  index:
+    runs-on: windows-latest
+
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Install ContextStream CLI
+        run: npm install -g contextstream-mcp
+
+      - name: Run ContextStream ingest
+        env:
+          CONTEXTSTREAM_API_URL: https://api.contextstream.io
+          CONTEXTSTREAM_PROJECT_ID: ${{ secrets.CONTEXTSTREAM_PROJECT_ID }}
+          CONTEXTSTREAM_WORKSPACE_ID: ${{ secrets.CONTEXTSTREAM_WORKSPACE_ID }}
+          CONTEXTSTREAM_API_KEY: ${{ secrets.CONTEXTSTREAM_API_KEY }}
+        run: pwsh -NoProfile -File scripts/contextstream-ingest.ps1 -Force

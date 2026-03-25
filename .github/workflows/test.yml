@@ -11,7 +11,8 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Restore packages
         run: dotnet restore
@@ -23,7 +24,8 @@ jobs:
         run: dotnet test src/SimSteward.Plugin.Tests/SimSteward.Plugin.Tests.csproj -c Release --no-build --logger trx --results-directory TestResults -v normal
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: test-results

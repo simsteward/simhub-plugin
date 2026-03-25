@@ -1,0 +1,33 @@
+name: NuGet Vulnerability Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * 1"
+
+jobs:
+  audit:
+    runs-on: windows-latest
+
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Restore packages
+        run: dotnet restore
+
+      - name: Check for vulnerable packages
+        run: dotnet list package --vulnerable --include-transitive 2>&1 | tee audit-output.txt
+
+      - name: Fail on vulnerabilities
+        shell: pwsh
+        run: |
+          $output = Get-Content audit-output.txt -Raw
+          if ($output -match "has the following vulnerable packages") {
+            Write-Error "Vulnerable NuGet packages detected. See output above."
+            exit 1
+          }
+          Write-Host "No known vulnerabilities found."

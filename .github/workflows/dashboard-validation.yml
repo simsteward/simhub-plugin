@@ -1,0 +1,78 @@
+name: Dashboard Validation
+
+on:
+  push:
+    paths:
+      - "src/SimSteward.Dashboard/**"
+  pull_request:
+    paths:
+      - "src/SimSteward.Dashboard/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Validate HTML files
+        run: |
+          errors=0
+          for f in src/SimSteward.Dashboard/*.html; do
+            echo "Checking $f..."
+
+            # Check for unclosed script/style tags
+            open_script=$(grep -c '<script' "$f" || true)
+            close_script=$(grep -c '</script>' "$f" || true)
+            if [ "$open_script" -ne "$close_script" ]; then
+              echo "::error file=$f::Mismatched <script> tags (open=$open_script, close=$close_script)"
+              errors=$((errors + 1))
+            fi
+
+            # Check for Sentry DSN not accidentally removed
+            if grep -q 'Sentry.init' "$f"; then
+              if ! grep -q 'dsn:' "$f"; then
+                echo "::error file=$f::Sentry.init found but no DSN configured"
+                errors=$((errors + 1))
+              fi
+            fi
+
+            # Check for console.log left in production (warning only)
+            count=$(grep -c 'console\.log' "$f" || true)
+            if [ "$count" -gt 5 ]; then
+              echo "::warning file=$f::$count console.log statements found - consider cleanup"
+            fi
+          done
+
+          if [ "$errors" -gt 0 ]; then
+            echo "::error::$errors validation error(s) found"
+            exit 1
+          fi
+          echo "All dashboard HTML files passed validation."
+
+  lighthouse:
+    runs-on: ubuntu-latest
+
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      # actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli
+
+      - name: Run Lighthouse on dashboards
+        run: |
+          for f in src/SimSteward.Dashboard/*.html; do
+            echo "Running Lighthouse on $f..."
+            lhci autorun --collect.staticDistDir=src/SimSteward.Dashboard \
+              --collect.url="file://$(pwd)/$f" \
+              --assert.preset=lighthouse:no-pwa \
+              --assert.assertions.categories:accessibility=warn \
+              --assert.assertions.categories:best-practices=warn || true
+          done

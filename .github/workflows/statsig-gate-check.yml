@@ -1,0 +1,54 @@
+name: StatsIG Gate Check
+
+on:
+  workflow_call:
+    inputs:
+      gate-name:
+        description: "StatsIG gate to check before proceeding"
+        required: true
+        type: string
+      environment:
+        description: "Target environment"
+        required: false
+        type: string
+        default: "production"
+    outputs:
+      gate-open:
+        description: "Whether the gate is open"
+        value: ${{ jobs.check-gate.outputs.gate-open }}
+
+jobs:
+  check-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      gate-open: ${{ steps.gate.outputs.open }}
+
+    steps:
+      - name: Check StatsIG gate
+        id: gate
+        env:
+          STATSIG_SERVER_KEY: ${{ secrets.STATSIG_SERVER_KEY }}
+        run: |
+          if [ -z "$STATSIG_SERVER_KEY" ]; then
+            echo "::warning::STATSIG_SERVER_KEY not set - defaulting gate to open"
+            echo "open=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          response=$(curl -s -X POST "https://statsigapi.net/v1/check_gate" \
+            -H "statsig-api-key: $STATSIG_SERVER_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"user\": { \"userID\": \"github-actions\", \"custom\": { \"environment\": \"${{ inputs.environment }}\" } },
+              \"gateName\": \"${{ inputs.gate-name }}\"
+            }")
+
+          gate_value=$(echo "$response" | jq -r '.value // false')
+          echo "Gate '${{ inputs.gate-name }}' = $gate_value"
+          echo "open=$gate_value" >> "$GITHUB_OUTPUT"
+
+      - name: Gate closed - block deploy
+        if: steps.gate.outputs.open != 'true'
+        run: |
+          echo "::error::StatsIG gate '${{ inputs.gate-name }}' is closed for environment '${{ inputs.environment }}'. Deploy blocked."
+          exit 1

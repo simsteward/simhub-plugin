@@ -1,0 +1,52 @@
+name: Sentry Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  sentry-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Sentry release
+        # getsentry/action-release@v3
+        uses: getsentry/action-release@dab6548b3c03c4717878099e43782cf5be654289
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: sim-steward
+        with:
+          projects: simhub-plugin web-dashboards
+          version: ${{ steps.version.outputs.version }}
+          set_commits: auto
+
+      - name: Register simhub-plugin deploy
+        if: env.SENTRY_AUTH_TOKEN != ''
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          curl -s -X POST \
+            "https://sentry.io/api/0/organizations/sim-steward/releases/${{ steps.version.outputs.version }}/deploys/" \
+            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"environment":"production","name":"simhub-plugin"}'
+
+      - name: Register web-dashboards deploy
+        if: env.SENTRY_AUTH_TOKEN != ''
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          curl -s -X POST \
+            "https://sentry.io/api/0/organizations/sim-steward/releases/${{ steps.version.outputs.version }}/deploys/" \
+            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"environment":"production","name":"web-dashboards"}'
