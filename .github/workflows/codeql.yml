@@ -23,17 +23,17 @@ jobs:
 
       # github/codeql-action/init@v3
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@480db559a14342288b67e54bd959dd52dc3ee68f
+        uses: github/codeql-action/init@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3
         with:
           languages: csharp
           queries: security-extended
 
       # github/codeql-action/autobuild@v3
       - name: Autobuild
-        uses: github/codeql-action/autobuild@480db559a14342288b67e54bd959dd52dc3ee68f
+        uses: github/codeql-action/autobuild@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3
 
       # github/codeql-action/analyze@v3
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@480db559a14342288b67e54bd959dd52dc3ee68f
+        uses: github/codeql-action/analyze@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3
         with:
           category: "/language:csharp"
