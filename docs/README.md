@@ -27,7 +27,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 
 - **Workspace:** Open this repo as a **single-folder** Cursor workspace rooted at `simhub-plugin` so search and tooling are not mixed with unrelated paths (other clones, AppData, etc.).
 - **ContextStream project:** Keep the ContextStream **project path** aligned with that same folder so `ingest_local` / MCP index the intended tree.
-- **Corpus hygiene:** [`.cursorignore`](../.cursorignore) trims noise for Cursor; after changing ignore rules or large doc/code moves, run a **forced** ContextStream ingest (`npm run contextstream:ingest:force` — see [.cursor/skills/contextstream/SKILL.md](../.cursor/skills/contextstream/SKILL.md)).
+- **Corpus hygiene:** [`.cursorignore`](../.cursorignore) trims noise for Cursor; after changing ignore rules or large doc/code moves, run a **forced** ContextStream ingest (`pnpm run contextstream:ingest:force` — see [.cursor/skills/contextstream/SKILL.md](../.cursor/skills/contextstream/SKILL.md)).
 - **Structural graph:** ContextStream **code graph** may not expose C# module edges; use keyword/semantic `search` plus the **Code map** in [ARCHITECTURE.md](ARCHITECTURE.md) for navigation.
 
 ---
@@ -38,7 +38,7 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 |-----|----------|
 | [USER-FEATURES-PM.md](USER-FEATURES-PM.md) | PM-style user features (12 flows), connections, vision vs shipped vs [PRODUCT-FLOW.md](PRODUCT-FLOW.md) |
 | [USER-FLOWS.md](USER-FLOWS.md) | Step-by-step user journeys through today's UI (mermaid diagrams); PM issues and flow gaps |
-| [observability-local.md](observability-local.md) | Local Grafana/Loki stack, npm scripts, loki-gateway |
+| [observability-local.md](observability-local.md) | Local Grafana/Loki stack, pnpm scripts, loki-gateway |
 | [observability-scaling.md](observability-scaling.md) | Many users, large grids, Loki cardinality |
 | [DATA-ROUTING-OBSERVABILITY.md](DATA-ROUTING-OBSERVABILITY.md) | OTel vs Loki vs Prometheus, ~1k-user sizing, car telemetry taxonomy |
 | [observability-testing.md](observability-testing.md) | Harness, AssertLokiQueries, Explore validation |

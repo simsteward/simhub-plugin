@@ -21,22 +21,22 @@ Quick start for plugin logs in local Grafana/Loki, **optional OTLP metrics** (Op
 2. **Start the stack** (repo root):
 
    ```powershell
-   npm run obs:up
+   pnpm run obs:up
    ```
 
-   Or copy `observability/local/.env.observability.example` → `.env.observability.local`, set passwords/tokens, then `npm run obs:up:env`. Check: `npm run obs:ps`.
+   Or copy `observability/local/.env.observability.example` → `.env.observability.local`, set passwords/tokens, then `pnpm run obs:up:env`. Check: `pnpm run obs:ps`.
 
 3. **Configure the plugin** — SimHub does not load `.env` by default. Recommended: `.\scripts\run-simhub-local-observability.ps1` (sets `SIMSTEWARD_LOKI_URL=http://localhost:3100`, `SIMSTEWARD_LOG_ENV=local`, and OTLP for metrics — see script). Or set those in Windows user env and restart SimHub. See `.env.example` “Local Loki” and “OTLP / Prometheus (local metrics)” blocks.
 
 4. **Grafana** — http://localhost:3000 → Explore → Loki → `{app="sim-steward", env="local"}`. Provisioned dashboard **Sim Steward — Deploy health** (`simsteward-deploy-health`) correlates `deploy.ps1` markers (`event=deploy_marker`) with plugin bring-up and errors. Put `SIMSTEWARD_LOKI_URL` (and `LOKI_PUSH_TOKEN` if using loki-gateway) in repo **`.env`** — `deploy.ps1` loads it automatically via `scripts/load-dotenv.ps1` (optional merge: `observability/local/.env.observability.local`).
 
-5. **Metrics (optional)** — With the stack up, set **`OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317`** (or use `SIMSTEWARD_OTLP_ENDPOINT`) before starting SimHub. After the plugin loads, Explore → **Prometheus Local** → e.g. `simsteward_process_cpu_percent` or `up{job="otel-collector"}`. Smoke: `npm run obs:poll:prometheus` or `.\scripts\poll-prometheus.ps1`.
+5. **Metrics (optional)** — With the stack up, set **`OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317`** (or use `SIMSTEWARD_OTLP_ENDPOINT`) before starting SimHub. After the plugin loads, Explore → **Prometheus Local** → e.g. `simsteward_process_cpu_percent` or `up{job="otel-collector"}`. Smoke: `pnpm run obs:poll:prometheus` or `.\scripts\poll-prometheus.ps1`.
 
 6. **Generate traffic** — Use SimHub + web dashboard; confirm logs in **Explore** with `{app="sim-steward", env="local"}` (no repo-provisioned Grafana dashboards until you add JSON under `observability/local/grafana/provisioning/dashboards/`).
 
 **Storage override:** Set `GRAFANA_STORAGE_PATH` in `.env.observability.local`; compose uses `${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}`.
 
-**Terminal tail:** `npm run obs:poll` (direct Loki :3100) or `npm run obs:poll:grafana` / `.\scripts\poll-loki.ps1 -ViaGrafana` using **GRAFANA_API_TOKEN** (or admin user/password) in repo `.env` — same path Grafana Explore uses (`loki_local` datasource). **Prometheus:** `npm run obs:poll:prometheus` / `.\scripts\poll-prometheus.ps1`.
+**Terminal tail:** `pnpm run obs:poll` (direct Loki :3100) or `pnpm run obs:poll:grafana` / `.\scripts\poll-loki.ps1 -ViaGrafana` using **GRAFANA_API_TOKEN** (or admin user/password) in repo `.env` — same path Grafana Explore uses (`loki_local` datasource). **Prometheus:** `pnpm run obs:poll:prometheus` / `.\scripts\poll-prometheus.ps1`.
 
 ---
 
@@ -44,7 +44,7 @@ Quick start for plugin logs in local Grafana/Loki, **optional OTLP metrics** (Op
 
 To **clear Loki chunks/WAL**, optional **Prometheus TSDB**, and optional Grafana bind-mount state **without** changing compose, `loki-config.yml`, datasource provisioning, `LOKI_PUSH_TOKEN`, or `SIMSTEWARD_LOKI_*`:
 
-1. From repo root, run **`npm run obs:wipe -- -Force`** (clears the `loki` and **`prometheus`** subdirectories under `GRAFANA_STORAGE_PATH`).
+1. From repo root, run **`pnpm run obs:wipe -- -Force`** (clears the `loki` and **`prometheus`** subdirectories under `GRAFANA_STORAGE_PATH`).
 2. Optional flags: **`-Grafana`** (wipes `grafana.db`; re-run `scripts/grafana-bootstrap.ps1` if you use `GRAFANA_API_TOKEN`), **`-SampleLogs`** (clears `observability/local/sample-logs/*` files), or **`-All`** for both.
 
 Equivalent: `.\scripts\obs-wipe-local-data.ps1 -Force` (same switches).
@@ -101,9 +101,9 @@ The stack publishes these **host** ports together; any other process (or second 
 
 ### Metrics / OTLP troubleshooting
 
-- **`up{job="otel-collector"} == 0`** — Prometheus cannot reach the collector on `otel-collector:8889` (compose network). Confirm `otel-collector` is running: `npm run obs:ps`.
+- **`up{job="otel-collector"} == 0`** — Prometheus cannot reach the collector on `otel-collector:8889` (compose network). Confirm `otel-collector` is running: `pnpm run obs:ps`.
 - **No `simsteward_*` series** — OTLP is off until **`OTEL_EXPORTER_OTLP_ENDPOINT`** or **`SIMSTEWARD_OTLP_ENDPOINT`** is set **before** SimHub starts. Use **`http://127.0.0.1:4317`** for gRPC; for port **4318** set **`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`**.
-- **Connection refused on 4317** — Collector not started or ports not published; run `npm run obs:up` from repo root.
+- **Connection refused on 4317** — Collector not started or ports not published; run `pnpm run obs:up` from repo root.
 - **Grafana Prometheus query errors** — Datasource must be **`http://prometheus:9090`** (container DNS), not `localhost:9090`.
 - **Loki remains authoritative** for `host_resource_sample` until you rely on Prom-only SLOs; metrics duplicate CPU/working set at OTLP export cadence.
 

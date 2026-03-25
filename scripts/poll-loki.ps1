@@ -1,7 +1,7 @@
 # Continuously poll Loki for SimSteward logs and print new lines (tail-style).
 # Run from repo root:
 #   Direct Loki:  .\scripts\poll-loki.ps1
-#   Via Grafana:  .\scripts\poll-loki.ps1 -ViaGrafana   (or npm run obs:poll:grafana)
+#   Via Grafana:  .\scripts\poll-loki.ps1 -ViaGrafana   (or pnpm run obs:poll:grafana)
 # .env: LOKI_QUERY_URL / SIMSTEWARD_LOKI_URL + optional SIMSTEWARD_LOKI_* (cloud).
 # -ViaGrafana: GRAFANA_URL, Bearer token = GRAFANA_API_TOKEN or CURSOR_ELEVATED_GRAFANA_TOKEN (or GRAFANA_ADMIN_USER + GRAFANA_ADMIN_PASSWORD), optional GRAFANA_LOKI_DATASOURCE_UID.
 # Env SIMSTEWARD_LOKI_VIA_GRAFANA=1 enables -ViaGrafana without the switch.

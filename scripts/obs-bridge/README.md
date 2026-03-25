@@ -15,13 +15,13 @@ Bridges the Sim Steward plugin WebSocket to OBS WebSocket (obs-websocket 5.x). W
 
 ```bash
 cd scripts/obs-bridge
-npm install
+pnpm install
 ```
 
 ## Run
 
 ```bash
-npm start
+pnpm start
 ```
 
 Or from the repo root:
@@ -38,7 +38,7 @@ The bridge auto-loads environment variables from the **repo root** `.env` file u
 copy .env.example .env
 # edit the root .env with your local values
 cd scripts/obs-bridge
-npm start
+pnpm start
 ```
 
 ## Environment
