@@ -475,13 +475,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 </style>
-<script src="https://browser.sentry-cdn.com/9.27.0/bundle.min.js" crossorigin="anonymous"></script>
+<script src="https://browser.sentry-cdn.com/9.27.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
 <script>
 Sentry.init({
   dsn: 'https://46ad94b35a51979ba4223eeffe38f5c8@o4511097126780928.ingest.us.sentry.io/4511103122210816',
   environment: 'local',
   release: '',
   tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [Sentry.replayIntegration()],
   initialScope: { tags: { dashboard: 'index' } },
 });
 </script>
