@@ -5,7 +5,7 @@
 
 param(
     [string]$DebugLogPath = "debug-2291d4.log",
-    [string]$Query = '{app="sim-steward"}',
+    [string]$Query = '{app=~"sim-steward|claude-dev-logging"}',
     [int]$LookbackSeconds = 7200
 )
 

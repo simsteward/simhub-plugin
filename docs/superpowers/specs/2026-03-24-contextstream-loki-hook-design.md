@@ -109,9 +109,9 @@ Four labels only (consistent with project schema):
 
 | Label | Value |
 |-------|-------|
-| `app` | `contextstream` |
+| `app` | `claude-dev-logging` |
 | `env` | Value of `$env:SIMSTEWARD_LOG_ENV`, default `local` |
-| `component` | `contextstream-test-cases` |
+| `component` | `mcp-contextstream` |
 | `level` | `INFO` (normal) or `ERROR` (hook caught a failure) |
 
 ## 8. Event Types
@@ -286,9 +286,9 @@ HTTP POST to `http://localhost:3100/loki/api/v1/push`
   "streams": [
     {
       "stream": {
-        "app": "contextstream",
+        "app": "claude-dev-logging",
         "env": "local",
-        "component": "contextstream-test-cases",
+        "component": "mcp-contextstream",
         "level": "INFO"
       },
       "values": [
@@ -359,7 +359,7 @@ observability/
 1. Start the local Loki stack (`docker compose up` in `observability/local/`).
 2. Open Grafana at `localhost:3000`.
 3. Run the ContextStream test suite from `tests/contextstream-mcp-test-prompt.md`.
-4. Query Grafana: `{app="contextstream", component="contextstream-test-cases"}`.
+4. Query Grafana: `{app="claude-dev-logging", component="mcp-contextstream"}`.
 5. Verify: tool_call lines for every MCP call, manifest lines for object-returning calls.
 
 ### Fallback verification
@@ -376,25 +376,25 @@ observability/
 
 **All ContextStream calls in the last hour:**
 ```logql
-{app="contextstream"} | json | event = "contextstream_tool_call"
+{app="claude-dev-logging", component="mcp-contextstream"} | json | event = "contextstream_tool_call"
 ```
 
 **Failed calls:**
 ```logql
-{app="contextstream", level="ERROR"} | json | success = false
+{app="claude-dev-logging", component="mcp-contextstream", level="ERROR"} | json | success = false
 ```
 
 **Object manifest for docs:**
 ```logql
-{app="contextstream"} | json | event = "contextstream_object_manifest" | manifest_object_type = "doc"
+{app="claude-dev-logging", component="mcp-contextstream"} | json | event = "contextstream_object_manifest" | manifest_object_type = "doc"
 ```
 
 **All actions on a specific object ID:**
 ```logql
-{app="contextstream"} | json | object_id = "abc-123-def"
+{app="claude-dev-logging", component="mcp-contextstream"} | json | object_id = "abc-123-def"
 ```
 
 **Call volume by action (last 24h):**
 ```logql
-sum by (action) (count_over_time({app="contextstream"} | json | event = "contextstream_tool_call" [24h]))
+sum by (action) (count_over_time({app="claude-dev-logging", component="mcp-contextstream"} | json | event = "contextstream_tool_call" [24h]))
 ```

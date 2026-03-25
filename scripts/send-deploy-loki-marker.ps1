@@ -42,7 +42,7 @@ $streamObj = [ordered]@{
     stream = @{
         app       = 'sim-steward'
         env       = $envName
-        component = 'simhub-plugin'
+        component = 'deploy'
         level     = $lvl
     }
     # Loki expects values as [[tsNs, line], ...] - leading comma forces a nested array in PowerShell.

@@ -44,12 +44,32 @@ At 30 sessions/month: ~7 MB. Never log on a tick; `DataUpdate()` runs at 60 Hz.
 
 Four labels only. Do **not** put high-cardinality values (`session_id`, `car_number`, `action`, `correlation_id`) in labels—they stay in the JSON body.
 
+### Two `app` namespaces
+
+| `app` | Audience | What it covers |
+|-------|----------|----------------|
+| `sim-steward` | Product / runtime | C# plugin, dashboard, deploy |
+| `claude-dev-logging` | Dev tooling observability | Claude Code hooks, MCP server instrumentation |
+
+### `app=sim-steward` (product)
+
 | Label | Values | Rationale |
 |-------|--------|-----------|
-| `app` | `sim-steward` | Namespace. |
+| `app` | `sim-steward` | Product namespace. |
 | `env` | `production` or `local` | From `SIMSTEWARD_LOG_ENV`. |
-| `component` | `simhub-plugin`, `bridge`, `tracker`, `dashboard` | Subsystem. |
+| `component` | `simhub-plugin`, `bridge`, `tracker`, `dashboard`, `deploy` | Subsystem. |
 | `level` | `INFO`, `WARN`, `ERROR`, `DEBUG` | Severity. `DEBUG` only when `SIMSTEWARD_LOG_DEBUG=1`. |
+
+### `app=claude-dev-logging` (dev tooling)
+
+| Label | Values | Rationale |
+|-------|--------|-----------|
+| `app` | `claude-dev-logging` | Dev tooling namespace. |
+| `env` | `local` or `dev` | From `SIMSTEWARD_LOG_ENV`. |
+| `component` | `hook`, `mcp-contextstream`, `mcp-sentry`, `mcp-ollama` | Subsystem. |
+| `level` | `INFO`, `WARN`, `ERROR` | Severity. |
+
+The generic hook logger (`~/.claude/hooks/loki-log.js`) uses `component=hook`. MCP-specific dedicated hooks use `component=mcp-<service>`. MCP service is also detected in the JSON body `service` field for tool-level queries: `{app="claude-dev-logging", component="hook"} | json | service="contextstream"`.
 
 ## Event taxonomy
 

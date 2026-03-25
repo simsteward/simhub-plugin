@@ -8,7 +8,7 @@
 
 param(
     [string]$LokiUrl = "",
-    [string]$Query = '{app="sim-steward"} | json | level != "DEBUG"',
+    [string]$Query = '{app=~"sim-steward|claude-dev-logging"} | json | level != "DEBUG"',
     [int]$IntervalSeconds = 2,
     [int]$LookbackSeconds = 120,
     [switch]$ViaGrafana
