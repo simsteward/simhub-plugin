@@ -244,12 +244,15 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 0 4px; margin-left: -28px; margin-right: 4px; transition: color 0.15s; z-index: 1; }
 .filter-clear:hover { color: var(--text); }
 </style>
-<script src="https://browser.sentry-cdn.com/9.27.0/bundle.min.js" crossorigin="anonymous"></script>
+<script src="https://browser.sentry-cdn.com/9.27.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
 <script>
 Sentry.init({
   dsn: 'https://46ad94b35a51979ba4223eeffe38f5c8@o4511097126780928.ingest.us.sentry.io/4511103122210816',
   environment: 'local',
   tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [Sentry.replayIntegration()],
 });
 Sentry.setTag('dashboard', 'data-capture-suite');
 </script>

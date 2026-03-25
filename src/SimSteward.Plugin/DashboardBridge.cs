@@ -278,8 +278,22 @@ namespace SimSteward.Plugin
             }
 
             var correlationId = Guid.NewGuid().ToString("N").Substring(0, 8);
-            var (success, result, error) = _dispatchAction(action, arg ?? "", correlationId);
-            SendActionResult(socket, action, success, result, error);
+            var tx = SentrySdk.StartTransaction("ws.message", "handle");
+            tx.SetExtra("action", action);
+            tx.SetExtra("correlation_id", correlationId);
+            SentrySdk.ConfigureScope(scope => scope.Transaction = tx);
+            try
+            {
+                var (success, result, error) = _dispatchAction(action, arg ?? "", correlationId);
+                SendActionResult(socket, action, success, result, error);
+                tx.Finish(success ? SpanStatus.Ok : SpanStatus.InternalError);
+            }
+            catch (Exception ex)
+            {
+                SentrySdk.CaptureException(ex);
+                tx.Finish(SpanStatus.InternalError);
+                throw;
+            }
         }
 
         private void SendActionResult(IWebSocketConnection socket, string action, bool success, string result, string error)

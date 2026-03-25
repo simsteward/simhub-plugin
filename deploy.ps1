@@ -434,6 +434,52 @@ function Push-SentryApi {
     }
 }
 
+function Push-SentryCheckIn {
+    param([string]$MonitorSlug, [string]$Status, [string]$CheckInId)
+    if ([string]::IsNullOrWhiteSpace($sentryAuthToken)) { return $null }
+    try {
+        $headers = @{ Authorization = "Bearer $sentryAuthToken"; 'Content-Type' = 'application/json' }
+        if ([string]::IsNullOrWhiteSpace($CheckInId)) {
+            # Initial check-in: POST with monitor_config for auto-creation
+            $url = "https://sentry.io/api/0/organizations/$sentryOrg/monitors/$MonitorSlug/checkins/"
+            $body = @{
+                status         = $Status
+                monitor_config = @{
+                    schedule        = @{ type = 'interval'; value = 1; unit = 'day' }
+                    checkin_margin  = 5
+                    max_runtime     = 10
+                    timezone        = 'UTC'
+                }
+            }
+            $json = $body | ConvertTo-Json -Compress -Depth 5
+            $resp = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop
+            $newId = $resp.id
+            Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in started: $MonitorSlug" @{
+                monitor_slug = $MonitorSlug
+                status       = $Status
+                checkin_id   = $newId
+            }
+            return $newId
+        } else {
+            # Completion check-in: PUT to update existing
+            $url = "https://sentry.io/api/0/organizations/$sentryOrg/monitors/$MonitorSlug/checkins/$CheckInId/"
+            $body = @{ status = $Status }
+            $json = $body | ConvertTo-Json -Compress -Depth 5
+            Invoke-RestMethod -Uri $url -Method Put -Headers $headers -Body $json -ErrorAction Stop | Out-Null
+            Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in completed: $MonitorSlug ($Status)" @{
+                monitor_slug = $MonitorSlug
+                status       = $Status
+                checkin_id   = $CheckInId
+            }
+            return $null
+        }
+    } catch {
+        # Non-fatal: deploy must not fail because Sentry API is down
+        Write-Warning "Sentry CheckIn ($MonitorSlug/$Status): $($_.Exception.Message)"
+        return $null
+    }
+}
+
 if (-not [string]::IsNullOrWhiteSpace($sentryAuthToken) -and -not [string]::IsNullOrWhiteSpace($sentryRelease)) {
     Write-Host "Registering Sentry release: $sentryRelease (3 projects)"
 
@@ -509,6 +555,7 @@ if (-not $skipTests) {
                 script_count = $testScripts.Count
                 scripts      = ($testScripts | ForEach-Object { $_.Name }) -join ','
             }
+            $checkInId = Push-SentryCheckIn 'post-deploy-tests' 'in_progress'
             foreach ($ts in $testScripts) {
                 Write-Host "  Running: $($ts.Name)"
                 $tsStart = Get-Date
@@ -557,6 +604,8 @@ if (-not $skipTests) {
                     }
                 }
             }
+            $checkInStatus = if ($postDeployFailed) { 'error' } else { 'ok' }
+            Push-SentryCheckIn 'post-deploy-tests' $checkInStatus $checkInId | Out-Null
             if ($postDeployFailed) {
                 Write-Warning "Post-deploy tests failed. Deploy files are in place but integration is not fully verified."
             } else {

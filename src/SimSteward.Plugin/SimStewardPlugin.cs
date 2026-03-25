@@ -609,6 +609,16 @@ namespace SimSteward.Plugin
         {
             if (string.IsNullOrEmpty(action))
                 return (false, null, "missing_action");
+
+            // Sentry: create a child span under the current transaction (if any)
+            ISpan _actionSpan = null;
+            SentrySdk.ConfigureScope(scope =>
+            {
+                var parentTx = scope.Transaction;
+                if (parentTx != null)
+                    _actionSpan = parentTx.StartChild("action", action ?? "unknown");
+            });
+
             var dispatchFields = new System.Collections.Generic.Dictionary<string, object>
             {
                 ["action"] = action,
@@ -617,6 +627,9 @@ namespace SimSteward.Plugin
             };
             MergeSessionAndRoutingFields(dispatchFields);
             _logger?.Structured("INFO", "simhub-plugin", "action_dispatched", action, dispatchFields, "action", null);
+
+            try
+            {
 
             if (string.Equals(action, "replay_session", StringComparison.OrdinalIgnoreCase))
             {
@@ -943,6 +956,18 @@ namespace SimSteward.Plugin
 
             LogActionResult(action, arg, correlationId, false, "not_supported");
             return (false, null, "not_supported");
+
+            }
+            catch
+            {
+                _actionSpan?.Finish(SpanStatus.InternalError);
+                _actionSpan = null;
+                throw;
+            }
+            finally
+            {
+                _actionSpan?.Finish(SpanStatus.Ok);
+            }
         }
 
         private void OnLog(string level, string message, string source)
