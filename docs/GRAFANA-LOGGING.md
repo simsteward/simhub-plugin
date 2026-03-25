@@ -66,10 +66,34 @@ Four labels only. Do **not** put high-cardinality values (`session_id`, `car_num
 |-------|--------|-----------|
 | `app` | `claude-dev-logging` | Dev tooling namespace. |
 | `env` | `local` or `dev` | From `SIMSTEWARD_LOG_ENV`. |
-| `component` | `hook`, `mcp-contextstream`, `mcp-sentry`, `mcp-ollama` | Subsystem. |
+| `component` | `tool`, `mcp-contextstream`, `mcp-sentry`, `mcp-ollama`, `lifecycle`, `agent`, `user`, `other` | Subsystem. |
 | `level` | `INFO`, `WARN`, `ERROR` | Severity. |
 
-The generic hook logger (`~/.claude/hooks/loki-log.js`) uses `component=hook`. MCP-specific dedicated hooks use `component=mcp-<service>`. MCP service is also detected in the JSON body `service` field for tool-level queries: `{app="claude-dev-logging", component="hook"} | json | service="contextstream"`.
+The hook logger (`~/.claude/hooks/loki-log.js`) buckets by hook type: tool hooks for non-MCP tools use `component=tool`; MCP tools use `component=mcp-<service>`; session/compact/stop use `lifecycle`; subagent/task use `agent`; prompt/notification/permission use `user`. MCP service is also in the JSON body `service` field: `{app="claude-dev-logging"} | json | service="contextstream"`.
+
+#### Enrichment fields (JSON body, not labels)
+
+Derived from stdin + temp-file timestamp correlation (`$TMPDIR/claude-hook-timing/`):
+
+| Field | Hook types | Description |
+|-------|-----------|-------------|
+| `duration_ms` | PostToolUse, PostToolUseFailure | Wall-clock tool execution time (Pre→Post diff). |
+| `tool_input_bytes` | PreToolUse, PostToolUse, PostToolUseFailure | `Buffer.byteLength(JSON.stringify(tool_input))`. |
+| `tool_response_bytes` | PostToolUse, PostToolUseFailure | `Buffer.byteLength(JSON.stringify(tool_response))`. |
+| `is_retry` | PreToolUse | `true` when same tool+input hash seen within 10 s. |
+| `retry_of` | PreToolUse | `tool_use_id` of the previous identical call. |
+| `error_type` | PostToolUseFailure | `timeout`, `permission_denied`, `not_found`, `connection_refused`, `rate_limited`, `unknown`. |
+| `agent_depth` | SubagentStart | Count of concurrently open agents in the session. |
+| `agent_duration_ms` | SubagentStop | Wall-clock subagent lifetime. |
+| `session_duration_ms` | SessionEnd | Wall-clock session lifetime. |
+| `compaction_count` | PreCompact, SessionEnd | Number of compactions in this session. |
+| `user_think_time_ms` | UserPromptSubmit | Time since last tool completion. |
+
+Stale files (>5 min) are cleaned on each PreToolUse and SessionStart. Retry markers expire after 10 s.
+
+#### Session token sidecar
+
+On `SessionEnd`, the hook reads `transcript_path` (JSONL) and writes aggregated metrics to `{cwd}/logs/claude-session-metrics.jsonl` (tailed by Alloy). No conversation content — only: `total_input_tokens`, `total_output_tokens`, `total_cache_creation_tokens`, `total_cache_read_tokens`, `assistant_turns`, `tool_use_count`, `model`, `session_duration_ms`, `compaction_count`.
 
 ## Event taxonomy
 
