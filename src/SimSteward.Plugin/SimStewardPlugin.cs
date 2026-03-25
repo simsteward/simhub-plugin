@@ -7,10 +7,13 @@ using System.Windows.Media;
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Reflection;
+using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
@@ -57,6 +60,7 @@ namespace SimSteward.Plugin
         private volatile bool _simHubHttpListening;
         private volatile string _dashboardPingStatus = "—";
         private DateTime _lastDashboardPingUtc = DateTime.MinValue;
+        private DateTime _lastAgentHttpDebugUtc = DateTime.MinValue;
         private int _dataUpdateTick;
         private SystemMetricsSampler _resourceSampler;
         private DateTime _nextResourceSampleUtc = DateTime.MaxValue;
@@ -68,6 +72,8 @@ namespace SimSteward.Plugin
         private IRacingSdk _irsdk;
         private double _lastSessionTime;
         private string _pluginMode = "Unknown";
+        private string _lokiBaseUrl = "";
+        private string _grafanaBaseUrl = "";
         private int _replayFrameNumEnd;
         /// <summary>Replay length (telemetry <c>ReplayFrameNumEnd</c>); 0 if unknown.</summary>
         private int _replayFrameTotal;
@@ -107,7 +113,8 @@ namespace SimSteward.Plugin
                 cameraGroups = GetCameraGroupNames(),
                 diagnostics = snapshot.Diagnostics,
                 replayIncidentIndex = snapshot.ReplayIncidentIndex,
-                dataCaptureSuite = snapshot.DataCaptureSuite
+                dataCaptureSuite = snapshot.DataCaptureSuite,
+                preflight = snapshot.Preflight
             };
             return JsonConvert.SerializeObject(state);
         }
@@ -264,7 +271,8 @@ namespace SimSteward.Plugin
                 ReplaySessionName = replaySessionName,
                 Diagnostics = BuildDiagnostics(clientCount),
                 ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot(),
-                DataCaptureSuite = BuildDataCaptureSuiteSnapshot()
+                DataCaptureSuite = BuildDataCaptureSuiteSnapshot(),
+                Preflight = _preflightSnapshot
             };
         }
 
@@ -279,7 +287,9 @@ namespace SimSteward.Plugin
                 WsClients = clientCount,
                 SteamRunning = _steamRunning,
                 SimHubHttpListening = _simHubHttpListening,
-                DashboardPing = _dashboardPingStatus
+                DashboardPing = _dashboardPingStatus,
+                GrafanaConfigured = !string.IsNullOrEmpty(_lokiBaseUrl),
+                ReplaySessionCompleted = IsReplaySessionCompleted()
             };
             if (_lastResourceSample != null)
             {
@@ -335,6 +345,78 @@ namespace SimSteward.Plugin
             }
 
             return "—";
+        }
+
+        /// <summary>
+        /// Checks YAML <c>Sessions[].SessionState</c> for any Race session that reached Checkered/CoolDown.
+        /// Uses reflection (same pattern as <see cref="ResolveSessionNameFromYaml"/>).
+        /// </summary>
+        private bool IsReplaySessionCompleted()
+        {
+            try
+            {
+                var sessionInfo = _irsdk?.Data?.SessionInfo;
+                if (!(sessionInfo?.SessionInfo?.Sessions is IList list)) return false;
+                foreach (var o in list)
+                {
+                    if (o == null) continue;
+                    var t = o.GetType();
+                    var typeProp = t.GetProperty("SessionType");
+                    var stateProp = t.GetProperty("ResultsOfficial");
+                    // Check if it's a Race session
+                    var sessionType = typeProp?.GetValue(o)?.ToString() ?? "";
+                    if (!string.Equals(sessionType, "Race", StringComparison.OrdinalIgnoreCase)) continue;
+                    // ResultsOfficial = 1 means session completed with official results
+                    var official = stateProp?.GetValue(o);
+                    if (official is int ival && ival >= 1) return true;
+                    if (int.TryParse(official?.ToString(), out int parsed) && parsed >= 1) return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private PreflightSessionInfo[] ReadSessionListFromYaml()
+        {
+            try
+            {
+                var sessionInfo = _irsdk?.Data?.SessionInfo;
+                if (!(sessionInfo?.SessionInfo?.Sessions is IList list) || list.Count == 0)
+                    return null;
+
+                var result = new List<PreflightSessionInfo>();
+                foreach (var o in list)
+                {
+                    if (o == null) continue;
+                    var t = o.GetType();
+                    var numProp    = t.GetProperty("SessionNum");
+                    var nameProp   = t.GetProperty("SessionName");
+                    var typeProp   = t.GetProperty("SessionType");
+                    var officialProp = t.GetProperty("ResultsOfficial");
+
+                    int num = 0;
+                    if (numProp?.GetValue(o) is int n) num = n;
+                    else int.TryParse(numProp?.GetValue(o)?.ToString(), out num);
+
+                    bool official = false;
+                    var offVal = officialProp?.GetValue(o);
+                    if (offVal is int oi) official = oi >= 1;
+                    else if (int.TryParse(offVal?.ToString(), out int op)) official = op >= 1;
+
+                    result.Add(new PreflightSessionInfo
+                    {
+                        SessionNum  = num,
+                        SessionName = nameProp?.GetValue(o)?.ToString() ?? "",
+                        SessionType = typeProp?.GetValue(o)?.ToString() ?? "",
+                        ResultsOfficial = official,
+                    });
+                }
+                return result.Count > 0 ? result.ToArray() : null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private object[] BuildDriverList()
@@ -799,11 +881,33 @@ namespace SimSteward.Plugin
 
             if (string.Equals(action, "data_capture_suite", StringComparison.OrdinalIgnoreCase))
             {
-                var verb = (arg ?? "").Trim().ToLowerInvariant();
+                var raw      = (arg ?? "").Trim();
+                var colonIdx = raw.IndexOf(':');
+                var verb     = (colonIdx >= 0 ? raw.Substring(0, colonIdx) : raw).ToLowerInvariant();
+                var skipParam = colonIdx >= 0 ? raw.Substring(colonIdx + 1) : "";
+                var skipIds   = string.IsNullOrEmpty(skipParam)
+                    ? Array.Empty<string>()
+                    : skipParam.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                 switch (verb)
                 {
                     case "start":
-                        TryStartDataCaptureSuite();
+                        TryStartDataCaptureSuite(skipIds);
+                        LogActionResult(action, arg, correlationId, true, "");
+                        return (true, "ok", null);
+                    case "preflight":
+                        _preflightRequested = true;
+                        LogActionResult(action, arg, correlationId, true, "");
+                        return (true, "ok", null);
+                    case "preflight_scope":
+                        _preflightReplayScope = string.Equals(skipParam, "partial", StringComparison.OrdinalIgnoreCase) ? "partial" : "full";
+                        _preflightSnapshot.ReplayScope = _preflightReplayScope;
+                        LogActionResult(action, arg, correlationId, true, "");
+                        return (true, "ok", null);
+                    case "preflight_reset":
+                        _preflightLevel = 0;
+                        _preflightCorrelationId = null;
+                        _preflightSnapshot = new PreflightSnapshot();
+                        _preflightStep = PreflightStep.Idle;
                         LogActionResult(action, arg, correlationId, true, "");
                         return (true, "ok", null);
                     case "cancel":
@@ -884,9 +988,10 @@ namespace SimSteward.Plugin
                 _steamRunning = false;
             }
 
+            IPEndPoint[] listeners = Array.Empty<IPEndPoint>();
             try
             {
-                var listeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
+                listeners = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners();
                 _simHubHttpListening = listeners.Any(e => e.Port == 8888);
             }
             catch
@@ -899,25 +1004,86 @@ namespace SimSteward.Plugin
                 return;
             _lastDashboardPingUtc = now;
 
+            // #region agent log
+            if ((now - _lastAgentHttpDebugUtc).TotalSeconds >= DashboardPingIntervalSec)
+            {
+                _lastAgentHttpDebugUtc = now;
+                var ep8888 = listeners.Where(e => e.Port == 8888).Select(e => e.Address.ToString() + ":" + e.Port).ToArray();
+                WriteAgentHttpDebug("H1,H2,H4", "simhub_http_listeners_8888", new Dictionary<string, object>
+                {
+                    ["count"] = ep8888.Length,
+                    ["endpoints"] = string.Join(";", ep8888),
+                    ["simHubHttpListening"] = _simHubHttpListening,
+                    ["hint_localhost_ipv6"] = "If browser uses localhost and refuses, try http://127.0.0.1:8888/... (H2)"
+                });
+            }
+            // #endregion
+
             Task.Run(() =>
             {
+                const string pingUrl = "http://127.0.0.1:8888/Web/sim-steward-dash/index.html";
                 try
                 {
                     var response = DashboardPingClient
-                        .GetAsync("http://127.0.0.1:8888/Web/sim-steward-dash/index.html")
+                        .GetAsync(pingUrl)
                         .ConfigureAwait(false)
                         .GetAwaiter()
                         .GetResult();
                     _dashboardPingStatus = response.IsSuccessStatusCode
                         ? $"OK ({(int)response.StatusCode})"
                         : $"HTTP {(int)response.StatusCode}";
+                    // #region agent log
+                    WriteAgentHttpDebug("H3", "dashboard_ping_ok", new Dictionary<string, object>
+                    {
+                        ["url"] = pingUrl,
+                        ["statusCode"] = (int)response.StatusCode,
+                        ["success"] = response.IsSuccessStatusCode
+                    });
+                    // #endregion
                 }
                 catch (Exception ex)
                 {
                     _dashboardPingStatus = "Error: " + ex.Message;
+                    // #region agent log
+                    WriteAgentHttpDebug("H1,H3,H5", "dashboard_ping_error", new Dictionary<string, object>
+                    {
+                        ["url"] = pingUrl,
+                        ["error"] = ex.GetType().Name,
+                        ["message"] = ex.Message
+                    });
+                    // #endregion
                 }
             });
         }
+
+        // #region agent log
+        private void WriteAgentHttpDebug(string hypothesisId, string message, Dictionary<string, object> data)
+        {
+            try
+            {
+                var baseDir = !string.IsNullOrEmpty(_pluginDataPath)
+                    ? _pluginDataPath
+                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SimHubWpf", "PluginsData", "SimSteward");
+                Directory.CreateDirectory(baseDir);
+                var envPath = Environment.GetEnvironmentVariable("SIMSTEWARD_DEBUG_LOG_PATH");
+                var path = !string.IsNullOrWhiteSpace(envPath) ? envPath.Trim() : Path.Combine(baseDir, "debug-959be8.log");
+                var payload = new Dictionary<string, object>
+                {
+                    ["sessionId"] = "959be8",
+                    ["hypothesisId"] = hypothesisId,
+                    ["location"] = "SimStewardPlugin.cs:RefreshDependencyChecks",
+                    ["message"] = message,
+                    ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    ["data"] = data
+                };
+                File.AppendAllText(path, JsonConvert.SerializeObject(payload) + "\n", Encoding.UTF8);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+        // #endregion
 #endif
 
 #if SIMHUB_SDK
@@ -929,6 +1095,8 @@ namespace SimSteward.Plugin
                 "SimHubWpf", "PluginsData", "SimSteward");
 
             _debugMode = Environment.GetEnvironmentVariable("SIMSTEWARD_LOG_DEBUG") == "1";
+            _lokiBaseUrl = Environment.GetEnvironmentVariable("SIMSTEWARD_LOKI_URL")?.Trim() ?? "";
+            _grafanaBaseUrl = Environment.GetEnvironmentVariable("SIMSTEWARD_GRAFANA_URL")?.Trim() ?? "http://localhost:3000";
             _logger = new PluginLogger(_pluginDataPath, isDebugMode: _debugMode);
             _logger.SetSpineProvider(() => (_currentSessionId ?? "", _currentSessionSeq ?? "", _replayFrameNumEnd));
             _logger.WriteError += OnLogWriteError;
@@ -1045,7 +1213,19 @@ namespace SimSteward.Plugin
             _resourceSampler = new SystemMetricsSampler();
             _nextResourceSampleUtc = DateTime.UtcNow.AddSeconds(_resourceSampleIntervalSec);
 
-            _metricsTelemetry = PluginMetricsTelemetry.TryCreate(_logger, () => _lastResourceSample);
+            try
+            {
+                _metricsTelemetry = PluginMetricsTelemetry.TryCreate(_logger, () => _lastResourceSample);
+            }
+            catch (Exception ex)
+            {
+                _logger?.Structured("WARN", "simhub-plugin", "otel_metrics_load_failed",
+                    $"OTLP metrics disabled — assembly load failure: {ex.Message}",
+                    new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["exception_type"] = ex.GetType().Name,
+                    }, "lifecycle", null);
+            }
 
             RefreshDependencyChecks();
         }

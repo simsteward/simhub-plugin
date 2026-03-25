@@ -45,7 +45,7 @@ $streamObj = [ordered]@{
         component = 'simhub-plugin'
         level     = $lvl
     }
-    # Loki expects values as [[tsNs, line], ...] — leading comma forces a nested array in PowerShell.
+    # Loki expects values as [[tsNs, line], ...] - leading comma forces a nested array in PowerShell.
     values = @( , @( [string]$tsNs, $line ) )
 }
 $root = [ordered]@{ streams = @( $streamObj ) }
@@ -57,7 +57,7 @@ $lokiUser = $env:SIMSTEWARD_LOKI_USER
 $lokiPass = $env:SIMSTEWARD_LOKI_TOKEN
 $gatewayToken = $env:LOKI_PUSH_TOKEN
 if ($url -match 'grafana\.net' -and ([string]::IsNullOrWhiteSpace($lokiUser) -or [string]::IsNullOrWhiteSpace($lokiPass))) {
-    Write-Host "send-deploy-loki-marker: warn — SIMSTEWARD_LOKI_URL looks like Grafana Cloud but SIMSTEWARD_LOKI_USER / SIMSTEWARD_LOKI_TOKEN missing (Basic auth required)."
+    Write-Host "send-deploy-loki-marker: warn - SIMSTEWARD_LOKI_URL looks like Grafana Cloud but SIMSTEWARD_LOKI_USER / SIMSTEWARD_LOKI_TOKEN missing (Basic auth required)."
 }
 # Grafana Cloud Loki: Basic (instance user id + API token). Local loki-gateway: Bearer LOKI_PUSH_TOKEN. Local Loki :3100: often no auth.
 if (-not [string]::IsNullOrWhiteSpace($lokiUser) -and -not [string]::IsNullOrWhiteSpace($lokiPass)) {

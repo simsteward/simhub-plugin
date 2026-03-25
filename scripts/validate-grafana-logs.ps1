@@ -92,5 +92,5 @@ if ($d.error) { $msg += ", error=$($d.error)" }
 Write-Host $msg
 if ($d.status -eq "ok" -and $d.totalLines -eq 0 -and $lokiUrl -match "localhost") {
     Write-Host ""
-    Write-Host "No plugin logs in Loki. Confirm plugin-structured.jsonl is ingested to Loki (your shipper or Grafana Cloud). SimHub data dir e.g. $env:LOCALAPPDATA\SimHubWpf\PluginsData\SimSteward — see docs/observability-local.md." -ForegroundColor Yellow
+    Write-Host "No plugin logs in Loki. Confirm plugin-structured.jsonl is ingested to Loki (your shipper or Grafana Cloud). SimHub data dir e.g. $env:LOCALAPPDATA\SimHubWpf\PluginsData\SimSteward - see docs/observability-local.md." -ForegroundColor Yellow
 }

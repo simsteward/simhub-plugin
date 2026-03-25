@@ -82,5 +82,5 @@ if ($SampleLogs) {
 
 Write-Host "PASS: Local observability data wiped. Restart with npm run obs:up or obs:up:env."
 if ($Grafana) {
-    Write-Host "Note: Grafana volume cleared — re-run scripts/grafana-bootstrap.ps1 if you use GRAFANA_API_TOKEN."
+    Write-Host "Note: Grafana volume cleared - re-run scripts/grafana-bootstrap.ps1 if you use GRAFANA_API_TOKEN."
 }

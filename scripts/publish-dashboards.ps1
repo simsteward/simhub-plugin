@@ -34,7 +34,7 @@ $headers = @{
 
 $dashboardFiles = @(Get-ChildItem -Path $DashboardDir -Filter "*.json" -ErrorAction SilentlyContinue)
 if ($dashboardFiles.Count -eq 0) {
-    Write-Host "PASS: No dashboard JSON in $DashboardDir — nothing to publish."
+    Write-Host "PASS: No dashboard JSON in $DashboardDir - nothing to publish."
     exit 0
 }
 

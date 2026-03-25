@@ -15,7 +15,16 @@
       "mcp__contextstream__search",
       "mcp__contextstream__session",
       "mcp__contextstream__skill",
-      "mcp__contextstream__workspace"
+      "mcp__contextstream__workspace",
+      "WebSearch"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "sentry@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true
   }
 }

@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Sim Steward — SDK Data Capture Suite</title>
+<style>
+:root {
+  --bg: #080808; --surface: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.08);
+  --accent: #1f9cff; --green: #0ef272; --red: #ff5f5f; --yellow: #ffc840; --cyan: #0dd8ff;
+  --text: #f0f0f0; --muted: rgba(240,240,240,0.45);
+  --r: 10px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; background: var(--bg); color: var(--text); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 12px 14px 28px; display: flex; flex-direction: column; gap: 10px; }
+.topnav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.82rem; }
+.topnav a { color: var(--accent); text-decoration: none; }
+.topnav a:hover { text-decoration: underline; }
+.ws-pill { margin-left: auto; font-size: 0.72rem; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); }
+.ws-pill.ok  { color: var(--green); border-color: rgba(14,242,114,0.35); }
+.ws-pill.bad { color: var(--red);   border-color: rgba(255,95,95,0.35); }
+.banner { padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--border); background: rgba(255,200,64,0.06); font-size: 0.85rem; line-height: 1.4; }
+.banner.err { border-color: rgba(255,95,95,0.4); background: rgba(255,95,95,0.07); }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.row:last-child { margin-bottom: 0; }
+.btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text); font-size: 0.82rem; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
+.btn.primary.large { font-size: 0.92rem; font-weight: 600; padding: 11px 22px; border-width: 2px; }
+.btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
+.btn.sm { padding: 4px 10px; font-size: 0.72rem; }
+.progress-bar-wrap { height: 6px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
+.meta { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+.meta strong { color: var(--text); font-weight: 600; }
+.mono { font-family: "Courier New", monospace; font-size: 0.72rem; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.45} }
+.running-label { animation: pulse 1.4s ease-in-out infinite; color: var(--accent); }
+input[type="checkbox"] { accent-color: var(--accent); }
+
+/* ── Step panels ──────────────────────────────────────────────── */
+.step { position: relative; border-left: 2px solid transparent; padding-left: 2px; transition: border-color 0.3s ease, opacity 0.25s ease; }
+.step.active { border-left-color: var(--accent); }
+.step.done   { border-left-color: var(--green); }
+.step.future { opacity: 0.5; pointer-events: none; }
+.step-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); font-size: 0.6rem; font-weight: 700; color: var(--muted); transition: border-color 0.3s, color 0.3s; }
+.step.active .step-num { border-color: var(--accent); color: var(--accent); }
+.step.done .step-num   { border-color: var(--green); color: var(--green); }
+
+/* ── Signals ──────────────────────────────────────────────────── */
+.signals { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 0.78rem; }
+.sig { display: flex; align-items: center; gap: 4px; }
+.sig-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; transition: background 0.2s; }
+.sig-dot.ok { background: var(--green); }
+.sig-dot.warn { background: var(--yellow); }
+.sig-label { color: var(--muted); }
+
+/* ── Precondition card ────────────────────────────────────────── */
+.pc-tests { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.pc-row { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-radius: 6px; border: 1px solid transparent; transition: border-color 0.3s, background 0.4s; background: transparent; }
+.pc-row.running { border-color: rgba(31,156,255,0.25); background: linear-gradient(90deg, rgba(31,156,255,0.08) 0%, rgba(31,156,255,0.03) 60%, transparent 100%); }
+.pc-row.pass { background: rgba(14,242,114,0.05); }
+.pc-row.fail { background: rgba(255,95,95,0.08); border-color: rgba(255,95,95,0.25); }
+.pc-row.skip { background: rgba(255,200,64,0.03); }
+.pc-icon { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; transition: background 0.25s, color 0.25s; }
+.pc-icon.pending  { background: rgba(255,255,255,0.06); color: var(--muted); }
+.pc-icon.running  { background: rgba(31,156,255,0.15); color: var(--accent); }
+.pc-icon.pass     { background: rgba(14,242,114,0.15); color: var(--green); }
+.pc-icon.fail     { background: rgba(255,95,95,0.15); color: var(--red); }
+.pc-icon.skip     { background: rgba(255,200,64,0.1); color: var(--yellow); }
+.pc-name { font-size: 0.82rem; flex: 1; }
+.pc-level { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.pc-detail { font-size: 0.72rem; color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-btn { transition: opacity 0.2s, border-color 0.2s; }
+.scope-btn:not(.active) { opacity: 0.35; }
+.scope-btn.active { border-color: var(--accent); color: var(--accent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pc-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+/* ── Filter bar ───────────────────────────────────────────────── */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.filter-chip { padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.72rem; cursor: pointer; transition: all 0.15s; }
+.filter-chip:hover { border-color: var(--accent); color: var(--text); }
+.filter-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
+.filter-input { padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: var(--text); font-size: 0.72rem; outline: none; margin-left: auto; width: 160px; }
+.filter-input:focus { border-color: var(--accent); }
+.filter-input::placeholder { color: var(--muted); }
+
+/* ── Test selection cards ─────────────────────────────────────── */
+.test-groups { display: flex; flex-direction: column; gap: 14px; }
+.test-group-hdr { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.test-group-hdr input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.test-group-name { font-weight: 600; font-size: 0.88rem; }
+.test-group-count { font-size: 0.72rem; color: var(--muted); }
+.test-group-chevron { font-size: 0.75rem; color: var(--muted); transition: transform 0.25s ease; display: inline-block; }
+.test-group-chevron.collapsed { transform: rotate(-90deg); }
+.test-group-status { margin-left: auto; font-size: 0.72rem; font-weight: 600; }
+.test-cards { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; overflow: hidden; max-height: 2000px; transition: max-height 0.25s ease, margin-top 0.25s ease, opacity 0.2s ease; opacity: 1; }
+.test-cards.collapsed { max-height: 0; margin-top: 0; opacity: 0; }
+.test-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); cursor: default; transition: border-color 0.15s; }
+.test-card:hover { border-color: rgba(255,255,255,0.18); }
+.test-card.filtered-out { display: none; }
+.test-card input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; cursor: pointer; }
+.test-card-body { flex: 1; min-width: 0; }
+.test-card-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.test-id { font-family: "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.85rem; }
+.test-name { font-weight: 600; font-size: 0.85rem; }
+.test-desc { font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+.test-card-pill { margin-left: auto; flex-shrink: 0; }
+
+/* ── Status pills ─────────────────────────────────────────────── */
+.pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.pill.pending  { color: var(--muted);  background: rgba(255,255,255,0.06); }
+.pill.emitted  { color: var(--cyan);   background: rgba(13,216,255,0.12); }
+.pill.found    { color: var(--accent); background: rgba(31,156,255,0.12); }
+.pill.pass     { color: var(--green);  background: rgba(14,242,114,0.12); }
+.pill.fail     { color: var(--red);    background: rgba(255,95,95,0.12); }
+.pill.skip     { color: var(--yellow); background: rgba(255,200,64,0.12); }
+.pill.running  { color: var(--accent); background: rgba(31,156,255,0.12); animation: pulse 1.4s ease-in-out infinite; }
+.pill.tentative-pass { color: rgba(14,242,114,0.55); background: rgba(14,242,114,0.06); border: 1px dashed rgba(14,242,114,0.3); }
+.pill.tentative-fail { color: rgba(255,95,95,0.55);  background: rgba(255,95,95,0.06);  border: 1px dashed rgba(255,95,95,0.3); }
+.result-card.status-tentative-pass { border-color: rgba(14,242,114,0.1); }
+.result-card.status-tentative-fail { border-color: rgba(255,95,95,0.15); }
+
+/* ── Legend ───────────────────────────────────────────────────── */
+.legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.65rem; color: var(--muted); }
+.legend-item { display: flex; align-items: center; gap: 4px; cursor: help; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-swatch.sw-pending  { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); }
+.legend-swatch.sw-running  { background: rgba(31,156,255,0.12); border: 1px solid rgba(31,156,255,0.4); }
+.legend-swatch.sw-emitted  { background: rgba(13,216,255,0.12); border: 1px solid rgba(13,216,255,0.4); }
+.legend-swatch.sw-tentative-pass { background: rgba(14,242,114,0.06); border: 1px dashed rgba(14,242,114,0.3); }
+.legend-swatch.sw-tentative-fail { background: rgba(255,95,95,0.06);  border: 1px dashed rgba(255,95,95,0.3); }
+.legend-swatch.sw-found    { background: rgba(31,156,255,0.12); border: 1px solid rgba(31,156,255,0.4); }
+.legend-swatch.sw-pass     { background: rgba(14,242,114,0.12); border: 1px solid rgba(14,242,114,0.4); }
+.legend-swatch.sw-fail     { background: rgba(255,95,95,0.12);  border: 1px solid rgba(255,95,95,0.4); }
+.legend-swatch.sw-skip     { background: rgba(255,200,64,0.12); border: 1px solid rgba(255,200,64,0.35); }
+
+/* ── Sub-steps ───────────────────────────────────────────────── */
+.substeps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; font-size: 0.68rem; }
+.substep { display: flex; align-items: center; gap: 3px; color: var(--muted); transition: color 0.2s; }
+.substep.done { color: var(--green); }
+.substep.active { color: var(--accent); }
+.substep.fail { color: var(--red); }
+.substep-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.substep.active .substep-dot { animation: pulse 1.4s ease-in-out infinite; }
+
+/* ── Summary bar ──────────────────────────────────────────────── */
+.summary-bar { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.82rem; font-weight: 600; }
+.summary-bar .s-pass { color: var(--green); }
+.summary-bar .s-fail { color: var(--red); }
+.summary-bar .s-skip { color: var(--yellow); }
+.summary-bar .s-found { color: var(--accent); }
+.summary-bar .s-emitted { color: var(--cyan); }
+.summary-bar .s-pending { color: var(--muted); }
+
+/* ── Result cards ─────────────────────────────────────────────── */
+.result-cards { display: flex; flex-direction: column; gap: 8px; }
+.result-card { border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); overflow: hidden; }
+.result-card.status-fail { border-color: rgba(255,95,95,0.3); }
+.result-card.status-pass { border-color: rgba(14,242,114,0.15); }
+.result-card.status-running { border-color: rgba(31,156,255,0.3); }
+.result-main { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; cursor: pointer; }
+.result-main:hover { background: rgba(255,255,255,0.02); }
+.result-status { flex-shrink: 0; min-width: 70px; }
+.result-body { flex: 1; min-width: 0; }
+.result-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.result-id { font-family: "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.88rem; }
+.result-name { font-weight: 600; font-size: 0.88rem; }
+.result-desc { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+.result-meta strong { color: var(--text); font-weight: 600; }
+.result-error { color: var(--red); font-size: 0.82rem; margin-top: 4px; font-weight: 500; }
+.result-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; align-self: center; }
+.result-detail { padding: 10px 16px 14px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.25); font-size: 0.78rem; }
+.result-detail .mono { word-break: break-all; margin: 6px 0; line-height: 1.5; }
+
+/* ── KPI grid ─────────────────────────────────────────────────── */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 8px; }
+.kpi-cell { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+.kpi-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.kpi-val { font-size: 1.1rem; font-weight: 700; margin-top: 2px; }
+
+/* ── Test cases (incident cards) ──────────────────────────────── */
+.incident-card { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); font-size: 0.78rem; cursor: pointer; }
+.incident-card:hover { border-color: var(--accent); }
+.incident-card .ic-idx { font-weight: 700; color: var(--accent); }
+.incident-card .ic-reason { font-size: 0.68rem; color: var(--muted); }
+
+/* ── Grafana confirmation ─────────────────────────────────────── */
+.confirm-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 0.78rem; }
+.confirm-item { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); }
+.confirm-item .c-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.confirm-item .c-dot.ok { background: var(--green); }
+.confirm-item .c-dot.fail { background: var(--red); }
+.confirm-item .c-id { font-family: "Courier New", monospace; font-weight: 600; font-size: 0.72rem; }
+.confirm-summary { font-size: 0.82rem; font-weight: 600; }
+.explore-btn { display: none; }
+.explore-btn.show { display: inline-flex; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="topnav">
+    <a href="index.html">&larr; Sim Steward dashboard</a>
+    <span style="color:var(--muted)">SDK Data Capture Suite</span>
+    <span class="mono" id="lbl-version" style="color:var(--muted);font-size:0.65rem"></span>
+    <span class="ws-pill bad" id="ws-pill">WS &hellip;</span>
+  </nav>
+
+  <div class="banner err" id="guard-banner" hidden></div>
+
+  <!-- Step 1: Signals -->
+  <div class="step panel" id="step-1">
+    <div class="step-label"><span class="step-num">1</span> Signals</div>
+    <div class="signals" id="signals">
+      <span class="sig"><span class="sig-dot" id="sig-ws"></span><span class="sig-label">WS</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-plugin"></span><span class="sig-label">Plugin</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-simhub"></span><span class="sig-label">SimHub</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-grafana"></span><span class="sig-label">Grafana</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-replay"></span><span class="sig-label">Replay</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-full"></span><span class="sig-label">Full replay</span></span>
+      <span class="sig" id="sig-partial-wrap" hidden><span class="sig-dot warn"></span><span class="sig-label">Partial</span></span>
+    </div>
+  </div>
+
+  <!-- Step 2: Pre-test Conditions -->
+  <div class="step panel" id="step-2">
+    <div class="step-label"><span class="step-num">2</span> Pre-test Conditions</div>
+    <div class="row" style="margin-bottom:8px">
+      <span style="font-size:0.78rem;color:var(--muted)">Replay scope:</span>
+      <button class="btn sm scope-btn active" id="btn-scope-full" onclick="setScope('full')">Full replay</button>
+      <button class="btn sm scope-btn" id="btn-scope-partial" onclick="setScope('partial')">Partial replay</button>
+      <button class="btn primary sm" id="btn-preflight" onclick="runPreflight()" style="margin-left:auto">Check conditions</button>
+      <button class="btn sm" id="btn-preflight-reset" onclick="resetPreflight()">Reset</button>
+    </div>
+    <div style="margin-bottom:6px"><div class="progress-bar-wrap"><div class="progress-bar" id="preflight-progress" style="width:0%;transition:width 0.3s,background 0.3s"></div></div></div>
+    <div class="pc-tests" id="pc-tests"></div>
+    <div class="meta" style="margin-top:6px">
+      Preflight ID: <span class="mono" id="lbl-preflight-id">&mdash;</span>
+      &nbsp;&middot;&nbsp; Level: <strong id="lbl-preflight-level">0</strong>/3
+    </div>
+  </div>
+
+  <!-- Step 3: Test Selection -->
+  <div class="step panel" id="step-3">
+    <div class="step-label"><span class="step-num">3</span> Test Selection</div>
+    <div class="filter-bar" id="filter-bar"></div>
+    <div class="test-groups" id="test-select"></div>
+  </div>
+
+  <!-- Step 4: Execute -->
+  <div class="step panel" id="step-4">
+    <div class="step-label"><span class="step-num">4</span> Execute</div>
+    <div class="row">
+      <button class="btn primary large" id="btn-start" onclick="sendStart()" disabled>&#9654; Run Selected Tests</button>
+      <button class="btn danger" id="btn-cancel" onclick="sendAction('cancel')" disabled>&#10005; Cancel</button>
+    </div>
+    <div style="margin-top:8px">
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+      <div class="meta" style="margin-top:5px">
+        Phase: <strong id="lbl-phase">idle</strong>
+        &nbsp;&middot;&nbsp; Step: <strong id="lbl-step">&mdash;</strong>
+        &nbsp;&middot;&nbsp; Elapsed: <strong id="lbl-elapsed">&mdash;</strong>
+        &nbsp;&middot;&nbsp; Run ID: <span class="mono" id="lbl-runid">&mdash;</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5: Results -->
+  <div class="step panel" id="step-5">
+    <div class="step-label"><span class="step-num">5</span> Results</div>
+    <div class="legend" style="margin-bottom:10px">
+      <span class="legend-item" title="Test has not started yet"><span class="legend-swatch sw-pending"></span> Pending</span>
+      <span class="legend-item" title="Test is currently executing"><span class="legend-swatch sw-running"></span> Running</span>
+      <span class="legend-item" title="Log emitted to Loki, awaiting ingestion"><span class="legend-swatch sw-emitted"></span> Emitted</span>
+      <span class="legend-item" title="Plugin data suggests pass, awaiting Loki confirmation"><span class="legend-swatch sw-tentative-pass"></span> Tentative pass</span>
+      <span class="legend-item" title="Plugin data suggests failure, awaiting Loki confirmation"><span class="legend-swatch sw-tentative-fail"></span> Tentative fail</span>
+      <span class="legend-item" title="Log entry found in Loki, content not yet validated"><span class="legend-swatch sw-found"></span> Found</span>
+      <span class="legend-item" title="Found in Loki and content matches expected values"><span class="legend-swatch sw-pass"></span> Pass</span>
+      <span class="legend-item" title="Not found in Loki, or content does not match expected values"><span class="legend-swatch sw-fail"></span> Fail</span>
+      <span class="legend-item" title="Test was skipped (deselected or dependency not met)"><span class="legend-swatch sw-skip"></span> Skip</span>
+    </div>
+    <div class="summary-bar" id="summary-bar" style="margin-bottom:10px" hidden></div>
+    <div id="test-cases-panel" hidden>
+      <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px">Test Cases (Selected Incidents)</div>
+      <div class="row" id="test-cases-row" style="margin-bottom:12px"></div>
+    </div>
+    <div class="result-cards" id="results-body"></div>
+    <div id="kpi-panel" hidden style="margin-top:12px">
+      <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px">KPIs</div>
+      <div class="kpi-grid" id="kpi-grid"></div>
+    </div>
+  </div>
+
+  <!-- Step 6: Grafana Confirmation -->
+  <div class="step panel" id="step-6">
+    <div class="step-label"><span class="step-num">6</span> Grafana Confirmation</div>
+    <div class="row">
+      <button class="btn" id="btn-verify" onclick="sendAction('verify')" disabled title="Re-query Loki for latest results">&#8635; Re-verify</button>
+      <a class="btn primary explore-btn" id="btn-grafana" href="#" target="_blank" rel="noopener">&#11041; Open in Grafana</a>
+      <span class="confirm-summary" id="confirm-summary"></span>
+    </div>
+    <div class="confirm-grid" id="confirm-grid"></div>
+  </div>
+</div>
+
+<script>
+const WS_PORT = 19847;
+const LOKI_WAIT_MS = 15000;
+const GRAFANA_BASE = 'http://localhost:3000';
+let ws = null;
+let state = null;
+let _pluginSeen = false;
+let _wsOk = false;
+let _lokiPhaseStart = null;
+let _expandedRows = new Set();
+let _lastStepName = null;
+let _lastPhase = null;
+
+// ── Test metadata ────────────────────────────────────────────────────
+const TEST_META = {
+  T0:     { name: 'Ground Truth Capture',    desc: 'Seek to 3 incidents at 1x speed, capture ground-truth frame/driver/lap data', event: 'sdk_capture_ground_truth_incident', pass: '\u2265 3 events with frame/driver/lap', depends: null },
+  T1:     { name: 'Speed Sweep Detection',   desc: 'Replay at 1x/4x/8x/16x \u2014 detect incidents via session-flag rising edges', event: 'sdk_capture_speed_sample', pass: '\u2265 4 speed samples (one per speed)', depends: null },
+  T2:     { name: 'Variable Inventory',      desc: 'Snapshot all available iRacing SDK telemetry variables and their types', event: 'sdk_capture_variable_inventory', pass: 'variable_count > 0', depends: null },
+  T3:     { name: 'Player Data Snapshot',    desc: 'Capture the player\u2019s own car data (position, lap, fuel, times)', event: 'sdk_capture_player_snapshot', pass: 'driver_name non-empty', depends: null },
+  T4:     { name: 'Driver Roster',           desc: 'Read the full driver roster from session YAML (name, car #, iRating)', event: 'sdk_capture_driver_roster', pass: 'driver_count > 0', depends: null },
+  T5:     { name: 'Camera Switch',           desc: 'Switch camera to a different driver and verify CamCarIdx updates', event: 'sdk_capture_camera_switch_driver', pass: 'cam_group_num present', depends: null },
+  T5b:    { name: 'Camera View Cycle',       desc: 'Cycle through all camera groups and log each view', event: 'sdk_capture_camera_view_sample', pass: 'camera_group_name present', depends: null },
+  T6:     { name: 'Session Results',         desc: 'Read session results (positions, laps, incidents) from completed replay', event: 'sdk_capture_session_results', pass: '\u2265 1 event', depends: null },
+  T7:     { name: 'Incident Re-Seek',        desc: 'Re-seek to T0 ground-truth frames and verify frame numbers match', event: 'sdk_capture_incident_reseek', pass: '\u2265 3 events, \u2265 1 with frame_match=true', depends: 'T0' },
+  T8:     { name: 'FF Sweep',                desc: 'Trigger fast-forward incident sweep and verify index events are built', event: 'sdk_capture_ff_sweep_result', pass: 'gt_cars_in_index \u2265 1', depends: null },
+  T_DISC: { name: 'Data Point Discovery',   desc: 'Sweep all Tier 1+2 SDK variables at 4 replay positions for availability map', event: 'sdk_capture_data_discovery', pass: '\u2265 4 events (one per position)', depends: null },
+  T_60Hz: { name: '60 Hz Telemetry Dump',   desc: 'Record 17 telemetry channels at 60 Hz to JSONL (feature-flagged)', event: 'sdk_capture_60hz_summary', pass: 'ticks_recorded > 0', depends: 'SIMSTEWARD_60HZ_TEST_CAPTURE=1' },
+};
+
+// ── Sub-steps per test (maps to SuiteInternalStep enum in plugin) ────
+const TEST_SUBSTEPS = {
+  T0:     [{ step: 'T0_Rewind', label: 'Rewind' }, { step: 'T0_FrameZero', label: 'Frame zero' }, { step: 'T0_ScanCooldown', label: 'Scan incidents' }, { step: 'T0_SeekCapture', label: 'Seek' }, { step: 'T0_CaptureSettle', label: 'Capture' }],
+  T1:     [{ step: 'T1_Rewind', label: 'Rewind' }, { step: 'T1_FrameZero', label: 'Frame zero' }, { step: 'T1_Sweep', label: 'Speed sweep' }],
+  T2:     [{ step: 'T2', label: 'Capture variables' }],
+  T3:     [{ step: 'T3', label: 'Capture player' }],
+  T4:     [{ step: 'T4', label: 'Read roster' }],
+  T5:     [{ step: 'T5_Switch', label: 'Switch camera' }, { step: 'T5_Settle', label: 'Verify' }],
+  T5b:    [{ step: 'T5b_Seek', label: 'Seek' }, { step: 'T5b_Cycle', label: 'Cycle cameras' }, { step: 'T5b_Settle', label: 'Confirm' }],
+  T6:     [{ step: 'T6', label: 'Read results' }],
+  T7:     [{ step: 'T7_Rewind', label: 'Rewind' }, { step: 'T7_FrameZero', label: 'Frame zero' }, { step: 'T7_Cooldown', label: 'Re-seek' }],
+  T8:     [{ step: 'T8_Trigger', label: 'Trigger sweep' }, { step: 'T8_Poll', label: 'Poll' }],
+  T_DISC: [{ step: 'TDISC_Seek', label: 'Seek' }, { step: 'TDISC_Settle', label: 'Settle' }, { step: 'TDISC_Capture', label: 'Capture' }],
+  T_60Hz: [{ step: '_60hz_record', label: 'Recording' }],
+};
+
+function getActiveTestFromStep(stepName) {
+  if (!stepName) return null;
+  if (stepName.startsWith('TDISC')) return 'T_DISC';
+  if (stepName.startsWith('T5b')) return 'T5b';
+  var m = stepName.match(/^(T\d+)/);
+  return m ? m[1] : null;
+}
+
+// ── Tentative pass/fail from KPI values (before Loki confirms) ───────
+function getTentativeStatus(r) {
+  if (!r || r.status !== 'emitted') return null;
+  var kl = (r.kpiLabel || '').toLowerCase();
+  var kv = (r.kpiValue || '').trim();
+  var num = parseFloat(kv);
+  switch (r.testId) {
+    case 'T0':   return (!isNaN(num) && num >= 3) ? 'tentative-pass' : 'tentative-fail';
+    case 'T1':   return (kv && !kv.startsWith('0')) ? 'tentative-pass' : 'tentative-fail';
+    case 'T2':   return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T3':   return kv ? 'tentative-pass' : 'tentative-fail';
+    case 'T4':   return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T5':   return (kv === 'true') ? 'tentative-pass' : 'tentative-fail';
+    case 'T5b':  return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T6':   return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T7':   return (kv && !kv.startsWith('0')) ? 'tentative-pass' : 'tentative-fail';
+    case 'T8':   return (!isNaN(num) && num >= 1) ? 'tentative-pass' : 'tentative-fail';
+    case 'T_DISC': return (!isNaN(num) && num >= 4) ? 'tentative-pass' : 'tentative-fail';
+    case 'T_60Hz': return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    default:     return null;
+  }
+}
+
+function buildSubstepsHtml(testId, currentStepName, testStatus) {
+  var subs = TEST_SUBSTEPS[testId];
+  if (!subs || subs.length <= 1) return '';
+  var activeTest = getActiveTestFromStep(currentStepName);
+  var isThisTestActive = activeTest === testId;
+  var currentIdx = isThisTestActive ? subs.findIndex(s => s.step === currentStepName) : -1;
+  var html = '<div class="substeps">';
+  subs.forEach(function(s, i) {
+    var cls = 'substep';
+    var icon = '\u25CB'; // ○
+    if (testStatus === 'pass') { cls += ' done'; icon = '\u2713'; }
+    else if (testStatus === 'fail') { cls += ' fail'; icon = '\u2717'; }
+    else if (testStatus === 'skip') { cls += ''; icon = '\u2298'; }
+    else if (isThisTestActive) {
+      if (i < currentIdx) { cls += ' done'; icon = '\u2713'; }
+      else if (i === currentIdx) { cls += ' active'; icon = ''; }
+      else { cls += ''; }
+    }
+    html += '<span class="' + cls + '">';
+    if (cls.includes('active')) html += '<span class="substep-dot"></span>';
+    else html += icon + ' ';
+    html += esc(s.label) + '</span>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// ── Test groups & selection ──────────────────────────────────────────
+const TEST_GROUPS = [
+  { id: 'incident', label: 'Incident Capture', tests: ['T0', 'T1'] },
+  { id: 'sdk',      label: 'SDK Data Capture', tests: ['T2', 'T3', 'T4'] },
+  { id: 'camera',   label: 'Camera Control',   tests: ['T5', 'T5b'] },
+  { id: 'session',  label: 'Session & Validation', tests: ['T6', 'T7', 'T8'] },
+  { id: 'disc',     label: 'Data Discovery',   tests: ['T_DISC'] },
+  { id: '60hz',     label: 'High-Rate Capture', tests: ['T_60Hz'] },
+];
+const ALL_TEST_IDS = TEST_GROUPS.flatMap(g => g.tests);
+let selectedTests = new Set(ALL_TEST_IDS);
+
+// ── Filter bar ───────────────────────────────────────────────────────
+function buildFilterBar() {
+  const bar = document.getElementById('filter-bar');
+  bar.innerHTML = '';
+  let activeGroupFilter = null;
+
+  TEST_GROUPS.forEach(g => {
+    const chip = document.createElement('button');
+    chip.className = 'filter-chip active';
+    chip.textContent = g.label;
+    chip.id = 'fchip-' + g.id;
+    chip.onclick = () => {
+      const cardsEl = document.getElementById('cards-' + g.id);
+      if (cardsEl) {
+        cardsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        // Brief highlight
+        const hdr = document.getElementById('grp-hdr-' + g.id);
+        if (hdr) { hdr.style.background = 'rgba(31,156,255,0.08)'; setTimeout(() => hdr.style.background = '', 600); }
+      }
+    };
+    bar.appendChild(chip);
+  });
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Filter tests\u2026';
+  input.className = 'filter-input';
+  input.id = 'filter-input';
+  input.addEventListener('input', () => filterTestCards(input.value));
+  bar.appendChild(input);
+}
+
+function filterTestCards(query) {
+  const q = query.toLowerCase().trim();
+  ALL_TEST_IDS.forEach(id => {
+    const card = document.getElementById('tcard-' + id);
+    if (!card) return;
+    if (!q) { card.classList.remove('filtered-out'); return; }
+    const meta = TEST_META[id] || {};
+    const text = (id + ' ' + (meta.name || '') + ' ' + (meta.desc || '')).toLowerCase();
+    card.classList.toggle('filtered-out', !text.includes(q));
+  });
+}
+
+// ── Test selection ───────────────────────────────────────────────────
+function buildTestSelect() {
+  const el = document.getElementById('test-select');
+  el.innerHTML = '';
+  TEST_GROUPS.forEach(g => {
+    const section = document.createElement('div');
+
+    const hdr = document.createElement('div');
+    hdr.className = 'test-group-hdr';
+    hdr.id = 'grp-hdr-' + g.id;
+    const groupCb = document.createElement('input');
+    groupCb.type = 'checkbox'; groupCb.checked = true; groupCb.id = 'grp-' + g.id;
+    groupCb.addEventListener('click', (e) => e.stopPropagation());
+    groupCb.addEventListener('change', () => {
+      g.tests.forEach(t => {
+        selectedTests[groupCb.checked ? 'add' : 'delete'](t);
+        const cb = document.getElementById('cb-' + t);
+        if (cb) { cb.checked = groupCb.checked; cb.disabled = false; }
+      });
+      enforceT0T7();
+    });
+    hdr.appendChild(groupCb);
+    const chevron = document.createElement('span');
+    chevron.className = 'test-group-chevron';
+    chevron.textContent = '\u25BE';
+    hdr.appendChild(chevron);
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'test-group-name';
+    nameSpan.textContent = g.label;
+    hdr.appendChild(nameSpan);
+    const countSpan = document.createElement('span');
+    countSpan.className = 'test-group-count';
+    countSpan.textContent = g.tests.length + (g.tests.length === 1 ? ' test' : ' tests');
+    hdr.appendChild(countSpan);
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'test-group-status';
+    statusSpan.id = 'grp-status-' + g.id;
+    hdr.appendChild(statusSpan);
+    section.appendChild(hdr);
+
+    const cards = document.createElement('div');
+    cards.className = 'test-cards';
+    cards.id = 'cards-' + g.id;
+
+    hdr.addEventListener('click', () => {
+      cards.classList.toggle('collapsed');
+      chevron.classList.toggle('collapsed');
+    });
+
+    g.tests.forEach(t => {
+      const meta = TEST_META[t] || { name: t, desc: '' };
+      const card = document.createElement('div');
+      card.className = 'test-card';
+      card.id = 'tcard-' + t;
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = true; cb.id = 'cb-' + t;
+      cb.addEventListener('change', () => {
+        selectedTests[cb.checked ? 'add' : 'delete'](t);
+        updateGroupState(g);
+        enforceT0T7();
+      });
+      card.appendChild(cb);
+
+      const body = document.createElement('div');
+      body.className = 'test-card-body';
+      body.innerHTML = '<div class="test-card-header"><span class="test-id">' + esc(t) + '</span><span class="test-name">' + esc(meta.name) + '</span></div><div class="test-desc">' + esc(meta.desc) + '</div>';
+      card.appendChild(body);
+
+      const pillWrap = document.createElement('div');
+      pillWrap.className = 'test-card-pill';
+      pillWrap.id = 'sel-pill-' + t;
+      card.appendChild(pillWrap);
+
+      cards.appendChild(card);
+    });
+    section.appendChild(cards);
+    el.appendChild(section);
+  });
+}
+
+function updateGroupState(g) {
+  const gcb = document.getElementById('grp-' + g.id);
+  if (!gcb) return;
+  const checked = g.tests.filter(t => selectedTests.has(t)).length;
+  gcb.checked = checked === g.tests.length;
+  gcb.indeterminate = checked > 0 && checked < g.tests.length;
+}
+
+function enforceT0T7() {
+  const t7cb = document.getElementById('cb-T7');
+  if (!t7cb) return;
+  if (!selectedTests.has('T0')) {
+    selectedTests.delete('T7');
+    t7cb.checked = false;
+    t7cb.disabled = true;
+  } else {
+    t7cb.disabled = false;
+  }
+  updateGroupState(TEST_GROUPS[3]);
+}
+
+function updateSelectionPills(results, currentStepName) {
+  if (!results || !results.length) return;
+  var activeTest = getActiveTestFromStep(currentStepName);
+  results.forEach(r => {
+    const el = document.getElementById('sel-pill-' + r.testId);
+    if (!el) return;
+    var isRunning = activeTest === r.testId && r.status === 'pending';
+    var tentative = getTentativeStatus(r);
+    var display = isRunning ? 'running' : (tentative || r.status);
+    if (display !== 'pending') el.innerHTML = '<span class="pill ' + display + '">' + display.replace('tentative-', '\u2248 ') + '</span>';
+    else el.innerHTML = '';
+  });
+  TEST_GROUPS.forEach(g => {
+    const statusEl = document.getElementById('grp-status-' + g.id);
+    if (!statusEl) return;
+    const groupResults = results.filter(r => g.tests.includes(r.testId));
+    if (!groupResults.length) { statusEl.textContent = ''; return; }
+    const pass = groupResults.filter(r => r.status === 'pass').length;
+    const fail = groupResults.filter(r => r.status === 'fail').length;
+    const parts = [];
+    if (pass) parts.push('<span style="color:var(--green)">' + pass + ' pass</span>');
+    if (fail) parts.push('<span style="color:var(--red)">' + fail + ' fail</span>');
+    statusEl.innerHTML = parts.join(' / ');
+  });
+}
+
+// ── Precondition mini-tests ──────────────────────────────────────────
+const PC_TESTS = [
+  { id: 'PC_WS',        name: 'WebSocket connected',    level: 1 },
+  { id: 'PC_PLUGIN',    name: 'Plugin responding',       level: 1 },
+  { id: 'PC_SIMHUB',    name: 'SimHub HTTP server',      level: 1 },
+  { id: 'PC_GRAFANA',   name: 'Grafana/Loki configured', level: 1 },
+  { id: 'PC_IRACING',   name: 'iRacing connected',       level: 1 },
+  { id: 'PC_REPLAY',    name: 'Replay mode active',      level: 1 },
+  { id: 'PC_SESSIONS',  name: 'Session map',              level: 1 },
+  { id: 'PC_CHECKERED', name: 'Session completed',       level: 2 },
+  { id: 'PC_RESULTS',   name: 'Results populated',       level: 2 },
+  { id: 'PC_LOKI_RT',   name: 'Loki roundtrip',          level: 3 },
+];
+let _replayScope = 'full';
+
+function buildPreconditionRows() {
+  const el = document.getElementById('pc-tests');
+  el.innerHTML = '';
+  PC_TESTS.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'pc-row';
+    row.id = 'pc-row-' + t.id;
+    row.innerHTML =
+      '<div class="pc-icon pending" id="pc-icon-' + t.id + '">&mdash;</div>' +
+      '<span class="pc-name">' + esc(t.name) + '</span>' +
+      '<span class="pc-level">L' + t.level + '</span>' +
+      '<span class="pc-detail" id="pc-detail-' + t.id + '"></span>';
+    el.appendChild(row);
+  });
+}
+
+function updatePreconditionCard(pf) {
+  if (!pf) return;
+  const tests = pf.miniTests || [];
+  const testMap = {};
+  tests.forEach(t => { testMap[t.id] = t; });
+
+  PC_TESTS.forEach(meta => {
+    const t = testMap[meta.id];
+    const icon = document.getElementById('pc-icon-' + meta.id);
+    const detail = document.getElementById('pc-detail-' + meta.id);
+    const row = document.getElementById('pc-row-' + meta.id);
+    if (!icon) return;
+
+    const status = t ? t.status : 'pending';
+    icon.className = 'pc-icon ' + status;
+    row.className = 'pc-row' + (status !== 'pending' ? ' ' + status : '');
+
+    // Icon content
+    if (status === 'running') icon.innerHTML = '<span class="pc-spinner"></span>';
+    else if (status === 'pass') icon.textContent = '\u2713';
+    else if (status === 'fail') icon.textContent = '\u2717';
+    else if (status === 'skip') icon.textContent = '\u2014';
+    else icon.textContent = '\u2014';
+
+    if (detail) detail.textContent = t ? (t.detail || '') : '';
+  });
+
+  // Progress bar
+  var pfBar = document.getElementById('preflight-progress');
+  if (pfBar) {
+    var total = tests.length || 1;
+    var done = tests.filter(function(t) { return t.status === 'pass' || t.status === 'skip'; }).length;
+    var failed = tests.some(function(t) { return t.status === 'fail'; });
+    var pct = Math.round((done / total) * 100);
+    if (failed) {
+      // Include the failed test in the fill, then stop
+      var failedCount = tests.filter(function(t) { return t.status === 'fail'; }).length;
+      pct = Math.round(((done + failedCount) / total) * 100);
+      pfBar.style.width = pct + '%';
+      pfBar.style.background = 'var(--red)';
+    } else if (pf.phase === 'complete' && !failed) {
+      pfBar.style.width = '100%';
+      pfBar.style.background = 'var(--green)';
+    } else {
+      pfBar.style.width = pct + '%';
+      pfBar.style.background = 'var(--accent)';
+    }
+  }
+
+  // Correlation ID + level
+  document.getElementById('lbl-preflight-id').textContent =
+    pf.correlationId ? pf.correlationId.slice(0, 8) + '\u2026' : '\u2014';
+  document.getElementById('lbl-preflight-level').textContent = pf.level || 0;
+
+  // Scope toggle sync
+  const scopeFull = document.getElementById('btn-scope-full');
+  const scopePartial = document.getElementById('btn-scope-partial');
+  if (pf.replayScope === 'partial') {
+    scopeFull.classList.remove('active');
+    scopePartial.classList.add('active');
+  } else {
+    scopeFull.classList.add('active');
+    scopePartial.classList.remove('active');
+  }
+
+  // Button text
+  const btn = document.getElementById('btn-preflight');
+  if (pf.allPassed && pf.level >= 3) {
+    btn.textContent = 'All passed \u2713';
+    btn.disabled = true;
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'var(--green)';
+  } else if (pf.phase === 'running') {
+    btn.textContent = 'Checking\u2026';
+    btn.disabled = true;
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  } else if (pf.level >= 1 && pf.level < 3) {
+    btn.textContent = 'Deepen check (L' + (pf.level + 1) + ')';
+    btn.disabled = false;
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  } else {
+    btn.textContent = 'Check conditions';
+    btn.disabled = false;
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+}
+
+function setScope(scope) {
+  _replayScope = scope;
+  document.getElementById('btn-scope-full').classList.toggle('active', scope === 'full');
+  document.getElementById('btn-scope-partial').classList.toggle('active', scope === 'partial');
+  send({ action: 'data_capture_suite', arg: 'preflight_scope:' + scope });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-scope-' + scope, event_type: 'click', message: 'Set replay scope: ' + scope });
+}
+
+function runPreflight() {
+  var diag = state && state.diagnostics || {};
+  if (!diag.irsdkConnected) {
+    var btn = document.getElementById('btn-preflight');
+    btn.textContent = '\u26A0 iRacing not connected';
+    btn.style.color = 'var(--red)';
+    btn.style.borderColor = 'var(--red)';
+    setTimeout(function() { btn.textContent = 'Check conditions'; btn.style.color = ''; btn.style.borderColor = ''; }, 3000);
+    return;
+  }
+  var btn = document.getElementById('btn-preflight');
+  btn.textContent = 'Checking\u2026';
+  btn.disabled = true;
+  // Set all precondition rows to running state immediately
+  var rows = document.querySelectorAll('.pc-row');
+  rows.forEach(function(row) {
+    row.classList.add('running');
+    var icon = row.querySelector('.pc-icon');
+    if (icon) { icon.className = 'pc-icon running'; icon.textContent = '\u25CB'; }
+  });
+  send({ action: 'data_capture_suite', arg: 'preflight' });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-preflight', event_type: 'click', message: 'Run preflight check' });
+}
+
+function resetPreflight() {
+  send({ action: 'data_capture_suite', arg: 'preflight_reset' });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-preflight-reset', event_type: 'click', message: 'Reset preflight' });
+  buildPreconditionRows();
+  var pfBar = document.getElementById('preflight-progress');
+  if (pfBar) { pfBar.style.width = '0%'; pfBar.style.background = 'var(--accent)'; }
+  var idEl = document.getElementById('lbl-preflight-id');
+  if (idEl) idEl.textContent = '\u2014';
+  var lvlEl = document.getElementById('lbl-preflight-level');
+  if (lvlEl) lvlEl.textContent = '0';
+  var btn = document.getElementById('btn-preflight');
+  btn.textContent = 'Check conditions';
+  btn.disabled = false;
+  btn.style.color = '';
+  btn.style.borderColor = '';
+  // Flash the reset button briefly
+  var resetBtn = document.getElementById('btn-preflight-reset');
+  if (resetBtn) { resetBtn.style.borderColor = 'var(--accent)'; setTimeout(function() { resetBtn.style.borderColor = ''; }, 400); }
+}
+
+buildPreconditionRows();
+buildFilterBar();
+buildTestSelect();
+
+// ── WebSocket ────────────────────────────────────────────────────────
+function connect() {
+  ws = new WebSocket('ws://127.0.0.1:' + WS_PORT);
+  ws.addEventListener('open', () => { _wsOk = true; setPill(true); });
+  ws.addEventListener('close', () => { _wsOk = false; _pluginSeen = false; setPill(false); setTimeout(connect, 2000); });
+  ws.addEventListener('message', ev => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'state') { _pluginSeen = true; handleState(msg); }
+    } catch {}
+  });
+}
+
+function setPill(ok) {
+  const p = document.getElementById('ws-pill');
+  p.textContent = ok ? 'WS connected' : 'WS disconnected';
+  p.className = 'ws-pill ' + (ok ? 'ok' : 'bad');
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify(obj));
+}
+
+function sendAction(verb) {
+  if (verb === 'cancel') _lokiPhaseStart = null;
+  send({ action: 'data_capture_suite', arg: verb });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-' + verb, event_type: 'click', message: 'Data capture suite: ' + verb });
+}
+
+function resetDashboardForNewRun() {
+  _lokiPhaseStart = null;
+  _lastStepName = null;
+  _lastPhase = null;
+  _expandedRows.clear();
+  document.getElementById('lbl-phase').textContent = 'starting\u2026';
+  document.getElementById('lbl-phase').className = 'running-label';
+  document.getElementById('lbl-step').textContent = '\u2014';
+  document.getElementById('lbl-elapsed').textContent = '0.0s';
+  document.getElementById('lbl-runid').textContent = '\u2014';
+  document.getElementById('progress-bar').style.width = '0%';
+  renderIdleResults();
+  document.getElementById('summary-bar').hidden = true;
+  document.getElementById('kpi-panel').hidden = true;
+  document.getElementById('test-cases-panel').hidden = true;
+  document.getElementById('btn-grafana').classList.remove('show');
+  document.getElementById('confirm-grid').innerHTML = '';
+  document.getElementById('confirm-summary').textContent = '';
+}
+
+function sendStart() {
+  resetDashboardForNewRun();
+  const skip = ALL_TEST_IDS.filter(id => !selectedTests.has(id));
+  const arg = skip.length ? 'start:' + skip.join(',') : 'start';
+  send({ action: 'data_capture_suite', arg });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-start', event_type: 'click', message: 'Data capture suite: ' + arg });
+}
+
+// ── Grafana deep link builder ────────────────────────────────────────
+function buildGrafanaUrl(runId, eventName) {
+  if (!runId) return '';
+  var logql = '{app="sim-steward"} |json |test_run_id="' + runId + '"';
+  if (eventName) logql += ' |event="' + eventName + '"';
+  var left = JSON.stringify({
+    datasource: 'loki_local',
+    queries: [{ refId: 'A', expr: logql, queryType: 'range' }],
+    range: { from: 'now-1h', to: 'now' }
+  });
+  return GRAFANA_BASE + '/explore?orgId=1&left=' + encodeURIComponent(left);
+}
+
+// ── Step state management ────────────────────────────────────────────
+function updateStepStates(phase, ready, preflightPhase) {
+  const steps = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5', 'step-6'];
+
+  function setStep(id, state) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('active', 'done', 'future');
+    if (state) el.classList.add(state);
+  }
+
+  if (!phase || phase === 'idle') {
+    setStep('step-1', ready ? 'done' : 'active');
+    setStep('step-2', preflightPhase === 'complete' ? 'done' : (ready ? 'active' : null));
+    setStep('step-3', 'active');
+    setStep('step-4', null);
+    setStep('step-5', null);
+    setStep('step-6', 'future');
+  } else if (phase === 'running') {
+    setStep('step-1', 'done');
+    setStep('step-2', 'done');
+    setStep('step-3', 'done');
+    setStep('step-4', 'active');
+    setStep('step-5', null);
+    setStep('step-6', 'future');
+  } else if (phase === 'awaitingloki') {
+    setStep('step-1', 'done');
+    setStep('step-2', 'done');
+    setStep('step-3', 'done');
+    setStep('step-4', 'done');
+    setStep('step-5', 'active');
+    setStep('step-6', 'future');
+  } else if (phase === 'complete') {
+    setStep('step-1', 'done');
+    setStep('step-2', 'done');
+    setStep('step-3', 'done');
+    setStep('step-4', 'done');
+    setStep('step-5', 'done');
+    setStep('step-6', 'active');
+  } else if (phase === 'cancelled') {
+    setStep('step-1', 'done');
+    setStep('step-2', 'done');
+    setStep('step-3', 'done');
+    setStep('step-4', null);
+    setStep('step-5', null);
+    setStep('step-6', 'future');
+  }
+}
+
+// ── State handling ───────────────────────────────────────────────────
+function handleState(msg) {
+  state = msg;
+  const suite  = msg.dataCaptureSuite;
+  const diag   = msg.diagnostics || {};
+  const replay = msg.pluginMode === 'Replay';
+
+  // Version display
+  var verEl = document.getElementById('lbl-version');
+  if (verEl && msg.pluginVersion) verEl.textContent = 'v' + msg.pluginVersion;
+
+  // Signals
+  setSig('sig-ws', _wsOk);
+  setSig('sig-plugin', _pluginSeen);
+  setSig('sig-simhub', diag.simHubHttpListening);
+  setSig('sig-grafana', diag.grafanaConfigured);
+  setSig('sig-replay', replay);
+  setSig('sig-full', diag.replaySessionCompleted);
+  document.getElementById('sig-partial-wrap').hidden = !(replay && !diag.replaySessionCompleted);
+
+  // Preflight / Precondition card
+  const pf = msg.preflight;
+  const pfPhase = pf ? pf.phase : 'idle';
+  updatePreconditionCard(pf);
+
+  // Also update signal dots from preflight results
+  if (pf && pf.phase === 'complete') {
+    setSig('sig-grafana', pf.grafanaOk);
+    setSig('sig-simhub', pf.simHubOk);
+    setSig('sig-full', pf.checkeredOk);
+  }
+
+  const preflightPassed = pf && pf.allPassed;
+  const ready = _wsOk && _pluginSeen && diag.simHubHttpListening && diag.grafanaConfigured && replay && diag.replaySessionCompleted && preflightPassed;
+
+  // Guard banner
+  const guard = document.getElementById('guard-banner');
+  if (!diag.irsdkConnected || !replay) {
+    guard.hidden = false;
+    guard.textContent = !diag.irsdkConnected
+      ? '\u26A0 iRacing not connected. Load a race replay to use this suite.'
+      : '\u26A0 Not in Replay mode. Open a race replay in iRacing.';
+  } else {
+    guard.hidden = true;
+  }
+
+  const phase = suite ? (suite.phase || 'idle') : 'idle';
+  updateStepStates(phase, ready, pfPhase);
+
+  if (!suite) {
+    document.getElementById('btn-start').disabled = !ready;
+    return;
+  }
+
+  const running = phase === 'running';
+  const waiting = phase === 'awaitingloki';
+  const done    = phase === 'complete' || phase === 'cancelled';
+  const idle    = phase === 'idle';
+
+  document.getElementById('btn-start').disabled  = !ready || running || waiting;
+  document.getElementById('btn-cancel').disabled = !running && !waiting;
+  document.getElementById('btn-verify').disabled = idle || running;
+
+  document.getElementById('lbl-phase').textContent = phase;
+  document.getElementById('lbl-phase').className   = running ? 'running-label' : '';
+
+  // Loki countdown
+  if (waiting) {
+    if (!_lokiPhaseStart) _lokiPhaseStart = Date.now();
+    const remaining = Math.max(0, Math.ceil((LOKI_WAIT_MS - (Date.now() - _lokiPhaseStart)) / 1000));
+    document.getElementById('lbl-step').textContent = 'Loki ingestion wait\u2026 ' + remaining + 's';
+  } else {
+    _lokiPhaseStart = null;
+    document.getElementById('lbl-step').textContent = suite.currentStepName || '\u2014';
+  }
+
+  document.getElementById('lbl-elapsed').textContent = suite.elapsedMs > 0
+    ? (suite.elapsedMs / 1000).toFixed(1) + 's' : '\u2014';
+  document.getElementById('lbl-runid').textContent = suite.testRunId
+    ? suite.testRunId.slice(0, 8) + '\u2026' : '\u2014';
+
+  const pct = suite.totalSteps > 0
+    ? Math.min(100, Math.round((suite.currentStep / suite.totalSteps) * 100)) : 0;
+  document.getElementById('progress-bar').style.width = (done ? 100 : pct) + '%';
+
+  // Grafana link
+  const gBtn = document.getElementById('btn-grafana');
+  const suiteGrafanaUrl = suite.grafanaExploreUrl || buildGrafanaUrl(suite.testRunId);
+  if (suiteGrafanaUrl && suite.testRunId) { gBtn.href = suiteGrafanaUrl; gBtn.classList.add('show'); }
+  else { gBtn.classList.remove('show'); }
+
+  // Results + summary
+  const results = suite.testResults || [];
+  const stepName = suite.currentStepName || null;
+  const stepChanged = stepName !== _lastStepName || phase !== (_lastPhase || 'idle');
+  _lastStepName = stepName;
+  _lastPhase = phase;
+
+  renderSummary(results);
+  if (stepChanged) renderResults(results, suite.testRunId, running ? stepName : null);
+  renderKpis(results);
+  renderTestCases(suite.selectedIncidents);
+  updateSelectionPills(results, stepName);
+  renderConfirmation(results, suite.testRunId);
+}
+
+function setSig(id, ok) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'sig-dot' + (ok ? ' ok' : '');
+}
+
+
+// ── Summary bar ──────────────────────────────────────────────────────
+function renderSummary(results) {
+  const bar = document.getElementById('summary-bar');
+  if (!results.length) { bar.hidden = true; return; }
+  bar.hidden = false;
+  const counts = { pass: 0, fail: 0, skip: 0, found: 0, emitted: 0, pending: 0, tpass: 0, tfail: 0 };
+  results.forEach(r => {
+    var t = getTentativeStatus(r);
+    if (t === 'tentative-pass') counts.tpass++;
+    else if (t === 'tentative-fail') counts.tfail++;
+    else if (counts[r.status] !== undefined) counts[r.status]++;
+  });
+  bar.innerHTML =
+    '<span class="s-pass">\u2713 ' + counts.pass + ' pass</span>' +
+    '<span class="s-fail">\u2717 ' + counts.fail + ' fail</span>' +
+    (counts.tpass ? '<span style="color:rgba(14,242,114,0.55)">\u2248 ' + counts.tpass + ' tentative</span>' : '') +
+    (counts.tfail ? '<span style="color:rgba(255,95,95,0.55)">\u2248 ' + counts.tfail + ' tentative fail</span>' : '') +
+    '<span class="s-skip">\u2298 ' + counts.skip + ' skip</span>' +
+    '<span class="s-found">\u25CF ' + counts.found + ' found</span>' +
+    '<span class="s-emitted">\u25CF ' + counts.emitted + ' emitted</span>' +
+    '<span class="s-pending">\u25CB ' + counts.pending + ' pending</span>';
+}
+
+// ── Idle result cards ────────────────────────────────────────────────
+function renderIdleResults(currentStepName) {
+  const container = document.getElementById('results-body');
+  container.innerHTML = '';
+  const activeTest = getActiveTestFromStep(currentStepName);
+  ALL_TEST_IDS.forEach(id => {
+    const meta = TEST_META[id] || { name: id, desc: '', event: '', pass: '', depends: null };
+    const isRunning = activeTest === id;
+    const pillStatus = isRunning ? 'running' : 'pending';
+    const card = document.createElement('div');
+    card.className = 'result-card status-' + pillStatus;
+
+    const main = document.createElement('div');
+    main.className = 'result-main';
+    main.onclick = () => toggleDetail(id);
+    main.innerHTML =
+      '<div class="result-status"><span class="pill ' + pillStatus + '">' + pillStatus + '</span></div>' +
+      '<div class="result-body">' +
+        '<div class="result-header">' +
+          '<span class="result-id">' + esc(id) + '</span>' +
+          '<span class="result-name">' + esc(meta.name) + '</span>' +
+        '</div>' +
+        '<div class="result-desc">' + esc(meta.desc) + '</div>' +
+        '<div class="result-meta">' +
+          '<span>Event: <strong class="mono">' + esc(meta.event) + '</strong></span>' +
+          '<span>Pass: <strong>' + esc(meta.pass) + '</strong></span>' +
+          (meta.depends ? '<span>Depends: <strong>' + esc(meta.depends) + '</strong></span>' : '') +
+        '</div>' +
+        buildSubstepsHtml(id, currentStepName, 'pending') +
+      '</div>';
+    card.appendChild(main);
+
+    const detail = document.createElement('div');
+    detail.className = 'result-detail';
+    detail.id = 'detail-' + id;
+    detail.hidden = !_expandedRows.has(id);
+    detail.innerHTML =
+      '<div><strong>Loki event:</strong> <span class="mono">' + esc(meta.event) + '</span></div>' +
+      '<div><strong>Pass criteria:</strong> ' + esc(meta.pass) + '</div>' +
+      (meta.depends ? '<div><strong>Dependency:</strong> ' + esc(meta.depends) + '</div>' : '<div><strong>Dependency:</strong> none</div>');
+    card.appendChild(detail);
+    container.appendChild(card);
+  });
+}
+
+// ── Result cards (active run) ────────────────────────────────────────
+function renderResults(results, runId, currentStepName) {
+  const container = document.getElementById('results-body');
+  if (!results.length) { renderIdleResults(currentStepName); return; }
+  container.innerHTML = '';
+  const activeTest = getActiveTestFromStep(currentStepName);
+
+  results.forEach(r => {
+    const meta = TEST_META[r.testId] || { name: r.name, desc: '', event: '', pass: '', depends: null };
+    const grafanaUrl = r.grafanaEventUrl || buildGrafanaUrl(runId, r.eventName);
+    const isRunning = activeTest === r.testId && r.status === 'pending';
+    const tentative = getTentativeStatus(r);
+    const displayStatus = isRunning ? 'running' : (tentative || r.status);
+
+    const card = document.createElement('div');
+    card.className = 'result-card status-' + displayStatus;
+
+    const main = document.createElement('div');
+    main.className = 'result-main';
+    main.onclick = () => toggleDetail(r.testId);
+
+    main.innerHTML =
+      '<div class="result-status"><span class="pill ' + displayStatus + '">' + displayStatus.replace('tentative-', '\u2248 ') + '</span></div>' +
+      '<div class="result-body">' +
+        '<div class="result-header">' +
+          '<span class="result-id">' + esc(r.testId) + '</span>' +
+          '<span class="result-name">' + esc(meta.name) + '</span>' +
+        '</div>' +
+        '<div class="result-desc">' + esc(meta.desc) + '</div>' +
+        (r.error ? '<div class="result-error">\u2717 ' + esc(r.error) + '</div>' : '') +
+        '<div class="result-meta">' +
+          '<span>Event: <strong class="mono">' + esc(meta.event || r.eventName || '') + '</strong></span>' +
+          '<span>Pass: <strong>' + esc(meta.pass || '') + '</strong></span>' +
+          (r.lokiCount > 0 ? '<span>Loki: <strong>' + r.lokiCount + ' lines</strong></span>' : '') +
+          (r.kpiLabel ? '<span>' + esc(r.kpiLabel) + ': <strong>' + esc(r.kpiValue) + '</strong></span>' : '') +
+          (meta.depends ? '<span>Depends: <strong>' + esc(meta.depends) + '</strong></span>' : '') +
+        '</div>' +
+        buildSubstepsHtml(r.testId, currentStepName, displayStatus) +
+      '</div>' +
+      '<div class="result-actions">' +
+        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="event.stopPropagation()" title="Open in Grafana Explore">Explore</a>' : '') +
+      '</div>';
+    card.appendChild(main);
+
+    const detail = document.createElement('div');
+    detail.className = 'result-detail';
+    detail.id = 'detail-' + r.testId;
+    detail.hidden = !_expandedRows.has(r.testId);
+    const logql = runId ? '{app="sim-steward"} |json |test_run_id="' + runId + '" |event="' + (r.eventName || '') + '"' : '';
+    detail.innerHTML =
+      '<div><strong>Event name:</strong> <span class="mono">' + esc(r.eventName || meta.event || '') + '</span></div>' +
+      '<div><strong>Pass criteria:</strong> ' + esc(meta.pass || '') + '</div>' +
+      (meta.depends ? '<div><strong>Dependency:</strong> ' + esc(meta.depends) + '</div>' : '') +
+      (r.kpiLabel ? '<div><strong>KPI:</strong> ' + esc(r.kpiLabel) + ' = ' + esc(r.kpiValue || '\u2014') + '</div>' : '') +
+      '<div><strong>Loki lines:</strong> ' + r.lokiCount + '</div>' +
+      (r.error ? '<div style="color:var(--red)"><strong>Error:</strong> ' + esc(r.error) + '</div>' : '') +
+      '<div class="mono">' + esc(logql) + '</div>' +
+      '<div style="margin-top:6px;display:flex;gap:8px">' +
+        '<button class="btn sm" onclick="navigator.clipboard.writeText(' + JSON.stringify(logql).replace(/</g, '\\u003c') + ');event.stopPropagation()">Copy LogQL</button>' +
+        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="event.stopPropagation()">Open in Grafana</a>' : '') +
+      '</div>';
+    card.appendChild(detail);
+    container.appendChild(card);
+  });
+}
+
+function toggleDetail(testId) {
+  const el = document.getElementById('detail-' + testId);
+  if (!el) return;
+  if (_expandedRows.has(testId)) { _expandedRows.delete(testId); el.hidden = true; }
+  else { _expandedRows.add(testId); el.hidden = false; }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ── Test Cases panel ─────────────────────────────────────────────────
+function renderTestCases(incidents) {
+  const panel = document.getElementById('test-cases-panel');
+  if (!incidents || !incidents.length) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const row = document.getElementById('test-cases-row');
+  row.innerHTML = '';
+  incidents.forEach(inc => {
+    const card = document.createElement('div');
+    card.className = 'incident-card';
+    card.onclick = () => { send({ action: 'seek_frame', arg: String(inc.frame) }); };
+    card.innerHTML =
+      '<span class="ic-idx">' + String.fromCodePoint(0x2460 + inc.index) + '</span>' +
+      '<span>Lap ' + inc.lap + ' \u2014 #' + esc(inc.carNumber) + ' ' + esc(inc.driverName) + '</span>' +
+      '<span class="mono">(frame ' + inc.frame + ')</span>' +
+      '<span class="ic-reason">' + esc(inc.reason) + '</span>';
+    row.appendChild(card);
+  });
+}
+
+// ── KPIs ─────────────────────────────────────────────────────────────
+function renderKpis(results) {
+  const hasKpi = results.some(r => r.kpiLabel);
+  const panel  = document.getElementById('kpi-panel');
+  if (!hasKpi) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const grid = document.getElementById('kpi-grid');
+  grid.innerHTML = '';
+  results.forEach(r => {
+    if (!r.kpiLabel) return;
+    const div = document.createElement('div');
+    div.className = 'kpi-cell';
+    div.innerHTML = '<div class="kpi-label">' + esc(r.testId) + ' \u2014 ' + esc(r.kpiLabel) + '</div><div class="kpi-val">' + (esc(r.kpiValue) || '\u2014') + '</div>';
+    grid.appendChild(div);
+  });
+}
+
+// ── Grafana confirmation (Step 6) ────────────────────────────────────
+function renderConfirmation(results, runId) {
+  const grid = document.getElementById('confirm-grid');
+  const summary = document.getElementById('confirm-summary');
+  if (!results.length) { grid.innerHTML = ''; summary.textContent = ''; return; }
+
+  grid.innerHTML = '';
+  let confirmed = 0;
+  let total = 0;
+  results.forEach(r => {
+    if (r.status === 'skip') return;
+    total++;
+    const found = r.lokiCount > 0;
+    if (found) confirmed++;
+    const item = document.createElement('span');
+    item.className = 'confirm-item';
+    item.innerHTML = '<span class="c-dot' + (found ? ' ok' : (r.status === 'pending' || r.status === 'emitted' ? '' : ' fail')) + '"></span><span class="c-id">' + esc(r.testId) + '</span>';
+    grid.appendChild(item);
+  });
+
+  if (total > 0) {
+    const allOk = confirmed === total;
+    const color = allOk ? 'var(--green)' : (confirmed > 0 ? 'var(--yellow)' : 'var(--red)');
+    summary.innerHTML = '<span style="color:' + color + '">' + confirmed + '/' + total + ' confirmed in Loki</span>';
+  } else {
+    summary.textContent = '';
+  }
+}
+
+renderIdleResults();
+connect();
+</script>
+</body>
+</html>

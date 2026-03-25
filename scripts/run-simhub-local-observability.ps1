@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 $PluginRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 
-# Load .env (+ optional Docker stack token file) — same as deploy.ps1
+# Load .env (+ optional Docker stack token file) - same as deploy.ps1
 $loadDotenv = Join-Path $ScriptDir "load-dotenv.ps1"
 if (Test-Path $loadDotenv) {
     . $loadDotenv

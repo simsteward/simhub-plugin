@@ -15,7 +15,7 @@ $jsonlPath = Join-Path $sampleLogsDir "plugin-structured.jsonl"
 
 if (-not (Test-Path $sampleLogsDir)) { New-Item -ItemType Directory -Force -Path $sampleLogsDir | Out-Null }
 $ts = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-$line = "{`"level`":`"INFO`",`"message`":`"Seed line at $ts — pipeline check`",`"timestamp`":`"$ts`",`"component`":`"simhub-plugin`",`"event`":`"pipeline_test`",`"domain`":`"lifecycle`"}"
+$line = "{`"level`":`"INFO`",`"message`":`"Seed line at $ts - pipeline check`",`"timestamp`":`"$ts`",`"component`":`"simhub-plugin`",`"event`":`"pipeline_test`",`"domain`":`"lifecycle`"}"
 Add-Content -Path $jsonlPath -Value $line -Encoding UTF8
 Write-Host "Appended 1 line to $jsonlPath"
 

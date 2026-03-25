@@ -201,6 +201,56 @@ namespace SimSteward.Plugin
             }
         }
 
+        /// <summary>
+        /// Starts 60 Hz record mode for the given reason tag.
+        /// No-op if already recording, not connected, or not in replay mode.
+        /// </summary>
+        private void StartReplayIncidentIndexRecordModeLocked(string reason)
+        {
+            if (_irsdk == null || !_irsdk.IsConnected) return;
+            string simMode = _irsdk.Data?.SessionInfo?.WeekendInfo?.SimMode ?? "";
+            if (!string.Equals(simMode, "replay", StringComparison.OrdinalIgnoreCase)) return;
+            int sub = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+            if (sub <= 0) return;
+
+            lock (_replayIndexRecordWriterLock)
+            {
+                if (_replayIndexRecordWriter != null) return; // already recording
+
+                string dir  = ReplayIncidentIndexOutputPaths.GetRecordSamplesDirectory();
+                Directory.CreateDirectory(dir);
+                string name = sub + "-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffZ", CultureInfo.InvariantCulture) + ".ndjson";
+                string path = Path.Combine(dir, name);
+                try
+                {
+                    _replayIndexRecordWriter = new StreamWriter(
+                        new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read),
+                        new UTF8Encoding(false)) { AutoFlush = true };
+                    _replayIndexRecordActivePath = path;
+                    _replayIndexRecordLastPath   = path;
+                }
+                catch
+                {
+                    return;
+                }
+            }
+
+            _replayIndexRecordTicksForStructuredWindow = 0;
+            _replayIndexRecordModeEnabled = true;
+
+            if (_logger != null)
+            {
+                var fields = new Dictionary<string, object>
+                {
+                    ["reason"] = reason,
+                    ["record_file"] = _replayIndexRecordActivePath ?? ""
+                };
+                MergeSessionAndRoutingFields(fields);
+                _logger.Structured("INFO", "simhub-plugin", "replay_incident_index_record_started",
+                    "Replay incident index record mode started.", fields, "lifecycle", null);
+            }
+        }
+
         private void StopReplayIncidentIndexRecordModeLocked(string reason)
         {
             bool hadWriter;

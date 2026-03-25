@@ -69,7 +69,7 @@ Write-Host "API Token generated."
 
 # 3. Update .env file
 if (-not (Test-Path $envFile)) {
-    Write-Host "FAIL: .env not found at $envFile — copy from .env.example first."
+    Write-Host "FAIL: .env not found at $envFile - copy from .env.example first."
     exit 1
 }
 $envContent = Get-Content $envFile -Raw
