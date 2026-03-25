@@ -475,6 +475,16 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 </style>
+<script src="https://browser.sentry-cdn.com/9.27.0/bundle.min.js" crossorigin="anonymous"></script>
+<script>
+Sentry.init({
+  dsn: 'https://46ad94b35a51979ba4223eeffe38f5c8@o4511097126780928.ingest.us.sentry.io/4511103122210816',
+  environment: 'local',
+  release: '',
+  tracesSampleRate: 1.0,
+  initialScope: { tags: { dashboard: 'index' } },
+});
+</script>
 </head>
 <body>
 <div class="app">
@@ -766,15 +776,26 @@ function connectWs() {
       renderInc();
       renderStd();
       log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
+      if (typeof Sentry !== 'undefined') {
+        Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket connected', level: 'info' });
+        Sentry.setTag('ws_connected', true);
+      }
     };
     ws.onclose = () => {
       ws = null; mockPaused = false;
       setWs('disconnected');
       log('health','WARN ','ws_closed','Connection lost — retrying in 3 s');
+      if (typeof Sentry !== 'undefined') {
+        Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket disconnected', level: 'warning' });
+        Sentry.setTag('ws_connected', false);
+      }
       setTimeout(connectWs, 3000);
     };
     ws.onerror = () => { ws = null; mockPaused = false; };
-    ws.onmessage = e => { try { onMsg(JSON.parse(e.data)); } catch {} };
+    ws.onmessage = e => {
+      try { onMsg(JSON.parse(e.data)); }
+      catch (err) { if (typeof Sentry !== 'undefined') Sentry.captureException(err); }
+    };
   } catch {
     setWs('disconnected');
     setTimeout(connectWs, 3000);
@@ -789,6 +810,14 @@ function send(action, arg) {
 
 /** Structured UI telemetry for Loki (plugin → plugin-structured.jsonl; ingestion outside plugin). */
 function sendDashboardUiEvent({ element_id, event_type, message, value }) {
+  if (typeof Sentry !== 'undefined') {
+    Sentry.addBreadcrumb({
+      category: 'ui.' + event_type,
+      message: message,
+      data: { element_id },
+      level: 'info',
+    });
+  }
   if (!ws || ws.readyState !== WebSocket.OPEN) return false;
   const o = { action: 'log', event: 'dashboard_ui_event', element_id, event_type, message };
   if (value !== undefined && value !== null) o.value = value;
@@ -829,6 +858,11 @@ function onState(m) {
     const pv = m.pluginVersion ? String(m.pluginVersion) : '';
     pvEl.textContent = pv ? ('v' + pv) : 'v—';
     pvEl.title = pv ? ('Sim Steward plugin ' + pv) : 'Sim Steward plugin build';
+    if (pv && typeof Sentry !== 'undefined') {
+      const client = Sentry.getClient();
+      if (client && client.getOptions) client.getOptions().release = pv;
+      Sentry.setTag('plugin_version', pv);
+    }
   }
   const pill = document.getElementById('mode-pill');
   pill.className = 'mode-pill ' + (mode==='Replay'?'replay':'waiting');

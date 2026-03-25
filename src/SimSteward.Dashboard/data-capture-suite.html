@@ -244,6 +244,15 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 0 4px; margin-left: -28px; margin-right: 4px; transition: color 0.15s; z-index: 1; }
 .filter-clear:hover { color: var(--text); }
 </style>
+<script src="https://browser.sentry-cdn.com/9.27.0/bundle.min.js" crossorigin="anonymous"></script>
+<script>
+Sentry.init({
+  dsn: 'https://46ad94b35a51979ba4223eeffe38f5c8@o4511097126780928.ingest.us.sentry.io/4511103122210816',
+  environment: 'local',
+  tracesSampleRate: 1.0,
+});
+Sentry.setTag('dashboard', 'data-capture-suite');
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -368,6 +377,9 @@ let _filterDebounce = null;
 // ── Microinteraction helpers ─────────────────────────────────────────
 function logUI(elementId, eventType, message) {
   send({ action: 'log', event: 'dashboard_ui_event', element_id: elementId, event_type: eventType, message: message });
+  if (typeof Sentry !== 'undefined') {
+    Sentry.addBreadcrumb({ category: 'ui.' + eventType, message: message, data: { element_id: elementId }, level: 'info' });
+  }
 }
 
 function flashEl(el, cls, ms) {
@@ -877,18 +889,26 @@ function connect() {
     }
     // Log after open so send() works
     logUI('ws-pill', 'state_change', 'WebSocket connected');
+    if (typeof Sentry !== 'undefined') {
+      Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket connected', level: 'info' });
+      Sentry.setTag('ws_connected', 'true');
+    }
   });
   ws.addEventListener('close', () => {
     _wsOk = false;
     _pluginSeen = false;
     setPill(false);
+    if (typeof Sentry !== 'undefined') {
+      Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket disconnected', level: 'warning' });
+      Sentry.setTag('ws_connected', 'false');
+    }
     setTimeout(connect, 2000);
   });
   ws.addEventListener('message', ev => {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'state') { _pluginSeen = true; handleState(msg); }
-    } catch {}
+    } catch (e) { if (typeof Sentry !== 'undefined') Sentry.captureException(e); }
   });
 }
 
@@ -1009,6 +1029,9 @@ function handleState(msg) {
   // Version display
   var verEl = document.getElementById('lbl-version');
   if (verEl && msg.pluginVersion) verEl.textContent = 'v' + msg.pluginVersion;
+  if (msg.pluginVersion && typeof Sentry !== 'undefined') {
+    Sentry.setTag('plugin_version', msg.pluginVersion);
+  }
 
   // Signals
   setSig('sig-ws', _wsOk);

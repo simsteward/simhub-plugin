@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using IRSDKSharper;
+using Sentry;
 
 namespace SimSteward.Plugin
 {
@@ -151,6 +152,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     _preflightSnapshot.Phase = "error";
                     _preflightSnapshot.Error = "BeginPreflight: " + ex.GetType().Name + ": " + ex.Message;
                     _preflightStep = PreflightStep.Complete;
@@ -161,6 +163,7 @@ namespace SimSteward.Plugin
                 try { TickPreflight(); }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     _preflightSnapshot.Phase = "error";
                     _preflightSnapshot.Error = "TickPreflight@" + _preflightStep + ": " + ex.GetType().Name + ": " + ex.Message;
                     _preflightStep = PreflightStep.Complete;
@@ -411,6 +414,7 @@ namespace SimSteward.Plugin
                     }
                     catch (Exception ex)
                     {
+                        SentrySdk.CaptureException(ex);
                         SetPfTest("PC_CHECKERED", false, "seek_failed: " + ex.Message);
                         SetPfTest("PC_RESULTS", false, "seek_failed");
                         _preflightSnapshot.Error = "seek_failed: " + ex.Message;
@@ -681,6 +685,8 @@ namespace SimSteward.Plugin
 
             EmitSuiteLifecycleEvent(DataCaptureSuiteConstants.EventSuiteStarted,
                 $"Data capture suite started. test_run_id={_suiteTestRunId}", "T_start");
+            SentrySdk.AddBreadcrumb("Data capture suite started", "lifecycle",
+                data: new Dictionary<string, string> { ["test_run_id"] = _suiteTestRunId });
             _logger?.Info($"DataCaptureSuite started. test_run_id={_suiteTestRunId}");
         }
 

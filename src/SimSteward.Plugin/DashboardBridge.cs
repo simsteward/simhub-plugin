@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Fleck;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Sentry;
 
 namespace SimSteward.Plugin
 {
@@ -72,6 +73,7 @@ namespace SimSteward.Plugin
                         }
                         catch (Exception ex)
                         {
+                            SentrySdk.CaptureException(ex);
                             _logger?.Warn($"DashboardBridge: getStateForNewClient failed: {ex.Message}");
                         }
                         try
@@ -82,6 +84,7 @@ namespace SimSteward.Plugin
                         }
                         catch (Exception ex)
                         {
+                            SentrySdk.CaptureException(ex);
                             _logger?.Warn($"DashboardBridge: getLogTailForNewClient failed: {ex.Message}");
                         }
                     };
@@ -106,6 +109,7 @@ namespace SimSteward.Plugin
             }
             catch (Exception ex)
             {
+                SentrySdk.CaptureException(ex);
                 _logger?.Error($"DashboardBridge: failed to start: {ex.Message}", ex);
                 throw;
             }
@@ -117,6 +121,7 @@ namespace SimSteward.Plugin
             try { _server.Dispose(); }
             catch (Exception ex)
             {
+                SentrySdk.CaptureException(ex);
                 _logger?.Warn($"DashboardBridge: dispose error: {ex.Message}");
             }
             _server = null;

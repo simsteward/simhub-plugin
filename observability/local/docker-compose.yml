@@ -81,6 +81,17 @@ services:
       - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/grafana:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
 
+  alloy:
+    image: grafana/alloy:v1.5.1
+    depends_on:
+      loki:
+        condition: service_healthy
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - ${SIMSTEWARD_DATA_PATH}:/var/log/simsteward:ro
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/alloy:/tmp/positions
+    command: ["run", "/etc/alloy/config.alloy", "--storage.path=/tmp/positions"]
+
   data-api:
     build: ./data-api
     ports:

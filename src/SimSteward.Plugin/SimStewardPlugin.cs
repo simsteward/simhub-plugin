@@ -18,6 +18,7 @@ using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Sentry;
 
 namespace SimSteward.Plugin
 {
@@ -43,6 +44,7 @@ namespace SimSteward.Plugin
 #endif
 
         private PluginLogger _logger;
+        private IDisposable _sentryDisposable;
         private bool _debugMode;
         private DashboardBridge _bridge;
         private DateTime _lastBroadcastAt = DateTime.MinValue;
@@ -1097,16 +1099,46 @@ namespace SimSteward.Plugin
             _debugMode = Environment.GetEnvironmentVariable("SIMSTEWARD_LOG_DEBUG") == "1";
             _lokiBaseUrl = Environment.GetEnvironmentVariable("SIMSTEWARD_LOKI_URL")?.Trim() ?? "";
             _grafanaBaseUrl = Environment.GetEnvironmentVariable("SIMSTEWARD_GRAFANA_URL")?.Trim() ?? "http://localhost:3000";
+
+            var sentryDsn = Environment.GetEnvironmentVariable("SIMSTEWARD_SENTRY_DSN")?.Trim();
+            if (string.IsNullOrWhiteSpace(sentryDsn))
+                sentryDsn = "https://ab2d0a6f7cd97033a46f4fa7d90dabab@o4511097126780928.ingest.us.sentry.io/4511102961319936";
+
             _logger = new PluginLogger(_pluginDataPath, isDebugMode: _debugMode);
             _logger.SetSpineProvider(() => (_currentSessionId ?? "", _currentSessionSeq ?? "", _replayFrameNumEnd));
             _logger.WriteError += OnLogWriteError;
             _logger.Structured("INFO", "simhub-plugin", "logging_ready", "Logging pipeline ready; init continuing.", null, "lifecycle", null);
+
+            try
+            {
+                _sentryDisposable = SentrySdk.Init(o =>
+                {
+                    o.Dsn = sentryDsn;
+                    o.Environment = "local";
+                    o.Release = PluginVersionInfo.Display;
+                    o.TracesSampleRate = 1.0;
+                    o.IsGlobalModeEnabled = true;
+                    o.SetBeforeSend((sentryEvent, hint) =>
+                    {
+                        sentryEvent.SetTag("plugin_mode", _pluginMode ?? "Unknown");
+                        sentryEvent.SetTag("iracing_connected", (_irsdk?.IsConnected ?? false).ToString().ToLowerInvariant());
+                        return sentryEvent;
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.Structured("WARN", "simhub-plugin", "sentry_init_failed",
+                    $"Sentry SDK init failed: {ex.Message}",
+                    new System.Collections.Generic.Dictionary<string, object> { ["error"] = ex.Message }, "lifecycle", null);
+            }
 
             var structuredPath = _logger.StructuredLogPath;
             _logger.Structured("INFO", "simhub-plugin", "file_tail_ready", "Structured log file ready for Loki ingestion.",
                 new System.Collections.Generic.Dictionary<string, object> { ["path"] = structuredPath ?? "(none)" }, "lifecycle", null);
 
             _logger.Structured("INFO", "simhub-plugin", "plugin_started", "SimSteward plugin starting.", null, "lifecycle", null);
+            SentrySdk.AddBreadcrumb("Plugin started", "lifecycle");
 
             pluginManager.AddProperty("SimSteward.PluginMode", GetType(), "Unknown");
             pluginManager.AddProperty("SimSteward.IncidentCount", GetType(), 0);
@@ -1156,9 +1188,12 @@ namespace SimSteward.Plugin
                 _bridge.Start(wsBind, wsPort, wsToken);
                 _logger.Structured("INFO", "simhub-plugin", "plugin_ready", "SimSteward ready.",
                     new System.Collections.Generic.Dictionary<string, object> { ["ws_port"] = _wsPort }, "lifecycle", null);
+                SentrySdk.AddBreadcrumb("WebSocket bridge started", "lifecycle",
+                    data: new Dictionary<string, string> { ["port"] = _wsPort.ToString() });
             }
             catch (Exception ex)
             {
+                SentrySdk.CaptureException(ex);
                 _logger.Structured("WARN", "simhub-plugin", "bridge_start_failed", $"WebSocket server could not start: {ex.Message}",
                     new System.Collections.Generic.Dictionary<string, object> { ["bind"] = wsBind, ["port"] = _wsPort, ["error"] = ex.Message }, "lifecycle", null);
                 _logger.Error($"WebSocket server could not start on {wsBind}:{wsPort}. Is it already in use?", ex);
@@ -1174,6 +1209,7 @@ namespace SimSteward.Plugin
                 _irsdk.UpdateInterval = 1;
                 _irsdk.OnConnected += () =>
                 {
+                    SentrySdk.AddBreadcrumb("iRacing connected", "lifecycle");
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_connected", "iRacing connected.", null, "lifecycle", null);
                     if (_irsdk != null && _logger != null)
                     {
@@ -1184,6 +1220,7 @@ namespace SimSteward.Plugin
                 };
                 _irsdk.OnDisconnected += () =>
                 {
+                    SentrySdk.AddBreadcrumb("iRacing disconnected", "lifecycle");
                     ReplayIncidentIndexOnIracingDisconnected();
                     _replayIncidentIndexPrereqLogKey = "";
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_disconnected", "iRacing disconnected.", null, "lifecycle", null);
@@ -1195,6 +1232,7 @@ namespace SimSteward.Plugin
             }
             catch (Exception ex)
             {
+                SentrySdk.CaptureException(ex);
                 _logger.Error("iRacing SDK (IRSDKSharper) failed to start. Plugin will run without iRacing data.", ex);
                 _irsdk = null;
             }
@@ -1219,6 +1257,7 @@ namespace SimSteward.Plugin
             }
             catch (Exception ex)
             {
+                SentrySdk.CaptureException(ex);
                 _logger?.Structured("WARN", "simhub-plugin", "otel_metrics_load_failed",
                     $"OTLP metrics disabled — assembly load failure: {ex.Message}",
                     new System.Collections.Generic.Dictionary<string, object>
@@ -1394,6 +1433,9 @@ namespace SimSteward.Plugin
         public void End(PluginManager pluginManager)
         {
             _logger?.Structured("INFO", "simhub-plugin", "plugin_stopped", "SimSteward plugin End.", null, "lifecycle", null);
+
+            try { _sentryDisposable?.Dispose(); } catch { }
+            _sentryDisposable = null;
 
             try
             {

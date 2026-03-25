@@ -107,7 +107,8 @@ $PluginDlls = @(
     "Fleck.dll",
     "Newtonsoft.Json.dll",
     "IRSDKSharper.dll",
-    "YamlDotNet.dll"
+    "YamlDotNet.dll",
+    "Sentry.dll"
 )
 
 function Read-PluginDllProductVersion {
@@ -410,6 +411,62 @@ if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) 
     }
 }
 Write-Host ""
+
+# ── Sentry release + deploy tracking ────────────────────────────────────────
+$sentryOrg = 'sim-steward'
+$sentryProjects = @('simhub-plugin', 'web-dashboards')
+$sentryAuthToken = if (-not [string]::IsNullOrWhiteSpace($env:SENTRY_AUTH_TOKEN)) { $env:SENTRY_AUTH_TOKEN }
+                   elseif (-not [string]::IsNullOrWhiteSpace($env:SENTRY_ELEVATED_API_KEY)) { $env:SENTRY_ELEVATED_API_KEY }
+                   else { $null }
+$sentryRelease = if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) { $script:SimStewardPluginVersionDeployed } else { $null }
+
+function Push-SentryApi {
+    param([string]$Path, [hashtable]$Body)
+    if ([string]::IsNullOrWhiteSpace($sentryAuthToken) -or [string]::IsNullOrWhiteSpace($sentryRelease)) { return }
+    try {
+        $url = "https://sentry.io/api/0/organizations/$sentryOrg/$Path"
+        $json = $Body | ConvertTo-Json -Compress -Depth 5
+        $headers = @{ Authorization = "Bearer $sentryAuthToken"; 'Content-Type' = 'application/json' }
+        Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop | Out-Null
+    } catch {
+        # Non-fatal: deploy must not fail because Sentry API is down
+        Write-Warning "Sentry API ($Path): $($_.Exception.Message)"
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($sentryAuthToken) -and -not [string]::IsNullOrWhiteSpace($sentryRelease)) {
+    Write-Host "Registering Sentry release: $sentryRelease (3 projects)"
+
+    # Create release across all 3 projects with commits
+    $fullSha = ''
+    try { $fullSha = (& git -C $PluginRoot rev-parse HEAD 2>$null) } catch {}
+    Push-SentryApi "releases/" @{
+        version  = $sentryRelease
+        projects = $sentryProjects
+        refs     = @(@{ repository = "simsteward/simhub-plugin"; commit = $fullSha })
+    }
+
+    # Deploy: simhub-plugin (C# DLLs)
+    Push-SentryApi "releases/$sentryRelease/deploys/" @{
+        environment = 'local'
+        name        = 'simhub-plugin'
+    }
+
+    # Deploy: web-dashboards (all HTML/JS dashboards)
+    Push-SentryApi "releases/$sentryRelease/deploys/" @{
+        environment = 'local'
+        name        = 'web-dashboards'
+    }
+
+    Write-Host "Sentry release + 2 deploys registered (simhub-plugin, web-dashboards)."
+    Push-LokiEvent 'deploy_sentry_release' 'INFO' "Sentry release registered: $sentryRelease" @{
+        sentry_release  = $sentryRelease
+        sentry_org      = $sentryOrg
+        sentry_projects = ($sentryProjects -join ',')
+    }
+} elseif ([string]::IsNullOrWhiteSpace($sentryAuthToken)) {
+    Write-Host "Skipping Sentry release tracking (SENTRY_AUTH_TOKEN not set)."
+}
 
 # ── 5. Re-launch SimHub ─────────────────────────────────────────────────────
 $skipLaunch = $env:SIMHUB_SKIP_LAUNCH -eq "1"
