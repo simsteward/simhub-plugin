@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@secretlint/secretlint-rule-preset-recommend": "^11.4.0",
-    "dotenv-cli": "^7.4.4",
+    "dotenv-cli": "^11.0.0",
     "secretlint": "^11.4.0"
   }
 }
