@@ -22,7 +22,7 @@
       ],
       "env": {
         "CONTEXTSTREAM_API_URL": "https://api.contextstream.io",
-        "CONTEXTSTREAM_API_KEY": "cbiq_SlhoP2xlfUE-jzVnFbeOBFSoaPPvf1aFET6TI3P9DXg",
+        "CONTEXTSTREAM_API_KEY": "${CONTEXTSTREAM_API_KEY}",
         "CONTEXTSTREAM_CONTEXT_PACK": "true"
       }
     }
