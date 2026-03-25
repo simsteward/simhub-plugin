@@ -23,7 +23,7 @@ Same contract both sides: `POST /session-complete` with `SessionSummary` JSON. D
 
 ### Deploy steps
 
-1. **Prereqs:** Node.js, [Wrangler](https://developers.cloudflare.com/workers/wrangler/install/) (`npm i -g wrangler` or `npx wrangler`), Cloudflare account.
+1. **Prereqs:** Node.js, [Wrangler](https://developers.cloudflare.com/workers/wrangler/install/) (`pnpm add -g wrangler` or `pnpx wrangler`), Cloudflare account.
 
 2. **Create the D1 database**
    ```bash

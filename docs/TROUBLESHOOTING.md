@@ -142,7 +142,7 @@ If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 
 1. **Plugin output** — The plugin writes **plugin-structured.jsonl** only (plus WebSocket to the dashboard). It does **not** batch-POST those lines to Loki in-process yet. **`deploy.ps1`** can POST a **`deploy_marker`** when **`SIMSTEWARD_LOKI_URL`** is set (see **`send-deploy-loki-marker.ps1`**). For full logs in Loki, use an external shipper to tail **plugin-structured.jsonl**.
 2. **Env metadata** — Set `SIMSTEWARD_LOKI_URL` and `SIMSTEWARD_LOG_ENV` before SimHub starts (e.g. `.env` loaded by **`deploy.ps1`** / **`run-simhub-local-observability.ps1`**) so JSON includes `loki_push_target` / `log_env`.
-3. **Local stack** — Start observability from `observability/local/` (`npm run obs:up`) so Loki (3100) and Grafana (3000) run; compose does **not** ingest **plugin-structured.jsonl** automatically.
+3. **Local stack** — Start observability from `observability/local/` (`pnpm run obs:up`) so Loki (3100) and Grafana (3000) run; compose does **not** ingest **plugin-structured.jsonl** automatically.
 4. **Auth (Grafana Cloud / gateway)** — For **deploy markers**: Grafana Cloud uses **Basic** (`SIMSTEWARD_LOKI_USER` + **`SIMSTEWARD_LOKI_TOKEN`**); local **loki-gateway** uses **Bearer `LOKI_PUSH_TOKEN`**. Push failures print in the deploy script output.
 5. **Data source in Grafana** — Point the Loki data source at your Loki URL (e.g. `http://localhost:3100` for local). Explore: `{app="sim-steward"}`.
 6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
@@ -155,7 +155,7 @@ See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL exam
 
 For the full pipeline (collector, ports, Grafana datasource URL), see **docs/observability-local.md** § Canonical path and § Metrics / OTLP troubleshooting.
 
-1. **Nothing in Explore (Prometheus Local)** — Confirm **`npm run obs:up`** is running and **`http://localhost:9090/-/healthy`** returns OK. Smoke: **`npm run obs:poll:prometheus`**.
+1. **Nothing in Explore (Prometheus Local)** — Confirm **`pnpm run obs:up`** is running and **`http://localhost:9090/-/healthy`** returns OK. Smoke: **`pnpm run obs:poll:prometheus`**.
 2. **No `simsteward_*` metrics** — OTLP is disabled unless **`OTEL_EXPORTER_OTLP_ENDPOINT`** or **`SIMSTEWARD_OTLP_ENDPOINT`** is set **before** SimHub starts (SimHub does not load `.env` automatically). Use **`scripts/run-simhub-local-observability.ps1`** or set env in the user/session environment.
 3. **`connection refused` to port 4317** — OpenTelemetry Collector is not up or ports are not mapped; restart compose from the repo root.
 4. **Wrong protocol** — gRPC defaults for **`http://127.0.0.1:4317`**. For HTTP/protobuf on **4318**, set **`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`** and point the endpoint at **4318**.

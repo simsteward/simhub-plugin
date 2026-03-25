@@ -80,7 +80,7 @@ if ($SampleLogs) {
     Get-ChildItem -Path $sample -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction Stop
 }
 
-Write-Host "PASS: Local observability data wiped. Restart with npm run obs:up or obs:up:env."
+Write-Host "PASS: Local observability data wiped. Restart with pnpm run obs:up or obs:up:env."
 if ($Grafana) {
     Write-Host "Note: Grafana volume cleared - re-run scripts/grafana-bootstrap.ps1 if you use GRAFANA_API_TOKEN."
 }

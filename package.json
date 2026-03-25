@@ -1,6 +1,7 @@
 {
   "name": "sim-steward-plugin",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
   "description": "SimSteward SimHub plugin and local observability stack",
   "scripts": {
     "env:run": "dotenv -e .env --",

@@ -331,22 +331,22 @@ With `.env` containing `SIMSTEWARD_LOKI_URL`, `SIMSTEWARD_LOKI_USER`, and `SIMST
 
 | Command | Purpose |
 |---------|---------|
-| `npm run loki:query` | One-off `GET .../loki/api/v1/query_range` via `scripts/query-loki-once.mjs`. Flags: `--query` (LogQL), `--limit`, `--lookback` (seconds). |
-| `npm run env:run -- <command>` | Load `.env` into the child process (e.g. `npm run env:run -- pwsh -NoProfile -File scripts/poll-loki.ps1`). |
-| `npm run obs:poll` | Tail-style poll, direct Loki (default). |
-| `npm run obs:poll:grafana` | Same, but `-ViaGrafana` (Bearer → Grafana proxy → Loki). |
-| `npm run obs:poll:grafana:env` | Same as `obs:poll:grafana` but injects `.env` with `dotenv-cli` first (secrets only in the child process). |
+| `pnpm run loki:query` | One-off `GET .../loki/api/v1/query_range` via `scripts/query-loki-once.mjs`. Flags: `--query` (LogQL), `--limit`, `--lookback` (seconds). |
+| `pnpm run env:run -- <command>` | Load `.env` into the child process (e.g. `pnpm run env:run -- pwsh -NoProfile -File scripts/poll-loki.ps1`). |
+| `pnpm run obs:poll` | Tail-style poll, direct Loki (default). |
+| `pnpm run obs:poll:grafana` | Same, but `-ViaGrafana` (Bearer → Grafana proxy → Loki). |
+| `pnpm run obs:poll:grafana:env` | Same as `obs:poll:grafana` but injects `.env` with `dotenv-cli` first (secrets only in the child process). |
 
-**Path A (direct Loki):** `SIMSTEWARD_LOKI_*` + `npm run loki:query` or `npm run obs:poll`.
+**Path A (direct Loki):** `SIMSTEWARD_LOKI_*` + `pnpm run loki:query` or `pnpm run obs:poll`.
 
 **Path B (Grafana Cloud, elevated `glsa_*` Bearer):** Set **`GRAFANA_URL`** to your stack (`https://<slug>.grafana.net` — **not** `logs-prod-*.grafana.net`). Set **`GRAFANA_LOKI_DATASOURCE_UID`** to the Loki datasource UID in that stack (Connections → Data sources). Set **`GRAFANA_API_TOKEN`** *or* **`CURSOR_ELEVATED_GRAFANA_TOKEN`** (service account token with permission to query the Loki datasource via the proxy). Then:
 
 ```powershell
-npm run obs:poll:grafana:env
-# or: npm run env:run -- pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana
+pnpm run obs:poll:grafana:env
+# or: pnpm run env:run -- pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana
 ```
 
-`poll-loki.ps1` reads `.env` from disk; `*:env` npm scripts add `dotenv -e .env` so variables are also loaded for the child process without exporting them in the shell.
+`poll-loki.ps1` reads `.env` from disk; `*:env` pnpm scripts add `dotenv -e .env` so variables are also loaded for the child process without exporting them in the shell.
 
 **401/403:** On Path A, the `glc_*` policy may lack Loki **read**. On Path B, ensure the Bearer token can query datasources; check datasource UID and stack URL.
 

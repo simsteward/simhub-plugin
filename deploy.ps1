@@ -28,7 +28,7 @@ $deployMarkerLocal = $false
 if ([string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOKI_URL)) {
     $env:SIMSTEWARD_LOKI_URL = $localLoki
     $deployMarkerLocal = $true
-    Write-Host "Loki deploy log: SIMSTEWARD_LOKI_URL was unset - using $localLoki (start stack: npm run obs:up)."
+    Write-Host "Loki deploy log: SIMSTEWARD_LOKI_URL was unset - using $localLoki (start stack: pnpm run obs:up)."
 } elseif ($env:SIMSTEWARD_LOKI_URL -match 'grafana\.net') {
     $hasCloudBasic = -not [string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOKI_USER) -and -not [string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOKI_TOKEN)
     if (-not $hasCloudBasic) {
