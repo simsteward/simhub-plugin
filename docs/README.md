@@ -19,7 +19,16 @@ Editing files outside the **SimHub rule doc allowlist** does not attach the full
 
 | Doc | Use when |
 |-----|----------|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Class diagrams (PluginSnapshot, LogEntry, WS messages), ER diagram (data API), sequence diagrams (action dispatch, incident pipeline) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Class diagrams (PluginSnapshot, LogEntry, WS messages), ER diagram (data API), sequence diagrams (action dispatch, incident pipeline); **Code map** table at top links partial `SimStewardPlugin` files |
+
+---
+
+## ContextStream index and mapping
+
+- **Workspace:** Open this repo as a **single-folder** Cursor workspace rooted at `simhub-plugin` so search and tooling are not mixed with unrelated paths (other clones, AppData, etc.).
+- **ContextStream project:** Keep the ContextStream **project path** aligned with that same folder so `ingest_local` / MCP index the intended tree.
+- **Corpus hygiene:** [`.cursorignore`](../.cursorignore) trims noise for Cursor; after changing ignore rules or large doc/code moves, run a **forced** ContextStream ingest (`npm run contextstream:ingest:force` — see [.cursor/skills/contextstream/SKILL.md](../.cursor/skills/contextstream/SKILL.md)).
+- **Structural graph:** ContextStream **code graph** may not expose C# module edges; use keyword/semantic `search` plus the **Code map** in [ARCHITECTURE.md](ARCHITECTURE.md) for navigation.
 
 ---
 

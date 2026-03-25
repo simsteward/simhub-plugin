@@ -1,4 +1,4 @@
-# Wipe persisted data for the local observability stack (Loki chunks/WAL, optional Grafana, sample logs).
+# Wipe persisted data for the local observability stack (Loki chunks/WAL, Prometheus TSDB, optional Grafana, sample logs).
 # Does NOT remove Loki config, datasource provisioning, gateway tokens in .env, or compose services.
 # Usage (repo root): .\scripts\obs-wipe-local-data.ps1 -Force
 # Optional: -Grafana -SampleLogs or -All (both optional dirs with -Force).
@@ -66,6 +66,9 @@ finally {
 Write-Host "Wiping Loki data under: $(Join-Path $base 'loki')"
 Clear-DirectoryContents (Join-Path $base "loki")
 
+Write-Host "Wiping Prometheus TSDB under: $(Join-Path $base 'prometheus')"
+Clear-DirectoryContents (Join-Path $base "prometheus")
+
 if ($Grafana) {
     Write-Host "Wiping Grafana lib under: $(Join-Path $base 'grafana')"
     Clear-DirectoryContents (Join-Path $base "grafana")
@@ -79,5 +82,5 @@ if ($SampleLogs) {
 
 Write-Host "PASS: Local observability data wiped. Restart with npm run obs:up or obs:up:env."
 if ($Grafana) {
-    Write-Host "Note: Grafana volume cleared — re-run scripts/grafana-bootstrap.ps1 if you use GRAFANA_API_TOKEN."
+    Write-Host "Note: Grafana volume cleared - re-run scripts/grafana-bootstrap.ps1 if you use GRAFANA_API_TOKEN."
 }

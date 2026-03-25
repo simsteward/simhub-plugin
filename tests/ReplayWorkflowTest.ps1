@@ -1,4 +1,4 @@
-# Replay capture workflow test — WebSocket state shape
+# Replay capture workflow test - WebSocket state shape
 # Requires: SimHub running with Sim Steward plugin loaded
 # Run: .\tests\ReplayWorkflowTest.ps1
 
@@ -8,7 +8,7 @@ $timeoutMs = 8000
 
 Add-Type -AssemblyName System.Core
 
-# --- 1. WebSocket connect and receive state (Test case 1 — Detect) ---
+# --- 1. WebSocket connect and receive state (Test case 1 - Detect) ---
 $uri = [System.Uri]::new("ws://127.0.0.1:$port/")
 $ws = New-Object System.Net.WebSockets.ClientWebSocket
 $cts = New-Object System.Threading.CancellationTokenSource
@@ -59,6 +59,16 @@ try {
     }
     Write-Host "PASS: State has pluginMode=$mode"
 
+    if (-not $stateObj.PSObject.Properties["pluginVersion"]) {
+        Write-Host "FAIL: State missing pluginVersion"
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$stateObj.pluginVersion)) {
+        Write-Host "FAIL: pluginVersion empty"
+        exit 1
+    }
+    Write-Host "PASS: State has pluginVersion=$($stateObj.pluginVersion)"
+
     # Expect: diagnostics present (WebSocket state mirrors PluginSnapshot.Diagnostics)
     if (-not $stateObj.PSObject.Properties["diagnostics"]) {
         Write-Host "FAIL: State missing diagnostics"
@@ -77,7 +87,7 @@ try {
         Write-Host "PASS: State lap absent (ok for older clients)"
     }
 
-    # When sessions array present, expect structure (Test case 2 — Sessions list)
+    # When sessions array present, expect structure (Test case 2 - Sessions list)
     if ($diag.PSObject.Properties["sessions"] -and $null -ne $diag.sessions) {
         $sessions = $diag.sessions
         if ($sessions -isnot [Array]) {

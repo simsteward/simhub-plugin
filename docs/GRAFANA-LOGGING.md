@@ -1,14 +1,14 @@
 # Grafana Loki Structured Logging
 
-Structured logging from the SimSteward plugin to Grafana Loki (Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. The pipeline: **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk for durability) → **HTTPS POST** to **one** Loki push endpoint (`SIMSTEWARD_LOKI_URL`). **No** per-user log shipper, forwarder, or Grafana agent on the user PC — ingestion is **in-process** from the plugin (see **docs/observability-scaling.md**). The in-dashboard log stream is pushed via WebSocket; if sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b) — that file is not sent to Loki. Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. For scaling (many users, large grids, label rules, LogQL), see **docs/observability-scaling.md**. Data routing (OTel vs Loki vs Prometheus, ~1k users, which telemetry is metrics vs logs): **docs/DATA-ROUTING-OBSERVABILITY.md**. Local Docker / quick start: **docs/observability-local.md**.
+Structured logging for SimSteward (Grafana Loki / Grafana Cloud or local Docker). All logs are event-driven; no per-tick logging in production. **Implemented today:** **Plugin** → `PluginLogger.Structured()` → **plugin-structured.jsonl** (NDJSON on disk) and the same entries are **mirrored to the dashboard over WebSocket**. **This repository’s plugin does not yet HTTP POST log lines to Loki** — `SIMSTEWARD_LOKI_URL` is used for routing metadata in JSON (`loki_push_target`), optional **read** paths (e.g. data-capture suite verification), and **scripts**: **`deploy.ps1`** posts a single **`deploy_marker`** via **`send-deploy-loki-marker.ps1`** when the URL is set. To see full plugin logs in Loki today, run an **external shipper** that tails **`plugin-structured.jsonl`** into your stack, or add in-process batch POST later (see **docs/observability-scaling.md**). If WebSocket log sends fail, the plugin writes to **broadcast-errors.log** (see **docs/TROUBLESHOOTING.md** §4b). Explore, custom panels, and AI tooling use the 4-label schema and fixed `event` taxonomy below. Data routing: **docs/DATA-ROUTING-OBSERVABILITY.md**. Local stack: **docs/observability-local.md**.
 
-**Loki: unencumbered stream.** No filtering is applied before Loki. The plugin writes every log entry to **plugin-structured.jsonl** and sends the same stream to Loki; do not filter at the push path. Loki retains the full stream.
+**Loki stream (when ingested):** Do not filter at the push path — ship the same lines you write to **plugin-structured.jsonl**.
 
 **Filtering is dashboard-only.** The web dashboard receives the full stream via WebSocket and applies level/event visibility filters for display only (checkboxes and `hiddenLevels` / `hiddenEvents`). Toggling "hide DEBUG" or hiding specific event types in the dashboard shows or hides entries that are already in the stream; nothing is dropped at the plugin.
 
 ### Local vs prod (same pipeline; env label only)
 
-One pipeline for both: plugin writes all logs to **plugin-structured.jsonl** and **POSTs** them to Loki at **`SIMSTEWARD_LOKI_URL`** (single endpoint per deployment). Set `SIMSTEWARD_LOG_ENV=local` for local dev (e.g. Docker stack) or `SIMSTEWARD_LOG_ENV=production` (default); this sets metadata on log lines (`log_env` / routing hints). No source-level omission: Loki and the dashboard stream are full. Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
+**Env label:** Set `SIMSTEWARD_LOG_ENV=local` for local dev or `SIMSTEWARD_LOG_ENV=production` (default); this flows into JSON as `log_env` / routing hints. The dashboard WebSocket stream is full; Loki reflects whatever you ingest from **plugin-structured.jsonl** (or future in-process POST). Volume is controlled by event-driven logging (no per-tick logs) and by the dashboard display filter.
 
 ## Grafana Cloud free tier limits
 
@@ -25,7 +25,7 @@ Volume allowance: free tier ~50 GB/month; our budget is &lt; 1 GB/month.
 
 ### Scale: hundreds of drivers / many users
 
-Stream count and labels stay bounded (four labels only; no `session_id` or `driver_id` as labels). Session-end results with 100–200+ drivers use chunked `session_end_datapoints_results` (35 drivers per line); merge chunks in Grafana. Many SimSteward users can send to **one** central Loki (each plugin POSTs to the same endpoint); use an optional bounded `instance_id` label if you need tenancy in queries. Do not log per-driver per-tick in Loki; use metrics (OTel) for high-frequency telemetry. Full stream/volume math, label rules, and query patterns: **docs/observability-scaling.md**.
+Stream count and labels stay bounded (four labels only; no `session_id` or `driver_id` as labels). Session-end results with 100–200+ drivers use chunked `session_end_datapoints_results` (35 drivers per line); merge chunks in Grafana. Many SimSteward users can send to **one** central Loki (each instance ships to the same endpoint); use an optional bounded `instance_id` label if you need tenancy in queries. Do not log per-driver per-tick in Loki; use metrics (OTel) for high-frequency telemetry. Full stream/volume math, label rules, and query patterns: **docs/observability-scaling.md**.
 
 ### Volume budget (per session, ~2 h)
 
@@ -44,12 +44,32 @@ At 30 sessions/month: ~7 MB. Never log on a tick; `DataUpdate()` runs at 60 Hz.
 
 Four labels only. Do **not** put high-cardinality values (`session_id`, `car_number`, `action`, `correlation_id`) in labels—they stay in the JSON body.
 
+### Two `app` namespaces
+
+| `app` | Audience | What it covers |
+|-------|----------|----------------|
+| `sim-steward` | Product / runtime | C# plugin, dashboard, deploy |
+| `claude-dev-logging` | Dev tooling observability | Claude Code hooks, MCP server instrumentation |
+
+### `app=sim-steward` (product)
+
 | Label | Values | Rationale |
 |-------|--------|-----------|
-| `app` | `sim-steward` | Namespace. |
+| `app` | `sim-steward` | Product namespace. |
 | `env` | `production` or `local` | From `SIMSTEWARD_LOG_ENV`. |
-| `component` | `simhub-plugin`, `bridge`, `tracker`, `dashboard` | Subsystem. |
+| `component` | `simhub-plugin`, `bridge`, `tracker`, `dashboard`, `deploy` | Subsystem. |
 | `level` | `INFO`, `WARN`, `ERROR`, `DEBUG` | Severity. `DEBUG` only when `SIMSTEWARD_LOG_DEBUG=1`. |
+
+### `app=claude-dev-logging` (dev tooling)
+
+| Label | Values | Rationale |
+|-------|--------|-----------|
+| `app` | `claude-dev-logging` | Dev tooling namespace. |
+| `env` | `local` or `dev` | From `SIMSTEWARD_LOG_ENV`. |
+| `component` | `hook`, `mcp-contextstream`, `mcp-sentry`, `mcp-ollama` | Subsystem. |
+| `level` | `INFO`, `WARN`, `ERROR` | Severity. |
+
+The generic hook logger (`~/.claude/hooks/loki-log.js`) uses `component=hook`. MCP-specific dedicated hooks use `component=mcp-<service>`. MCP service is also detected in the JSON body `service` field for tool-level queries: `{app="claude-dev-logging", component="hook"} | json | service="contextstream"`.
 
 ## Event taxonomy
 
@@ -65,6 +85,7 @@ Every log line has an `event` field. Key events:
 | `bridge_starting` | simhub-plugin | `bind`, `port` | WebSocket bridge starting. |
 | `bridge_start_failed` | simhub-plugin | `bind`, `port`, `error` | WebSocket server failed to start (WARN). |
 | `plugin_ready` | simhub-plugin | `ws_port`, `env` | Lifecycle readiness. |
+| `deploy_marker` | simhub-plugin | `deploy_status` (`ok` \| `failed`), `post_deploy_warn`, `detail`, `machine`, `simhub_path` | **Not from the in-process plugin** — one line at end of `deploy.ps1` via [scripts/send-deploy-loki-marker.ps1](../scripts/send-deploy-loki-marker.ps1) when `SIMSTEWARD_LOKI_URL` is set. **WARN** level if `post_deploy_warn` (post-deploy `tests/*.ps1` failed after retry). Use Grafana dashboard **Sim Steward — Deploy health** (`simsteward-deploy-health`). |
 | `host_resource_sample` | simhub-plugin | `process_cpu_pct`, `process_working_set_mb`, `process_private_mb`, `gc_heap_mb`, `process_threads`, `disk_root`, `disk_total_gb`, `disk_free_gb`, `disk_used_pct`, `ws_clients`, `sample_interval_sec` | **~1/min** (default): SimHub process CPU (share of all logical CPUs), memory, managed heap, and usage of the drive that hosts plugin data. Tune interval with `SIMSTEWARD_RESOURCE_SAMPLE_SEC` (15–3600). Use Explore time series on numeric fields to spot spikes; rising `process_working_set_mb` / `gc_heap_mb` over hours suggests growth (not necessarily a leak—correlate with sessions). |
 | `log_streaming_subscribed` | simhub-plugin | — | Dashboard log streaming attached. |
 | `irsdk_started` | simhub-plugin | — | iRacing SDK started. |

@@ -1,23 +1,24 @@
 # Publish Grafana dashboards from JSON files to the Grafana API.
-# Usage: .\scripts\publish-dashboards.ps1
+# Usage (any cwd): .\scripts\publish-dashboards.ps1
 $ErrorActionPreference = "Stop"
+$repoRoot = $PSScriptRoot | Split-Path -Parent
 $GrafanaUrl = "http://localhost:3000"
-$DashboardDir = "observability/local/grafana/provisioning/dashboards"
+$DashboardDir = Join-Path $repoRoot "observability\local\grafana\provisioning\dashboards"
 
-# Load .env file to get GRAFANA_API_TOKEN
-$envFile = ".env"
-if (-not (Test-Path $envFile)) {
-    Write-Host "FAIL: .env file not found. Run grafana-bootstrap.ps1 first."
+$loadDotenv = Join-Path $repoRoot "scripts\load-dotenv.ps1"
+if (-not (Test-Path (Join-Path $repoRoot ".env"))) {
+    Write-Host "FAIL: .env not found at $(Join-Path $repoRoot '.env'). Run grafana-bootstrap.ps1 first."
     exit 1
 }
-Get-Content $envFile | Foreach-Object {
-    if ($_ -match '^(?<name>[^=]+)=(?<value>.*)') {
-        $name = $Matches.name.Trim()
-        $value = $Matches.value.Trim().Trim('"')
-        # Set environment variable for the current process
-        [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
-    }
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv @(
+        (Join-Path $repoRoot ".env"),
+        (Join-Path $repoRoot "observability\local\.env.observability.local")
+    )
 }
+$gu = [System.Environment]::GetEnvironmentVariable("GRAFANA_URL", "Process")
+if ($gu) { $GrafanaUrl = $gu.Trim().TrimEnd('/') }
 
 $grafanaApiToken = [System.Environment]::GetEnvironmentVariable("GRAFANA_API_TOKEN", "Process")
 
@@ -33,7 +34,7 @@ $headers = @{
 
 $dashboardFiles = @(Get-ChildItem -Path $DashboardDir -Filter "*.json" -ErrorAction SilentlyContinue)
 if ($dashboardFiles.Count -eq 0) {
-    Write-Host "PASS: No dashboard JSON in $DashboardDir — nothing to publish."
+    Write-Host "PASS: No dashboard JSON in $DashboardDir - nothing to publish."
     exit 0
 }
 

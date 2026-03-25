@@ -4,7 +4,7 @@
   "description": "SimSteward SimHub plugin and local observability stack",
   "scripts": {
     "env:run": "dotenv -e .env --",
-    "obs:up": "docker compose -f observability/local/docker-compose.yml up -d",
+    "obs:up": "docker compose --env-file observability/local/.env.observability.local -f observability/local/docker-compose.yml up -d",
     "obs:up:env": "docker compose --env-file observability/local/.env.observability.local -f observability/local/docker-compose.yml up -d",
     "obs:down": "docker compose -f observability/local/docker-compose.yml down",
     "obs:ps": "docker compose -f observability/local/docker-compose.yml ps",
@@ -12,9 +12,17 @@
     "obs:poll:grafana": "pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana",
     "obs:poll:grafana:env": "dotenv -e .env -- pwsh -NoProfile -File scripts/poll-loki.ps1 -ViaGrafana",
     "obs:wipe": "pwsh -NoProfile -File scripts/obs-wipe-local-data.ps1",
-    "loki:query": "dotenv -e .env -- node scripts/query-loki-once.mjs"
+    "obs:poll:prometheus": "pwsh -NoProfile -File scripts/poll-prometheus.ps1",
+    "obs:ports": "pwsh -NoProfile -File scripts/check-obs-ports.ps1",
+    "loki:query": "dotenv -e .env -- node scripts/query-loki-once.mjs",
+    "secrets:lint": "secretlint \"**/*\"",
+    "secrets:gitleaks": "pwsh -NoProfile -File scripts/run-gitleaks-docker.ps1",
+    "contextstream:ingest": "pwsh -NoProfile -File scripts/contextstream-ingest.ps1",
+    "contextstream:ingest:force": "pwsh -NoProfile -File scripts/contextstream-ingest.ps1 -Force"
   },
   "devDependencies": {
-    "dotenv-cli": "^7.4.4"
+    "@secretlint/secretlint-rule-preset-recommend": "^11.4.0",
+    "dotenv-cli": "^7.4.4",
+    "secretlint": "^11.4.0"
   }
 }

@@ -8,7 +8,7 @@
 
 param(
     [string]$LokiUrl = "",
-    [string]$Query = '{app="sim-steward"} | json | level != "DEBUG"',
+    [string]$Query = '{app=~"sim-steward|claude-dev-logging"} | json | level != "DEBUG"',
     [int]$IntervalSeconds = 2,
     [int]$LookbackSeconds = 120,
     [switch]$ViaGrafana
@@ -16,16 +16,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = $PSScriptRoot | Split-Path -Parent
-$envFile = Join-Path $repoRoot ".env"
-
-if (Test-Path $envFile) {
-    Get-Content $envFile | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]*)=(.*)$') {
-            $name = $Matches[1].Trim()
-            $value = $Matches[2].Trim().Trim('"')
-            [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
-    }
+$loadDotenv = Join-Path $repoRoot "scripts\load-dotenv.ps1"
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv @(
+        (Join-Path $repoRoot ".env"),
+        (Join-Path $repoRoot "observability\local\.env.observability.local")
+    )
 }
 
 $useGrafanaProxy = [bool]$ViaGrafana

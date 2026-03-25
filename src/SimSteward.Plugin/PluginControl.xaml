@@ -31,6 +31,7 @@
     <StackPanel Margin="20,18">
       <TextBlock Text="Sim Steward" FontSize="18" FontWeight="SemiBold"
                  Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+      <TextBlock x:Name="PluginVersionText" Style="{StaticResource Muted}" Margin="0,0,0,4" FontFamily="Consolas,Courier New,monospace"/>
       <TextBlock Style="{StaticResource Muted}" Margin="0,0,0,18" MaxWidth="520">
         Dependency status and WebSocket bridge. Dashboard: http://localhost:8888/Web/sim-steward-dash/index.html — WS: ws://localhost:19847
       </TextBlock>

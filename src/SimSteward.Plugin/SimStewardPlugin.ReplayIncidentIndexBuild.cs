@@ -61,6 +61,15 @@ namespace SimSteward.Plugin
 
             try
             {
+                ProcessDataCaptureSuiteTick();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn("data_capture_suite tick: " + ex.Message);
+            }
+
+            try
+            {
                 AppendReplayIncidentIndexRecordSampleIfEnabled();
             }
             catch (Exception ex)

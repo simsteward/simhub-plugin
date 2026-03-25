@@ -3,15 +3,13 @@
 # Auth: GRAFANA_ADMIN_USER_OVERRIDE / GRAFANA_ADMIN_PASSWORD_OVERRIDE, else repo .env GRAFANA_ADMIN_USER / GRAFANA_ADMIN_PASSWORD, else admin/admin.
 $ErrorActionPreference = "Stop"
 $repoRoot = $PSScriptRoot | Split-Path -Parent
-$envFile = Join-Path $repoRoot ".env"
-if (Test-Path $envFile) {
-    Get-Content $envFile | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]*)=(.*)$') {
-            $name = $Matches[1].Trim()
-            $value = $Matches[2].Trim().Trim('"')
-            [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
-    }
+$loadDotenv = Join-Path $repoRoot "scripts\load-dotenv.ps1"
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv @(
+        (Join-Path $repoRoot ".env"),
+        (Join-Path $repoRoot "observability\local\.env.observability.local")
+    )
 }
 
 $GrafanaUrl = "http://localhost:3000"
@@ -71,7 +69,7 @@ Write-Host "API Token generated."
 
 # 3. Update .env file
 if (-not (Test-Path $envFile)) {
-    Write-Host "FAIL: .env not found at $envFile — copy from .env.example first."
+    Write-Host "FAIL: .env not found at $envFile - copy from .env.example first."
     exit 1
 }
 $envContent = Get-Content $envFile -Raw

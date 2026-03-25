@@ -23,5 +23,5 @@ description: Grafana/Loki observability stack expert.
 - **AI Filter:** ALWAYS append `| level != "DEBUG"`.
 
 ## Stack
-- **Grafana:** No repo-provisioned dashboard JSON; use **Explore** + LogQL in **docs/GRAFANA-LOGGING.md**. Local wipe: **docs/observability-local.md** § Housekeeping.
+- **Grafana:** **Explore** + LogQL per **docs/GRAFANA-LOGGING.md**; local compose also provisions **Sim Steward — Deploy health** ([observability/local/grafana/provisioning/dashboards/simsteward-deploy-health.json](../../observability/local/grafana/provisioning/dashboards/simsteward-deploy-health.json)) for `deploy.ps1` / plugin bring-up correlation. Local wipe: **docs/observability-local.md** § Housekeeping.
 - **Local:** `observability/local/`. Loki on 3100. Use `SIMSTEWARD_LOKI_URL=http://localhost:3100`, `SIMSTEWARD_LOG_ENV=local`.

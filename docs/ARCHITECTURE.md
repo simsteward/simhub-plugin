@@ -4,6 +4,22 @@ Diagrams covering C# data structures, WebSocket message contracts, data API sche
 
 ---
 
+## Code map (search anchor)
+
+`SimStewardPlugin` is a **partial class** split across several files (same type, compile-time merge). Use this table to jump from a concern to source.
+
+| Subsystem | Primary paths | Role |
+|-----------|---------------|------|
+| Plugin host, lifecycle, WebSocket server, action dispatch | `src/SimSteward.Plugin/SimStewardPlugin.cs` | `IPlugin` / `IDataPlugin` entry, Fleck WS, `DispatchAction`, snapshot broadcast |
+| Live + replay incident detection | `src/SimSteward.Plugin/SimStewardPlugin.Incidents.cs` | YAML deltas, incident logging, replay search hooks |
+| Replay incident index (data) | `src/SimSteward.Plugin/SimStewardPlugin.ReplayIncidentIndex.cs`, `SimStewardPlugin.ReplayIncidentIndexBuild.cs` | Index build, TR-019-style payloads |
+| Replay incident index (dashboard / WS actions) | `src/SimSteward.Plugin/SimStewardPlugin.ReplayIncidentIndexDashboard.cs` | WS actions for index UI |
+| Data capture suite (SDK / Loki verification) | `src/SimSteward.Plugin/SimStewardPlugin.DataCaptureSuite.cs` | Capture-suite actions and plumbing |
+| Dashboard UI (SimHub HTTP) | `src/SimSteward.Dashboard/index.html`, `replay-incident-index.html`, `data-capture-suite.html` | Browser ES6+ clients; WS to plugin on `SIMSTEWARD_WS_PORT` |
+| Structured logging / Loki | `SessionLogging`, sinks under `src/SimSteward.Plugin/` (see [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)) | JSONL + optional Loki push |
+
+---
+
 ## C# Plugin — Core Data Structures
 
 Classes that drive the WebSocket state broadcast and structured logging.
@@ -122,7 +138,7 @@ classDiagram
 *   **Why?**
     1.  **Security:** Doing so would require embedding sensitive API tokens (like `SIMSTEWARD_LOKI_TOKEN`) directly into the client-side JavaScript, where anyone could extract them.
     2.  **CORS:** Browsers will block cross-origin requests from the local SimHub web server (`localhost:8888`) to external domains unless complex and insecure CORS policies are configured on the destination server.
-*   **The Solution:** The dashboard must route all observability intents (like capturing an incident) through the WebSocket to the C# Plugin. The C# Plugin acts as a secure backend, utilizing `PluginLogger` to batch and execute the HTTPS POST requests to `SIMSTEWARD_LOKI_URL` from a trusted server environment.
+*   **The Solution:** The dashboard must route all observability intents (like capturing an incident) through the WebSocket to the C# Plugin. The C# Plugin acts as a secure backend: **`PluginLogger`** persists structured lines to **`plugin-structured.jsonl`** (and mirrors them over WebSocket). **Loki HTTP push of those lines is not implemented in-process in this repo yet** — use an external shipper tailing the JSONL file, or **`send-deploy-loki-marker.ps1`** for deploy-only markers when `SIMSTEWARD_LOKI_URL` is set.
 
 ---
 
@@ -245,7 +261,7 @@ sequenceDiagram
       T->>P: incident_detected callback
       P->>P: Enrich with session context (MergeSessionAndRoutingFields)
       P->>JSONL: Write incident_detected NDJSON line
-      JSONL-->>Loki: Plugin batches HTTPS POST to SIMSTEWARD_LOKI_URL (async)
+      JSONL-->>Loki: External shipper or future batch POST (not in plugin today)
       P->>D: Broadcast updated incidents[] via WebSocket
       D->>D: Re-render leaderboard + filter chips
     end

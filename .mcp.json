@@ -1,33 +1,14 @@
 {
   "mcpServers": {
-    "ollama": {
-      "command": "node",
-      "args": [
-        "C:\\Users\\winth\\AppData\\Roaming\\npm\\node_modules\\@muhammadmehdi\\ollama-mcp-server\\dist\\index.js"
-      ],
-      "env": {
-        "OLLAMA_BASE_URL": "http://localhost:11434",
-        "OLLAMA_NUM_CTX": "131072"
-      }
-    },
-    "sentry": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@sentry/mcp-server@latest"
-      ]
-    },
     "contextstream": {
-      "command": "npx",
       "args": [
-        "-y",
-        "envmcp",
-        "--env-file",
-        ".env",
+        "/c",
         "contextstream-mcp"
       ],
+      "command": "cmd",
       "env": {
         "CONTEXTSTREAM_ALLOW_HEADER_AUTH": "false",
+        "CONTEXTSTREAM_API_KEY": "cbiq_SlhoP2xlfUE-jzVnFbeOBFSoaPPvf1aFET6TI3P9DXg",
         "CONTEXTSTREAM_API_URL": "https://api.contextstream.io",
         "CONTEXTSTREAM_AUTO_HIDE_INTEGRATIONS": "true",
         "CONTEXTSTREAM_CONSOLIDATED": "true",
@@ -37,13 +18,28 @@
         "CONTEXTSTREAM_LOG_LEVEL": "quiet",
         "CONTEXTSTREAM_OUTPUT_FORMAT": "compact",
         "CONTEXTSTREAM_PROGRESSIVE_MODE": "false",
+        "CONTEXTSTREAM_PROJECT_ID": "253a5461-8d7a-410e-a4a8-c8923e49eddc",
         "CONTEXTSTREAM_ROUTER_MODE": "false",
-        "CONTEXTSTREAM_SEARCH_LIMIT": "16",
-        "CONTEXTSTREAM_SEARCH_MAX_CHARS": "1024",
+        "CONTEXTSTREAM_SEARCH_LIMIT": "10",
+        "CONTEXTSTREAM_SEARCH_MAX_CHARS": "800",
         "CONTEXTSTREAM_SHOW_TIMING": "false",
         "CONTEXTSTREAM_TOOLSET": "standard",
         "CONTEXTSTREAM_TRANSCRIPTS_ENABLED": "false",
-        "CONTEXTSTREAM_USER_AGENT": "contextstream-mcp-rust/0.1.74"
+        "CONTEXTSTREAM_USER_AGENT": "contextstream-mcp-rust/0.1.77",
+        "CONTEXTSTREAM_WORKSPACE_ID": "f5c5b873-acfb-47ec-b93b-4acabfa78a8b"
+      }
+    },
+    "ollama": {
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@muhammadmehdi/ollama-mcp-server"
+      ],
+      "command": "cmd",
+      "env": {
+        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "OLLAMA_NUM_CTX": "131072"
       }
     }
   }

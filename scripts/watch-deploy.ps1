@@ -1,5 +1,6 @@
 param(
-    [int]$DebounceMs = 750
+    [int]$DebounceMs = 750,
+    [string]$EnvFile = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,10 +55,14 @@ function Invoke-Deploy {
     $deployInProgress = $true
     try {
         Write-Host '[watch-deploy] Starting deploy (SIMHUB_SKIP_LAUNCH=1)...'
-        $env:SIMHUB_SKIP_LAUNCH = '1'
+        $env:SIMHUB_SKIP_LAUNCH = '0'
         Push-Location $RepoRoot
         try {
-            & pwsh -NoProfile -File $DeployScript
+            if ([string]::IsNullOrWhiteSpace($EnvFile)) {
+                & pwsh -NoProfile -File $DeployScript
+            } else {
+                & pwsh -NoProfile -File $DeployScript -EnvFile $EnvFile
+            }
         } catch {
             Write-Host "[watch-deploy] Deploy failed: $($_.Exception.Message)"
         } finally {

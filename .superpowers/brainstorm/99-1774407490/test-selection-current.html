@@ -1,0 +1,64 @@
+<h2>Step 3: Test Selection — What's Wrong & What Could Be</h2>
+<p class="subtitle">Current design vs 3 redesign approaches. Click to select your preferred direction.</p>
+
+<div class="section">
+<h3>Current Problems</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+  <div style="background:rgba(255,95,95,0.08);border:1px solid rgba(255,95,95,0.2);border-radius:10px;padding:14px;">
+    <strong style="color:#ff5f5f;">Flat & Repetitive</strong>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-top:4px;">Every test card looks identical. No visual hierarchy. Groups are just text headers with checkboxes. The eye has nowhere to land.</p>
+  </div>
+  <div style="background:rgba(255,95,95,0.08);border:1px solid rgba(255,95,95,0.2);border-radius:10px;padding:14px;">
+    <strong style="color:#ff5f5f;">Filter Bar Is Fake</strong>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-top:4px;">Chips just scroll to groups — they don't actually filter. Text filter hides cards but gives no count feedback. No way to filter by status or dependency.</p>
+  </div>
+  <div style="background:rgba(255,95,95,0.08);border:1px solid rgba(255,95,95,0.2);border-radius:10px;padding:14px;">
+    <strong style="color:#ff5f5f;">No Selection Summary</strong>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-top:4px;">You toggle checkboxes but there's no "8 of 13 selected" or visual summary of what you're about to run. You have to scroll and count.</p>
+  </div>
+  <div style="background:rgba(255,95,95,0.08);border:1px solid rgba(255,95,95,0.2);border-radius:10px;padding:14px;">
+    <strong style="color:#ff5f5f;">Dependencies Invisible</strong>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-top:4px;">T7 depends on T0 but nothing shows that visually. The T7 checkbox just silently disables. The feature flag for T_60Hz is hidden.</p>
+  </div>
+</div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Grid Cards with Group Lanes</h3>
+      <p>Replace the stacked list with a <strong>horizontal grid</strong>. Each group is a visual "lane" with a colored left accent matching the group's identity. Tests become compact cards in a 2- or 3-column grid within each lane. A sticky <strong>selection summary bar</strong> at the top shows "8/13 selected" with mini chips for each test. Dependencies shown as thin connecting lines between cards.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Dense — see all tests without scrolling</li><li>Groups feel distinct and visual</li><li>Summary bar gives instant feedback</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Cards must be compact (less description space)</li><li>Dependency lines may feel noisy with 13 tests</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Compact Tag Table + Selection Tray</h3>
+      <p>A <strong>dense table layout</strong> — one row per test with columns for ID, name, group tag, dependency badge, and a toggle switch (not checkbox). A floating <strong>"selection tray"</strong> at the bottom collects selected tests as removable chips with drag reordering. Group filtering via colored tag pills in the header. The whole thing fits in one viewport.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Maximum density — all 13 tests visible at once</li><li>Tray gives clear "what will run" preview</li><li>Table is scannable and sortable</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Less visual personality — table feels utilitarian</li><li>Less room for test descriptions</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Interactive Test Map</h3>
+      <p>A visual <strong>node map</strong> inspired by pipeline/DAG views. Each test is a node with its group color. Dependency arrows connect T0→T7. Nodes have toggle states (selected = filled, deselected = ghost). Groups are soft background regions. A <strong>sticky summary strip</strong> shows selection count + estimated run time. Clicking a group region toggles all its nodes. Search dims non-matching nodes.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Dependencies are first-class visual citizens</li><li>Most distinctive and memorable design</li><li>Natural for a test pipeline mental model</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Most complex to implement</li><li>Layout may be harder to maintain as tests grow</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px;">Click your preferred approach, or tell me in the terminal if you want a hybrid.</p>

@@ -19,6 +19,8 @@ These are the **intended** paths for SimSteward observability data. Implementati
 
 **Grafana** is the visualization layer; it is not the scaling bottleneck.
 
+**Local stack (metrics path):** The repo’s **Docker Compose** stack runs **OpenTelemetry Collector** (OTLP gRPC/HTTP → Prometheus scrape endpoint) and **Prometheus** alongside Loki and Grafana. The SimHub plugin sends **OTLP metrics** when `OTEL_EXPORTER_OTLP_ENDPOINT` or `SIMSTEWARD_OTLP_ENDPOINT` is set (no in-process `/metrics` HTTP server — avoids HttpListener constraints). End-to-end steps and ports: **docs/observability-local.md** § Metrics.
+
 ---
 
 ## 2. Decision matrix
@@ -132,6 +134,7 @@ These stay **events or throttled snapshots** in structured logs — **not** a mi
 
 ## References
 
+- **docs/observability-local.md** — Local Grafana/Loki/**Prometheus** compose, OTLP env, smoke queries.
 - **docs/GRAFANA-LOGGING.md** — Loki schema, volume table, events.
 - **docs/IRACING-OBSERVABILITY-STRATEGY.md** — iRacing SDK telemetry mapping to Prometheus metrics & Loki events.
 - **docs/observability-scaling.md** — Many users, central Loki, label rules.

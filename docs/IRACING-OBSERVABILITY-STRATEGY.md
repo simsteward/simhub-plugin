@@ -37,7 +37,7 @@ iRacing SDK (60Hz)
         │
         ├──── Prometheus metrics (/metrics endpoint, scraped every 1s)
         │
-        └──── Loki log shipping (via Promtail or Grafana Alloy, structured JSON)
+        └──── Loki log shipping (structured JSON via HTTP POST or external shipper)
 
 iRacing REST API (post-race)
         │

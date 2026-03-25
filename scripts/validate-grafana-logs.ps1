@@ -5,24 +5,21 @@
 
 param(
     [string]$DebugLogPath = "debug-2291d4.log",
-    [string]$Query = '{app="sim-steward"}',
+    [string]$Query = '{app=~"sim-steward|claude-dev-logging"}',
     [int]$LookbackSeconds = 7200
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = $PSScriptRoot | Split-Path -Parent
-$envFile = Join-Path $repoRoot ".env"
 $debugLog = if ([System.IO.Path]::IsPathRooted($DebugLogPath)) { $DebugLogPath } else { Join-Path $repoRoot $DebugLogPath }
 
-# Load .env
-if (Test-Path $envFile) {
-    Get-Content $envFile | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]*)=(.*)$') {
-            $name = $Matches[1].Trim()
-            $value = $Matches[2].Trim().Trim('"')
-            [System.Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
-    }
+$loadDotenv = Join-Path $repoRoot "scripts\load-dotenv.ps1"
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv @(
+        (Join-Path $repoRoot ".env"),
+        (Join-Path $repoRoot "observability\local\.env.observability.local")
+    )
 }
 
 $lokiUrl = [System.Environment]::GetEnvironmentVariable("LOKI_QUERY_URL", "Process")
@@ -95,5 +92,5 @@ if ($d.error) { $msg += ", error=$($d.error)" }
 Write-Host $msg
 if ($d.status -eq "ok" -and $d.totalLines -eq 0 -and $lokiUrl -match "localhost") {
     Write-Host ""
-    Write-Host "No plugin logs in Loki. Confirm plugin-structured.jsonl is ingested to Loki (your shipper or Grafana Cloud). SimHub data dir e.g. $env:LOCALAPPDATA\SimHubWpf\PluginsData\SimSteward — see docs/observability-local.md." -ForegroundColor Yellow
+    Write-Host "No plugin logs in Loki. Confirm plugin-structured.jsonl is ingested to Loki (your shipper or Grafana Cloud). SimHub data dir e.g. $env:LOCALAPPDATA\SimHubWpf\PluginsData\SimSteward - see docs/observability-local.md." -ForegroundColor Yellow
 }

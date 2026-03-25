@@ -26,6 +26,16 @@ If the dashboard or plugin "does not work", use this checklist to find the cause
 - **Check:** The page should show "Sim Steward" with connection status, mode, and replay controls. If the component stays blank or returns 404, the DashTemplate wasn’t deployed or SimHub cannot reach port 8888—run `deploy.ps1` again so `SimHub\Web\sim-steward-dash\` exists.
 - If you have configured `SIMSTEWARD_WS_TOKEN`, append `?token=<value>` (or `?wsToken=<value>`) to the URL in Dash Studio so the dashboard forwards the token when it opens the WebSocket.
 
+### 3b. Browser says connection refused on `localhost:8888` (or `127.0.0.1:8888`)
+
+**Deploy is not an HTTP server.** `deploy.ps1` copies HTML/CSS/JS into `SimHub\Web\sim-steward-dash\`. **SimHub** must run its **built-in web server** on the configured port (default **8888**) so those files are reachable.
+
+- **Smoke test:** With SimHub running, open **`http://127.0.0.1:8888/`** — you should see SimHub’s dash list (same check as [SimHub wiki: Dashstudio Web access](https://github.com/SHWotever/SimHub/wiki/Troubleshoot-Dashstudio-Web-access#check-is-simhub-server-is-running)). If that refuses, the problem is SimHub’s HTTP stack or port (not this plugin).
+- **Check:** SimHub **Settings** → confirm the **HTTP / web / Dash** port matches **8888** (or use your configured port in every URL). Try another port if something else owns 8888, then restart SimHub.
+- **Firewall / VPN:** Allow **SimHubWPF** (incoming **8888**). VPNs can block localhost routing on some setups.
+- **WebSocket vs HTTP:** The plugin can listen on **19847** while **8888** is still down — green WS in Dash Studio does not prove **8888** is up.
+- **404 on `data-capture-suite.html`:** Older `deploy.ps1` only copied `index.html` and `replay-incident-index.html`. Run **`.\deploy.ps1`** again so `data-capture-suite.html` is copied to `SimHub\Web\sim-steward-dash\`.
+
 ---
 
 ## 4. Plugin log
@@ -93,6 +103,7 @@ If you run a replay and incidents are not captured or signaled:
 | Red status, "Cannot reach plugin" | Plugin log; port 19847 free; firewall |
 | Incidents not detected in replay | Section 6: shared memory, connection, focused car, plugin.log |
 | Blank or 404 in Web Page | URL = `http://localhost:8888/Web/sim-steward-dash/index.html`; run deploy |
+| **Connection refused** on `:8888` | §3b: SimHub HTTP not listening — open `http://127.0.0.1:8888/`; Settings port/firewall |
 | Mode always "Unknown" | iRacing running and shared memory enabled |
 | No logs in Grafana / Loki | Section 8: SIMSTEWARD_LOKI_URL, local stack, auth, data source |
 | Log stream empty when clicking buttons | Section 4b: connection, broadcast-errors.log, browser console |
@@ -129,10 +140,10 @@ For a step-by-step to get plugin data into **local** Grafana, see **docs/observa
 
 If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 
-1. **Plugin output** — The plugin writes **plugin-structured.jsonl** and **POSTs** batched lines to **`SIMSTEWARD_LOKI_URL`** (one Loki push endpoint; no separate agent on the PC). For local stacks, point that URL at `http://localhost:3100` or your **loki-gateway** push URL with `LOKI_PUSH_TOKEN` as documented in **docs/observability-local.md** and **docs/GRAFANA-LOGGING.md**.
-2. **Env metadata** — Set `SIMSTEWARD_LOKI_URL` and `SIMSTEWARD_LOG_ENV` before SimHub starts (e.g. via `.env` loaded by your launcher) so log lines include `loki_push_target` / `log_env`; this does not replace ingestion.
-3. **Local stack** — Start observability from `observability/local/` (`docker compose up -d`) so Loki (3100) and Grafana (3000) run; compose does **not** tail `plugin-structured.jsonl` for you.
-4. **Auth (Grafana Cloud)** — Use your stack’s credentials on the **in-process** push to Grafana Cloud; wrong tokens show up as push failures in **plugin.log**, not in a separate agent’s logs.
+1. **Plugin output** — The plugin writes **plugin-structured.jsonl** only (plus WebSocket to the dashboard). It does **not** batch-POST those lines to Loki in-process yet. **`deploy.ps1`** can POST a **`deploy_marker`** when **`SIMSTEWARD_LOKI_URL`** is set (see **`send-deploy-loki-marker.ps1`**). For full logs in Loki, use an external shipper to tail **plugin-structured.jsonl**.
+2. **Env metadata** — Set `SIMSTEWARD_LOKI_URL` and `SIMSTEWARD_LOG_ENV` before SimHub starts (e.g. `.env` loaded by **`deploy.ps1`** / **`run-simhub-local-observability.ps1`**) so JSON includes `loki_push_target` / `log_env`.
+3. **Local stack** — Start observability from `observability/local/` (`npm run obs:up`) so Loki (3100) and Grafana (3000) run; compose does **not** ingest **plugin-structured.jsonl** automatically.
+4. **Auth (Grafana Cloud / gateway)** — For **deploy markers**: Grafana Cloud uses **Basic** (`SIMSTEWARD_LOKI_USER` + **`SIMSTEWARD_LOKI_TOKEN`**); local **loki-gateway** uses **Bearer `LOKI_PUSH_TOKEN`**. Push failures print in the deploy script output.
 5. **Data source in Grafana** — Point the Loki data source at your Loki URL (e.g. `http://localhost:3100` for local). Explore: `{app="sim-steward"}`.
 6. **Debug vs production** — With `SIMSTEWARD_LOG_DEBUG=1`, many more lines (e.g. `tick_stats`, `yaml_update`) are sent. For AI or production dashboards, filter with `| level != "DEBUG"` to avoid noise.
 
@@ -140,7 +151,18 @@ See **docs/GRAFANA-LOGGING.md** for label schema, event taxonomy, and LogQL exam
 
 ---
 
-## 9. ContextStream MCP (index / search / 401)
+## 9. Prometheus / OTLP metrics (local stack)
+
+For the full pipeline (collector, ports, Grafana datasource URL), see **docs/observability-local.md** § Canonical path and § Metrics / OTLP troubleshooting.
+
+1. **Nothing in Explore (Prometheus Local)** — Confirm **`npm run obs:up`** is running and **`http://localhost:9090/-/healthy`** returns OK. Smoke: **`npm run obs:poll:prometheus`**.
+2. **No `simsteward_*` metrics** — OTLP is disabled unless **`OTEL_EXPORTER_OTLP_ENDPOINT`** or **`SIMSTEWARD_OTLP_ENDPOINT`** is set **before** SimHub starts (SimHub does not load `.env` automatically). Use **`scripts/run-simhub-local-observability.ps1`** or set env in the user/session environment.
+3. **`connection refused` to port 4317** — OpenTelemetry Collector is not up or ports are not mapped; restart compose from the repo root.
+4. **Wrong protocol** — gRPC defaults for **`http://127.0.0.1:4317`**. For HTTP/protobuf on **4318**, set **`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`** and point the endpoint at **4318**.
+
+---
+
+## 10. ContextStream MCP (index / search / 401)
 
 **Default workflow:** Keep the repo in sync with ContextStream using the **ContextStream MCP** **`project` tool** — `project(action="index")` or `project(action="ingest_local", path="<repo>")` — then log the run with `session(action="capture", event_type="operation", …)` per **docs/CONTEXTSTREAM-UPLOAD-PLAN.md**. Do **not** use ad-hoc HTTP/API scripts for routine sync. The CLI steps below are **troubleshooting only** when MCP or env is misconfigured.
 

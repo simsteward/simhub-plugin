@@ -1,40 +1,35 @@
 # Start SimHub with env vars set for local Loki (plugin pushes to local Grafana stack).
-# Run from plugin repo root:  .\scripts\run-simhub-local-observability.ps1
+# Run from plugin repo root:  .\scripts\run-simhub-local-observability.ps1 [-EnvFile path\to\secrets.env]
 # See docs/observability-local.md and docs/GRAFANA-LOGGING.md.
+
+param([string]$EnvFile = "")
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 $PluginRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 
-# Load .env from repo root if present (KEY=VALUE; skip comments and empty lines)
-$envFile = Join-Path $PluginRoot ".env"
-if (Test-Path $envFile) {
-    Get-Content $envFile -Raw | ForEach-Object {
-        $_ -split "`n" | ForEach-Object {
-            $line = $_.Trim()
-            if ($line -and -not $line.StartsWith("#")) {
-                $idx = $line.IndexOf("=")
-                if ($idx -gt 0) {
-                    $key = $line.Substring(0, $idx).Trim()
-                    $val = $line.Substring($idx + 1).Trim()
-                    if ($val.Length -ge 2 -and $val.StartsWith('"') -and $val.EndsWith('"')) { $val = $val.Substring(1, $val.Length - 2) }
-                    if ($key -and $key -notmatch "^\s*#") { Set-Item -Path "Env:$key" -Value $val }
-                }
-            }
-        }
+# Load .env (+ optional Docker stack token file) - same as deploy.ps1
+$loadDotenv = Join-Path $ScriptDir "load-dotenv.ps1"
+if (Test-Path $loadDotenv) {
+    . $loadDotenv
+    Import-DotEnv (Resolve-SimStewardEnvPaths -RepoRoot $PluginRoot -EnvFile $EnvFile)
+    if (-not [string]::IsNullOrWhiteSpace($EnvFile)) {
+        Write-Host "Loaded env from -EnvFile $EnvFile (+ observability local merge if present)"
+    } else {
+        Write-Host "Loaded env from .env / .env.observability.local (if present)"
     }
-    Write-Host "Loaded env from: $envFile"
 }
 
 # Debug log for agent sessions (writes to workspace so we can read after run)
 $env:SIMSTEWARD_DEBUG_LOG_PATH = Join-Path $PluginRoot "debug-e2bb5f.log"
 
-# Force local Loki so plugin pushes to local Docker stack
-$env:SIMSTEWARD_LOKI_URL = "http://localhost:3100"
-$env:SIMSTEWARD_LOKI_USER = ""
-$env:SIMSTEWARD_LOKI_TOKEN = ""
-$env:SIMSTEWARD_LOG_ENV = "local"
-if (-not $env:SIMSTEWARD_LOG_DEBUG) { $env:SIMSTEWARD_LOG_DEBUG = "1" }
+# Defaults for local stack only when not set in .env
+if ([string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOKI_URL)) { $env:SIMSTEWARD_LOKI_URL = "http://localhost:3100" }
+if ([string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOG_ENV)) { $env:SIMSTEWARD_LOG_ENV = "local" }
+if ([string]::IsNullOrWhiteSpace($env:SIMSTEWARD_LOG_DEBUG)) { $env:SIMSTEWARD_LOG_DEBUG = "1" }
+
+# OTLP → OpenTelemetry Collector (see docs/observability-local.md). Override in .env if needed.
+if (-not $env:OTEL_EXPORTER_OTLP_ENDPOINT) { $env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4317" }
 
 # Resolve SimHub path (same logic as deploy.ps1)
 $SimHubPath = $null
@@ -59,6 +54,6 @@ if (-not (Test-Path $SimHubExe)) {
     Write-Error "SimHub not found at: $SimHubExe. Set SIMHUB_PATH to your SimHub folder."
 }
 
-Write-Host "Starting SimHub with local Loki (SIMSTEWARD_LOKI_URL=$env:SIMSTEWARD_LOKI_URL, SIMSTEWARD_LOG_ENV=$env:SIMSTEWARD_LOG_ENV)"
+Write-Host "Starting SimHub with local Loki + OTLP metrics (SIMSTEWARD_LOKI_URL=$env:SIMSTEWARD_LOKI_URL, OTEL_EXPORTER_OTLP_ENDPOINT=$env:OTEL_EXPORTER_OTLP_ENDPOINT, SIMSTEWARD_LOG_ENV=$env:SIMSTEWARD_LOG_ENV)"
 Write-Host "SimHub: $SimHubExe"
 & $SimHubExe

@@ -21,7 +21,12 @@ namespace SimSteward.Plugin
                 Interval = new System.TimeSpan(0, 0, 1)
             };
             _refreshTimer.Tick += RefreshStatus;
-            Loaded += (s, e) => { _refreshTimer.Start(); RefreshStatus(s, e); };
+            Loaded += (s, e) =>
+            {
+                PluginVersionText.Text = "Version: " + PluginVersionInfo.Display;
+                _refreshTimer.Start();
+                RefreshStatus(s, e);
+            };
             Unloaded += (s, e) => _refreshTimer.Stop();
         }
 

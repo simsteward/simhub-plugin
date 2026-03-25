@@ -6,6 +6,14 @@
     Runs contextstream-mcp.exe ingest with credentials from .env via envmcp.
     Use from a normal terminal (or this script uses cmd.exe so ingest sees a console).
 
+    When to use -Force: after .cursorignore changes, large refactors, new first-party
+    paths under src/, or when ContextStream search/graph looks stale. Equivalent npm:
+    npm run contextstream:ingest:force
+
+    Note: .cursorignore affects Cursor IDE indexing; ContextStream server-side ingest
+    may apply separate include/exclude rules (see product docs). For MCP-driven refresh
+    use project(ingest_local, force=true).
+
 .PARAMETER Force
     Pass --force to re-upload all files.
 #>

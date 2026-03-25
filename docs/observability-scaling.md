@@ -40,19 +40,18 @@ Per-driver per-tick telemetry is time-series data; use metrics (OTel), not Loki.
 
 Local Docker + Loki per developer does **not** scale to ~120 users each running the full stack.
 
-### Current pipeline (local, single-user)
+### Current pipeline (this repo, local single-user)
 
-Plugin → `plugin-structured.jsonl` (durability) → batched **HTTPS POST** to `SIMSTEWARD_LOKI_URL` → Loki. **No** separate agent on the user machine; push runs in-process (batching keeps `DataUpdate()` off the hot path).
+Plugin → **`plugin-structured.jsonl`** (durability) + WebSocket to dashboard. **No** in-process Loki POST in `SimSteward.Plugin` today. Optional: **`deploy.ps1`** → **`send-deploy-loki-marker.ps1`** POSTs one **`deploy_marker`** line when **`SIMSTEWARD_LOKI_URL`** is set.
 
+### Target / production shape
 
-### Implementation
-
-Always write **`plugin-structured.jsonl`**. When **`SIMSTEWARD_LOKI_URL`** is set, batch and **POST** NDJSON to that **single** Loki HTTP endpoint (central or Grafana Cloud). No separate forwarder process.
+Always write **`plugin-structured.jsonl`**. **Intended:** batch **HTTPS POST** of NDJSON to **`SIMSTEWARD_LOKI_URL`** from inside the plugin (or an approved sidecar) — **one** Loki HTTP endpoint (central or Grafana Cloud).
 
 ### Recommendation
 
-- **Default:** Plugin writes **plugin-structured.jsonl** locally and **POSTs** batched NDJSON to **one** Loki HTTP endpoint (`SIMSTEWARD_LOKI_URL`) from inside the plugin — **no** separate log shipper or forwarder on user machines.
-- **Many users:** Same pattern: many plugin instances → one central Loki; scale ingestion/retention to `users × volume per session`.
+- **Today:** Run a **file tail → Loki** agent for **`plugin-structured.jsonl`**, or wait for in-process batch POST.
+- **Many users:** Same pattern: many instances → one central Loki; scale ingestion/retention to `users × volume per session`.
 
 ### Central Loki / Grafana Cloud
 

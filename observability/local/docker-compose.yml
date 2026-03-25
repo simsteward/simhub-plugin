@@ -32,10 +32,44 @@ services:
       timeout: 5s
       retries: 10
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      # Host 18889 avoids conflict with other tools binding Windows :8889; Prometheus still scrapes otel-collector:8889 on the Docker network.
+      - "18889:8889"
+      - "13133:13133"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    depends_on:
+      - otel-collector
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/prometheus:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   grafana:
     image: grafana/grafana:11.2.0
     depends_on:
       loki:
+        condition: service_healthy
+      prometheus:
         condition: service_healthy
     ports:
       - "3000:3000"
@@ -46,6 +80,17 @@ services:
     volumes:
       - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/grafana:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+
+  alloy:
+    image: grafana/alloy:v1.5.1
+    depends_on:
+      loki:
+        condition: service_healthy
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - ${SIMSTEWARD_DATA_PATH}:/var/log/simsteward:ro
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/alloy:/tmp/positions
+    command: ["run", "/etc/alloy/config.alloy", "--storage.path=/tmp/positions"]
 
   data-api:
     build: ./data-api
