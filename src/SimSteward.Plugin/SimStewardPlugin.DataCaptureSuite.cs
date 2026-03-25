@@ -770,6 +770,7 @@ namespace SimSteward.Plugin
             }
             catch (Exception ex)
             {
+                SentrySdk.CaptureException(ex);
                 _logger?.Warn("DataCaptureSuite T0 rewind: " + ex.Message);
             }
 

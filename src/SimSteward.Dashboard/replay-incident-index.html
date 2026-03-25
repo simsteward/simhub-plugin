@@ -155,8 +155,9 @@ function connectWs() {
       setTimeout(connectWs, 3000);
     };
     ws.onerror = () => {};
-    ws.onmessage = (e) => { try { onMsg(JSON.parse(e.data)); } catch (_) {} };
-  } catch (_) {
+    ws.onmessage = (e) => { try { onMsg(JSON.parse(e.data)); } catch (err) { if (typeof Sentry !== 'undefined') Sentry.captureException(err); } };
+  } catch (err) {
+    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
     setTimeout(connectWs, 3000);
   }
 }

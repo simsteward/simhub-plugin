@@ -799,7 +799,8 @@ function connectWs() {
       try { onMsg(JSON.parse(e.data)); }
       catch (err) { if (typeof Sentry !== 'undefined') Sentry.captureException(err); }
     };
-  } catch {
+  } catch (err) {
+    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
     setWs('disconnected');
     setTimeout(connectWs, 3000);
   }
@@ -827,7 +828,8 @@ function sendDashboardUiEvent({ element_id, event_type, message, value }) {
   try {
     ws.send(JSON.stringify(o));
     return true;
-  } catch {
+  } catch (err) {
+    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
     return false;
   }
 }

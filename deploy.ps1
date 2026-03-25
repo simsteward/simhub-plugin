@@ -420,6 +420,21 @@ $sentryAuthToken = if (-not [string]::IsNullOrWhiteSpace($env:SENTRY_AUTH_TOKEN)
                    else { $null }
 $sentryRelease = if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) { $script:SimStewardPluginVersionDeployed } else { $null }
 
+function Parse-SentryDsn {
+    param([string]$Dsn)
+    # https://<public_key>@<ingest_domain>/<project_id>
+    if ($Dsn -match '^https://([^@]+)@([^/]+)/(\d+)$') {
+        return @{
+            PublicKey     = $Matches[1]
+            IngestDomain  = $Matches[2]
+            ProjectId     = $Matches[3]
+        }
+    }
+    return $null
+}
+
+$script:sentryDsn = Parse-SentryDsn $env:SIMSTEWARD_SENTRY_DSN
+
 function Push-SentryApi {
     param([string]$Path, [hashtable]$Body)
     if ([string]::IsNullOrWhiteSpace($sentryAuthToken) -or [string]::IsNullOrWhiteSpace($sentryRelease)) { return }
@@ -436,12 +451,12 @@ function Push-SentryApi {
 
 function Push-SentryCheckIn {
     param([string]$MonitorSlug, [string]$Status, [string]$CheckInId)
-    if ([string]::IsNullOrWhiteSpace($sentryAuthToken)) { return $null }
+    if (-not $script:sentryDsn) { return $null }
     try {
-        $headers = @{ Authorization = "Bearer $sentryAuthToken"; 'Content-Type' = 'application/json' }
+        $baseUrl = "https://$($script:sentryDsn.IngestDomain)/api/$($script:sentryDsn.ProjectId)/cron/$MonitorSlug/$($script:sentryDsn.PublicKey)/"
+        $headers = @{ 'Content-Type' = 'application/json' }
         if ([string]::IsNullOrWhiteSpace($CheckInId)) {
-            # Initial check-in: POST with monitor_config for auto-creation
-            $url = "https://sentry.io/api/0/organizations/$sentryOrg/monitors/$MonitorSlug/checkins/"
+            # Initial check-in: POST with monitor_config for upsert/auto-creation
             $body = @{
                 status         = $Status
                 monitor_config = @{
@@ -452,7 +467,7 @@ function Push-SentryCheckIn {
                 }
             }
             $json = $body | ConvertTo-Json -Compress -Depth 5
-            $resp = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop
+            $resp = Invoke-RestMethod -Uri $baseUrl -Method Post -Headers $headers -Body $json -ErrorAction Stop
             $newId = $resp.id
             Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in started: $MonitorSlug" @{
                 monitor_slug = $MonitorSlug
@@ -461,11 +476,11 @@ function Push-SentryCheckIn {
             }
             return $newId
         } else {
-            # Completion check-in: PUT to update existing
-            $url = "https://sentry.io/api/0/organizations/$sentryOrg/monitors/$MonitorSlug/checkins/$CheckInId/"
+            # Completion check-in: POST with check_in_id to update existing
+            $url = "${baseUrl}?check_in_id=$CheckInId"
             $body = @{ status = $Status }
             $json = $body | ConvertTo-Json -Compress -Depth 5
-            Invoke-RestMethod -Uri $url -Method Put -Headers $headers -Body $json -ErrorAction Stop | Out-Null
+            Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop | Out-Null
             Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in completed: $MonitorSlug ($Status)" @{
                 monitor_slug = $MonitorSlug
                 status       = $Status
@@ -489,17 +504,20 @@ if (-not [string]::IsNullOrWhiteSpace($sentryAuthToken) -and -not [string]::IsNu
     Push-SentryApi "releases/" @{
         version  = $sentryRelease
         projects = $sentryProjects
-        refs     = @(@{ repository = "simsteward/simhub-plugin"; commit = $fullSha })
+        ref      = $fullSha
     }
 
+    # URL-encode release version for path segments ('+' in SemVer breaks URLs)
+    $encodedRelease = [System.Uri]::EscapeDataString($sentryRelease)
+
     # Deploy: simhub-plugin (C# DLLs)
-    Push-SentryApi "releases/$sentryRelease/deploys/" @{
+    Push-SentryApi "releases/$encodedRelease/deploys/" @{
         environment = 'local'
         name        = 'simhub-plugin'
     }
 
     # Deploy: web-dashboards (all HTML/JS dashboards)
-    Push-SentryApi "releases/$sentryRelease/deploys/" @{
+    Push-SentryApi "releases/$encodedRelease/deploys/" @{
         environment = 'local'
         name        = 'web-dashboards'
     }

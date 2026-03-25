@@ -218,6 +218,7 @@ namespace SimSteward.Plugin
 
         private void WriteBroadcastError(string context, Exception ex)
         {
+            if (ex != null) SentrySdk.CaptureException(ex);
             if (string.IsNullOrEmpty(_pluginDataPath)) return;
             var path = Path.Combine(_pluginDataPath, "broadcast-errors.log");
             var line = DateTime.UtcNow.ToString("o") + " " + context + (ex != null ? " " + ex.Message : "") + Environment.NewLine;
@@ -659,6 +660,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     var err = ex.Message ?? "replay_session_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
@@ -712,6 +714,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     var err = ex.Message ?? "replay_speed_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
@@ -746,6 +749,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     var err = ex.Message ?? "replay_seek_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
@@ -780,6 +784,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     var err = ex.Message ?? "replay_jump_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
@@ -810,6 +815,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     var err = ex.Message ?? "seek_to_incident_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
@@ -843,6 +849,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     LogActionResult(action, arg, correlationId, false, ex.Message);
                     return (false, null, ex.Message);
                 }
@@ -889,6 +896,7 @@ namespace SimSteward.Plugin
                 catch (Exception ex)
                 {
                     sw.Stop();
+                    SentrySdk.CaptureException(ex);
                     LogActionResult(action, arg, correlationId, false, ex.Message, BuildCaptureIncidentSupplement(parsed, sw.ElapsedMilliseconds));
                     return (false, null, ex.Message);
                 }
@@ -1070,6 +1078,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     _dashboardPingStatus = "Error: " + ex.Message;
                     // #region agent log
                     WriteAgentHttpDebug("H1,H3,H5", "dashboard_ping_error", new Dictionary<string, object>
@@ -1491,6 +1500,7 @@ namespace SimSteward.Plugin
                 }
                 catch (Exception ex)
                 {
+                    SentrySdk.CaptureException(ex);
                     _logger?.Warn($"iRacing SDK Stop failed: {ex.Message}");
                 }
                 _irsdk = null;
