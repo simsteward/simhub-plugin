@@ -1,0 +1,146 @@
+<h2>Test Selection — Sentry-Inspired Redesign</h2>
+<p class="subtitle">Sentry UI patterns adapted for test selection. Which combination resonates?</p>
+
+<div class="section">
+<h3>Sentry Patterns We Can Steal</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
+  <div style="background:rgba(31,156,255,0.06);border:1px solid rgba(31,156,255,0.15);border-radius:10px;padding:14px;">
+    <strong style="color:#1f9cff;">Issue Stream</strong>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin-top:4px;">Each test as a row with inline status pill, group tag, dependency badge, and a mini sparkline showing last-5-runs pass/fail history. Checkbox on hover, not always visible.</p>
+  </div>
+  <div style="background:rgba(189,52,254,0.06);border:1px solid rgba(189,52,254,0.15);border-radius:10px;padding:14px;">
+    <strong style="color:#bd34fe;">Tag Facets Sidebar</strong>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin-top:4px;">Instead of filter chips, a left sidebar with clickable facets: Group (6), Dependency (2), Has Feature Flag (1). Click a facet value to filter the stream. Sentry's signature pattern.</p>
+  </div>
+  <div style="background:rgba(14,242,114,0.06);border:1px solid rgba(14,242,114,0.15);border-radius:10px;padding:14px;">
+    <strong style="color:#0ef272;">Query Bar</strong>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin-top:4px;">A Sentry-style composable query bar at top: <code style="font-size:0.75rem;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">group:camera is:selected has:dependency</code>. Tags autocomplete. Feels powerful and searchable.</p>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h3>Mockup: The Sentry-Flavored Test Stream</h3>
+<div class="mockup">
+  <div class="mockup-header">Step 3 — Test Selection (Sentry-inspired)</div>
+  <div class="mockup-body" style="background:#060608;padding:0;">
+
+    <!-- Selection summary bar -->
+    <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.07);font-size:0.82rem;">
+      <label style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.5);cursor:pointer;">
+        <input type="checkbox" checked style="accent-color:#1f9cff;"> <span style="color:#eaeaea;font-weight:600;">9</span> of 13 selected
+      </label>
+      <div style="display:flex;gap:6px;margin-left:auto;">
+        <span style="padding:3px 10px;border-radius:99px;font-size:0.68rem;font-weight:600;background:rgba(31,156,255,0.1);color:#1f9cff;">Incident 2</span>
+        <span style="padding:3px 10px;border-radius:99px;font-size:0.68rem;font-weight:600;background:rgba(14,242,114,0.1);color:#0ef272;">SDK 3</span>
+        <span style="padding:3px 10px;border-radius:99px;font-size:0.68rem;font-weight:600;background:rgba(13,216,255,0.1);color:#0dd8ff;">Camera 2</span>
+        <span style="padding:3px 10px;border-radius:99px;font-size:0.68rem;font-weight:600;background:rgba(255,200,64,0.1);color:#ffc840;">Session 2</span>
+      </div>
+    </div>
+
+    <!-- Query bar -->
+    <div style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.07);">
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.07);background:rgba(0,0,0,0.2);font-size:0.78rem;">
+        <span style="color:rgba(255,255,255,0.3);">&#128269;</span>
+        <span style="padding:2px 8px;border-radius:4px;background:rgba(31,156,255,0.12);color:#1f9cff;font-size:0.72rem;font-weight:600;">is:selected</span>
+        <span style="color:rgba(255,255,255,0.3);font-size:0.78rem;">Filter by name, group, dependency...</span>
+      </div>
+    </div>
+
+    <div style="display:flex;">
+      <!-- Facet sidebar -->
+      <div style="width:160px;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.07);padding:12px;font-size:0.75rem;">
+        <div style="color:rgba(255,255,255,0.35);text-transform:uppercase;font-size:0.62rem;letter-spacing:0.1em;margin-bottom:8px;font-weight:600;">Group</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">Incident <span style="color:rgba(255,255,255,0.3);">2</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;background:rgba(31,156,255,0.08);cursor:pointer;color:#1f9cff;">SDK Data <span>3</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">Camera <span style="color:rgba(255,255,255,0.3);">2</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">Session <span style="color:rgba(255,255,255,0.3);">3</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">Discovery <span style="color:rgba(255,255,255,0.3);">1</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">High-Rate <span style="color:rgba(255,255,255,0.3);">1</span></div>
+        </div>
+        <div style="color:rgba(255,255,255,0.35);text-transform:uppercase;font-size:0.62rem;letter-spacing:0.1em;margin:14px 0 8px;font-weight:600;">Dependency</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">None <span style="color:rgba(255,255,255,0.3);">11</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">T0 <span style="color:rgba(255,255,255,0.3);">1</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.7);">Feature flag <span style="color:rgba(255,255,255,0.3);">1</span></div>
+        </div>
+      </div>
+
+      <!-- Test stream -->
+      <div style="flex:1;min-width:0;">
+        <!-- Row: T0 -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;">
+          <input type="checkbox" checked style="accent-color:#1f9cff;">
+          <span style="font-family:monospace;font-weight:700;color:#1f9cff;font-size:0.82rem;width:50px;">T0</span>
+          <span style="flex:1;font-size:0.84rem;font-weight:500;">Ground Truth Capture</span>
+          <span style="padding:2px 8px;border-radius:99px;font-size:0.62rem;font-weight:600;background:rgba(31,156,255,0.1);color:#1f9cff;">incident</span>
+          <span style="font-size:0.65rem;color:rgba(255,255,255,0.3);">no deps</span>
+        </div>
+        <!-- Row: T1 -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);">
+          <input type="checkbox" checked style="accent-color:#1f9cff;">
+          <span style="font-family:monospace;font-weight:700;color:#1f9cff;font-size:0.82rem;width:50px;">T1</span>
+          <span style="flex:1;font-size:0.84rem;font-weight:500;">Speed Sweep Detection</span>
+          <span style="padding:2px 8px;border-radius:99px;font-size:0.62rem;font-weight:600;background:rgba(31,156,255,0.1);color:#1f9cff;">incident</span>
+          <span style="font-size:0.65rem;color:rgba(255,255,255,0.3);">no deps</span>
+        </div>
+        <!-- Row: T2 -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);">
+          <input type="checkbox" checked style="accent-color:#1f9cff;">
+          <span style="font-family:monospace;font-weight:700;color:#1f9cff;font-size:0.82rem;width:50px;">T2</span>
+          <span style="flex:1;font-size:0.84rem;font-weight:500;">Variable Inventory</span>
+          <span style="padding:2px 8px;border-radius:99px;font-size:0.62rem;font-weight:600;background:rgba(14,242,114,0.1);color:#0ef272;">sdk</span>
+          <span style="font-size:0.65rem;color:rgba(255,255,255,0.3);">no deps</span>
+        </div>
+        <!-- Row: T7 (dependency) -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(255,200,64,0.02);">
+          <input type="checkbox" checked style="accent-color:#1f9cff;">
+          <span style="font-family:monospace;font-weight:700;color:#1f9cff;font-size:0.82rem;width:50px;">T7</span>
+          <span style="flex:1;font-size:0.84rem;font-weight:500;">Incident Re-Seek</span>
+          <span style="padding:2px 8px;border-radius:99px;font-size:0.62rem;font-weight:600;background:rgba(255,200,64,0.1);color:#ffc840;">session</span>
+          <span style="padding:2px 8px;border-radius:99px;font-size:0.62rem;font-weight:500;border:1px dashed rgba(31,156,255,0.3);color:#1f9cff;">← T0</span>
+        </div>
+        <!-- Row: T_60Hz (feature flag) -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);opacity:0.5;">
+          <input type="checkbox" style="accent-color:#1f9cff;">
+          <span style="font-family:monospace;font-weight:700;color:#1f9cff;font-size:0.82rem;width:50px;">T_60Hz</span>
+          <span style="flex:1;font-size:0.84rem;font-weight:500;">60 Hz Telemetry Dump</span>
+          <span style="padding:2px 8px;border-radius:99px;font-size:0.62rem;font-weight:600;background:rgba(189,52,254,0.1);color:#bd34fe;">high-rate</span>
+          <span style="padding:2px 8px;border-radius:99px;font-size:0.62rem;font-weight:500;border:1px dashed rgba(255,200,64,0.3);color:#ffc840;">&#9873; flag</span>
+        </div>
+        <div style="padding:8px 16px;font-size:0.72rem;color:rgba(255,255,255,0.25);text-align:center;">+ 8 more tests</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<h3 style="margin-top:28px;">Pick your direction</h3>
+<p class="subtitle">These can be combined. The Sentry patterns work with any of the original layouts.</p>
+
+<div class="options">
+  <div class="option" data-choice="stream" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Sentry Issue Stream (shown above)</h3>
+      <p><strong>Facet sidebar + query bar + flat stream rows.</strong> Most Sentry-native. Dense, scannable, powerful filtering. Selection summary bar at top. Dependencies and feature flags as inline badges. Group identity via colored tag pills. This is what Sentry Issues actually looks like — your future Sentry integration will feel seamless.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="stream-grid" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h3>Sentry Stream + Grid Hybrid</h3>
+      <p><strong>Facet sidebar + query bar, but tests as mini cards in a grid</strong> instead of flat rows. 2-3 column card grid grouped by color. More visual than pure stream, keeps the powerful Sentry filtering. Selection summary at top. Best of both worlds if you want more visual personality than rows.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="stream-kanban" onclick="toggleSelect(this)">
+    <div class="letter">G</div>
+    <div class="content">
+      <h3>Sentry Query Bar + Kanban Columns</h3>
+      <p><strong>Query bar at top, groups as side-by-side columns below.</strong> Drops the facet sidebar (columns ARE the facets). Each column header has the group tag color + select-all. Sentry query bar for search/filter. Merges Option D with Sentry's query language. Dependencies as cross-column connectors.</p>
+    </div>
+  </div>
+</div>

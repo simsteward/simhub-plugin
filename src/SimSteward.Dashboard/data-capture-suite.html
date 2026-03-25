@@ -6,64 +6,83 @@
 <title>Sim Steward — SDK Data Capture Suite</title>
 <style>
 :root {
-  --bg: #080808; --surface: rgba(255,255,255,0.03);
-  --border: rgba(255,255,255,0.08);
+  --bg: #060608; --surface: rgba(255,255,255,0.025);
+  --border: rgba(255,255,255,0.07);
+  --border-hover: rgba(255,255,255,0.14);
   --accent: #1f9cff; --green: #0ef272; --red: #ff5f5f; --yellow: #ffc840; --cyan: #0dd8ff;
-  --text: #f0f0f0; --muted: rgba(240,240,240,0.45);
-  --r: 10px;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  --text: #eaeaea; --muted: rgba(240,240,240,0.42);
+  --r: 12px;
+  --panel-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { min-height: 100%; background: var(--bg); color: var(--text); }
-.wrap { max-width: 1100px; margin: 0 auto; padding: 12px 14px 28px; display: flex; flex-direction: column; gap: 10px; }
-.topnav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.82rem; }
-.topnav a { color: var(--accent); text-decoration: none; }
-.topnav a:hover { text-decoration: underline; }
-.ws-pill { margin-left: auto; font-size: 0.72rem; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); }
-.ws-pill.ok  { color: var(--green); border-color: rgba(14,242,114,0.35); }
-.ws-pill.bad { color: var(--red);   border-color: rgba(255,95,95,0.35); }
-.banner { padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--border); background: rgba(255,200,64,0.06); font-size: 0.85rem; line-height: 1.4; }
-.banner.err { border-color: rgba(255,95,95,0.4); background: rgba(255,95,95,0.07); }
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+html, body { min-height: 100%; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 18px 20px 36px; display: flex; flex-direction: column; gap: 14px; }
+.topnav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; padding: 6px 0 2px; }
+.topnav a { color: var(--accent); text-decoration: none; transition: opacity 0.15s; }
+.topnav a:hover { opacity: 0.8; text-decoration: underline; }
+.ws-pill { margin-left: auto; font-size: 0.72rem; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); transition: all 0.3s ease; }
+.ws-pill.ok  { color: var(--green); border-color: rgba(14,242,114,0.3); background: rgba(14,242,114,0.06); }
+.ws-pill.bad { color: var(--red);   border-color: rgba(255,95,95,0.3); background: rgba(255,95,95,0.05); }
+.banner { padding: 12px 16px; border-radius: var(--r); border: 1px solid var(--border); background: rgba(255,200,64,0.06); font-size: 0.85rem; line-height: 1.5; }
+.banner.err { border-color: rgba(255,95,95,0.35); background: rgba(255,95,95,0.06); }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--panel-shadow); transition: border-color 0.3s ease; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
 .row:last-child { margin-bottom: 0; }
-.btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text); font-size: 0.82rem; cursor: pointer; }
-.btn:hover { border-color: var(--accent); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text); font-size: 0.82rem; cursor: pointer; transition: all 0.15s ease; }
+.btn:hover { border-color: var(--accent); background: rgba(31,156,255,0.06); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--border); background: rgba(255,255,255,0.04); transform: none; }
 .btn.primary { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
-.btn.primary.large { font-size: 0.92rem; font-weight: 600; padding: 11px 22px; border-width: 2px; }
+.btn.primary:hover { background: rgba(31,156,255,0.14); }
+.btn.primary.large { font-size: 0.92rem; font-weight: 600; padding: 11px 24px; border-width: 2px; letter-spacing: 0.01em; }
 .btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
-.btn.sm { padding: 4px 10px; font-size: 0.72rem; }
-.progress-bar-wrap { height: 6px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
-.progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
+.btn.danger:hover { background: rgba(255,95,95,0.12); }
+.btn.sm { padding: 5px 11px; font-size: 0.72rem; }
+.progress-bar-wrap { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; }
 .meta { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
 .meta strong { color: var(--text); font-weight: 600; }
-.mono { font-family: "Courier New", monospace; font-size: 0.72rem; }
-@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.45} }
+.mono { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-size: 0.72rem; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
 .running-label { animation: pulse 1.4s ease-in-out infinite; color: var(--accent); }
-input[type="checkbox"] { accent-color: var(--accent); }
+input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
 /* ── Step panels ──────────────────────────────────────────────── */
-.step { position: relative; border-left: 2px solid transparent; padding-left: 2px; transition: border-color 0.3s ease, opacity 0.25s ease; }
+.step { position: relative; border-left: 2px solid transparent; padding-left: 4px; transition: border-color 0.3s ease, opacity 0.3s ease; }
 .step.active { border-left-color: var(--accent); }
 .step.done   { border-left-color: var(--green); }
-.step.future { opacity: 0.5; pointer-events: none; }
-.step-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-.step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); font-size: 0.6rem; font-weight: 700; color: var(--muted); transition: border-color 0.3s, color 0.3s; }
-.step.active .step-num { border-color: var(--accent); color: var(--accent); }
-.step.done .step-num   { border-color: var(--green); color: var(--green); }
+.step.future { opacity: 0.4; pointer-events: none; }
+.step-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 7px; font-weight: 500; }
+.step-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); font-size: 0.62rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
+.step.active .step-num { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px rgba(31,156,255,0.2); }
+.step.done .step-num   { border-color: var(--green); color: var(--green); box-shadow: 0 0 8px rgba(14,242,114,0.15); }
+
+/* Section background gradients */
+.step-bg-1 { background: radial-gradient(at 0% 0%, rgba(31,156,255,0.06) 0%, transparent 50%), var(--surface); }
+.step-bg-2 { background: radial-gradient(at 100% 0%, rgba(14,242,114,0.06) 0%, transparent 50%), var(--surface); }
+.step-bg-3 { background: radial-gradient(at 0% 100%, rgba(13,216,255,0.06) 0%, transparent 50%), var(--surface); }
+.step-bg-4 { background: radial-gradient(at 100% 100%, rgba(255,200,64,0.06) 0%, transparent 50%), var(--surface); }
+.step-bg-5 { background: radial-gradient(at 50% 0%, rgba(189,52,254,0.06) 0%, transparent 60%), var(--surface); }
+.step-bg-6 { background: radial-gradient(at 100% 50%, rgba(14,242,114,0.05) 0%, transparent 55%), var(--surface); }
 
 /* ── Signals ──────────────────────────────────────────────────── */
-.signals { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 0.78rem; }
-.sig { display: flex; align-items: center; gap: 4px; }
-.sig-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; transition: background 0.2s; }
-.sig-dot.ok { background: var(--green); }
-.sig-dot.warn { background: var(--yellow); }
-.sig-label { color: var(--muted); }
+.signals { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 0.78rem; }
+.sig { display: flex; align-items: center; gap: 6px; }
+.sig-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; transition: all 0.3s ease; box-shadow: 0 0 6px rgba(255,95,95,0.3); }
+.sig-dot.ok { background: var(--green); box-shadow: 0 0 6px rgba(14,242,114,0.3); }
+.sig-dot.warn { background: var(--yellow); box-shadow: 0 0 6px rgba(255,200,64,0.3); }
+.sig-label { color: var(--muted); font-size: 0.76rem; }
 
 /* ── Precondition card ────────────────────────────────────────── */
-.pc-tests { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
-.pc-row { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-radius: 6px; border: 1px solid transparent; transition: border-color 0.3s, background 0.4s; background: transparent; }
+.pc-tests { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.pc-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 8px; border: 1px solid transparent; transition: border-color 0.3s, background 0.4s; background: transparent; }
 .pc-row.running { border-color: rgba(31,156,255,0.25); background: linear-gradient(90deg, rgba(31,156,255,0.08) 0%, rgba(31,156,255,0.03) 60%, transparent 100%); }
 .pc-row.pass { background: rgba(14,242,114,0.05); }
 .pc-row.fail { background: rgba(255,95,95,0.08); border-color: rgba(255,95,95,0.25); }
@@ -84,38 +103,39 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .pc-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
 /* ── Filter bar ───────────────────────────────────────────────── */
-.filter-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
-.filter-chip { padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.72rem; cursor: pointer; transition: all 0.15s; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+.filter-chip { padding: 5px 13px; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.72rem; cursor: pointer; transition: all 0.15s ease; }
 .filter-chip:hover { border-color: var(--accent); color: var(--text); }
 .filter-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
-.filter-input { padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: var(--text); font-size: 0.72rem; outline: none; margin-left: auto; width: 160px; }
-.filter-input:focus { border-color: var(--accent); }
+.filter-input { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: var(--text); font-size: 0.72rem; outline: none; margin-left: auto; width: 170px; transition: border-color 0.2s, box-shadow 0.2s; }
+.filter-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(31,156,255,0.1); }
 .filter-input::placeholder { color: var(--muted); }
 
 /* ── Test selection cards ─────────────────────────────────────── */
-.test-groups { display: flex; flex-direction: column; gap: 14px; }
-.test-group-hdr { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.test-groups { display: flex; flex-direction: column; gap: 16px; }
+.test-group-hdr { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding-bottom: 6px; border-bottom: 1px solid var(--border); transition: border-color 0.2s; }
+.test-group-hdr:hover { border-bottom-color: var(--border-hover); }
 .test-group-hdr input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
 .test-group-name { font-weight: 600; font-size: 0.88rem; }
 .test-group-count { font-size: 0.72rem; color: var(--muted); }
 .test-group-chevron { font-size: 0.75rem; color: var(--muted); transition: transform 0.25s ease; display: inline-block; }
 .test-group-chevron.collapsed { transform: rotate(-90deg); }
 .test-group-status { margin-left: auto; font-size: 0.72rem; font-weight: 600; }
-.test-cards { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; overflow: hidden; max-height: 2000px; transition: max-height 0.25s ease, margin-top 0.25s ease, opacity 0.2s ease; opacity: 1; }
+.test-cards { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; overflow: hidden; max-height: 2000px; transition: max-height 0.3s ease, margin-top 0.3s ease, opacity 0.25s ease; opacity: 1; }
 .test-cards.collapsed { max-height: 0; margin-top: 0; opacity: 0; }
-.test-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); cursor: default; transition: border-color 0.15s; }
-.test-card:hover { border-color: rgba(255,255,255,0.18); }
+.test-card { display: flex; align-items: flex-start; gap: 12px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); cursor: default; transition: border-color 0.2s, background 0.2s; }
+.test-card:hover { border-color: var(--border-hover); background: rgba(0,0,0,0.18); }
 .test-card.filtered-out { display: none; }
 .test-card input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; cursor: pointer; }
 .test-card-body { flex: 1; min-width: 0; }
 .test-card-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.test-id { font-family: "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.85rem; }
+.test-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.84rem; }
 .test-name { font-weight: 600; font-size: 0.85rem; }
-.test-desc { font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+.test-desc { font-size: 0.78rem; color: var(--muted); margin-top: 4px; line-height: 1.45; }
 .test-card-pill { margin-left: auto; flex-shrink: 0; }
 
 /* ── Status pills ─────────────────────────────────────────────── */
-.pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.pill { display: inline-block; padding: 4px 11px; border-radius: 99px; font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .pill.pending  { color: var(--muted);  background: rgba(255,255,255,0.06); }
 .pill.emitted  { color: var(--cyan);   background: rgba(13,216,255,0.12); }
 .pill.found    { color: var(--accent); background: rgba(31,156,255,0.12); }
@@ -162,40 +182,44 @@ input[type="checkbox"] { accent-color: var(--accent); }
 
 /* ── Result cards ─────────────────────────────────────────────── */
 .result-cards { display: flex; flex-direction: column; gap: 8px; }
-.result-card { border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); overflow: hidden; }
-.result-card.status-fail { border-color: rgba(255,95,95,0.3); }
-.result-card.status-pass { border-color: rgba(14,242,114,0.15); }
-.result-card.status-running { border-color: rgba(31,156,255,0.3); }
-.result-main { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; cursor: pointer; }
+.result-card { border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
+.result-card:hover { border-color: var(--border-hover); }
+.result-card.status-fail { border-color: rgba(255,95,95,0.25); background: rgba(255,95,95,0.02); }
+.result-card.status-pass { border-color: rgba(14,242,114,0.12); background: rgba(14,242,114,0.015); }
+.result-card.status-running { border-color: rgba(31,156,255,0.25); background: rgba(31,156,255,0.02); }
+.result-main { display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px; cursor: pointer; transition: background 0.15s; }
 .result-main:hover { background: rgba(255,255,255,0.02); }
-.result-status { flex-shrink: 0; min-width: 70px; }
+.result-status { flex-shrink: 0; min-width: 72px; }
 .result-body { flex: 1; min-width: 0; }
 .result-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.result-id { font-family: "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.88rem; }
+.result-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.88rem; }
 .result-name { font-weight: 600; font-size: 0.88rem; }
-.result-desc { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
-.result-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+.result-desc { font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 0.78rem; color: var(--muted); }
 .result-meta strong { color: var(--text); font-weight: 600; }
-.result-error { color: var(--red); font-size: 0.82rem; margin-top: 4px; font-weight: 500; }
+.result-error { color: var(--red); font-size: 0.82rem; margin-top: 5px; font-weight: 500; }
 .result-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; align-self: center; }
-.result-detail { padding: 10px 16px 14px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.25); font-size: 0.78rem; }
+.result-detail { max-height: 0; overflow: hidden; padding: 0 18px; border-top: 1px solid transparent; background: rgba(0,0,0,0.2); font-size: 0.78rem; line-height: 1.5; opacity: 0; transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.2s ease, border-top-color 0.2s; }
+.result-detail.open { max-height: 500px; padding: 12px 18px 16px; border-top-color: var(--border); opacity: 1; }
 .result-detail .mono { word-break: break-all; margin: 6px 0; line-height: 1.5; }
 
 /* ── KPI grid ─────────────────────────────────────────────────── */
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 8px; }
-.kpi-cell { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; }
+.kpi-cell { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.18); transition: border-color 0.2s; }
+.kpi-cell:hover { border-color: var(--border-hover); }
 .kpi-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.kpi-val { font-size: 1.1rem; font-weight: 700; margin-top: 2px; }
+.kpi-val { font-size: 1.15rem; font-weight: 700; margin-top: 4px; }
 
 /* ── Test cases (incident cards) ──────────────────────────────── */
-.incident-card { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); font-size: 0.78rem; cursor: pointer; }
-.incident-card:hover { border-color: var(--accent); }
+.incident-card { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); font-size: 0.78rem; cursor: pointer; transition: all 0.15s ease; }
+.incident-card:hover { border-color: var(--accent); background: rgba(31,156,255,0.04); }
 .incident-card .ic-idx { font-weight: 700; color: var(--accent); }
 .incident-card .ic-reason { font-size: 0.68rem; color: var(--muted); }
 
 /* ── Grafana confirmation ─────────────────────────────────────── */
-.confirm-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 0.78rem; }
-.confirm-item { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); }
+.confirm-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 0.78rem; }
+.confirm-item { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); transition: border-color 0.15s; }
+.confirm-item:hover { border-color: var(--border-hover); }
 .confirm-item .c-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
 .confirm-item .c-dot.ok { background: var(--green); }
 .confirm-item .c-dot.fail { background: var(--red); }
@@ -203,12 +227,28 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .confirm-summary { font-size: 0.82rem; font-weight: 600; }
 .explore-btn { display: none; }
 .explore-btn.show { display: inline-flex; }
+
+/* ── Microinteractions ───────────────────────────────────────── */
+@keyframes flash-hl { 0% { background-color: rgba(31,156,255,0.1); } 100% { background-color: transparent; } }
+.flash { animation: flash-hl 0.4s ease-out; }
+@keyframes check-flash { 0% { box-shadow: 0 0 0 3px rgba(31,156,255,0.25); } 100% { box-shadow: 0 0 0 3px transparent; } }
+.check-flash { animation: check-flash 0.4s ease-out; }
+@keyframes copied-pop { 0%,70% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-6px); } }
+.copy-toast { display: inline-block; font-size: 0.65rem; color: var(--green); font-weight: 600; margin-left: 8px; pointer-events: none; animation: copied-pop 1.2s ease-out forwards; }
+@keyframes ws-reconnect { 0% { box-shadow: 0 0 0 0 rgba(14,242,114,0.4); } 70% { box-shadow: 0 0 0 8px rgba(14,242,114,0); } 100% { box-shadow: 0 0 0 0 rgba(14,242,114,0); } }
+.ws-pill.reconnected { animation: ws-reconnect 0.8s ease-out; }
+.incident-card:active { transform: scale(0.97); }
+.result-card.just-expanded { border-color: var(--border-hover); }
+.test-card.toggled { animation: flash-hl 0.35s ease-out; }
+.filter-count { font-size: 0.65rem; color: var(--muted); margin-left: 6px; transition: opacity 0.2s; }
+.filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 0 4px; margin-left: -28px; margin-right: 4px; transition: color 0.15s; z-index: 1; }
+.filter-clear:hover { color: var(--text); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <nav class="topnav">
-    <a href="index.html">&larr; Sim Steward dashboard</a>
+    <a href="index.html" id="nav-back" onclick="logUI('nav-back','click','Navigate to main dashboard')">&larr; Sim Steward dashboard</a>
     <span style="color:var(--muted)">SDK Data Capture Suite</span>
     <span class="mono" id="lbl-version" style="color:var(--muted);font-size:0.65rem"></span>
     <span class="ws-pill bad" id="ws-pill">WS &hellip;</span>
@@ -217,7 +257,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
   <div class="banner err" id="guard-banner" hidden></div>
 
   <!-- Step 1: Signals -->
-  <div class="step panel" id="step-1">
+  <div class="step panel step-bg-1" id="step-1">
     <div class="step-label"><span class="step-num">1</span> Signals</div>
     <div class="signals" id="signals">
       <span class="sig"><span class="sig-dot" id="sig-ws"></span><span class="sig-label">WS</span></span>
@@ -231,7 +271,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
   </div>
 
   <!-- Step 2: Pre-test Conditions -->
-  <div class="step panel" id="step-2">
+  <div class="step panel step-bg-2" id="step-2">
     <div class="step-label"><span class="step-num">2</span> Pre-test Conditions</div>
     <div class="row" style="margin-bottom:8px">
       <span style="font-size:0.78rem;color:var(--muted)">Replay scope:</span>
@@ -249,14 +289,14 @@ input[type="checkbox"] { accent-color: var(--accent); }
   </div>
 
   <!-- Step 3: Test Selection -->
-  <div class="step panel" id="step-3">
+  <div class="step panel step-bg-3" id="step-3">
     <div class="step-label"><span class="step-num">3</span> Test Selection</div>
     <div class="filter-bar" id="filter-bar"></div>
     <div class="test-groups" id="test-select"></div>
   </div>
 
   <!-- Step 4: Execute -->
-  <div class="step panel" id="step-4">
+  <div class="step panel step-bg-4" id="step-4">
     <div class="step-label"><span class="step-num">4</span> Execute</div>
     <div class="row">
       <button class="btn primary large" id="btn-start" onclick="sendStart()" disabled>&#9654; Run Selected Tests</button>
@@ -274,7 +314,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
   </div>
 
   <!-- Step 5: Results -->
-  <div class="step panel" id="step-5">
+  <div class="step panel step-bg-5" id="step-5">
     <div class="step-label"><span class="step-num">5</span> Results</div>
     <div class="legend" style="margin-bottom:10px">
       <span class="legend-item" title="Test has not started yet"><span class="legend-swatch sw-pending"></span> Pending</span>
@@ -300,11 +340,11 @@ input[type="checkbox"] { accent-color: var(--accent); }
   </div>
 
   <!-- Step 6: Grafana Confirmation -->
-  <div class="step panel" id="step-6">
+  <div class="step panel step-bg-6" id="step-6">
     <div class="step-label"><span class="step-num">6</span> Grafana Confirmation</div>
     <div class="row">
       <button class="btn" id="btn-verify" onclick="sendAction('verify')" disabled title="Re-query Loki for latest results">&#8635; Re-verify</button>
-      <a class="btn primary explore-btn" id="btn-grafana" href="#" target="_blank" rel="noopener">&#11041; Open in Grafana</a>
+      <a class="btn primary explore-btn" id="btn-grafana" href="#" target="_blank" rel="noopener" onclick="logUI('btn-grafana','click','Open suite in Grafana')">&#11041; Open in Grafana</a>
       <span class="confirm-summary" id="confirm-summary"></span>
     </div>
     <div class="confirm-grid" id="confirm-grid"></div>
@@ -323,6 +363,20 @@ let _lokiPhaseStart = null;
 let _expandedRows = new Set();
 let _lastStepName = null;
 let _lastPhase = null;
+let _filterDebounce = null;
+
+// ── Microinteraction helpers ─────────────────────────────────────────
+function logUI(elementId, eventType, message) {
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: elementId, event_type: eventType, message: message });
+}
+
+function flashEl(el, cls, ms) {
+  if (!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth; // force reflow
+  el.classList.add(cls);
+  setTimeout(function() { el.classList.remove(cls); }, ms || 500);
+}
 
 // ── Test metadata ────────────────────────────────────────────────────
 const TEST_META = {
@@ -441,10 +495,10 @@ function buildFilterBar() {
       const cardsEl = document.getElementById('cards-' + g.id);
       if (cardsEl) {
         cardsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        // Brief highlight
         const hdr = document.getElementById('grp-hdr-' + g.id);
-        if (hdr) { hdr.style.background = 'rgba(31,156,255,0.08)'; setTimeout(() => hdr.style.background = '', 600); }
+        if (hdr) flashEl(hdr, 'flash', 600);
       }
+      logUI('fchip-' + g.id, 'click', 'Filter chip: ' + g.label);
     };
     bar.appendChild(chip);
   });
@@ -454,20 +508,50 @@ function buildFilterBar() {
   input.placeholder = 'Filter tests\u2026';
   input.className = 'filter-input';
   input.id = 'filter-input';
-  input.addEventListener('input', () => filterTestCards(input.value));
+  input.addEventListener('input', () => {
+    filterTestCards(input.value);
+    clearBtn.style.display = input.value ? 'inline' : 'none';
+    clearTimeout(_filterDebounce);
+    _filterDebounce = setTimeout(() => {
+      if (input.value.trim()) logUI('filter-input', 'input', 'Filter: ' + input.value.trim());
+    }, 600);
+  });
   bar.appendChild(input);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'filter-clear';
+  clearBtn.textContent = '\u00D7';
+  clearBtn.title = 'Clear filter';
+  clearBtn.style.display = 'none';
+  clearBtn.onclick = () => {
+    input.value = '';
+    filterTestCards('');
+    clearBtn.style.display = 'none';
+    logUI('filter-clear', 'click', 'Clear filter');
+  };
+  bar.appendChild(clearBtn);
+
+  const countSpan = document.createElement('span');
+  countSpan.className = 'filter-count';
+  countSpan.id = 'filter-match-count';
+  bar.appendChild(countSpan);
 }
 
 function filterTestCards(query) {
   const q = query.toLowerCase().trim();
+  let visible = 0;
   ALL_TEST_IDS.forEach(id => {
     const card = document.getElementById('tcard-' + id);
     if (!card) return;
-    if (!q) { card.classList.remove('filtered-out'); return; }
+    if (!q) { card.classList.remove('filtered-out'); visible++; return; }
     const meta = TEST_META[id] || {};
     const text = (id + ' ' + (meta.name || '') + ' ' + (meta.desc || '')).toLowerCase();
-    card.classList.toggle('filtered-out', !text.includes(q));
+    const match = text.includes(q);
+    card.classList.toggle('filtered-out', !match);
+    if (match) visible++;
   });
+  const countEl = document.getElementById('filter-match-count');
+  if (countEl) countEl.textContent = q ? visible + '/' + ALL_TEST_IDS.length + ' shown' : '';
 }
 
 // ── Test selection ───────────────────────────────────────────────────
@@ -490,6 +574,8 @@ function buildTestSelect() {
         if (cb) { cb.checked = groupCb.checked; cb.disabled = false; }
       });
       enforceT0T7();
+      flashEl(hdr, 'flash', 400);
+      logUI('grp-' + g.id, 'change', 'Group ' + g.label + ' ' + (groupCb.checked ? 'selected' : 'deselected'));
     });
     hdr.appendChild(groupCb);
     const chevron = document.createElement('span');
@@ -515,8 +601,10 @@ function buildTestSelect() {
     cards.id = 'cards-' + g.id;
 
     hdr.addEventListener('click', () => {
+      const wasCollapsed = cards.classList.contains('collapsed');
       cards.classList.toggle('collapsed');
       chevron.classList.toggle('collapsed');
+      logUI('grp-hdr-' + g.id, 'click', 'Group ' + g.label + ' ' + (wasCollapsed ? 'expanded' : 'collapsed'));
     });
 
     g.tests.forEach(t => {
@@ -531,6 +619,8 @@ function buildTestSelect() {
         selectedTests[cb.checked ? 'add' : 'delete'](t);
         updateGroupState(g);
         enforceT0T7();
+        flashEl(card, 'toggled', 350);
+        logUI('cb-' + t, 'change', 'Test ' + t + ' ' + (cb.checked ? 'selected' : 'deselected'));
       });
       card.appendChild(cb);
 
@@ -777,9 +867,23 @@ buildTestSelect();
 
 // ── WebSocket ────────────────────────────────────────────────────────
 function connect() {
+  var wasConnected = _wsOk;
   ws = new WebSocket('ws://127.0.0.1:' + WS_PORT);
-  ws.addEventListener('open', () => { _wsOk = true; setPill(true); });
-  ws.addEventListener('close', () => { _wsOk = false; _pluginSeen = false; setPill(false); setTimeout(connect, 2000); });
+  ws.addEventListener('open', () => {
+    _wsOk = true;
+    setPill(true);
+    if (wasConnected === false) {
+      flashEl(document.getElementById('ws-pill'), 'reconnected', 800);
+    }
+    // Log after open so send() works
+    logUI('ws-pill', 'state_change', 'WebSocket connected');
+  });
+  ws.addEventListener('close', () => {
+    _wsOk = false;
+    _pluginSeen = false;
+    setPill(false);
+    setTimeout(connect, 2000);
+  });
   ws.addEventListener('message', ev => {
     try {
       const msg = JSON.parse(ev.data);
@@ -1065,7 +1169,7 @@ function renderIdleResults(currentStepName) {
     const detail = document.createElement('div');
     detail.className = 'result-detail';
     detail.id = 'detail-' + id;
-    detail.hidden = !_expandedRows.has(id);
+    if (_expandedRows.has(id)) detail.classList.add('open');
     detail.innerHTML =
       '<div><strong>Loki event:</strong> <span class="mono">' + esc(meta.event) + '</span></div>' +
       '<div><strong>Pass criteria:</strong> ' + esc(meta.pass) + '</div>' +
@@ -1115,14 +1219,14 @@ function renderResults(results, runId, currentStepName) {
         buildSubstepsHtml(r.testId, currentStepName, displayStatus) +
       '</div>' +
       '<div class="result-actions">' +
-        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="event.stopPropagation()" title="Open in Grafana Explore">Explore</a>' : '') +
+        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="logUI(\'explore-' + esc(r.testId) + '\',\'click\',\'Open Grafana for ' + esc(r.testId) + '\');event.stopPropagation()" title="Open in Grafana Explore">Explore</a>' : '') +
       '</div>';
     card.appendChild(main);
 
     const detail = document.createElement('div');
     detail.className = 'result-detail';
     detail.id = 'detail-' + r.testId;
-    detail.hidden = !_expandedRows.has(r.testId);
+    if (_expandedRows.has(r.testId)) detail.classList.add('open');
     const logql = runId ? '{app="sim-steward"} |json |test_run_id="' + runId + '" |event="' + (r.eventName || '') + '"' : '';
     detail.innerHTML =
       '<div><strong>Event name:</strong> <span class="mono">' + esc(r.eventName || meta.event || '') + '</span></div>' +
@@ -1132,9 +1236,9 @@ function renderResults(results, runId, currentStepName) {
       '<div><strong>Loki lines:</strong> ' + r.lokiCount + '</div>' +
       (r.error ? '<div style="color:var(--red)"><strong>Error:</strong> ' + esc(r.error) + '</div>' : '') +
       '<div class="mono">' + esc(logql) + '</div>' +
-      '<div style="margin-top:6px;display:flex;gap:8px">' +
-        '<button class="btn sm" onclick="navigator.clipboard.writeText(' + JSON.stringify(logql).replace(/</g, '\\u003c') + ');event.stopPropagation()">Copy LogQL</button>' +
-        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="event.stopPropagation()">Open in Grafana</a>' : '') +
+      '<div style="margin-top:6px;display:flex;gap:8px;align-items:center">' +
+        '<button class="btn sm" id="copy-btn-' + esc(r.testId) + '" onclick="copyLogQL(this,' + JSON.stringify(logql).replace(/</g, '\\u003c') + ',\'' + esc(r.testId) + '\');event.stopPropagation()">Copy LogQL</button>' +
+        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="logUI(\'explore-' + esc(r.testId) + '\',\'click\',\'Open Grafana for ' + esc(r.testId) + '\');event.stopPropagation()">Open in Grafana</a>' : '') +
       '</div>';
     card.appendChild(detail);
     container.appendChild(card);
@@ -1144,11 +1248,32 @@ function renderResults(results, runId, currentStepName) {
 function toggleDetail(testId) {
   const el = document.getElementById('detail-' + testId);
   if (!el) return;
-  if (_expandedRows.has(testId)) { _expandedRows.delete(testId); el.hidden = true; }
-  else { _expandedRows.add(testId); el.hidden = false; }
+  if (_expandedRows.has(testId)) {
+    _expandedRows.delete(testId);
+    el.classList.remove('open');
+    logUI('detail-' + testId, 'click', 'Result ' + testId + ' collapsed');
+  } else {
+    _expandedRows.add(testId);
+    el.classList.add('open');
+    var card = el.closest('.result-card');
+    if (card) flashEl(card, 'just-expanded', 600);
+    logUI('detail-' + testId, 'click', 'Result ' + testId + ' expanded');
+  }
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+function copyLogQL(btn, logql, testId) {
+  navigator.clipboard.writeText(logql);
+  var existing = btn.parentNode.querySelector('.copy-toast');
+  if (existing) existing.remove();
+  var toast = document.createElement('span');
+  toast.className = 'copy-toast';
+  toast.textContent = 'Copied!';
+  btn.parentNode.insertBefore(toast, btn.nextSibling);
+  setTimeout(function() { toast.remove(); }, 1200);
+  logUI('copy-logql-' + testId, 'click', 'Copied LogQL for ' + testId);
+}
 
 // ── Test Cases panel ─────────────────────────────────────────────────
 function renderTestCases(incidents) {
@@ -1160,7 +1285,11 @@ function renderTestCases(incidents) {
   incidents.forEach(inc => {
     const card = document.createElement('div');
     card.className = 'incident-card';
-    card.onclick = () => { send({ action: 'seek_frame', arg: String(inc.frame) }); };
+    card.onclick = () => {
+      send({ action: 'seek_to_incident', arg: String(inc.frame) });
+      flashEl(card, 'flash', 400);
+      logUI('incident-' + inc.index, 'click', 'Seek to incident ' + inc.index + ' frame ' + inc.frame);
+    };
     card.innerHTML =
       '<span class="ic-idx">' + String.fromCodePoint(0x2460 + inc.index) + '</span>' +
       '<span>Lap ' + inc.lap + ' \u2014 #' + esc(inc.carNumber) + ' ' + esc(inc.driverName) + '</span>' +

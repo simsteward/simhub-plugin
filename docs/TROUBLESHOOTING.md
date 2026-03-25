@@ -140,7 +140,7 @@ For a step-by-step to get plugin data into **local** Grafana, see **docs/observa
 
 If you expect SimSteward logs in Grafana (Cloud or local) but see none:
 
-1. **Plugin output** — The plugin writes **plugin-structured.jsonl** only (plus WebSocket to the dashboard). It does **not** batch-POST those lines to Loki in-process yet. **`deploy.ps1`** can POST a **`deploy_marker`** when **`SIMSTEWARD_LOKI_URL`** is set (see **`send-deploy-loki-marker.ps1`**). For full logs in Loki, tail **plugin-structured.jsonl** with Alloy/Promtail or similar.
+1. **Plugin output** — The plugin writes **plugin-structured.jsonl** only (plus WebSocket to the dashboard). It does **not** batch-POST those lines to Loki in-process yet. **`deploy.ps1`** can POST a **`deploy_marker`** when **`SIMSTEWARD_LOKI_URL`** is set (see **`send-deploy-loki-marker.ps1`**). For full logs in Loki, use an external shipper to tail **plugin-structured.jsonl**.
 2. **Env metadata** — Set `SIMSTEWARD_LOKI_URL` and `SIMSTEWARD_LOG_ENV` before SimHub starts (e.g. `.env` loaded by **`deploy.ps1`** / **`run-simhub-local-observability.ps1`**) so JSON includes `loki_push_target` / `log_env`.
 3. **Local stack** — Start observability from `observability/local/` (`npm run obs:up`) so Loki (3100) and Grafana (3000) run; compose does **not** ingest **plugin-structured.jsonl** automatically.
 4. **Auth (Grafana Cloud / gateway)** — For **deploy markers**: Grafana Cloud uses **Basic** (`SIMSTEWARD_LOKI_USER` + **`SIMSTEWARD_LOKI_TOKEN`**); local **loki-gateway** uses **Bearer `LOKI_PUSH_TOKEN`**. Push failures print in the deploy script output.

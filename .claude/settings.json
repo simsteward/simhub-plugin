@@ -16,7 +16,8 @@
       "mcp__contextstream__session",
       "mcp__contextstream__skill",
       "mcp__contextstream__workspace",
-      "WebSearch"
+      "WebSearch",
+      "mcp__claude_ai_Sentry__*"
     ]
   },
   "enabledPlugins": {

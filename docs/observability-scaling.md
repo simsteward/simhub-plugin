@@ -46,7 +46,7 @@ Plugin → **`plugin-structured.jsonl`** (durability) + WebSocket to dashboard. 
 
 ### Target / production shape
 
-Always write **`plugin-structured.jsonl`**. **Intended:** batch **HTTPS POST** of NDJSON to **`SIMSTEWARD_LOKI_URL`** from inside the plugin (or an approved sidecar), **or** tail the same file with **Grafana Alloy** / Promtail — **one** Loki HTTP endpoint (central or Grafana Cloud).
+Always write **`plugin-structured.jsonl`**. **Intended:** batch **HTTPS POST** of NDJSON to **`SIMSTEWARD_LOKI_URL`** from inside the plugin (or an approved sidecar) — **one** Loki HTTP endpoint (central or Grafana Cloud).
 
 ### Recommendation
 

@@ -1,0 +1,42 @@
+<h2>Step 3: Test Selection — All Options Including D</h2>
+<p class="subtitle">Four directions. Click your pick — or describe a hybrid in the terminal.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Grid Cards with Group Lanes</h3>
+      <p>Horizontal grid. Groups as colored lanes. Tests as compact cards in 2-3 columns. Sticky selection summary bar at top. Dependency lines between cards.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Compact Tag Table + Selection Tray</h3>
+      <p>Dense table — one row per test. Toggle switches, group tag pills, dependency badges. Floating selection tray at bottom with removable chips. All 13 tests visible in one viewport.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Interactive Test Map (DAG)</h3>
+      <p>Pipeline node map. Tests as toggleable nodes with group colors. Dependency arrows (T0→T7). Background regions per group. Sticky summary strip. Most visual, most complex.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Kanban-Style Group Columns</h3>
+      <p>Each test group becomes a <strong>vertical column</strong> side-by-side — like a Kanban board. Column headers carry the group name + color accent + select-all toggle. Tests are stacked cards within each column. Dependencies shown as a subtle dashed connector between columns. A <strong>persistent selection bar</strong> spans the full width above the columns: "9 of 13 selected — Incident Capture (2) · SDK Data (3) · Camera (2) · Session (2)". The whole layout is horizontally scrollable if needed but aims to fit in viewport. Group columns have distinct radial gradient backgrounds (matching the step-bg pattern from the rest of the page).</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Groups are visually parallel and scannable at a glance</li><li>Natural mental model — "columns of work"</li><li>Fits the page's existing gradient language</li><li>Easy to see what's selected per group</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Horizontal space needed — may compress on narrow screens</li><li>Uneven column heights (1 test vs 3 tests)</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Or tell me what you'd combine — e.g. "D's columns but with A's summary bar and C's dependency arrows"</p>
