@@ -59,3 +59,10 @@ debug-*.log
 
 # Local observability stack host data (Docker bind mounts)
 observability/local/.storage/
+
+# ContextStream logs/support exports
+contextstream-logs-*.json
+contextstream-support-case-*.md
+
+# Session metrics (local only)
+logs/claude-session-metrics.jsonl
