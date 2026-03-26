@@ -506,14 +506,14 @@ function buildModelComparison() {
   p.push(barchartPanel(++id, 'Output Tokens per Dollar (by Model)', [
     target(
       `sum by (model) (sum_over_time(${M_ALL} | json total_output_tokens | unwrap total_output_tokens [$__range])) / sum by (model) (sum_over_time(${M_ALL} | json cost_usd | unwrap cost_usd [$__range]))`,
-      '{{model}}'
+      '{{model}}', 'instant'
     )
   ], 0, y, 12, 10, { unit: 'short', colorOverrides: MODEL_COLORS }));
 
   p.push(barchartPanel(++id, 'Cost per Turn (by Model)', [
     target(
       `sum by (model) (sum_over_time(${M_ALL} | json cost_usd | unwrap cost_usd [$__range])) / sum by (model) (sum_over_time(${M_ALL} | json assistant_turns | unwrap assistant_turns [$__range]))`,
-      '{{model}}'
+      '{{model}}', 'instant'
     )
   ], 12, y, 12, 10, { unit: 'currencyUSD', colorOverrides: MODEL_COLORS }));
   y += 10;
@@ -570,11 +570,11 @@ function buildModelComparison() {
   p.push(barchartPanel(++id, 'Avg Session Cost: Thinking vs Standard', [
     target(
       `sum(sum_over_time(${thinkOn} | json cost_usd | unwrap cost_usd [$__range])) / count(count_over_time(${thinkOn} [$__range]))`,
-      'Thinking On', 'range', 'A'
+      'Thinking On', 'instant', 'A'
     ),
     target(
       `sum(sum_over_time(${thinkOff} | json cost_usd | unwrap cost_usd [$__range])) / count(count_over_time(${thinkOff} [$__range]))`,
-      'Thinking Off', 'range', 'B'
+      'Thinking Off', 'instant', 'B'
     )
   ], 0, y, 8, 9, {
     unit: 'currencyUSD', orientation: 'auto',
@@ -584,11 +584,11 @@ function buildModelComparison() {
   p.push(barchartPanel(++id, 'Avg Output Tokens: Thinking vs Standard', [
     target(
       `sum(sum_over_time(${thinkOn} | json total_output_tokens | unwrap total_output_tokens [$__range])) / count(count_over_time(${thinkOn} [$__range]))`,
-      'Thinking On', 'range', 'A'
+      'Thinking On', 'instant', 'A'
     ),
     target(
       `sum(sum_over_time(${thinkOff} | json total_output_tokens | unwrap total_output_tokens [$__range])) / count(count_over_time(${thinkOff} [$__range]))`,
-      'Thinking Off', 'range', 'B'
+      'Thinking Off', 'instant', 'B'
     )
   ], 8, y, 8, 9, {
     unit: 'short', orientation: 'auto',
@@ -604,7 +604,7 @@ function buildModelComparison() {
         const cw = `sum(sum_over_time(${s} | json total_cache_creation_tokens | unwrap total_cache_creation_tokens [$__range]))`;
         return `${cr} / (${inp} + ${cw} + ${cr}) * 100`;
       })(),
-      'Thinking On', 'range', 'A'
+      'Thinking On', 'instant', 'A'
     ),
     target(
       (() => {
@@ -614,7 +614,7 @@ function buildModelComparison() {
         const cw = `sum(sum_over_time(${s} | json total_cache_creation_tokens | unwrap total_cache_creation_tokens [$__range]))`;
         return `${cr} / (${inp} + ${cw} + ${cr}) * 100`;
       })(),
-      'Thinking Off', 'range', 'B'
+      'Thinking Off', 'instant', 'B'
     )
   ], 16, y, 8, 9, {
     unit: 'percent', orientation: 'auto',
@@ -708,7 +708,7 @@ function buildCacheHealth() {
         const cw  = `sum by (model) (sum_over_time(${s} | json total_cache_creation_tokens | unwrap total_cache_creation_tokens [$__range]))`;
         return `${cr} / (${inp} + ${cw} + ${cr}) * 100`;
       })(),
-      '{{model}}'
+      '{{model}}', 'instant'
     )
   ], 0, y, 12, 10, { unit: 'percent', colorOverrides: MODEL_COLORS }));
 

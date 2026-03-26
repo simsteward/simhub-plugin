@@ -587,7 +587,7 @@
           },
           "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json total_output_tokens | unwrap total_output_tokens [$__range])) / sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [$__range]))",
           "legendFormat": "{{model}}",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "A"
         }
       ]
@@ -677,7 +677,7 @@
           },
           "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [$__range])) / sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json assistant_turns | unwrap assistant_turns [$__range]))",
           "legendFormat": "{{model}}",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "A"
         }
       ]
@@ -1198,7 +1198,7 @@
           },
           "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" | json cost_usd | unwrap cost_usd [$__range])) / count(count_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" [$__range]))",
           "legendFormat": "Thinking On",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "A"
         },
         {
@@ -1208,7 +1208,7 @@
           },
           "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" | json cost_usd | unwrap cost_usd [$__range])) / count(count_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" [$__range]))",
           "legendFormat": "Thinking Off",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "B"
         }
       ]
@@ -1298,7 +1298,7 @@
           },
           "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" | json total_output_tokens | unwrap total_output_tokens [$__range])) / count(count_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" [$__range]))",
           "legendFormat": "Thinking On",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "A"
         },
         {
@@ -1308,7 +1308,7 @@
           },
           "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" | json total_output_tokens | unwrap total_output_tokens [$__range])) / count(count_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" [$__range]))",
           "legendFormat": "Thinking Off",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "B"
         }
       ]
@@ -1398,7 +1398,7 @@
           },
           "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" | json total_cache_read_tokens | unwrap total_cache_read_tokens [$__range])) / (sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" | json total_input_tokens | unwrap total_input_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" | json total_cache_creation_tokens | unwrap total_cache_creation_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking=~\"true\" | json total_cache_read_tokens | unwrap total_cache_read_tokens [$__range]))) * 100",
           "legendFormat": "Thinking On",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "A"
         },
         {
@@ -1408,7 +1408,7 @@
           },
           "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" | json total_cache_read_tokens | unwrap total_cache_read_tokens [$__range])) / (sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" | json total_input_tokens | unwrap total_input_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" | json total_cache_creation_tokens | unwrap total_cache_creation_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\"} | json thinking | thinking!~\"true\" | json total_cache_read_tokens | unwrap total_cache_read_tokens [$__range]))) * 100",
           "legendFormat": "Thinking Off",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "B"
         }
       ]

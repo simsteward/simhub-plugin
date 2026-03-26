@@ -838,7 +838,7 @@
           },
           "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json total_cache_read_tokens | unwrap total_cache_read_tokens [$__range])) / (sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json total_input_tokens | unwrap total_input_tokens [$__range])) + sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json total_cache_creation_tokens | unwrap total_cache_creation_tokens [$__range])) + sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json total_cache_read_tokens | unwrap total_cache_read_tokens [$__range]))) * 100",
           "legendFormat": "{{model}}",
-          "queryType": "range",
+          "queryType": "instant",
           "refId": "A"
         }
       ]
