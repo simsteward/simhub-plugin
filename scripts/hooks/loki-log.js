@@ -1,8 +1,16 @@
-// Claude Code hook -> Loki push (app=claude-dev-logging)
+// Claude Code hook -> Loki push
 // Self-contained: loads .env, reads stdin, pushes to Loki. No shell wrapper needed.
 // Enrichments: tool duration, payload sizes, retry detection, error classification,
 //              agent topology, session lifecycle, token sidecar.
 // Usage: node loki-log.js <hook-type>
+//
+// DATA ARCHITECTURE:
+//   app="claude-dev-logging"   — ALL hook events: tool calls, lifecycle, agents, user prompts,
+//                                intermediate token snapshots (component="tokens", stop hook)
+//   app="claude-token-metrics" — ONE entry per completed session: token totals, cost_usd, effort
+//                                Join key: session_id (present in both streams)
+//   On-disk: logs/claude-session-metrics.jsonl — local backup only (not ingested by Alloy).
+//            Includes session_duration_ms + compaction_count for local debugging.
 
 const http = require('http');
 const https = require('https');
@@ -128,8 +136,11 @@ function cleanStaleFiles() {
       const fp = path.join(TIMING_DIR, f);
       try {
         const age = now - fs.statSync(fp).mtimeMs;
-        // Retry markers expire at RETRY_WINDOW_MS; everything else at STALE_MS
-        const threshold = f.startsWith('retry-') ? RETRY_WINDOW_MS : STALE_MS;
+        // Token tracking files live for the whole session (24h max)
+        // Retry markers expire quickly; everything else at STALE_MS
+        const threshold = (f.startsWith('token-offset-') || f.startsWith('token-totals-'))
+          ? 24 * 60 * 60 * 1000
+          : f.startsWith('retry-') ? RETRY_WINDOW_MS : STALE_MS;
         if (age > threshold) fs.unlinkSync(fp);
       } catch {}
     }
@@ -186,7 +197,105 @@ function classifyError(toolResponse) {
   } catch { return 'unknown'; }
 }
 
-// --- Session token extraction from transcript ---
+// --- Model pricing (per 1M tokens) ---
+const MODEL_PRICING = {
+  'claude-opus-4':   { input: 15,   output: 75,   cacheWrite: 18.75, cacheRead: 1.50 },
+  'claude-sonnet-4': { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30 },
+  'claude-haiku-4':  { input: 0.80, output: 4,    cacheWrite: 1.00,  cacheRead: 0.08 },
+};
+
+function getPricing(model) {
+  if (!model) return MODEL_PRICING['claude-opus-4'];
+  const m = model.toLowerCase();
+  if (m.includes('haiku'))  return MODEL_PRICING['claude-haiku-4'];
+  if (m.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4'];
+  return MODEL_PRICING['claude-opus-4'];
+}
+
+function computeCostUsd(tokenData) {
+  try {
+    const p = getPricing(tokenData.model);
+    const M = 1_000_000;
+    return Math.round(
+      ((tokenData.total_input_tokens          || 0) / M * p.input
+     + (tokenData.total_output_tokens         || 0) / M * p.output
+     + (tokenData.total_cache_creation_tokens || 0) / M * p.cacheWrite
+     + (tokenData.total_cache_read_tokens     || 0) / M * p.cacheRead) * 100000
+    ) / 100000; // 5 decimal precision
+  } catch { return undefined; }
+}
+
+// --- Incremental token extraction from transcript ---
+// Reads only new bytes since last offset, accumulates totals in timing files.
+// Used by the `stop` hook for intermediate snapshots — O(new bytes) not O(transcript size).
+function extractTokensIncremental(transcriptPath, sessionId) {
+  try {
+    const offsetKey = 'token-offset-' + sessionId;
+    const totalsKey = 'token-totals-' + sessionId;
+    const prev = readTimingFile(offsetKey, false) || { offset: 0 };
+    const accum = readTimingFile(totalsKey, false) || {
+      input: 0, output: 0, cacheCreate: 0, cacheRead: 0,
+      turns: 0, tools: 0, model: undefined,
+    };
+
+    const stat = fs.statSync(transcriptPath);
+    if (stat.size <= prev.offset) {
+      return formatTokenResult(accum);
+    }
+
+    const fd = fs.openSync(transcriptPath, 'r');
+    const buf = Buffer.alloc(stat.size - prev.offset);
+    fs.readSync(fd, buf, 0, buf.length, prev.offset);
+    fs.closeSync(fd);
+
+    const chunk = buf.toString('utf8');
+    const lines = chunk.split('\n').filter(Boolean);
+
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'assistant' && obj.message && obj.message.usage) {
+          const u = obj.message.usage;
+          accum.input += u.input_tokens || 0;
+          accum.output += u.output_tokens || 0;
+          accum.cacheCreate += u.cache_creation_input_tokens || 0;
+          accum.cacheRead += u.cache_read_input_tokens || 0;
+          accum.turns++;
+          if (!accum.model && obj.message.model) accum.model = obj.message.model;
+        }
+        if (obj.type === 'tool_use' || (obj.type === 'progress' && obj.data && obj.data.type === 'tool_use')) {
+          accum.tools++;
+        }
+      } catch {}
+    }
+
+    writeTimingFile(offsetKey, { offset: stat.size });
+    writeTimingFile(totalsKey, accum);
+
+    return formatTokenResult(accum);
+  } catch { return null; }
+}
+
+function formatTokenResult(accum) {
+  return {
+    total_input_tokens: accum.input,
+    total_output_tokens: accum.output,
+    total_cache_creation_tokens: accum.cacheCreate,
+    total_cache_read_tokens: accum.cacheRead,
+    total_tokens: accum.input + accum.output,
+    assistant_turns: accum.turns,
+    tool_use_count: accum.tools,
+    model: accum.model || undefined,
+  };
+}
+
+function cleanupTokenFiles(sessionId) {
+  try { fs.unlinkSync(path.join(TIMING_DIR, 'token-offset-' + sessionId + '.json')); } catch {}
+  try { fs.unlinkSync(path.join(TIMING_DIR, 'token-totals-' + sessionId + '.json')); } catch {}
+}
+
+// --- Full session token extraction (session-end only) ---
+// Single file read; includes effort detection. Authoritative — used for the permanent record.
 function extractSessionTokens(transcriptPath) {
   try {
     const text = fs.readFileSync(transcriptPath, 'utf8');
@@ -212,16 +321,65 @@ function extractSessionTokens(transcriptPath) {
       } catch {}
     }
 
+    // Detect effort (reuses already-read text — no second file read)
+    let effort = 'standard';
+    if (/"type"\s*:\s*"thinking"/.test(text)) effort = 'extended_thinking';
+    else if (model && model.toLowerCase().includes('fast')) effort = 'fast';
+
     return {
       total_input_tokens: totalInput,
       total_output_tokens: totalOutput,
       total_cache_creation_tokens: totalCacheCreate,
       total_cache_read_tokens: totalCacheRead,
+      total_tokens: totalInput + totalOutput,
       assistant_turns: assistantTurns,
       tool_use_count: toolUseCalls,
       model: model || undefined,
+      effort,
     };
   } catch { return null; }
+}
+
+// --- Push token usage to Loki ---
+// isFinal=false → claude-dev-logging (component=tokens), intermediate snapshot, no cost/effort
+// isFinal=true  → claude-token-metrics, one per session, includes cost_usd + labeled by effort
+function pushTokenUsage(sessionId, project, tokenData, isFinal) {
+  if (isFinal) {
+    const logLine = scrubSecrets(JSON.stringify({
+      event: 'claude_session_token_summary',
+      session_id: sessionId,
+      project,
+      machine,
+      env: envLabel,
+      is_final: true,
+      timestamp: new Date().toISOString(),
+      ...tokenData,
+    }));
+    pushToLoki(
+      {
+        app: 'claude-token-metrics',
+        env: envLabel,
+        model: tokenData.model || 'unknown',
+        project: project || 'unknown',
+        effort: tokenData.effort || 'standard',
+      },
+      logLine
+    );
+  } else {
+    const logLine = scrubSecrets(JSON.stringify({
+      event: 'claude_token_usage',
+      session_id: sessionId,
+      project,
+      machine,
+      env: envLabel,
+      is_final: false,
+      ...tokenData,
+    }));
+    pushToLoki(
+      { app: 'claude-dev-logging', env: envLabel, component: 'tokens', level: 'INFO' },
+      logLine
+    );
+  }
 }
 
 // --- Build enriched log line ---
@@ -260,7 +418,8 @@ function pushToLoki(stream, logLine) {
   req.end();
 }
 
-// --- Write session metrics sidecar ---
+// --- Write session metrics sidecar (on-disk backup, not ingested into Loki) ---
+// Includes session_duration_ms + compaction_count for local debugging context.
 function writeSessionMetricsSidecar(hp, sessionId, project, sessionEnrichments, tokenData) {
   try {
     const metricsDir = path.join(hp.cwd || process.cwd(), 'logs');
@@ -336,7 +495,6 @@ process.stdin.on('end', () => {
   else if (hookType === 'subagent-start') {
     const agentId = hp.agent_id || toolUseId || 'unknown';
     writeTimingFile('agent-' + agentId, { start: Date.now(), session_id: sessionId });
-    // Count open agent files for depth
     try {
       const agentFiles = fs.readdirSync(TIMING_DIR).filter(f =>
         f.startsWith('agent-') && f.endsWith('.json'));
@@ -382,28 +540,38 @@ process.stdin.on('end', () => {
     enrichments.compaction_count = newCount;
   }
 
-  // --- Build and push ---
+  // --- Main push to claude-dev-logging (all hook types) ---
   const stream = { app: 'claude-dev-logging', env: envLabel, component, level };
   const logLine = scrubSecrets(buildEnrichedLogLine(hp, hookType, enrichments, base));
   pushToLoki(stream, logLine);
 
-  // --- Session token sidecar (SessionEnd only) ---
+  // --- Stop hook: intermediate token snapshot → claude-dev-logging component=tokens ---
+  if (hookType === 'stop' && hp.transcript_path) {
+    const tokenData = extractTokensIncremental(hp.transcript_path, sessionId);
+    if (tokenData) pushTokenUsage(sessionId, project, tokenData, false);
+  }
+
+  // --- Session-end: full token summary → claude-token-metrics + on-disk sidecar ---
   if (hookType === 'session-end' && hp.transcript_path) {
     const tokenData = extractSessionTokens(hp.transcript_path);
     if (tokenData) {
+      tokenData.cost_usd = computeCostUsd(tokenData);
+      pushTokenUsage(sessionId, project, tokenData, true);
       writeSessionMetricsSidecar(hp, sessionId, project, enrichments, tokenData);
     } else {
-      // Log extraction failure to Loki
-      const errLine = JSON.stringify({
-        event: 'claude_session_metrics_error',
-        session_id: sessionId,
-        project,
-        machine,
-        env: envLabel,
-        error: 'transcript_parse_failed',
-        transcript_path: compress(hp.transcript_path),
-      });
-      pushToLoki({ app: 'claude-dev-logging', env: envLabel, component: 'lifecycle', level: 'WARN' }, scrubSecrets(errLine));
+      pushToLoki(
+        { app: 'claude-dev-logging', env: envLabel, component: 'lifecycle', level: 'WARN' },
+        scrubSecrets(JSON.stringify({
+          event: 'claude_session_metrics_error',
+          session_id: sessionId,
+          project,
+          machine,
+          env: envLabel,
+          error: 'transcript_parse_failed',
+          transcript_path: compress(hp.transcript_path),
+        }))
+      );
     }
+    cleanupTokenFiles(sessionId);
   }
 });
