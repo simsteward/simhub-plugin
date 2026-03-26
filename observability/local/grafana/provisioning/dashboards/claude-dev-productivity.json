@@ -29,8 +29,8 @@
           "type": "loki",
           "uid": "loki_local"
         },
-        "query": "{app=\"claude-token-metrics\"}",
-        "regex": "project=\"([^\"]+)\"",
+        "query": "{app=\"claude-token-metrics\"} | json",
+        "regex": "\"project\":\"([^\"]+)\"",
         "refresh": 2,
         "includeAll": true,
         "allValue": ".*",
@@ -111,7 +111,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "count(count_over_time({app=\"claude-token-metrics\"} | json [$__range]))",
+          "expr": "count(count_over_time({app=\"claude-token-metrics\"} [$__range]))",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -175,7 +175,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | unwrap cost_usd [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [$__range]))",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -184,7 +184,7 @@
     },
     {
       "id": 3,
-      "title": "Avg Output Tokens / Session",
+      "title": "Avg Output / Session",
       "type": "stat",
       "datasource": {
         "type": "loki",
@@ -239,7 +239,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\"} | json | unwrap total_output_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json total_output_tokens | unwrap total_output_tokens [$__range])) / count(count_over_time({app=\"claude-token-metrics\"} [$__range]))",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -248,7 +248,7 @@
     },
     {
       "id": 4,
-      "title": "Cost per 1K Output Tokens",
+      "title": "Cost per 1K Output",
       "type": "stat",
       "datasource": {
         "type": "loki",
@@ -310,7 +310,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | unwrap cost_usd [$__range])) / sum(sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_output_tokens [$__range])) * 1000",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [$__range])) / sum(sum_over_time({app=\"claude-token-metrics\"} | json total_output_tokens | unwrap total_output_tokens [$__range])) * 1000",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -374,7 +374,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "count(sum by (project) (count_over_time({app=\"claude-token-metrics\"} | json [$__range])))",
+          "expr": "count(sum by (project) (count_over_time({app=\"claude-token-metrics\"} [$__range])))",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -383,7 +383,7 @@
     },
     {
       "type": "row",
-      "title": "📁 Project Cost Analysis",
+      "title": "📁 Project Cost",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -394,7 +394,7 @@
     },
     {
       "id": 6,
-      "title": "Cost by Project Over Time",
+      "title": "Spend by Project Over Time",
       "type": "timeseries",
       "datasource": {
         "type": "loki",
@@ -409,6 +409,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "currencyUSD",
+          "decimals": 2,
           "color": {
             "mode": "palette-classic"
           },
@@ -431,11 +432,12 @@
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
+          "displayMode": "list",
+          "placement": "bottom",
           "calcs": [
             "sum"
-          ]
+          ],
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -448,7 +450,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap cost_usd [$__interval]))",
+          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [$__interval]))",
           "legendFormat": "{{project}}",
           "queryType": "range",
           "refId": "A"
@@ -483,11 +485,9 @@
           "percent"
         ],
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "sum"
-          ]
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single"
@@ -509,7 +509,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap cost_usd [$__range]))",
+          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [$__range]))",
           "legendFormat": "{{project}}",
           "queryType": "range",
           "refId": "A"
@@ -554,7 +554,7 @@
       ],
       "options": {
         "frameIndex": 0,
-        "showHeader": false,
+        "showHeader": true,
         "cellHeight": "sm",
         "sortBy": [
           {
@@ -586,7 +586,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 220
+                "value": 200
               },
               {
                 "id": "min",
@@ -601,6 +601,18 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
           }
         ]
       },
@@ -610,7 +622,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_output_tokens [$__range]))",
+          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json total_output_tokens | unwrap total_output_tokens [$__range]))",
           "legendFormat": "{{project}}",
           "queryType": "range",
           "refId": "A"
@@ -619,7 +631,7 @@
     },
     {
       "id": 9,
-      "title": "Cost per 1K Output Tokens by Project",
+      "title": "Cost per 1K Output by Project",
       "type": "table",
       "datasource": {
         "type": "loki",
@@ -644,7 +656,7 @@
       ],
       "options": {
         "frameIndex": 0,
-        "showHeader": false,
+        "showHeader": true,
         "cellHeight": "sm",
         "sortBy": [
           {
@@ -676,7 +688,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 220
+                "value": 200
               },
               {
                 "id": "min",
@@ -691,6 +703,18 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
           }
         ]
       },
@@ -700,7 +724,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap cost_usd [$__range])) / sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_output_tokens [$__range])) * 1000",
+          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [$__range])) / sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json total_output_tokens | unwrap total_output_tokens [$__range])) * 1000",
           "legendFormat": "{{project}}",
           "queryType": "range",
           "refId": "A"
@@ -735,6 +759,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "palette-classic"
           },
@@ -757,7 +782,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Sessions / day"
+              "options": "Sessions"
             },
             "properties": [
               {
@@ -773,12 +798,13 @@
       },
       "options": {
         "legend": {
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "calcs": [
             "sum",
             "mean"
-          ]
+          ],
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -791,8 +817,8 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "count(count_over_time({app=\"claude-token-metrics\"} | json [$__interval]))",
-          "legendFormat": "Sessions / day",
+          "expr": "count(count_over_time({app=\"claude-token-metrics\"} [$__interval]))",
+          "legendFormat": "Sessions",
           "queryType": "range",
           "refId": "A"
         }
@@ -800,7 +826,7 @@
     },
     {
       "id": 11,
-      "title": "Daily Cost Trend",
+      "title": "Daily Spend",
       "type": "timeseries",
       "datasource": {
         "type": "loki",
@@ -815,6 +841,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "currencyUSD",
+          "decimals": 2,
           "color": {
             "mode": "palette-classic"
           },
@@ -837,7 +864,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Daily Spend"
+              "options": "Spend"
             },
             "properties": [
               {
@@ -853,12 +880,13 @@
       },
       "options": {
         "legend": {
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "calcs": [
             "sum",
             "mean"
-          ]
+          ],
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -871,8 +899,8 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | unwrap cost_usd [1d]))",
-          "legendFormat": "Daily Spend",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json cost_usd | unwrap cost_usd [1d]))",
+          "legendFormat": "Spend",
           "queryType": "range",
           "refId": "A"
         }
@@ -891,7 +919,7 @@
     },
     {
       "id": 12,
-      "title": "Model Usage by Project",
+      "title": "Model Sessions by Project",
       "type": "table",
       "datasource": {
         "type": "loki",
@@ -916,7 +944,7 @@
       ],
       "options": {
         "frameIndex": 0,
-        "showHeader": false,
+        "showHeader": true,
         "cellHeight": "sm",
         "sortBy": [
           {
@@ -948,7 +976,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 220
+                "value": 200
               },
               {
                 "id": "min",
@@ -963,6 +991,18 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
           }
         ]
       },
@@ -972,7 +1012,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (project, model) (count_over_time({app=\"claude-token-metrics\"} | json [$__range]))",
+          "expr": "sum by (project, model) (count_over_time({app=\"claude-token-metrics\"} [$__range]))",
           "legendFormat": "{{project}} — {{model}}",
           "queryType": "range",
           "refId": "A"
@@ -1006,7 +1046,7 @@
       ],
       "options": {
         "frameIndex": 0,
-        "showHeader": false,
+        "showHeader": true,
         "cellHeight": "sm",
         "sortBy": [
           {
@@ -1038,7 +1078,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 220
+                "value": 200
               },
               {
                 "id": "min",
@@ -1057,45 +1097,12 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "extended_thinking"
+              "options": "Field"
             },
             "properties": [
               {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#F2495C",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "standard"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#5794F2",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "fast"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#73BF69",
-                  "mode": "fixed"
-                }
+                "id": "custom.width",
+                "value": 280
               }
             ]
           }
@@ -1107,12 +1114,13 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (project, effort) (count_over_time({app=\"claude-token-metrics\"} | json [$__range]))",
+          "expr": "sum by (project, effort) (count_over_time({app=\"claude-token-metrics\"} [$__range]))",
           "legendFormat": "{{project}} — {{effort}}",
           "queryType": "range",
           "refId": "A"
         }
       ]
     }
-  ]
+  ],
+  "links": []
 }

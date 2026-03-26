@@ -29,8 +29,8 @@
           "type": "loki",
           "uid": "loki_local"
         },
-        "query": "{app=\"claude-token-metrics\"}",
-        "regex": "model=\"([^\"]+)\"",
+        "query": "{app=\"claude-token-metrics\"} | json",
+        "regex": "\"model\":\"([^\"]+)\"",
         "refresh": 2,
         "includeAll": true,
         "allValue": ".*",
@@ -48,8 +48,8 @@
           "type": "loki",
           "uid": "loki_local"
         },
-        "query": "{app=\"claude-token-metrics\"}",
-        "regex": "project=\"([^\"]+)\"",
+        "query": "{app=\"claude-token-metrics\"} | json",
+        "regex": "\"project\":\"([^\"]+)\"",
         "refresh": 2,
         "includeAll": true,
         "allValue": ".*",
@@ -67,8 +67,8 @@
           "type": "loki",
           "uid": "loki_local"
         },
-        "query": "{app=\"claude-token-metrics\"}",
-        "regex": "effort=\"([^\"]+)\"",
+        "query": "{app=\"claude-token-metrics\"} | json",
+        "regex": "\"effort\":\"([^\"]+)\"",
         "refresh": 2,
         "includeAll": true,
         "allValue": ".*",
@@ -94,7 +94,7 @@
     },
     {
       "id": 1,
-      "title": "Avg Session Duration",
+      "title": "Avg Turns / Session",
       "type": "stat",
       "datasource": {
         "type": "loki",
@@ -104,70 +104,6 @@
         "x": 0,
         "y": 1,
         "w": 5,
-        "h": 4
-      },
-      "transparent": true,
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "unit": "ms",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#5794F2"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "value": null,
-                "color": "#5794F2"
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "horizontal",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki_local"
-          },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap session_duration_ms [$__range]))",
-          "legendFormat": "",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 2,
-      "title": "Avg Turns / Session",
-      "type": "stat",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki_local"
-      },
-      "gridPos": {
-        "x": 5,
-        "y": 1,
-        "w": 4,
         "h": 4
       },
       "transparent": true,
@@ -213,7 +149,78 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap assistant_turns [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json assistant_turns | unwrap assistant_turns [$__range])) / count(count_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} [$__range]))",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Max Turns (any session)",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 5,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "transparent": true,
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#73BF69"
+              },
+              {
+                "value": 30,
+                "color": "#FADE2A"
+              },
+              {
+                "value": 80,
+                "color": "#F2495C"
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json assistant_turns | unwrap assistant_turns [$__range]))",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -222,16 +229,16 @@
     },
     {
       "id": 3,
-      "title": "Avg Tools / Session",
+      "title": "Avg Total Tokens / Session",
       "type": "stat",
       "datasource": {
         "type": "loki",
         "uid": "loki_local"
       },
       "gridPos": {
-        "x": 9,
+        "x": 10,
         "y": 1,
-        "w": 4,
+        "w": 5,
         "h": 4
       },
       "transparent": true,
@@ -277,7 +284,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap tool_use_count [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json total_tokens | unwrap total_tokens [$__range])) / count(count_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} [$__range]))",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -286,80 +293,16 @@
     },
     {
       "id": 4,
-      "title": "Longest Session",
+      "title": "Avg Tool Uses / Session",
       "type": "stat",
       "datasource": {
         "type": "loki",
         "uid": "loki_local"
       },
       "gridPos": {
-        "x": 13,
+        "x": 15,
         "y": 1,
-        "w": 5,
-        "h": 4
-      },
-      "transparent": true,
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "unit": "ms",
-          "decimals": 0,
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#FF9830"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "value": null,
-                "color": "#FF9830"
-              }
-            ]
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "orientation": "horizontal",
-        "textMode": "auto",
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki_local"
-          },
-          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap session_duration_ms [$__range]))",
-          "legendFormat": "",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "title": "Max Turns in a Session",
-      "type": "stat",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki_local"
-      },
-      "gridPos": {
-        "x": 18,
-        "y": 1,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "transparent": true,
@@ -369,22 +312,15 @@
           "unit": "short",
           "decimals": 0,
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "value": null,
-                "color": "#73BF69"
-              },
-              {
-                "value": 30,
-                "color": "#FADE2A"
-              },
-              {
-                "value": 60,
-                "color": "#F2495C"
+                "color": "#5794F2"
               }
             ]
           },
@@ -412,7 +348,71 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap assistant_turns [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json tool_use_count | unwrap tool_use_count [$__range])) / count(count_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} [$__range]))",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Sessions",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 19,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "transparent": true,
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8FF"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#8AB8FF"
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "count(count_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} [$__range]))",
           "legendFormat": "",
           "queryType": "range",
           "refId": "A"
@@ -421,7 +421,7 @@
     },
     {
       "type": "row",
-      "title": "⏱ Duration Analysis",
+      "title": "📊 Turn Depth",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -432,7 +432,7 @@
     },
     {
       "id": 6,
-      "title": "Session Duration Over Time (Avg & Max)",
+      "title": "Avg & Max Turns per Session Over Time",
       "type": "timeseries",
       "datasource": {
         "type": "loki",
@@ -446,213 +446,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "lineInterpolation": "smooth",
-            "spanNulls": true,
-            "axisBorderShow": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            }
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Avg Duration"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#5794F2",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Max Duration"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#F2495C",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max"
-          ]
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki_local"
-          },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap session_duration_ms [$__interval]))",
-          "legendFormat": "Avg Duration",
-          "queryType": "range",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki_local"
-          },
-          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap session_duration_ms [$__interval]))",
-          "legendFormat": "Max Duration",
-          "queryType": "range",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "title": "Top 10 Longest Sessions",
-      "type": "table",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki_local"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 6,
-        "w": 8,
-        "h": 10
-      },
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "lastNotNull"
-            ],
-            "mode": "seriesToRows"
-          }
-        }
-      ],
-      "options": {
-        "frameIndex": 0,
-        "showHeader": false,
-        "cellHeight": "sm",
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Last *"
-          }
-        ],
-        "footer": {
-          "show": false
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "decimals": 0,
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "inspect": false
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byType",
-              "options": "number"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 220
-              },
-              {
-                "id": "min",
-                "value": 0
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "gauge",
-                  "mode": "basic",
-                  "valueDisplayMode": "color"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki_local"
-          },
-          "expr": "topk(10, sum by (session_id) (max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap session_duration_ms [$__range])))",
-          "legendFormat": "{{session_id}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "🔧 Turn & Tool Depth",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 16,
-        "w": 24,
-        "h": 1
-      }
-    },
-    {
-      "id": 8,
-      "title": "Avg Assistant Turns per Session",
-      "type": "timeseries",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki_local"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 17,
-        "w": 12,
-        "h": 10
-      },
-      "fieldConfig": {
-        "defaults": {
           "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "palette-classic"
           },
@@ -706,12 +501,13 @@
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
+          "displayMode": "list",
+          "placement": "bottom",
           "calcs": [
             "mean",
             "max"
-          ]
+          ],
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -724,7 +520,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap assistant_turns [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json assistant_turns | unwrap assistant_turns [$__interval])) / count(count_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} [$__interval]))",
           "legendFormat": "Avg Turns",
           "queryType": "range",
           "refId": "A"
@@ -734,7 +530,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap assistant_turns [$__interval]))",
+          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json assistant_turns | unwrap assistant_turns [$__interval]))",
           "legendFormat": "Max Turns",
           "queryType": "range",
           "refId": "B"
@@ -742,15 +538,128 @@
       ]
     },
     {
-      "id": 9,
-      "title": "Tool Use Density (Tools per Turn)",
+      "id": 7,
+      "title": "Top 10 Sessions by Turns",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 8,
+        "h": 10
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        }
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "topk(10, sum by (session_id) (max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json assistant_turns | unwrap assistant_turns [$__range])))",
+          "legendFormat": "{{session_id}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "🔢 Token Depth",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 8,
+      "title": "Input & Output Tokens Over Time",
       "type": "timeseries",
       "datasource": {
         "type": "loki",
         "uid": "loki_local"
       },
       "gridPos": {
-        "x": 12,
+        "x": 0,
         "y": 17,
         "w": 12,
         "h": 10
@@ -758,13 +667,14 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
             "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 30,
+            "lineWidth": 1,
+            "fillOpacity": 20,
             "gradientMode": "opacity",
             "showPoints": "never",
             "lineInterpolation": "smooth",
@@ -780,7 +690,22 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Tools / Turn"
+              "options": "Input"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output"
             },
             "properties": [
               {
@@ -796,11 +721,12 @@
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
+          "displayMode": "list",
+          "placement": "bottom",
           "calcs": [
-            "mean"
-          ]
+            "sum"
+          ],
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -813,10 +739,126 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap tool_use_count [$__interval])) / avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap assistant_turns [$__interval]))",
-          "legendFormat": "Tools / Turn",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json total_input_tokens | unwrap total_input_tokens [$__interval]))",
+          "legendFormat": "Input",
           "queryType": "range",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json total_output_tokens | unwrap total_output_tokens [$__interval]))",
+          "legendFormat": "Output",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Cache Tokens Over Time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 17,
+        "w": 12,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache Read"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache Write"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json total_cache_read_tokens | unwrap total_cache_read_tokens [$__interval]))",
+          "legendFormat": "Cache Read",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json total_cache_creation_tokens | unwrap total_cache_creation_tokens [$__interval]))",
+          "legendFormat": "Cache Write",
+          "queryType": "range",
+          "refId": "B"
         }
       ]
     },
@@ -833,7 +875,7 @@
     },
     {
       "id": 10,
-      "title": "Session Cost Over Time",
+      "title": "Avg & Max Session Cost Over Time",
       "type": "timeseries",
       "datasource": {
         "type": "loki",
@@ -842,12 +884,13 @@
       "gridPos": {
         "x": 0,
         "y": 28,
-        "w": 12,
+        "w": 16,
         "h": 10
       },
       "fieldConfig": {
         "defaults": {
           "unit": "currencyUSD",
+          "decimals": 2,
           "color": {
             "mode": "palette-classic"
           },
@@ -901,12 +944,13 @@
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
+          "displayMode": "list",
+          "placement": "bottom",
           "calcs": [
             "mean",
             "max"
-          ]
+          ],
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -919,7 +963,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap cost_usd [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json cost_usd | unwrap cost_usd [$__interval])) / count(count_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} [$__interval]))",
           "legendFormat": "Avg Cost",
           "queryType": "range",
           "refId": "A"
@@ -929,7 +973,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap cost_usd [$__interval]))",
+          "expr": "max(max_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json cost_usd | unwrap cost_usd [$__interval]))",
           "legendFormat": "Max Cost",
           "queryType": "range",
           "refId": "B"
@@ -945,9 +989,9 @@
         "uid": "loki_local"
       },
       "gridPos": {
-        "x": 12,
+        "x": 16,
         "y": 28,
-        "w": 12,
+        "w": 8,
         "h": 10
       },
       "transformations": [
@@ -963,7 +1007,7 @@
       ],
       "options": {
         "frameIndex": 0,
-        "showHeader": false,
+        "showHeader": true,
         "cellHeight": "sm",
         "sortBy": [
           {
@@ -995,7 +1039,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 220
+                "value": 200
               },
               {
                 "id": "min",
@@ -1010,6 +1054,18 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
           }
         ]
       },
@@ -1019,7 +1075,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "topk(15, sum by (session_id) (sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap cost_usd [$__range])))",
+          "expr": "topk(15, sum by (session_id) (sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json cost_usd | unwrap cost_usd [$__range])))",
           "legendFormat": "{{session_id}}",
           "queryType": "range",
           "refId": "A"
@@ -1028,7 +1084,7 @@
     },
     {
       "type": "row",
-      "title": "📡 Per-Turn Token Flow",
+      "title": "📡 Per-Turn Token Flow (stop hook)",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1039,7 +1095,7 @@
     },
     {
       "id": 12,
-      "title": "Per-Turn Token Consumption (from stop hook)",
+      "title": "Turn Input & Output Tokens Over Time",
       "type": "timeseries",
       "datasource": {
         "type": "loki",
@@ -1048,26 +1104,27 @@
       "gridPos": {
         "x": 0,
         "y": 39,
-        "w": 24,
-        "h": 10
+        "w": 12,
+        "h": 9
       },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "decimals": 0,
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
-            "fillOpacity": 40,
+            "fillOpacity": 20,
             "gradientMode": "opacity",
             "showPoints": "never",
             "lineInterpolation": "smooth",
             "spanNulls": true,
             "axisBorderShow": false,
             "stacking": {
-              "mode": "normal",
+              "mode": "none",
               "group": "A"
             }
           }
@@ -1076,22 +1133,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Output (turn)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#B877D9",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Input (turn)"
+              "options": "Turn Input"
             },
             "properties": [
               {
@@ -1106,13 +1148,13 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Cache Read (turn)"
+              "options": "Turn Output"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#73BF69",
+                  "fixedColor": "#B877D9",
                   "mode": "fixed"
                 }
               }
@@ -1122,11 +1164,12 @@
       },
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
+          "displayMode": "list",
+          "placement": "bottom",
           "calcs": [
             "sum"
-          ]
+          ],
+          "showLegend": true
         },
         "tooltip": {
           "mode": "single",
@@ -1139,8 +1182,8 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-dev-logging\", component=\"tokens\"} | json turn_output_tokens | unwrap turn_output_tokens [$__interval]))",
-          "legendFormat": "Output (turn)",
+          "expr": "sum(sum_over_time({app=\"claude-dev-logging\", component=\"tokens\"} | json turn_input_tokens | unwrap turn_input_tokens [$__interval]))",
+          "legendFormat": "Turn Input",
           "queryType": "range",
           "refId": "A"
         },
@@ -1149,22 +1192,119 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-dev-logging\", component=\"tokens\"} | json turn_input_tokens | unwrap turn_input_tokens [$__interval]))",
-          "legendFormat": "Input (turn)",
+          "expr": "sum(sum_over_time({app=\"claude-dev-logging\", component=\"tokens\"} | json turn_output_tokens | unwrap turn_output_tokens [$__interval]))",
+          "legendFormat": "Turn Output",
           "queryType": "range",
           "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Turn Cache Tokens Over Time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 39,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
         },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Turn Cache Read"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Turn Cache Write"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "targets": [
         {
           "datasource": {
             "type": "loki",
             "uid": "loki_local"
           },
           "expr": "sum(sum_over_time({app=\"claude-dev-logging\", component=\"tokens\"} | json turn_cache_read_tokens | unwrap turn_cache_read_tokens [$__interval]))",
-          "legendFormat": "Cache Read (turn)",
+          "legendFormat": "Turn Cache Read",
           "queryType": "range",
-          "refId": "C"
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-dev-logging\", component=\"tokens\"} | json turn_cache_creation_tokens | unwrap turn_cache_creation_tokens [$__interval]))",
+          "legendFormat": "Turn Cache Write",
+          "queryType": "range",
+          "refId": "B"
         }
       ]
     }
-  ]
+  ],
+  "links": []
 }

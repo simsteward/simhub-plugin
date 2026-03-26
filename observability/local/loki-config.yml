@@ -39,6 +39,7 @@ limits_config:
   max_global_streams_per_user: 0
   max_line_size: 0
   retention_period: 0
+  max_query_length: 0
 
 ruler:
   alertmanager_url: http://localhost:9093
