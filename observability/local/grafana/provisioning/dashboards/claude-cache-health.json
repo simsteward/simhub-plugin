@@ -1,0 +1,1081 @@
+{
+  "id": null,
+  "uid": "claude-cache-health",
+  "title": "Claude Code — Cache & Context Health",
+  "description": "",
+  "tags": [
+    "claude-code",
+    "cost-analysis"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "style": "dark",
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "label": "Model",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki_local"
+        },
+        "query": "{app=\"claude-token-metrics\"}",
+        "regex": "model=\"([^\"]+)\"",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki_local"
+        },
+        "query": "{app=\"claude-token-metrics\"}",
+        "regex": "project=\"([^\"]+)\"",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "effort",
+        "label": "Effort",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki_local"
+        },
+        "query": "{app=\"claude-token-metrics\"}",
+        "regex": "effort=\"([^\"]+)\"",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "📦 Cache At-a-Glance",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 1,
+      "title": "Cache Hit Rate",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "transparent": true,
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#F2495C"
+              },
+              {
+                "value": 30,
+                "color": "#FADE2A"
+              },
+              {
+                "value": 60,
+                "color": "#73BF69"
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__range])) / (sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_input_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__range]))) * 100",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Total Cache Reads",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 5,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "transparent": true,
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#73BF69"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#73BF69"
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__range]))",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Total Cache Writes",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "transparent": true,
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF9830"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#FF9830"
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__range]))",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Cache ROI (reads/write)",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "transparent": true,
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#F2495C"
+              },
+              {
+                "value": 1,
+                "color": "#FADE2A"
+              },
+              {
+                "value": 3,
+                "color": "#73BF69"
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__range])) / sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__range]))",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Avg Compactions/Session",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "transparent": true,
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#73BF69"
+              },
+              {
+                "value": 2,
+                "color": "#FADE2A"
+              },
+              {
+                "value": 5,
+                "color": "#F2495C"
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "avg(avg_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap compaction_count [$__range]))",
+          "legendFormat": "",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "📉 Cache Efficiency Trend",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 6,
+      "title": "Cache Hit Rate Over Time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache Hit %"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__interval])) / (sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_input_tokens [$__interval])) + sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__interval])) + sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__interval]))) * 100",
+          "legendFormat": "Cache Hit %",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "🔄 Token Flow Breakdown",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 7,
+      "title": "Cache Reads vs Writes vs Input Over Time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 50,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache Read"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache Write"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#B877D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__interval]))",
+          "legendFormat": "Cache Read",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__interval]))",
+          "legendFormat": "Cache Write",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_input_tokens [$__interval]))",
+          "legendFormat": "Input",
+          "queryType": "range",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap total_output_tokens [$__interval]))",
+          "legendFormat": "Output",
+          "queryType": "range",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "🏷 Cache by Dimension",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 8,
+      "title": "Cache Hit Rate by Model",
+      "type": "barchart",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 12,
+        "h": 10
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelMaxLength": 20,
+        "xTickLabelRotation": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "stacking": "none",
+        "fillOpacity": 80,
+        "gradientMode": "opacity",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-opus-4"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#B877D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-sonnet-4"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "claude-haiku-4"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_cache_read_tokens [$__range])) / (sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_input_tokens [$__range])) + sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_cache_creation_tokens [$__range])) + sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_cache_read_tokens [$__range]))) * 100",
+          "legendFormat": "{{model}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Cache Hit Rate by Project",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 27,
+        "w": 12,
+        "h": 10
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        }
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": false,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_cache_read_tokens [$__range])) / (sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_input_tokens [$__range])) + sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_cache_creation_tokens [$__range])) + sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | unwrap total_cache_read_tokens [$__range]))) * 100",
+          "legendFormat": "{{project}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "🔁 Compaction Analysis",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 10,
+      "title": "Compaction Events Over Time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 60,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "lineInterpolation": "smooth",
+            "spanNulls": true,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Compactions"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap compaction_count [$__interval]))",
+          "legendFormat": "Compactions",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Top Sessions by Compaction Count",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 9
+      },
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        }
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": false,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "topk(10, sum by (session_id) (sum_over_time({app=\"claude-token-metrics\", model=~\"$model\", project=~\"$project\", effort=~\"$effort\"} | json | unwrap compaction_count [$__range])))",
+          "legendFormat": "{{session_id}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
