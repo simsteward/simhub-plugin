@@ -1,0 +1,34 @@
+name: review_incident
+display_name: Review Incident
+description: User clicks an incident row, dashboard dispatches seek, action succeeds.
+source_doc: docs/RULES-ActionCoverage.md
+steps:
+  - id: ui_click
+    event: dashboard_ui_event
+    label: Incident row clicked
+    filters:
+      event_type: click
+    timeout_sec: 0
+    optional: false
+    next:
+      - seek_dispatched
+  - id: seek_dispatched
+    event: action_dispatched
+    label: Seek to incident dispatched
+    filters:
+      action: seek_to_incident
+    timeout_sec: 5
+    optional: false
+    next:
+      - seek_result
+  - id: seek_result
+    event: action_result
+    label: Seek to incident succeeded
+    filters:
+      action: seek_to_incident
+      success: "true"
+    timeout_sec: 5
+    optional: false
+    next: []
+expected_completion_sec: 15
+gap_severity: warn

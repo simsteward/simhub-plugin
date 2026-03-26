@@ -1,0 +1,2 @@
+[     636ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/simsteward-log-sentinel?orgId=1&from=now-6h&to=now:0
+[   59082ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Connection closed before receiving a handshake response @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312

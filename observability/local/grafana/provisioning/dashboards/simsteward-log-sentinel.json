@@ -1,0 +1,541 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Sentinel Health",
+      "type": "row"
+    },
+    {
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
+        "content": "**Log Sentinel v2** — Autonomous log-analysis pipeline.\n\n- **16 detectors** across two categories: **app** (plugin crashes, bridge failures, action errors) and **ops** (deploy issues, disk pressure, connectivity).\n- **Three-tier LLM** — T0 detectors emit findings; T1 deduplicates and prioritises; T2 investigates high-severity findings and writes root-cause reports.\n- All structured events carry `component=log-sentinel`. Cycle runs every 5 minutes by default.",
+        "mode": "markdown"
+      },
+      "title": "About",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 4 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({component=\"log-sentinel\", event=\"sentinel_cycle\"} [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Cycles completed",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "auto"
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 10, "x": 6, "y": 4 },
+      "id": 3,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_cycle\"} | json | unwrap duration_ms",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Cycle duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 4 },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({component=\"log-sentinel\", event=\"sentinel_detector_run\"} | json | error!=\"\" | error!=\"null\" | error!=\"None\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Detector errors",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
+      "id": 101,
+      "title": "Per-Detector Timing",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 11 },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_detector_run\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Detector runs",
+      "type": "logs"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "id": 102,
+      "title": "App Findings",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 20 },
+      "id": 6,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"app\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "App findings",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 15 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+      "id": 7,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"app\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "App finding count",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "id": 103,
+      "title": "Ops Findings",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 29 },
+      "id": 8,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"ops\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Ops findings",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "orange", "value": 15 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 29 },
+      "id": 9,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"ops\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Ops finding count",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "id": 104,
+      "title": "T2 LLM Activity",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 38 },
+      "id": 10,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_t2_run\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "T2 run metrics",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 38 },
+      "id": 11,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({component=\"log-sentinel\", event=\"sentinel_t2_run\"} [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "T2 investigations",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 38 },
+      "id": 12,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({component=\"log-sentinel\", event=\"sentinel_t2_run\"} | json | trigger=\"proactive\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Proactive polls",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "id": 105,
+      "title": "T2 Investigation Reports",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 47 },
+      "id": 13,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_investigation\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Investigation reports",
+      "type": "logs"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 57 },
+      "id": 106,
+      "title": "Sentry Issues",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 6, "w": 16, "x": 0, "y": 58 },
+      "id": 14,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_sentry_issue\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Sentry issues created",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 58 },
+      "id": 15,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({component=\"log-sentinel\", event=\"sentinel_sentry_issue\"} [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Sentry issues",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 64 },
+      "id": 107,
+      "title": "Process Logs",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 65 },
+      "id": 16,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{component=\"log-sentinel\", event=\"sentinel_log\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Sentinel process logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["simsteward", "log-sentinel", "observability"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "local", "value": "local" },
+        "hide": 0,
+        "includeAll": false,
+        "label": "env",
+        "name": "env",
+        "options": [
+          { "selected": true, "text": "local", "value": "local" },
+          { "selected": false, "text": "production", "value": "production" }
+        ],
+        "query": "local,production",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SimSteward — Log Sentinel",
+  "uid": "simsteward-log-sentinel",
+  "version": 1,
+  "weekStart": ""
+}
