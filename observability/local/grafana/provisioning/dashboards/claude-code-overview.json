@@ -3,11 +3,17 @@
   "uid": "claude-code-overview",
   "title": "Claude Code — Session Overview",
   "description": "Full observability for Claude Code sessions: tool calls, agents, errors, and cross-session trends.",
-  "tags": ["claude-code", "observability"],
+  "tags": [
+    "claude-code",
+    "observability"
+  ],
   "timezone": "browser",
   "editable": true,
   "graphTooltip": 1,
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "refresh": "30s",
   "schemaVersion": 39,
   "fiscalYearStartMonth": 0,
@@ -19,26 +25,38 @@
         "name": "session_id",
         "label": "Session",
         "type": "query",
-        "datasource": { "type": "loki", "uid": "loki_local" },
-        "query": "{app=\"claude-dev-logging\", component=\"lifecycle\"} | json | hook_type=\"session-start\"",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki_local"
+        },
+        "query": "{app=\"claude-dev-logging\", component=\"lifecycle\"} | json hook_type, session_id | hook_type=\"session-start\"",
         "regex": "session_id\":\"([^\"]+)",
         "refresh": 2,
         "includeAll": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "sort": 2
       },
       {
         "name": "project",
         "label": "Project",
         "type": "query",
-        "datasource": { "type": "loki", "uid": "loki_local" },
-        "query": "{app=\"claude-dev-logging\", component=\"lifecycle\"} | json | hook_type=\"session-start\"",
+        "datasource": {
+          "type": "loki",
+          "uid": "loki_local"
+        },
+        "query": "{app=\"claude-dev-logging\", component=\"lifecycle\"} | json hook_type, session_id | hook_type=\"session-start\"",
         "regex": "project\":\"([^\"]+)",
         "refresh": 2,
         "includeAll": true,
         "allValue": ".*",
-        "current": { "text": "All", "value": "$__all" },
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "sort": 1
       }
     ]
@@ -48,37 +66,74 @@
       "type": "row",
       "title": "Session At-a-Glance",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      }
     },
     {
       "id": 1,
       "title": "Tool Calls",
       "type": "stat",
       "transparent": true,
-      "gridPos": { "x": 0, "y": 1, "w": 5, "h": 5 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__range])",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__range]))",
+          "legendFormat": "Tool Calls",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
-        "textMode": "auto",
-        "wideLayout": true,
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
         "orientation": "auto",
-        "text": { "titleSize": 12, "valueSize": 32 },
-        "reduceOptions": { "values": false, "calcs": ["sum"], "fields": "" }
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#5794F2" },
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "#5794F2" }] }
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#5794F2"
+              }
+            ]
+          }
         },
         "overrides": []
       }
@@ -88,36 +143,67 @@
       "title": "Errors",
       "type": "stat",
       "transparent": true,
-      "gridPos": { "x": 5, "y": 1, "w": 5, "h": 5 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": {
+        "x": 5,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json | session_id=~\"$session_id\" [$__range])",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | session_id=~\"$session_id\" [$__range]))",
+          "legendFormat": "Errors",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
-        "textMode": "auto",
-        "wideLayout": true,
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
         "orientation": "auto",
-        "text": { "titleSize": 12, "valueSize": 32 },
-        "reduceOptions": { "values": false, "calcs": ["sum"], "fields": "" }
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
           "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": null, "color": "#73BF69" },
-              { "value": 1, "color": "#FF9830" },
-              { "value": 5, "color": "#F2495C" }
+              {
+                "value": null,
+                "color": "#73BF69"
+              },
+              {
+                "value": 1,
+                "color": "#FF9830"
+              },
+              {
+                "value": 5,
+                "color": "#F2495C"
+              }
             ]
           }
         },
@@ -129,31 +215,62 @@
       "title": "Agents Spawned",
       "type": "stat",
       "transparent": true,
-      "gridPos": { "x": 10, "y": 1, "w": 5, "h": 5 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json | session_id=~\"$session_id\" | hook_type=\"subagent-start\" [$__range])",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"subagent-start\" [$__range]))",
+          "legendFormat": "Agents",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
-        "textMode": "auto",
-        "wideLayout": true,
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
         "orientation": "auto",
-        "text": { "titleSize": 12, "valueSize": 32 },
-        "reduceOptions": { "values": false, "calcs": ["sum"], "fields": "" }
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#B877D9" },
           "noValue": "0",
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "#B877D9" }] }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#B877D9"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#B877D9"
+              }
+            ]
+          }
         },
         "overrides": []
       }
@@ -163,31 +280,62 @@
       "title": "User Prompts",
       "type": "stat",
       "transparent": true,
-      "gridPos": { "x": 15, "y": 1, "w": 5, "h": 5 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": {
+        "x": 15,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json | session_id=~\"$session_id\" | hook_type=\"user-prompt-submit\" [$__range])",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"user-prompt-submit\" [$__range]))",
+          "legendFormat": "Prompts",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
-        "textMode": "auto",
-        "wideLayout": true,
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
         "orientation": "auto",
-        "text": { "titleSize": 12, "valueSize": 32 },
-        "reduceOptions": { "values": false, "calcs": ["sum"], "fields": "" }
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#8AB8FF" },
           "noValue": "0",
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "#8AB8FF" }] }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8AB8FF"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#8AB8FF"
+              }
+            ]
+          }
         },
         "overrides": []
       }
@@ -197,303 +345,60 @@
       "title": "Permission Requests",
       "type": "stat",
       "transparent": true,
-      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 5 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json | session_id=~\"$session_id\" | hook_type=\"permission-request\" [$__range])",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"permission-request\" [$__range]))",
+          "legendFormat": "Permissions",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
-        "textMode": "auto",
-        "wideLayout": true,
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
         "orientation": "auto",
-        "text": { "titleSize": 12, "valueSize": 32 },
-        "reduceOptions": { "values": false, "calcs": ["sum"], "fields": "" }
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
+          ],
+          "fields": ""
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#FF9830" },
           "noValue": "0",
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "#FF9830" }] }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "type": "row",
-      "title": "Activity Over Time",
-      "collapsed": false,
-      "gridPos": { "x": 0, "y": 7, "w": 24, "h": 1 }
-    },
-    {
-      "id": 6,
-      "title": "Tool Call Rate by Component",
-      "description": "Stacked view of tool usage across all component types over time.",
-      "type": "timeseries",
-      "transparent": true,
-      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 10 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (component) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__interval]))",
-          "legendFormat": "{{component}}",
-          "queryType": "range"
-        }
-      ],
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum", "mean"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "fillOpacity": 15,
-            "gradientMode": "opacity",
-            "showPoints": "never",
-            "barAlignment": 0,
-            "spanNulls": false,
-            "axisBorderShow": false,
-            "stacking": { "mode": "none", "group": "A" }
-          }
-        },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "tool" }, "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "mcp-contextstream" }, "properties": [{ "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "mcp-sentry" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "mcp-ollama" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] }
-        ]
-      }
-    },
-    {
-      "type": "row",
-      "title": "Breakdown",
-      "collapsed": false,
-      "gridPos": { "x": 0, "y": 19, "w": 24, "h": 1 }
-    },
-    {
-      "id": 7,
-      "title": "Component Distribution",
-      "type": "piechart",
-      "transparent": true,
-      "gridPos": { "x": 0, "y": 20, "w": 8, "h": 9 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (component) (count_over_time({app=\"claude-dev-logging\"} | json | session_id=~\"$session_id\" [$__range]))",
-          "queryType": "range"
-        }
-      ],
-      "options": {
-        "pieType": "donut",
-        "displayLabels": ["percent"],
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
-        "tooltip": { "mode": "multi" },
-        "reduceOptions": { "values": false, "calcs": ["sum"], "fields": "" }
-      },
-      "fieldConfig": {
-        "defaults": { "color": { "mode": "palette-classic" } },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "tool" }, "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "mcp-contextstream" }, "properties": [{ "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "user" }, "properties": [{ "id": "color", "value": { "fixedColor": "#8AB8FF", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "lifecycle" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "agent" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "transcript" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FADE2A", "mode": "fixed" } }] }
-        ]
-      }
-    },
-    {
-      "id": 8,
-      "title": "Hook Type Breakdown",
-      "type": "barchart",
-      "transparent": true,
-      "gridPos": { "x": 8, "y": 20, "w": 8, "h": 9 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (hook_type) (count_over_time({app=\"claude-dev-logging\"} | json | session_id=~\"$session_id\" | hook_type!=\"\" [$__range]))",
-          "queryType": "range"
-        }
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "barWidth": 0.7,
-        "groupWidth": 0.7,
-        "showValue": "auto",
-        "stacking": "none",
-        "legend": { "displayMode": "hidden" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "fillOpacity": 80, "gradientMode": "hue" }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 9,
-      "title": "Top Tools Used",
-      "type": "barchart",
-      "transparent": true,
-      "gridPos": { "x": 16, "y": 20, "w": 8, "h": 9 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (tool_name) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__range]))",
-          "queryType": "range"
-        }
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "barWidth": 0.7,
-        "groupWidth": 0.7,
-        "showValue": "auto",
-        "stacking": "none",
-        "legend": { "displayMode": "hidden" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#5794F2" },
-          "custom": { "fillOpacity": 80, "gradientMode": "hue" }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "type": "row",
-      "title": "Agent Activity",
-      "collapsed": false,
-      "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 }
-    },
-    {
-      "id": 10,
-      "title": "Agent Lifecycle Timeline",
-      "description": "Subagent start/stop events over time.",
-      "type": "state-timeline",
-      "transparent": true,
-      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 6 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "{app=\"claude-dev-logging\", component=\"agent\"} | json | session_id=~\"$session_id\"",
-          "queryType": "range"
-        }
-      ],
-      "options": {
-        "showValue": "auto",
-        "mergeValues": true,
-        "alignValue": "left",
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": { "fillOpacity": 70 },
-          "thresholds": { "mode": "absolute", "steps": [{ "value": null, "color": "#B877D9" }] }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "type": "row",
-      "title": "Cross-Session Trends",
-      "collapsed": false,
-      "gridPos": { "x": 0, "y": 38, "w": 24, "h": 1 }
-    },
-    {
-      "id": 11,
-      "title": "Tool Calls per Session",
-      "type": "barchart",
-      "transparent": true,
-      "gridPos": { "x": 0, "y": 39, "w": 12, "h": 8 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json | hook_type=\"post-tool-use\" [$__range]))",
-          "queryType": "range"
-        }
-      ],
-      "options": {
-        "orientation": "vertical",
-        "barWidth": 0.6,
-        "showValue": "auto",
-        "stacking": "none",
-        "xTickLabelRotation": -45,
-        "xTickLabelMaxLength": 8,
-        "legend": { "displayMode": "hidden" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "fixed", "fixedColor": "#5794F2" },
-          "custom": { "fillOpacity": 80, "gradientMode": "hue" }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 12,
-      "title": "Errors per Session",
-      "type": "barchart",
-      "transparent": true,
-      "gridPos": { "x": 12, "y": 39, "w": 12, "h": 8 },
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json [$__range]))",
-          "queryType": "range"
-        }
-      ],
-      "options": {
-        "orientation": "vertical",
-        "barWidth": 0.6,
-        "showValue": "auto",
-        "stacking": "none",
-        "xTickLabelRotation": -45,
-        "xTickLabelMaxLength": 8,
-        "legend": { "displayMode": "hidden" },
-        "tooltip": { "mode": "multi" }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": { "fillOpacity": 80, "gradientMode": "hue" },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF9830"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": null, "color": "#73BF69" },
-              { "value": 1, "color": "#FF9830" },
-              { "value": 5, "color": "#F2495C" }
+              {
+                "value": null,
+                "color": "#FF9830"
+              }
             ]
           }
         },
@@ -502,37 +407,934 @@
     },
     {
       "type": "row",
-      "title": "Log Stream",
-      "collapsed": true,
-      "gridPos": { "x": 0, "y": 48, "w": 24, "h": 1 },
-      "panels": [
+      "title": "Activity Over Time",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 6,
+      "title": "Tool Call Rate",
+      "description": "Stacked bar rate of individual tool usage over time.",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
         {
-          "id": 13,
-          "title": "Full Session Logs",
-          "type": "logs",
-          "transparent": true,
-          "gridPos": { "x": 0, "y": 49, "w": 24, "h": 14 },
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": { "type": "loki", "uid": "loki_local" },
-              "expr": "{app=\"claude-dev-logging\"} | json | session_id=~\"$session_id\" | line_format \"{{.hook_type}} | {{.component}} | {{.tool_name}}\"",
-              "queryType": "range"
-            }
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (tool_name) (rate({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" [$__interval]) * 60)",
+          "legendFormat": "{{tool_name}}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "calls/min",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "barAlignment": 0,
+            "spanNulls": true,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "lineInterpolation": "smooth"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Composition",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 7,
+      "title": "Component Share",
+      "type": "piechart",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 8,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (component) (count_over_time({app=\"claude-dev-logging\"} | json session_id | session_id=~\"$session_id\" [$__range]))",
+          "legendFormat": "{{component}}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "sum"
           ],
+          "fields": ""
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tool"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mcp-contextstream"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#B877D9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#8AB8FF",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "lifecycle"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "agent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF9830",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "title": "Hook Type Breakdown",
+      "description": "% share of each hook type across all events.",
+      "type": "table",
+      "transparent": true,
+      "gridPos": {
+        "x": 8,
+        "y": 19,
+        "w": 8,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (hook_type) (count_over_time({app=\"claude-dev-logging\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type != \"\" [$__range])) / ignoring(hook_type) group_left() sum(count_over_time({app=\"claude-dev-logging\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type != \"\" [$__range])) * 100",
+          "legendFormat": "{{hook_type}}",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
           "options": {
-            "showTime": true,
-            "showLabels": false,
-            "showCommonLabels": false,
-            "wrapLogMessage": true,
-            "prettifyLogMessage": false,
-            "enableLogDetails": true,
-            "sortOrder": "Descending",
-            "dedupStrategy": "none"
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "displayName": "Last *",
+                "desc": true
+              }
+            ]
           }
         }
-      ]
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": false,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "custom": {
+            "inspect": false,
+            "width": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "title": "Top Tools Used",
+      "description": "% share of each tool across all post-tool-use events.",
+      "type": "table",
+      "transparent": true,
+      "gridPos": {
+        "x": 16,
+        "y": 19,
+        "w": 8,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (tool_name) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" [$__range])) / ignoring(tool_name) group_left() sum(count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" [$__range])) * 100",
+          "legendFormat": "{{tool_name}}",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "displayName": "Last *",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": false,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "custom": {
+            "inspect": false,
+            "width": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "title": "Agent Insights",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 10,
+      "title": "Agent Events",
+      "description": "Count of agent lifecycle events by type.",
+      "type": "table",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (hook_type) (count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type != \"\" [$__range]))",
+          "legendFormat": "{{hook_type}}",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": [
+              {
+                "displayName": "Last *",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": false,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "inspect": false,
+            "width": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "title": "Tool Calls vs Errors Over Time",
+      "description": "Session health — productive tool call rate alongside error rate.",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": {
+        "x": 8,
+        "y": 31,
+        "w": 16,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-dev-logging\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__interval]) * 60)",
+          "legendFormat": "Tool Calls",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | session_id=~\"$session_id\" [$__interval]) * 60)",
+          "legendFormat": "Errors",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "axisBorderShow": false,
+            "lineInterpolation": "smooth"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tool Calls"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Errors"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 60
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "title": "Cross-Session Trends",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 11,
+      "title": "Tool Calls per Session",
+      "type": "table",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | hook_type=\"post-tool-use\" [$__range]))",
+          "legendFormat": "{{session_id}}",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        }
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": false,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "displayName",
+                "value": "Session"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "title": "Errors per Session",
+      "type": "table",
+      "transparent": true,
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id [$__range]))",
+          "legendFormat": "{{session_id}}",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "lastNotNull"
+            ],
+            "mode": "seriesToRows"
+          }
+        }
+      ],
+      "options": {
+        "frameIndex": 0,
+        "showHeader": false,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Last *"
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic",
+                  "valueDisplayMode": "color"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Field"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "displayName",
+                "value": "Session"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
