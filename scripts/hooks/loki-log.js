@@ -227,7 +227,8 @@ function computeCostUsd(tokenData) {
 
 // --- Incremental token extraction from transcript ---
 // Reads only new bytes since last offset, accumulates totals in timing files.
-// Used by the `stop` hook for intermediate snapshots — O(new bytes) not O(transcript size).
+// Returns { turn, total } where `turn` is the delta for THIS stop event and
+// `total` is the running session total. Used by the `stop` hook for per-call logging.
 function extractTokensIncremental(transcriptPath, sessionId) {
   try {
     const offsetKey = 'token-offset-' + sessionId;
@@ -240,7 +241,7 @@ function extractTokensIncremental(transcriptPath, sessionId) {
 
     const stat = fs.statSync(transcriptPath);
     if (stat.size <= prev.offset) {
-      return formatTokenResult(accum);
+      return { turn: null, total: formatTokenResult(accum) };
     }
 
     const fd = fs.openSync(transcriptPath, 'r');
@@ -251,19 +252,28 @@ function extractTokensIncremental(transcriptPath, sessionId) {
     const chunk = buf.toString('utf8');
     const lines = chunk.split('\n').filter(Boolean);
 
+    // Track this turn's delta separately from the running total
+    const delta = { input: 0, output: 0, cacheCreate: 0, cacheRead: 0, turns: 0, tools: 0 };
+
     for (const line of lines) {
       try {
         const obj = JSON.parse(line);
         if (obj.type === 'assistant' && obj.message && obj.message.usage) {
           const u = obj.message.usage;
-          accum.input += u.input_tokens || 0;
-          accum.output += u.output_tokens || 0;
+          delta.input      += u.input_tokens || 0;
+          delta.output     += u.output_tokens || 0;
+          delta.cacheCreate += u.cache_creation_input_tokens || 0;
+          delta.cacheRead  += u.cache_read_input_tokens || 0;
+          delta.turns++;
+          accum.input      += u.input_tokens || 0;
+          accum.output     += u.output_tokens || 0;
           accum.cacheCreate += u.cache_creation_input_tokens || 0;
-          accum.cacheRead += u.cache_read_input_tokens || 0;
+          accum.cacheRead  += u.cache_read_input_tokens || 0;
           accum.turns++;
           if (!accum.model && obj.message.model) accum.model = obj.message.model;
         }
         if (obj.type === 'tool_use' || (obj.type === 'progress' && obj.data && obj.data.type === 'tool_use')) {
+          delta.tools++;
           accum.tools++;
         }
       } catch {}
@@ -272,20 +282,31 @@ function extractTokensIncremental(transcriptPath, sessionId) {
     writeTimingFile(offsetKey, { offset: stat.size });
     writeTimingFile(totalsKey, accum);
 
-    return formatTokenResult(accum);
+    return {
+      turn: {
+        input_tokens:          delta.input,
+        output_tokens:         delta.output,
+        cache_creation_tokens: delta.cacheCreate,
+        cache_read_tokens:     delta.cacheRead,
+        total_tokens:          delta.input + delta.output,
+        assistant_turns:       delta.turns,
+        tool_use_count:        delta.tools,
+      },
+      total: formatTokenResult(accum),
+    };
   } catch { return null; }
 }
 
 function formatTokenResult(accum) {
   return {
-    total_input_tokens: accum.input,
-    total_output_tokens: accum.output,
+    total_input_tokens:          accum.input,
+    total_output_tokens:         accum.output,
     total_cache_creation_tokens: accum.cacheCreate,
-    total_cache_read_tokens: accum.cacheRead,
-    total_tokens: accum.input + accum.output,
-    assistant_turns: accum.turns,
-    tool_use_count: accum.tools,
-    model: accum.model || undefined,
+    total_cache_read_tokens:     accum.cacheRead,
+    total_tokens:                accum.input + accum.output,
+    assistant_turns:             accum.turns,
+    tool_use_count:              accum.tools,
+    model:                       accum.model || undefined,
   };
 }
 
@@ -545,10 +566,37 @@ process.stdin.on('end', () => {
   const logLine = scrubSecrets(buildEnrichedLogLine(hp, hookType, enrichments, base));
   pushToLoki(stream, logLine);
 
-  // --- Stop hook: intermediate token snapshot → claude-dev-logging component=tokens ---
+  // --- Stop hook: per-turn token delta → claude-dev-logging component=tokens ---
+  // Fires after every Claude response. Pushes this turn's token burn + running total.
   if (hookType === 'stop' && hp.transcript_path) {
-    const tokenData = extractTokensIncremental(hp.transcript_path, sessionId);
-    if (tokenData) pushTokenUsage(sessionId, project, tokenData, false);
+    const result = extractTokensIncremental(hp.transcript_path, sessionId);
+    if (result) {
+      pushToLoki(
+        { app: 'claude-dev-logging', env: envLabel, component: 'tokens', level: 'INFO' },
+        scrubSecrets(JSON.stringify({
+          event: 'claude_turn_tokens',
+          session_id: sessionId,
+          project,
+          machine,
+          env: envLabel,
+          model: result.total.model || undefined,
+          // This turn's delta — what was just burned
+          turn_input_tokens:          result.turn ? result.turn.input_tokens          : 0,
+          turn_output_tokens:         result.turn ? result.turn.output_tokens         : 0,
+          turn_cache_creation_tokens: result.turn ? result.turn.cache_creation_tokens : 0,
+          turn_cache_read_tokens:     result.turn ? result.turn.cache_read_tokens     : 0,
+          turn_total_tokens:          result.turn ? result.turn.total_tokens          : 0,
+          turn_tool_use_count:        result.turn ? result.turn.tool_use_count        : 0,
+          // Running session totals (for trend lines)
+          total_input_tokens:          result.total.total_input_tokens,
+          total_output_tokens:         result.total.total_output_tokens,
+          total_cache_creation_tokens: result.total.total_cache_creation_tokens,
+          total_cache_read_tokens:     result.total.total_cache_read_tokens,
+          total_tokens:                result.total.total_tokens,
+          assistant_turns:             result.total.assistant_turns,
+        }))
+      );
+    }
   }
 
   // --- Session-end: full token summary → claude-token-metrics + on-disk sidecar ---
