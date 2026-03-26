@@ -56,6 +56,20 @@
         "allValue": ".*",
         "current": { "text": "All", "value": "$__all" },
         "sort": 1
+      },
+      {
+        "name": "session_id",
+        "label": "Session",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki_local" },
+        "query": "{app=\"claude-token-metrics\"} | json",
+        "regex": "\"session_id\":\"([^\"]+)\"",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 0
       }
     ]
   },
@@ -78,7 +92,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_output_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_output_tokens [$__range]))",
           "queryType": "range"
         }
       ],
@@ -114,7 +128,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap cost_usd [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap cost_usd [$__range]))",
           "queryType": "range"
         }
       ],
@@ -158,21 +172,21 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_cache_read_tokens [$__range]))",
           "queryType": "range",
           "hide": true
         },
         {
           "refId": "B",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_input_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_input_tokens [$__range]))",
           "queryType": "range",
           "hide": true
         },
         {
           "refId": "C",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_cache_creation_tokens [$__range]))",
           "queryType": "range",
           "hide": true
         },
@@ -225,7 +239,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(count_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} [$__range]))",
+          "expr": "sum(count_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" [$__range]))",
           "queryType": "range"
         }
       ],
@@ -261,7 +275,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "avg_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap cost_usd [$__range])",
+          "expr": "avg_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap cost_usd [$__range])",
           "queryType": "range"
         }
       ],
@@ -312,28 +326,28 @@
         {
           "refId": "Cache Read",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_cache_read_tokens [$__interval]))",
           "legendFormat": "Cache Read",
           "queryType": "range"
         },
         {
           "refId": "Output",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_output_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_output_tokens [$__interval]))",
           "legendFormat": "Output",
           "queryType": "range"
         },
         {
           "refId": "Cache Create",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_cache_creation_tokens [$__interval]))",
           "legendFormat": "Cache Create",
           "queryType": "range"
         },
         {
           "refId": "Input",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_input_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_input_tokens [$__interval]))",
           "legendFormat": "Input",
           "queryType": "range"
         }
@@ -404,7 +418,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_output_tokens [$__interval]))",
+          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_output_tokens [$__interval]))",
           "legendFormat": "{{model}}",
           "queryType": "range"
         }
@@ -461,7 +475,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap cost_usd [$__range]))",
+          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap cost_usd [$__range]))",
           "legendFormat": "{{model}}",
           "queryType": "range"
         }
@@ -514,7 +528,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (effort) (sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\"} | json | unwrap cost_usd [$__range]))",
+          "expr": "sum by (effort) (sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\"} | json | session_id=~\"$session_id\" | unwrap cost_usd [$__range]))",
           "legendFormat": "{{effort}}",
           "queryType": "range"
         }
@@ -568,7 +582,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum by (effort) (sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\"} | json | unwrap total_output_tokens [$__range]))",
+          "expr": "sum by (effort) (sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\"} | json | session_id=~\"$session_id\" | unwrap total_output_tokens [$__range]))",
           "legendFormat": "{{effort}}",
           "queryType": "range"
         }
@@ -622,21 +636,21 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_cache_read_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_cache_read_tokens [$__interval]))",
           "queryType": "range",
           "hide": true
         },
         {
           "refId": "B",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_input_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_input_tokens [$__interval]))",
           "queryType": "range",
           "hide": true
         },
         {
           "refId": "C",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap total_cache_creation_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap total_cache_creation_tokens [$__interval]))",
           "queryType": "range",
           "hide": true
         },
@@ -701,7 +715,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "topk(15, sum by (session_id) (sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json session_id=\"session_id\" | unwrap cost_usd [$__range])))",
+          "expr": "topk(15, sum by (session_id) (sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json session_id=\"session_id\" | session_id=~\"$session_id\" | unwrap cost_usd [$__range])))",
           "legendFormat": "{{session_id}}",
           "queryType": "range"
         }
@@ -744,7 +758,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "{app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | line_format \"{{.model}} | {{.effort}} | ${{.cost_usd}} | out={{.total_output_tokens}} | turns={{.assistant_turns}} | cache={{.total_cache_read_tokens}} | {{.session_id}}\"",
+          "expr": "{app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | line_format \"{{.model}} | {{.effort}} | ${{.cost_usd}} | out={{.total_output_tokens}} | turns={{.assistant_turns}} | cache={{.total_cache_read_tokens}} | {{.session_id}}\"",
           "queryType": "range"
         }
       ],
@@ -778,7 +792,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap cost_usd [1d]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap cost_usd [1d]))",
           "legendFormat": "Daily Cost",
           "queryType": "range"
         }
@@ -826,14 +840,14 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "avg_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap assistant_turns [$__interval])",
+          "expr": "avg_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap assistant_turns [$__interval])",
           "legendFormat": "Avg Turns",
           "queryType": "range"
         },
         {
           "refId": "B",
           "datasource": { "type": "loki", "uid": "loki_local" },
-          "expr": "max_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | unwrap assistant_turns [$__interval])",
+          "expr": "max_over_time({app=\"claude-token-metrics\",model=~\"$model\",project=~\"$project\",effort=~\"$effort\"} | json | session_id=~\"$session_id\" | unwrap assistant_turns [$__interval])",
           "legendFormat": "Max Turns",
           "queryType": "range"
         }
