@@ -151,3 +151,32 @@ All session context fields fall back to `"not in session"` (use `SessionLogging.
 - [ ] `iracing_incident` / `incident_detected` log → full uniqueness signature (`unique_user_id`, start/end frame, camera)
 
 **Canonical reference:** [docs/RULES-ActionCoverage.md](../docs/RULES-ActionCoverage.md)
+
+---
+
+## Agent Swarm
+
+Specialized agents live in `.claude/agents/`. Use the **orchestrator** to route tasks.
+
+### Quick Reference
+
+| Agent | Invoke for |
+|-------|-----------|
+| `orchestrator` | Task routing — decides which agents to call |
+| `plugin-dev` | C# plugin work (iRacing SDK, WebSocket, actions) |
+| `dashboard-dev` | HTML/JS dashboard work (UI, events, WebSocket) |
+| `test-runner` | Build + unit tests + post-deploy tests |
+| `log-compliance` | Audit 100% action coverage before PRs |
+| `grafana-poller` | Query Loki, validate log format, detect anomalies |
+| `pr-reviewer` | Full PR review (build gate + coverage + architecture) |
+| `deployer` | Build → deploy → verify pipeline |
+| `observability` | Grafana/Loki/Prometheus stack management |
+| `babysit` | Persistent log/metrics monitoring, ad-hoc LogQL/PromQL, watch tasks from agents |
+
+### Workflow Patterns
+
+**After code changes**: always run `test-runner`, then `log-compliance`
+**Before PRs**: run `test-runner` + `log-compliance` + `pr-reviewer`
+**After deploy**: run `grafana-poller` to verify log format, then `babysit` to watch for regressions
+**Log investigation**: run `babysit` for pattern analysis, metrics, and ad-hoc queries
+**Parallel-safe pairs**: `plugin-dev` + `dashboard-dev`, `test-runner` + `log-compliance`, `babysit` + `test-runner`
