@@ -1,0 +1,30 @@
+name: session_health
+display_name: Session Health
+description: Dashboard opens, WebSocket connects, plugin reports ready.
+source_doc: docs/RULES-ActionCoverage.md
+steps:
+  - id: dashboard_opened
+    event: dashboard_opened
+    label: Dashboard opened
+    filters: {}
+    timeout_sec: 0
+    optional: false
+    next:
+      - ws_connected
+  - id: ws_connected
+    event: ws_client_connected
+    label: WebSocket client connected
+    filters: {}
+    timeout_sec: 10
+    optional: false
+    next:
+      - plugin_ready
+  - id: plugin_ready
+    event: plugin_ready
+    label: Plugin ready
+    filters: {}
+    timeout_sec: 5
+    optional: true
+    next: []
+expected_completion_sec: 20
+gap_severity: warn
