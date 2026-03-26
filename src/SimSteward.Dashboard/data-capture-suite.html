@@ -96,9 +96,8 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .pc-name { font-size: 0.82rem; flex: 1; }
 .pc-level { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .pc-detail { font-size: 0.72rem; color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scope-btn { transition: opacity 0.2s, border-color 0.2s; }
-.scope-btn:not(.active) { opacity: 0.35; }
-.scope-btn.active { border-color: var(--accent); color: var(--accent); }
+.scope-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.76rem; font-weight: 600; border: 1px solid var(--border); color: var(--muted); opacity: 0.35; transition: opacity 0.3s, border-color 0.3s, color 0.3s, background 0.3s; cursor: default; }
+.scope-badge.active { opacity: 1; border-color: var(--accent); color: var(--accent); background: rgba(99,144,255,0.08); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .pc-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
@@ -277,8 +276,6 @@ Sentry.setTag('dashboard', 'data-capture-suite');
       <span class="sig"><span class="sig-dot" id="sig-simhub"></span><span class="sig-label">SimHub</span></span>
       <span class="sig"><span class="sig-dot" id="sig-grafana"></span><span class="sig-label">Grafana</span></span>
       <span class="sig"><span class="sig-dot" id="sig-replay"></span><span class="sig-label">Replay</span></span>
-      <span class="sig"><span class="sig-dot" id="sig-full"></span><span class="sig-label">Full replay</span></span>
-      <span class="sig" id="sig-partial-wrap" hidden><span class="sig-dot warn"></span><span class="sig-label">Partial</span></span>
     </div>
   </div>
 
@@ -287,8 +284,8 @@ Sentry.setTag('dashboard', 'data-capture-suite');
     <div class="step-label"><span class="step-num">2</span> Pre-test Conditions</div>
     <div class="row" style="margin-bottom:8px">
       <span style="font-size:0.78rem;color:var(--muted)">Replay scope:</span>
-      <button class="btn sm scope-btn active" id="btn-scope-full" onclick="setScope('full')">Full replay</button>
-      <button class="btn sm scope-btn" id="btn-scope-partial" onclick="setScope('partial')">Partial replay</button>
+      <span class="scope-badge" id="badge-scope-full">Full replay</span>
+      <span class="scope-badge" id="badge-scope-partial">Partial replay</span>
       <button class="btn primary sm" id="btn-preflight" onclick="runPreflight()" style="margin-left:auto">Check conditions</button>
       <button class="btn sm" id="btn-preflight-reset" onclick="resetPreflight()">Reset</button>
     </div>
@@ -788,16 +785,8 @@ function updatePreconditionCard(pf) {
     pf.correlationId ? pf.correlationId.slice(0, 8) + '\u2026' : '\u2014';
   document.getElementById('lbl-preflight-level').textContent = pf.level || 0;
 
-  // Scope toggle sync
-  const scopeFull = document.getElementById('btn-scope-full');
-  const scopePartial = document.getElementById('btn-scope-partial');
-  if (pf.replayScope === 'partial') {
-    scopeFull.classList.remove('active');
-    scopePartial.classList.add('active');
-  } else {
-    scopeFull.classList.add('active');
-    scopePartial.classList.remove('active');
-  }
+  // Scope badge sync — reflects what the app detected
+  updateScopeBadge(pf.replayScope === 'partial' ? 'partial' : 'full');
 
   // Button text
   const btn = document.getElementById('btn-preflight');
@@ -824,12 +813,10 @@ function updatePreconditionCard(pf) {
   }
 }
 
-function setScope(scope) {
-  _replayScope = scope;
-  document.getElementById('btn-scope-full').classList.toggle('active', scope === 'full');
-  document.getElementById('btn-scope-partial').classList.toggle('active', scope === 'partial');
-  send({ action: 'data_capture_suite', arg: 'preflight_scope:' + scope });
-  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-scope-' + scope, event_type: 'click', message: 'Set replay scope: ' + scope });
+function updateScopeBadge(scope) {
+  if (scope) _replayScope = scope;
+  document.getElementById('badge-scope-full').classList.toggle('active', scope === 'full');
+  document.getElementById('badge-scope-partial').classList.toggle('active', scope === 'partial');
 }
 
 function runPreflight() {
@@ -1042,8 +1029,9 @@ function handleState(msg) {
   setSig('sig-simhub', diag.simHubHttpListening);
   setSig('sig-grafana', diag.grafanaConfigured);
   setSig('sig-replay', replay);
-  setSig('sig-full', diag.replaySessionCompleted);
-  document.getElementById('sig-partial-wrap').hidden = !(replay && !diag.replaySessionCompleted);
+
+  // Replay scope badge — auto-detected from session data
+  updateScopeBadge(replay ? (diag.replaySessionCompleted ? 'full' : 'partial') : null);
 
   // Preflight / Precondition card
   const pf = msg.preflight;
@@ -1054,11 +1042,10 @@ function handleState(msg) {
   if (pf && pf.phase === 'complete') {
     setSig('sig-grafana', pf.grafanaOk);
     setSig('sig-simhub', pf.simHubOk);
-    setSig('sig-full', pf.checkeredOk);
   }
 
   const preflightPassed = pf && pf.allPassed;
-  const ready = _wsOk && _pluginSeen && diag.simHubHttpListening && diag.grafanaConfigured && replay && diag.replaySessionCompleted && preflightPassed;
+  const ready = _wsOk && _pluginSeen && diag.simHubHttpListening && diag.grafanaConfigured && replay && preflightPassed;
 
   // Guard banner
   const guard = document.getElementById('guard-banner');

@@ -328,6 +328,9 @@ namespace SimSteward.Plugin
             if (_preflightSnapshot.MiniTests == null || _preflightLevel == 0)
                 _preflightSnapshot.MiniTests = BuildPreflightMiniTests();
 
+            // Auto-detect replay scope from session data
+            _preflightReplayScope = IsReplaySessionCompleted() ? "full" : "partial";
+
             _preflightSnapshot.Phase = "running";
             _preflightSnapshot.CorrelationId = _preflightCorrelationId;
             _preflightSnapshot.ReplayScope = _preflightReplayScope;

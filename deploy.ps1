@@ -102,13 +102,27 @@ Push-LokiEvent 'deploy_started' 'INFO' 'Deploy script started' @{
     loki_url   = $env:SIMSTEWARD_LOKI_URL
 }
 
+# ── Plugin DLLs to deploy ────────────────────────────────────────────────────
+# ONLY list DLLs that SimHub does NOT ship. Overwriting SimHub's own assemblies
+# (System.*, Microsoft.*, Newtonsoft.Json, etc.) breaks its web server and
+# plugin loader via binding-redirect mismatches. See docs/DEPLOY-DLLS.md.
 $PluginDlls = @(
     "SimSteward.Plugin.dll",
     "Fleck.dll",
-    "Newtonsoft.Json.dll",
     "IRSDKSharper.dll",
     "YamlDotNet.dll",
-    "Sentry.dll"
+    "Sentry.dll",
+    "System.Text.Json.dll",
+    # OpenTelemetry + gRPC
+    "OpenTelemetry.dll",
+    "OpenTelemetry.Api.dll",
+    "OpenTelemetry.Api.ProviderBuilderExtensions.dll",
+    "OpenTelemetry.Exporter.OpenTelemetryProtocol.dll",
+    "Google.Protobuf.dll",
+    "Grpc.Core.dll",
+    "Grpc.Core.Api.dll",
+    "grpc_csharp_ext.x64.dll",
+    "grpc_csharp_ext.x86.dll"
 )
 
 function Read-PluginDllProductVersion {
@@ -317,10 +331,27 @@ Push-LokiEvent 'deploy_dlls_cleaned' 'INFO' "Removed $($deletedDlls.Count) exist
 }
 
 # ── 3. Copy build files to target location ──────────────────────────────────
+# Guard: refuse to overwrite a SimHub-shipped DLL if its assembly version differs
+# from ours. This prevents breaking SimHub's binding redirects.
 function Copy-DeployDlls {
     foreach ($d in $PluginDlls) {
         $src = Join-Path $outDir $d
         if (-not (Test-Path $src)) { throw "Build output missing: $src" }
+        $existing = Join-Path $SimHubPath $d
+        if ((Test-Path $existing) -and $d -notlike "SimSteward.*") {
+            try {
+                $ourVer  = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $src).Path).Version.ToString()
+                $theirVer = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $existing).Path).Version.ToString()
+                if ($ourVer -ne $theirVer) {
+                    Push-LokiEvent 'deploy_dll_version_conflict' 'ERROR' "Refusing to overwrite $d (SimHub=$theirVer, ours=$ourVer)" @{
+                        dll = $d; simhub_version = $theirVer; our_version = $ourVer
+                    }
+                    Write-Error "BLOCKED: $d already in SimHub with version $theirVer (ours is $ourVer). Overwriting would break SimHub. Remove $d from `$PluginDlls or match the version."
+                }
+            } catch [System.BadImageFormatException] {
+                # native DLL (e.g. grpc_csharp_ext) — no managed assembly version, skip check
+            }
+        }
         Copy-Item $src $SimHubPath -Force
     }
 }
