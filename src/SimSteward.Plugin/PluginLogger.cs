@@ -59,9 +59,12 @@ namespace SimSteward.Plugin
 
         private readonly string _logPath;
         private readonly string _jsonLogPath;
+        private readonly string _lokiUrl;
+        private readonly string _lokiEnv;
         private readonly object _lock = new object();
         private readonly Queue<LogEntry> _ring = new Queue<LogEntry>();
         private readonly Queue<(string json, string text)> _writeBuffer = new Queue<(string, string)>();
+        private readonly Queue<LogEntry> _lokiBuffer = new Queue<LogEntry>();
         private System.Threading.Timer _flushTimer;
         private Func<(string sessionId, string sessionSeq, int replayFrame)> _getSpine;
 
@@ -73,6 +76,8 @@ namespace SimSteward.Plugin
         {
             _logPath = string.IsNullOrEmpty(basePath) ? null : Path.Combine(basePath, "plugin.log");
             _jsonLogPath = string.IsNullOrEmpty(basePath) ? null : Path.Combine(basePath, "plugin-structured.jsonl");
+            _lokiUrl = Environment.GetEnvironmentVariable("SIMSTEWARD_LOKI_URL");
+            _lokiEnv = Environment.GetEnvironmentVariable("SIMSTEWARD_LOG_ENV") ?? "local";
             IsDebugMode = isDebugMode;
             if (!string.IsNullOrEmpty(basePath))
                 _flushTimer = new System.Threading.Timer(_ => Flush(), null, FlushIntervalMs, FlushIntervalMs);
@@ -159,6 +164,7 @@ namespace SimSteward.Plugin
                     JsonConvert.SerializeObject(entry) + "\n",
                     $"{entry.Timestamp} [{entry.Level}] {entry.Message}{Environment.NewLine}"
                 ));
+                _lokiBuffer.Enqueue(entry);
             }
 
             try { LogWritten?.Invoke(entry); } catch { }
@@ -167,11 +173,14 @@ namespace SimSteward.Plugin
         private void Flush()
         {
             (string json, string text)[] batch;
+            LogEntry[] lokiBatch;
             lock (_lock)
             {
                 if (_writeBuffer.Count == 0) return;
                 batch = _writeBuffer.ToArray();
                 _writeBuffer.Clear();
+                lokiBatch = _lokiBuffer.ToArray();
+                _lokiBuffer.Clear();
             }
 
             var jsonSb = new System.Text.StringBuilder();
@@ -189,6 +198,10 @@ namespace SimSteward.Plugin
                 try { AppendToFile(_logPath, textSb.ToString(), () => RotateLogs()); }
                 catch (Exception ex) { try { WriteError?.Invoke("log_write_error", ex); } catch { } }
             }
+
+            // Fire-and-forget push to Loki — replaces Alloy file-tailing
+            if (!string.IsNullOrEmpty(_lokiUrl) && lokiBatch.Length > 0)
+                LokiPushClient.Push(_lokiUrl, "simsteward", _lokiEnv, lokiBatch);
         }
 
         private void AppendToFile(string path, string content, Action rotate)

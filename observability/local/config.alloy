@@ -1,43 +1,9 @@
-// Grafana Alloy — tail plugin-structured.jsonl → Loki
-// Docs: https://grafana.com/docs/alloy/latest/
-
-local.file_match "simsteward_structured" {
-  path_targets = [{"__path__" = "/var/log/simsteward/plugin-structured.jsonl"}]
-  sync_period  = "5s"
-}
-
-loki.source.file "simsteward_structured" {
-  targets    = local.file_match.simsteward_structured.targets
-  forward_to = [loki.process.simsteward.receiver]
-
-  tail_from_end = true
-}
-
-loki.process "simsteward" {
-  forward_to = [loki.write.local.receiver]
-
-  // Extract low-cardinality labels from JSON; everything else stays in the log line.
-  stage.json {
-    expressions = {
-      level     = "level",
-      component = "component",
-      event     = "event",
-      domain    = "domain",
-    }
-  }
-
-  stage.labels {
-    values = {
-      level     = "",
-      component = "",
-      event     = "",
-      domain    = "",
-    }
-  }
-}
-
-loki.write "local" {
-  endpoint {
-    url = "http://loki:3100/loki/api/v1/push"
-  }
-}
+// RETIRED — Alloy is no longer part of the observability stack.
+//
+// The SimHub plugin (PluginLogger.cs) now pushes plugin-structured.jsonl entries directly
+// to Loki via LokiPushClient at flush time (~500ms batches), replacing this file-tail pipeline.
+//
+// Claude Code token metrics are pushed directly from ~/.claude/hooks/loki-log.js at session-end.
+//
+// This file is kept for reference only. Remove the alloy service from docker-compose.yml
+// before starting the stack.
