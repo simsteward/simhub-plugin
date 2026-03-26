@@ -1005,6 +1005,57 @@ function buildDevProductivity() {
   ], 12, y, 12, 10, { unit: 'short' }));
   y += 10;
 
+  // ── Sentinel Findings ─────────────────────────────────────────────────────────
+  const SF = '{app="sim-steward", component="log-sentinel", event="sentinel_finding"}';
+  const SF_WARN = `${SF} | json severity | severity=~"warn|critical"`;
+
+  p.push(row('🔍 Sentinel Findings', y++));
+
+  p.push(statPanel(++id, 'Total Findings', [
+    target(`count(count_over_time(${SF} [$__range]))`)
+  ], 'short', '#5794F2', 0, y, 5));
+
+  p.push(statPanel(++id, 'Warn / Critical', [
+    target(`count(count_over_time(${SF_WARN} [$__range]))`)
+  ], 'short', [
+    { value: null, color: '#73BF69' },
+    { value: 1,    color: '#FADE2A' },
+    { value: 5,    color: '#F2495C' },
+  ], 5, y, 5));
+
+  p.push(timeseriesPanel(++id, 'Findings Over Time by Severity', [
+    target(`sum by (severity) (count_over_time(${SF} | json severity [$__interval]))`, '{{severity}}')
+  ], 10, y, 14, 5, {
+    colorOverrides: [
+      ['critical', '#F2495C'],
+      ['warn',     '#FADE2A'],
+      ['info',     '#5794F2'],
+    ],
+    legendPlacement: 'right',
+    legendCalcs: ['sum'],
+  }));
+  y += 5;
+
+  p.push(tablePanel(++id, 'Findings by Detector', [
+    target(`sum by (detector) (count_over_time(${SF} | json detector [$__range]))`, '{{detector}}', 'instant')
+  ], 0, y, 8, 8, { unit: 'short' }));
+
+  p.push(tablePanel(++id, 'Findings by Severity', [
+    target(`sum by (severity) (count_over_time(${SF} | json severity [$__range]))`, '{{severity}}', 'instant')
+  ], 8, y, 8, 8, { unit: 'short' }));
+
+  p.push(timeseriesPanel(++id, 'Escalated (T2) Investigations', [
+    target(
+      `count(count_over_time(${SF} | json escalated_to_t2 | escalated_to_t2=~"true" [$__interval]))`,
+      'Escalated'
+    )
+  ], 16, y, 8, 8, {
+    colorOverrides: [['Escalated', '#B877D9']],
+    legendCalcs: ['sum'],
+    fillOpacity: 40,
+  }));
+  y += 8;
+
   return dashboard('claude-dev-productivity', 'Claude Code — Developer Productivity',
     'now-30d', '5m',
     [templateVar('project', 'Project', '"project":"([^"]+)"')],

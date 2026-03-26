@@ -236,7 +236,7 @@ function extractTokensIncremental(transcriptPath, sessionId) {
     const prev = readTimingFile(offsetKey, false) || { offset: 0 };
     const accum = readTimingFile(totalsKey, false) || {
       input: 0, output: 0, cacheCreate: 0, cacheRead: 0,
-      turns: 0, tools: 0, model: undefined,
+      turns: 0, tools: 0, model: undefined, thinking: false,
     };
 
     const stat = fs.statSync(transcriptPath);
@@ -279,6 +279,7 @@ function extractTokensIncremental(transcriptPath, sessionId) {
       } catch {}
     }
 
+    if (!accum.thinking && /"type"\s*:\s*"thinking"/.test(chunk)) accum.thinking = true;
     writeTimingFile(offsetKey, { offset: stat.size });
     writeTimingFile(totalsKey, accum);
 
@@ -307,6 +308,7 @@ function formatTokenResult(accum) {
     assistant_turns:             accum.turns,
     tool_use_count:              accum.tools,
     model:                       accum.model || undefined,
+    thinking:                    accum.thinking || false,
   };
 }
 
@@ -383,8 +385,8 @@ function extractSessionTokens(transcriptPath) {
 }
 
 // --- Push token usage to Loki ---
-// isFinal=false → claude-dev-logging (component=tokens), intermediate snapshot, no cost/effort
-// isFinal=true  → claude-token-metrics, one per session, includes cost_usd + labeled by effort
+// isFinal=true  → claude-token-metrics (called at session-end for backfill / historical writes)
+// isFinal=false → claude-dev-logging (component=tokens) — only used for legacy backfill paths
 function pushTokenUsage(sessionId, project, tokenData, isFinal) {
   if (isFinal) {
     const logLine = scrubSecrets(JSON.stringify({
@@ -587,7 +589,7 @@ process.stdin.on('end', () => {
   const logLine = scrubSecrets(buildEnrichedLogLine(hp, hookType, enrichments, base));
   pushToLoki(stream, logLine);
 
-  // --- Stop hook: per-turn token delta → claude-dev-logging component=tokens ---
+  // --- Stop hook: per-turn token delta → claude-dev-logging + claude-token-metrics ---
   // Fires after every Claude response. Pushes this turn's token burn + running total.
   if (hookType === 'stop' && hp.transcript_path) {
     const result = extractTokensIncremental(hp.transcript_path, sessionId);
@@ -617,15 +619,69 @@ process.stdin.on('end', () => {
           assistant_turns:             result.total.assistant_turns,
         }))
       );
+
+      // Push per-turn delta to claude-token-metrics so dashboards update in real-time.
+      // Each stop event pushes this turn's incremental cost/tokens; sum_over_time accumulates
+      // correctly. The session-end hook no longer pushes to claude-token-metrics to avoid
+      // double-counting (sidecar file remains the authoritative off-Loki record).
+      if (result.turn && (result.turn.input_tokens > 0 || result.turn.output_tokens > 0
+          || result.turn.cache_creation_tokens > 0 || result.turn.cache_read_tokens > 0)) {
+        // Read effort from settings.json (same fallback used by full session extraction)
+        const EFFORT_MAP_STOP = { low: 'low', medium: 'med', med: 'med', high: 'high', max: 'max' };
+        let stopEffort = 'med';
+        try {
+          const settings = JSON.parse(fs.readFileSync(
+            path.join(os.homedir(), '.claude', 'settings.json'), 'utf8'));
+          const mapped = EFFORT_MAP_STOP[(settings.effortLevel || '').toLowerCase()];
+          if (mapped) stopEffort = mapped;
+        } catch {}
+        const turnCostUsd = computeCostUsd({
+          model:                       result.total.model,
+          total_input_tokens:          result.turn.input_tokens,
+          total_output_tokens:         result.turn.output_tokens,
+          total_cache_creation_tokens: result.turn.cache_creation_tokens,
+          total_cache_read_tokens:     result.turn.cache_read_tokens,
+        });
+        pushToLoki(
+          {
+            app: 'claude-token-metrics',
+            env: envLabel,
+            model: result.total.model || 'unknown',
+            project: project || 'unknown',
+            effort: stopEffort,
+          },
+          scrubSecrets(JSON.stringify({
+            event:                       'claude_turn_metrics',
+            session_id:                  sessionId,
+            project,
+            machine,
+            env:                         envLabel,
+            is_final:                    false,
+            timestamp:                   new Date().toISOString(),
+            model:                       result.total.model || undefined,
+            effort:                      stopEffort,
+            thinking:                    result.total.thinking,
+            cost_usd:                    turnCostUsd,
+            total_input_tokens:          result.turn.input_tokens,
+            total_output_tokens:         result.turn.output_tokens,
+            total_cache_creation_tokens: result.turn.cache_creation_tokens,
+            total_cache_read_tokens:     result.turn.cache_read_tokens,
+            total_tokens:                result.turn.total_tokens,
+            assistant_turns:             result.turn.assistant_turns,
+            tool_use_count:              result.turn.tool_use_count,
+          }))
+        );
+      }
     }
   }
 
-  // --- Session-end: full token summary → claude-token-metrics + on-disk sidecar ---
+  // --- Session-end: full token summary → on-disk sidecar (no Loki push — per-turn stop
+  //     events have already pushed incremental deltas to claude-token-metrics, so a final
+  //     push here would double-count when dashboards run sum_over_time(cost_usd)). ---
   if (hookType === 'session-end' && hp.transcript_path) {
     const tokenData = extractSessionTokens(hp.transcript_path);
     if (tokenData) {
       tokenData.cost_usd = computeCostUsd(tokenData);
-      pushTokenUsage(sessionId, project, tokenData, true);
       writeSessionMetricsSidecar(hp, sessionId, project, enrichments, tokenData);
     } else {
       pushToLoki(

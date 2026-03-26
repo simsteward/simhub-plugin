@@ -1,0 +1,40 @@
+name: walk_driver
+display_name: Walk Driver Incidents
+description: >
+  User triggers a find-driver-incidents scan. The plugin seeks through
+  each incident for the selected driver. Individual seek results are
+  optional since the count depends on incident data.
+source_doc: USER-FLOWS.md#flow-4-walk-driver
+
+steps:
+  - id: ui_trigger
+    event: dashboard_ui_event
+    label: Find driver incidents clicked
+    filters:
+      element_id: find-driver-incidents
+    timeout_sec: 0
+    optional: false
+    next:
+      - seek_dispatched
+
+  - id: seek_dispatched
+    event: action_dispatched
+    label: Seek to incident dispatched
+    filters:
+      action: seek_to_incident
+    timeout_sec: 10
+    optional: false
+    next:
+      - seek_result
+
+  - id: seek_result
+    event: action_result
+    label: Seek to incident result
+    filters:
+      action: seek_to_incident
+    timeout_sec: 10
+    optional: true
+    next: []
+
+expected_completion_sec: 600
+gap_severity: warn

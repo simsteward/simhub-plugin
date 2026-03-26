@@ -1,0 +1,294 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
+        "content": "**Log Sentinel** — Automated operational support for SimSteward.\n\n- **Tier 1** — 7 rule-based detectors run every 60s: error spikes, action failures, WebSocket health, silent sessions, stuck users, incident anomalies, flow gaps.\n- **Tier 2 Fast** — DeepSeek-R1 8B investigates escalated findings (root-cause analysis).\n- **Tier 2 Deep** — Llama 3.3 70B re-investigates low-confidence results.\n\nFindings and investigations are pushed back to Loki as `component=log-sentinel` events.",
+        "mode": "markdown"
+      },
+      "title": "About",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 3 },
+      "id": 2,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_finding\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Findings timeline",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisLabel": "findings",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "normal" }
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "id": 3,
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "sum by (detector) (count_over_time({app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_finding\"} | json [$__interval]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Findings by detector",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "id": 4,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right" },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "sum by (severity) (count_over_time({app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_finding\"} | json [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Severity distribution",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 21 },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_investigation\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Tier 2 investigation reports",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 31 },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_finding\"} | json | severity=\"critical\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Critical findings",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "orange", "value": 5 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 31 },
+      "id": 7,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_finding\"} | json | flow_context!=\"\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Flow-related findings",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "purple", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 31 },
+      "id": 8,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "count_over_time({app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_investigation\"} [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "T2 investigations triggered",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 37 },
+      "id": 9,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "{app=\"sim-steward\", component=\"log-sentinel\", event=\"sentinel_log\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Sentinel process logs",
+      "type": "logs"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["simsteward", "log-sentinel", "observability"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "local", "value": "local" },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "env",
+        "options": [
+          { "selected": true, "text": "local", "value": "local" },
+          { "selected": false, "text": "production", "value": "production" }
+        ],
+        "query": "local,production",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SimSteward — Log Sentinel",
+  "uid": "simsteward-log-sentinel"
+}

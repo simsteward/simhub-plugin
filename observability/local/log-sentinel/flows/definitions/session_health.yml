@@ -1,0 +1,45 @@
+name: session_health
+display_name: Session Health
+description: >
+  Verifies that opening the dashboard leads to a working WebSocket
+  connection and optional iRacing readiness signals.
+source_doc: USER-FLOWS.md#flow-1-session-health
+
+steps:
+  - id: dashboard_opened
+    event: dashboard_opened
+    label: Dashboard opened
+    filters: {}
+    timeout_sec: 0
+    optional: false
+    next:
+      - ws_connected
+      - plugin_ready
+
+  - id: ws_connected
+    event: ws_client_connected
+    label: WebSocket client connected
+    filters: {}
+    timeout_sec: 10
+    optional: false
+    next:
+      - iracing_connected
+
+  - id: plugin_ready
+    event: plugin_ready
+    label: Plugin reports ready
+    filters: {}
+    timeout_sec: 30
+    optional: true
+    next: []
+
+  - id: iracing_connected
+    event: iracing_connected
+    label: iRacing SDK connected
+    filters: {}
+    timeout_sec: 30
+    optional: true
+    next: []
+
+expected_completion_sec: 60
+gap_severity: warn

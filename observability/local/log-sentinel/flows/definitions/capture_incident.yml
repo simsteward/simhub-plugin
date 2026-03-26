@@ -1,0 +1,30 @@
+name: capture_incident
+display_name: Capture Incident
+description: >
+  User triggers incident capture. The plugin dispatches the action
+  and expects a successful result within a short window.
+source_doc: USER-FLOWS.md#flow-6-capture-incident
+
+steps:
+  - id: capture_dispatched
+    event: action_dispatched
+    label: Capture incident dispatched
+    filters:
+      action: capture_incident
+    timeout_sec: 0
+    optional: false
+    next:
+      - capture_result
+
+  - id: capture_result
+    event: action_result
+    label: Capture incident succeeded
+    filters:
+      action: capture_incident
+      success: true
+    timeout_sec: 15
+    optional: false
+    next: []
+
+expected_completion_sec: 30
+gap_severity: warn

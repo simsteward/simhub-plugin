@@ -1,0 +1,40 @@
+name: walk_session
+display_name: Walk Session Incidents
+description: >
+  User triggers a find-all-incidents scan. The plugin seeks through
+  every incident in the session. Individual seek results are optional
+  since the count depends on session data.
+source_doc: USER-FLOWS.md#flow-5-walk-session
+
+steps:
+  - id: ui_trigger
+    event: dashboard_ui_event
+    label: Find all incidents clicked
+    filters:
+      element_id: find-all-incidents
+    timeout_sec: 0
+    optional: false
+    next:
+      - seek_dispatched
+
+  - id: seek_dispatched
+    event: action_dispatched
+    label: Seek to incident dispatched
+    filters:
+      action: seek_to_incident
+    timeout_sec: 10
+    optional: false
+    next:
+      - seek_result
+
+  - id: seek_result
+    event: action_result
+    label: Seek to incident result
+    filters:
+      action: seek_to_incident
+    timeout_sec: 10
+    optional: true
+    next: []
+
+expected_completion_sec: 600
+gap_severity: warn
