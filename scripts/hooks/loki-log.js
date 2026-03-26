@@ -342,10 +342,30 @@ function extractSessionTokens(transcriptPath) {
       } catch {}
     }
 
-    // Detect effort (reuses already-read text — no second file read)
-    let effort = 'standard';
-    if (/"type"\s*:\s*"thinking"/.test(text)) effort = 'extended_thinking';
-    else if (model && model.toLowerCase().includes('fast')) effort = 'fast';
+    // Detect thinking (separate from effort — presence of thinking blocks in transcript)
+    const thinking = /"type"\s*:\s*"thinking"/.test(text);
+
+    // Detect effort level: check transcript metadata first, fall back to settings.json
+    const EFFORT_MAP = { low: 'low', medium: 'med', med: 'med', high: 'high', max: 'max' };
+    let effort = 'high'; // Claude Code default
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+        if (obj.effort) {
+          const mapped = EFFORT_MAP[obj.effort.toLowerCase()];
+          if (mapped) { effort = mapped; break; }
+        }
+      } catch {}
+    }
+    if (effort === 'high') {
+      // Fall back to settings.json effortLevel
+      try {
+        const settings = JSON.parse(fs.readFileSync(
+          path.join(os.homedir(), '.claude', 'settings.json'), 'utf8'));
+        const mapped = EFFORT_MAP[(settings.effortLevel || '').toLowerCase()];
+        if (mapped) effort = mapped;
+      } catch {}
+    }
 
     return {
       total_input_tokens: totalInput,
@@ -357,6 +377,7 @@ function extractSessionTokens(transcriptPath) {
       tool_use_count: toolUseCalls,
       model: model || undefined,
       effort,
+      thinking,
     };
   } catch { return null; }
 }
