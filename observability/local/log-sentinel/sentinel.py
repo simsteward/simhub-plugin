@@ -1,377 +1,326 @@
-"""Log Sentinel main loop — parallel detectors, async T2, dedup, circuit breakers, 100% logging."""
+"""Log Sentinel v3 — main cycle orchestrator."""
 
 import logging
-import queue
-import threading
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 
 import schedule
 
+from baseline import BaselineManager
 from circuit_breaker import CircuitBreaker
 from config import Config
+from evidence import EvidenceBuilder
 from grafana_client import GrafanaClient
 from loki_client import LokiClient
-from models import Finding, TimeWindow
-from query_cache import CycleQueryCache
+from ollama_client import OllamaClient
 from sentry_client import SentryClient
-
-from detectors.error_spike import ErrorSpikeDetector
-from detectors.action_failure import ActionFailureDetector
-from detectors.websocket_health import WebSocketHealthDetector
-from detectors.silent_session import SilentSessionDetector
-from detectors.flow_gap import FlowGapDetector
-from detectors.stuck_user import StuckUserDetector
-from detectors.incident_anomaly import IncidentAnomalyDetector
-from detectors.plugin_lifecycle import PluginLifecycleDetector
-from detectors.resource_health import ResourceHealthDetector
-from detectors.session_quality import SessionQualityDetector
-from detectors.claude_session import ClaudeSessionDetector
-from detectors.mcp_health import McpHealthDetector
-from detectors.agent_loop import AgentLoopDetector
-from detectors.tool_patterns import ToolPatternsDetector
-from detectors.token_usage import TokenUsageDetector
-from detectors.sentinel_health import SentinelHealthDetector
-
-from flows.engine import FlowEngine
-from investigator.chain import InvestigationChain
+from t1_agent import T1Agent, T1Result
+from t2_agent import T2Agent, T2Result
+from t3_agent import T3Agent
+from timeline import TimelineBuilder
+from trace import InvocationBuilder
 
 logger = logging.getLogger("sentinel")
+
+
+@dataclass
+class CycleResult:
+    cycle_id: str
+    cycle_num: int
+    window_minutes: int
+    t1: T1Result | None
+    timeline_event_count: int
+    anomaly_count: int
+    duration_ms: int
+    error: str | None = None
 
 
 class Sentinel:
     def __init__(self, config: Config):
         self.config = config
+
         self.loki = LokiClient(config.loki_url)
+        self.ollama = OllamaClient(config.ollama_url)
         self.grafana = GrafanaClient(config.grafana_url, config.grafana_user, config.grafana_password)
         self.sentry = SentryClient(config.sentry_dsn, config.env_label)
-        self.cache = CycleQueryCache(self.loki)
-        self.flow_engine = FlowEngine("flows/definitions")
 
-        # Circuit breakers
         self.loki_breaker = CircuitBreaker("loki", failure_threshold=3, backoff_sec=60)
         self.ollama_breaker = CircuitBreaker("ollama", failure_threshold=3, backoff_sec=120)
 
-        # In-memory stats for sentinel_health detector (avoids circular Loki query)
+        self.baseline = BaselineManager(self.loki, config.baseline_path)
+        self.evidence_builder = EvidenceBuilder(self.loki)
+        self.invocation_builder = InvocationBuilder()
+        self.timeline_builder = TimelineBuilder(self.loki, self.loki_breaker)
+
+        self.t1_agent = T1Agent(
+            self.ollama, self.loki, self.ollama_breaker, config,
+            self.baseline, self.evidence_builder,
+        )
+        self.t2_agent = T2Agent(
+            self.ollama, self.loki, self.grafana, self.sentry,
+            self.ollama_breaker, config,
+        )
+        self.t3_agent = T3Agent(
+            self.ollama, self.loki, self.grafana, self.sentry,
+            self.baseline, self.ollama_breaker, config,
+        )
+
+        self._cycle_num = 0
+        self._trigger_dedup: dict[str, float] = {}  # alertname → last trigger time.time()
         self._stats = {
-            "last_cycle_duration_ms": 0,
-            "consecutive_detector_errors": 0,
-            "last_t2_duration_ms": 0,
-            "t2_queue_size": 0,
             "cycles_completed": 0,
+            "total_anomalies": 0,
+            "last_cycle_duration_ms": 0,
+            "last_t1_duration_ms": 0,
+            "last_t2_run_ts": 0,
+            "last_t3_run_ts": 0,
         }
 
-        # Detectors — app category
-        self.detectors = [
-            ErrorSpikeDetector(),
-            ActionFailureDetector(),
-            WebSocketHealthDetector(),
-            SilentSessionDetector(),
-            FlowGapDetector(self.flow_engine),
-            StuckUserDetector(),
-            IncidentAnomalyDetector(),
-            PluginLifecycleDetector(),
-            ResourceHealthDetector(),
-            SessionQualityDetector(),
-            # ops category
-            ClaudeSessionDetector(),
-            McpHealthDetector(),
-            AgentLoopDetector(),
-            ToolPatternsDetector(),
-            TokenUsageDetector(),
-            SentinelHealthDetector(self._stats),
-        ]
-
-        # T2 investigator
-        self.investigator = None
-        self._t2_queue: queue.Queue = queue.Queue()
-        if config.t2_enabled:
-            self.investigator = InvestigationChain(
-                ollama_url=config.ollama_url,
-                model_fast=config.ollama_model_fast,
-                model_deep=config.ollama_model_deep,
-                loki=self.loki,
-            )
-
-        # Dedup: fingerprint → last_seen_timestamp
-        self._seen_fingerprints: dict[str, float] = {}
-        # T2 dedup: fingerprint → last_investigated_time
-        self._investigated_fingerprints: dict[str, float] = {}
-        self._proactive_hash: str = ""
-
-        self._cycle_count = 0
-
-    # ── T1 Cycle ──
-
-    def run_cycle(self):
-        """Single T1 detection cycle with parallel execution and 100% logging."""
-        cycle_id = str(uuid.uuid4())[:8]
-        self._cycle_count += 1
-        cycle_start = time.time()
-
-        window = TimeWindow.from_now(self.config.lookback_sec)
-
-        # Populate shared query cache (one Loki call per query key)
-        if not self.loki_breaker.allow_request():
-            logger.warning("Cycle #%d skipped: Loki circuit open", self._cycle_count)
-            return
-
-        try:
-            self.cache.populate(window)
-            self.loki_breaker.record_success()
-        except Exception as e:
-            self.loki_breaker.record_failure()
-            logger.error("Cache populate failed: %s", e)
-            return
-
-        # Run all detectors in parallel
-        all_findings: list[Finding] = []
-        detector_errors = 0
-
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futures = {
-                pool.submit(self._run_detector, det, cycle_id): det
-                for det in self.detectors
-            }
-            for future in as_completed(futures):
-                det = futures[future]
-                try:
-                    findings = future.result()
-                    all_findings.extend(findings)
-                except Exception as e:
-                    detector_errors += 1
-                    logger.error("Detector %s failed: %s", det.name, e)
-
-        # Update stats for sentinel_health
-        self._stats["consecutive_detector_errors"] = (
-            self._stats["consecutive_detector_errors"] + detector_errors
-            if detector_errors > 0 else 0
-        )
-
-        # Dedup and process findings — priority order: critical, warn, info
-        all_findings.sort(key=lambda f: {"critical": 0, "warn": 1, "info": 2}.get(f.severity, 3))
-
-        escalated = 0
-        suppressed = 0
-        for finding in all_findings:
-            if self._is_duplicate(finding):
-                suppressed += 1
-                continue
-
-            self.loki.push_finding(finding, self.config.env_label)
-
-            if finding.severity in ("warn", "critical"):
-                self.grafana.annotate(finding)
-
-            # Critical findings → Sentry immediately
-            if finding.severity == "critical":
-                event_id = self.sentry.create_issue(finding)
-                if event_id:
-                    self.loki.push_sentry_event({
-                        "finding_id": finding.finding_id,
-                        "sentry_event_id": event_id,
-                        "title": finding.title,
-                        "level": "error",
-                    }, self.config.env_label)
-
-            # Escalate to T2 (non-blocking, with dedup)
-            if finding.escalate_to_t2 and self.investigator:
-                fp = finding.fingerprint
-                last_inv = self._investigated_fingerprints.get(fp, 0)
-                if time.time() - last_inv < 900:  # 15 min T2 dedup window
-                    logger.debug("T2 dedup: skipping %s (investigated %ds ago)", fp[:8], int(time.time() - last_inv))
-                else:
-                    self._investigated_fingerprints[fp] = time.time()
-                    escalated += 1
-                    self._t2_queue.put(("escalation", finding))
-
-        # Emit cycle metrics
-        cycle_duration_ms = int((time.time() - cycle_start) * 1000)
-        self._stats["last_cycle_duration_ms"] = cycle_duration_ms
-        self._stats["cycles_completed"] = self._cycle_count
-        self._stats["t2_queue_size"] = self._t2_queue.qsize()
-
-        app_findings = sum(1 for f in all_findings if f.category == "app" and not self._is_duplicate(f))
-        ops_findings = sum(1 for f in all_findings if f.category == "ops" and not self._is_duplicate(f))
-
-        self.loki.push_cycle({
-            "cycle_id": cycle_id,
-            "cycle_num": self._cycle_count,
-            "duration_ms": cycle_duration_ms,
-            "finding_count": len(all_findings) - suppressed,
-            "suppressed_count": suppressed,
-            "escalated_count": escalated,
-            "error_count": detector_errors,
-            "app_findings": app_findings,
-            "ops_findings": ops_findings,
-            "cache_queries": self.cache.stats["queries"],
-            "cache_lines": self.cache.stats["total_lines"],
-        }, self.config.env_label)
-
-        logger.info(
-            "Cycle #%d: %d findings (%d suppressed), %d escalated, %d errors, %dms",
-            self._cycle_count, len(all_findings) - suppressed, suppressed,
-            escalated, detector_errors, cycle_duration_ms,
-        )
-
-    def _run_detector(self, detector, cycle_id: str) -> list[Finding]:
-        """Run a single detector with timing and logging."""
-        start = time.time()
-        error_msg = None
-        findings = []
-        try:
-            findings = detector.detect(self.cache)
-        except Exception as e:
-            error_msg = str(e)
-            raise
-        finally:
-            duration_ms = int((time.time() - start) * 1000)
-            self.loki.push_detector_run({
-                "cycle_id": cycle_id,
-                "detector": detector.name,
-                "category": detector.category,
-                "duration_ms": duration_ms,
-                "finding_count": len(findings),
-                "error": error_msg,
-            }, self.config.env_label)
-        return findings
-
-    # ── Dedup ──
-
-    def _is_duplicate(self, finding: Finding) -> bool:
-        fp = finding.fingerprint
-        now = time.time()
-        last_seen = self._seen_fingerprints.get(fp)
-        if last_seen and (now - last_seen) < self.config.dedup_window_sec:
-            return True
-        self._seen_fingerprints[fp] = now
-        # Clean old entries
-        cutoff = now - self.config.dedup_window_sec * 2
-        self._seen_fingerprints = {
-            k: v for k, v in self._seen_fingerprints.items() if v > cutoff
-        }
-        return False
-
-    # ── T2 Background Thread ──
-
-    def _t2_worker(self):
-        """Background thread that processes T2 investigations from the queue."""
-        logger.info("T2 worker started")
-        while True:
-            try:
-                trigger, payload = self._t2_queue.get(timeout=5)
-            except queue.Empty:
-                continue
-
-            if not self.ollama_breaker.allow_request():
-                logger.warning("T2 skipped: Ollama circuit open")
-                self._t2_queue.task_done()
-                continue
-
-            try:
-                if trigger == "escalation":
-                    investigation = self.investigator.investigate(payload)
-                elif trigger == "proactive":
-                    investigation = self.investigator.investigate_patterns(payload)
-                else:
-                    self._t2_queue.task_done()
-                    continue
-
-                self.ollama_breaker.record_success()
-
-                # Push results
-                self.loki.push_investigation(investigation, self.config.env_label)
-                self.grafana.annotate_investigation(investigation)
-                self.loki.push_t2_run({
-                    "investigation_id": investigation.investigation_id,
-                    "finding_id": investigation.finding.finding_id if trigger == "escalation" else "proactive",
-                    "trigger": trigger,
-                    "tier": f"t2_{'deep' if investigation.model == self.config.ollama_model_deep else 'fast'}",
-                    "model": investigation.model,
-                    "gather_duration_ms": investigation.gather_duration_ms,
-                    "inference_duration_ms": investigation.inference_duration_ms,
-                    "total_duration_ms": investigation.gather_duration_ms + investigation.inference_duration_ms,
-                    "context_lines": investigation.context_lines_gathered,
-                    "confidence": investigation.confidence,
-                    "issue_type": investigation.issue_type,
-                    "escalated_to_deep": investigation.model == self.config.ollama_model_deep,
-                }, self.config.env_label)
-
-                # T2 investigations → Sentry
-                sentry_id = self.sentry.create_investigation_issue(investigation)
-                if sentry_id:
-                    self.loki.push_sentry_event({
-                        "investigation_id": investigation.investigation_id,
-                        "sentry_event_id": sentry_id,
-                        "title": investigation.root_cause[:100],
-                        "level": "error" if investigation.finding.severity == "critical" else "warning",
-                    }, self.config.env_label)
-
-                logger.info(
-                    "T2 complete [%s]: %s confidence=%s model=%s type=%s",
-                    trigger, investigation.investigation_id[:8],
-                    investigation.confidence, investigation.model, investigation.issue_type,
-                )
-                self._stats["last_t2_duration_ms"] = investigation.gather_duration_ms + investigation.inference_duration_ms
-
-            except Exception as e:
-                self.ollama_breaker.record_failure()
-                logger.error("T2 investigation failed: %s", e)
-            finally:
-                self._t2_queue.task_done()
-                self._stats["t2_queue_size"] = self._t2_queue.qsize()
-
-    def _t2_proactive_poll(self):
-        """Periodically query L1 findings and ask T2 to analyze patterns."""
-        import hashlib
-        if not self.investigator:
-            return
-        window = TimeWindow.from_now(self.config.t2_proactive_interval_sec)
-        findings = self.loki.query_lines(
-            '{app="sim-steward", component="log-sentinel", event="sentinel_finding"} | json',
-            window.start_ns, window.end_ns, limit=100,
-        )
-        if len(findings) >= 3:
-            # Dedup: skip if same finding set as last poll
-            fps = sorted(set(f.get("fingerprint", "") for f in findings))
-            set_hash = hashlib.sha256("|".join(fps).encode()).hexdigest()[:16]
-            if set_hash == self._proactive_hash:
-                logger.debug("T2 proactive dedup: same finding set, skipping")
-                return
-            self._proactive_hash = set_hash
-            logger.info("T2 proactive: analyzing %d recent findings", len(findings))
-            self._t2_queue.put(("proactive", findings))
-
-    # ── Lifecycle ──
+    # ── Public ───────────────────────────────────────────────────────────────
 
     def start(self):
-        """Start all loops."""
+        """Blocking schedule loop."""
         logger.info(
-            "Sentinel v2 started: %d detectors (app=%d ops=%d), poll %ds, lookback %ds, T2 %s, models: fast=%s deep=%s",
-            len(self.detectors),
-            sum(1 for d in self.detectors if d.category == "app"),
-            sum(1 for d in self.detectors if d.category == "ops"),
-            self.config.poll_interval_sec,
-            self.config.lookback_sec,
-            "enabled" if self.investigator else "disabled",
+            "Sentinel v3 started: mode=%s t1=%ds t2=%ds t3=%ds fast=%s deep=%s",
+            self.config.sentinel_mode,
+            self.config.t1_interval_sec,
+            self.config.t2_interval_sec,
+            self.config.t3_interval_sec,
             self.config.ollama_model_fast,
             self.config.ollama_model_deep,
         )
-
-        # Start T2 background worker
-        if self.investigator:
-            t2_thread = threading.Thread(target=self._t2_worker, daemon=True)
-            t2_thread.start()
-
-        # Run first cycle immediately
         self.run_cycle()
-
-        # Schedule recurring
-        schedule.every(self.config.poll_interval_sec).seconds.do(self.run_cycle)
-        if self.investigator:
-            schedule.every(self.config.t2_proactive_interval_sec).seconds.do(self._t2_proactive_poll)
-
+        schedule.every(self.config.t1_interval_sec).seconds.do(self.run_cycle)
+        schedule.every(self.config.t2_interval_sec).seconds.do(self.run_t2_cycle)
+        schedule.every(self.config.t3_interval_sec).seconds.do(self.run_t3_cycle)
         while True:
             schedule.run_pending()
             time.sleep(1)
+
+    def run_cycle(self) -> CycleResult:
+        """T1 analysis cycle. Always returns CycleResult."""
+        self._cycle_num += 1
+        cycle_id = str(uuid.uuid4())[:8]
+        cycle_start = time.time()
+
+        end_ns = self.loki.now_ns()
+        start_ns = end_ns - int(self.config.lookback_sec * 1e9)
+        window_minutes = max(1, self.config.lookback_sec // 60)
+
+        logger.info("Cycle #%d [%s] start: window=%dmin", self._cycle_num, cycle_id, window_minutes)
+
+        t1 = None
+        timeline_events = []
+        error = None
+
+        try:
+            # 1. Gather
+            counts, samples = self._gather(start_ns, end_ns)
+
+            # 2. Build timeline + invocations
+            timeline_events = self.timeline_builder.build(start_ns, end_ns)
+            tl_stats = self.timeline_builder.get_stats(timeline_events)
+            self.loki.push_timeline({
+                **tl_stats,
+                "cycle_id": cycle_id,
+                "truncated": tl_stats["event_count"] > 60,
+            }, self.config.env_label)
+
+            invocations = self.invocation_builder.build(timeline_events)
+
+            # 3. T1 analysis
+            if not self.ollama_breaker.allow_request():
+                logger.warning("T1 skipped: Ollama circuit open")
+            else:
+                t1 = self.t1_agent.run(
+                    start_ns, end_ns, counts,
+                    samples["sim-steward"],
+                    samples["claude-dev-logging"],
+                    samples["claude-token-metrics"],
+                    invocations=invocations,
+                    trigger_source="scheduled",
+                )
+                self.loki.push_analyst_run({
+                    "cycle_id": cycle_id,
+                    "tier": "t1",
+                    "model": t1.model,
+                    "think_mode": True,
+                    "duration_ms": t1.total_duration_ms,
+                    "summary_duration_ms": t1.summary_duration_ms,
+                    "anomaly_duration_ms": t1.anomaly_duration_ms,
+                    "anomaly_count": len(t1.anomalies),
+                    "needs_t2_count": sum(1 for a in t1.anomalies if a.get("needs_t2")),
+                    "evidence_packet_count": len(t1.evidence_packets),
+                    "invocation_count": len(t1.invocations),
+                    "window_minutes": window_minutes,
+                    "trigger_source": t1.trigger_source,
+                }, self.config.env_label)
+
+        except Exception as e:
+            error = str(e)
+            logger.error("Cycle #%d error: %s", self._cycle_num, e)
+
+        duration_ms = int((time.time() - cycle_start) * 1000)
+        result = CycleResult(
+            cycle_id=cycle_id,
+            cycle_num=self._cycle_num,
+            window_minutes=window_minutes,
+            t1=t1,
+            timeline_event_count=len(timeline_events),
+            anomaly_count=len(t1.anomalies) if t1 else 0,
+            duration_ms=duration_ms,
+            error=error,
+        )
+
+        self.loki.push_cycle({
+            "cycle_id": cycle_id,
+            "cycle_num": self._cycle_num,
+            "window_minutes": window_minutes,
+            "t1_duration_ms": t1.total_duration_ms if t1 else 0,
+            "anomaly_count": result.anomaly_count,
+            "evidence_packet_count": len(t1.evidence_packets) if t1 else 0,
+            "timeline_event_count": len(timeline_events),
+            "total_duration_ms": duration_ms,
+            "error": error,
+        }, self.config.env_label)
+
+        self._stats["cycles_completed"] = self._cycle_num
+        self._stats["last_cycle_duration_ms"] = duration_ms
+        self._stats["last_t1_duration_ms"] = t1.total_duration_ms if t1 else 0
+        if t1:
+            self._stats["total_anomalies"] += result.anomaly_count
+
+        logger.info(
+            "Cycle #%d complete: %d anomalies %d evidence_packets %dms",
+            self._cycle_num, result.anomaly_count,
+            len(t1.evidence_packets) if t1 else 0, duration_ms,
+        )
+        return result
+
+    def run_t2_cycle(self) -> None:
+        """Independent T2 investigation cycle — pulls evidence packets from Loki."""
+        if not self.ollama_breaker.allow_request():
+            logger.warning("T2 cycle skipped: Ollama circuit open")
+            return
+        logger.info("T2 cycle starting")
+        try:
+            result = self.t2_agent.run()
+            self._stats["last_t2_run_ts"] = int(time.time())
+            if result:
+                logger.info(
+                    "T2 cycle complete: confidence=%s sentry=%s %dms",
+                    result.confidence, result.sentry_worthy, result.total_duration_ms,
+                )
+        except Exception as e:
+            logger.error("T2 cycle error: %s", e)
+
+    def run_t3_cycle(self) -> None:
+        """Independent T3 synthesis cycle — runs on slow cadence."""
+        if not self.ollama_breaker.allow_request():
+            logger.warning("T3 cycle skipped: Ollama circuit open")
+            return
+        logger.info("T3 cycle starting (mode=%s)", self.config.sentinel_mode)
+        try:
+            result = self.t3_agent.run(trigger="scheduled")
+            self._stats["last_t3_run_ts"] = int(time.time())
+            logger.info(
+                "T3 cycle complete: %d sessions, regression=%s, %dms",
+                result.sessions_analyzed, result.regression_detected, result.inference_duration_ms,
+            )
+        except Exception as e:
+            logger.error("T3 cycle error: %s", e)
+
+    def trigger_cycle(
+        self,
+        alert_context: str,
+        trigger_tier: str,
+        alert_names: list[str],
+        lookback_sec: int = 1800,
+    ) -> None:
+        """Alert-driven cycle — called from /trigger webhook, runs in background thread."""
+        logger.info(
+            "Trigger cycle: tier=%s alerts=%s lookback=%ds",
+            trigger_tier, alert_names, lookback_sec,
+        )
+        end_ns = self.loki.now_ns()
+        start_ns = end_ns - lookback_sec * 1_000_000_000
+
+        try:
+            counts, samples = self._gather(start_ns, end_ns)
+            timeline_events = self.timeline_builder.build(start_ns, end_ns)
+            invocations = self.invocation_builder.build(timeline_events)
+        except Exception as e:
+            logger.error("Trigger cycle gather failed: %s", e)
+            return
+
+        if not self.ollama_breaker.allow_request():
+            logger.warning("Trigger cycle T1 skipped: Ollama circuit open")
+            return
+
+        t1 = None
+        try:
+            t1 = self.t1_agent.run(
+                start_ns, end_ns, counts,
+                samples["sim-steward"],
+                samples["claude-dev-logging"],
+                samples["claude-token-metrics"],
+                invocations=invocations,
+                alert_context=alert_context,
+                trigger_source="grafana_alert",
+                alert_names=alert_names,
+            )
+            logger.info(
+                "Trigger T1 complete: %d anomalies, %d evidence_packets, %dms",
+                len(t1.anomalies), len(t1.evidence_packets), t1.total_duration_ms,
+            )
+        except Exception as e:
+            logger.error("Trigger cycle T1 failed: %s", e)
+
+        # For t2-tier alerts, skip needs_t2 gate — escalate immediately
+        if trigger_tier == "t2" and self.config.t2_enabled:
+            if not self.ollama_breaker.allow_request():
+                logger.warning("Trigger cycle T2 skipped: Ollama circuit open")
+                return
+            try:
+                forced_ids = [ep.anomaly_id for ep in t1.evidence_packets] if t1 else None
+                result = self.t2_agent.run(forced_packet_ids=forced_ids)
+                self._stats["last_t2_run_ts"] = int(time.time())
+                if result:
+                    logger.info(
+                        "Trigger T2 complete: confidence=%s sentry=%s %dms",
+                        result.confidence, result.sentry_worthy, result.total_duration_ms,
+                    )
+            except Exception as e:
+                logger.error("Trigger cycle T2 failed: %s", e)
+
+    # ── Private ──────────────────────────────────────────────────────────────
+
+    def _gather(self, start_ns: int, end_ns: int) -> tuple[dict, dict]:
+        """Fetch counts and samples from all three Loki streams."""
+        stream_queries = {
+            "sim-steward":          '{app="sim-steward"} | json',
+            "claude-dev-logging":   '{app="claude-dev-logging"} | json',
+            "claude-token-metrics": '{app="claude-token-metrics"} | json',
+        }
+
+        counts = {}
+        samples = {}
+
+        if not self.loki_breaker.allow_request():
+            logger.warning("Gather skipped: Loki circuit open")
+            return {k: 0 for k in stream_queries}, {k: [] for k in stream_queries}
+
+        try:
+            for name, logql in stream_queries.items():
+                counts[name] = self.loki.count(logql, start_ns, end_ns)
+                samples[name] = self.loki.query_lines(logql, start_ns, end_ns, limit=100)
+            self.loki_breaker.record_success()
+        except Exception as e:
+            self.loki_breaker.record_failure()
+            logger.error("Gather failed: %s", e)
+            for name in stream_queries:
+                counts.setdefault(name, -1)
+                samples.setdefault(name, [])
+
+        return counts, samples

@@ -74,14 +74,14 @@
       }
     },
     {
-      "id": 1,
-      "title": "Tool Calls",
+      "id": 20,
+      "title": "Session Cost",
       "type": "stat",
       "transparent": true,
       "gridPos": {
-        "x": 0,
+        "x": 20,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -95,14 +95,77 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json session_id | session_id=~\"$session_id\" | unwrap cost_usd [$__interval]))",
+          "legendFormat": "Cost",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["sum"],
+          "fields": ""
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "$0.00",
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#73BF69" },
+              { "value": 5, "color": "#FF9830" },
+              { "value": 20, "color": "#F2495C" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 1,
+      "title": "Tool Calls",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__interval]))",
           "legendFormat": "Tool Calls",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "none",
+        "graphMode": "area",
         "textMode": "value",
         "justifyMode": "center",
         "orientation": "auto",
@@ -144,9 +207,9 @@
       "type": "stat",
       "transparent": true,
       "gridPos": {
-        "x": 5,
+        "x": 4,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -160,14 +223,14 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | session_id=~\"$session_id\" [$__range]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | session_id=~\"$session_id\" [$__interval]))",
           "legendFormat": "Errors",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "none",
+        "graphMode": "area",
         "textMode": "value",
         "justifyMode": "center",
         "orientation": "auto",
@@ -216,9 +279,9 @@
       "type": "stat",
       "transparent": true,
       "gridPos": {
-        "x": 10,
+        "x": 8,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -232,14 +295,14 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"subagent-start\" [$__range]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"subagent-start\" [$__interval]))",
           "legendFormat": "Agents",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "none",
+        "graphMode": "area",
         "textMode": "value",
         "justifyMode": "center",
         "orientation": "auto",
@@ -281,9 +344,9 @@
       "type": "stat",
       "transparent": true,
       "gridPos": {
-        "x": 15,
+        "x": 12,
         "y": 1,
-        "w": 5,
+        "w": 4,
         "h": 4
       },
       "datasource": {
@@ -297,14 +360,14 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"user-prompt-submit\" [$__range]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"user-prompt-submit\" [$__interval]))",
           "legendFormat": "Prompts",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "none",
+        "graphMode": "area",
         "textMode": "value",
         "justifyMode": "center",
         "orientation": "auto",
@@ -346,7 +409,7 @@
       "type": "stat",
       "transparent": true,
       "gridPos": {
-        "x": 20,
+        "x": 16,
         "y": 1,
         "w": 4,
         "h": 4
@@ -362,14 +425,14 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"permission-request\" [$__range]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"permission-request\" [$__interval]))",
           "legendFormat": "Permissions",
           "queryType": "range"
         }
       ],
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "none",
+        "graphMode": "area",
         "textMode": "value",
         "justifyMode": "center",
         "orientation": "auto",
@@ -515,7 +578,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (component) (count_over_time({app=\"claude-dev-logging\"} | json session_id | session_id=~\"$session_id\" [$__range]))",
+          "expr": "sum by (component) (count_over_time({app=\"claude-dev-logging\"} | json session_id | session_id=~\"$session_id\" [$__interval]))",
           "legendFormat": "{{component}}",
           "queryType": "range"
         }
@@ -592,6 +655,21 @@
                 "id": "color",
                 "value": {
                   "fixedColor": "#8AB8FF",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tokens"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FF6D00",
                   "mode": "fixed"
                 }
               }
@@ -757,7 +835,7 @@
     {
       "id": 9,
       "title": "Top Tools Used",
-      "description": "% share of each tool across all post-tool-use events.",
+      "description": "Tool call counts across all post-tool-use events. mcp__ prefix stripped for readability.",
       "type": "table",
       "transparent": true,
       "gridPos": {
@@ -777,8 +855,8 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (tool_name) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" [$__range])) / ignoring(tool_name) group_left() sum(count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" [$__range])) * 100",
-          "legendFormat": "{{tool_name}}",
+          "expr": "sum by (short_name) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" | line_format \"{{.tool_name}}\" | regexp \"(?:mcp__)?(?P<short_name>.*)\" [$__range]))",
+          "legendFormat": "{{short_name}}",
           "queryType": "range"
         }
       ],
@@ -824,8 +902,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "decimals": 1,
+          "unit": "short",
+          "decimals": 0,
           "custom": {
             "inspect": false,
             "width": 0
@@ -843,22 +921,12 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 200
-              },
-              {
-                "id": "max",
-                "value": 100
-              },
-              {
-                "id": "min",
-                "value": 0
+                "value": 90
               },
               {
                 "id": "custom.cellOptions",
                 "value": {
-                  "type": "gauge",
-                  "mode": "basic",
-                  "valueDisplayMode": "color"
+                  "type": "auto"
                 }
               }
             ]
@@ -871,7 +939,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 170
+                "value": 200
               }
             ]
           }

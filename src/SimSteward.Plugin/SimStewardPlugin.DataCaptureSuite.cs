@@ -419,12 +419,13 @@ namespace SimSteward.Plugin
                         return;
                     }
 
-                    // Seek to near-end of replay for L2
-                    int seekTarget = Math.Max(0, _replayFrameTotal - 10);
+                    // Seek to end of replay using ReplaySearch(ToEnd) — more reliable than
+                    // frame-based seek (ReplayFrameNumEnd can be 0 or stale, which would
+                    // seek to frame 0 and read SessionState at replay start instead of end).
+                    _preflightSettleTicks = 0;
                     try
                     {
-                        _irsdk.ReplaySetPlaySpeed(1, false);
-                        _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, seekTarget);
+                        _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.ToEnd);
                     }
                     catch (Exception ex)
                     {
@@ -444,8 +445,10 @@ namespace SimSteward.Plugin
                 {
                     _preflightSettleTicks++;
                     int frame = SafeGetInt("ReplayFrameNum");
-                    int seekTarget = Math.Max(0, _replayFrameTotal - 10);
-                    if (Math.Abs(frame - seekTarget) <= 30 || _preflightSettleTicks > 300)
+                    // ReplaySearch(ToEnd) is fire-and-forget; we don't have an exact target frame.
+                    // Settle when: near ReplayFrameNumEnd (if valid) OR after 60 ticks (1s min wait).
+                    bool nearEnd = _replayFrameTotal > 0 && frame >= _replayFrameTotal - 60;
+                    if (nearEnd || _preflightSettleTicks >= 60 || _preflightSettleTicks > 300)
                     {
                         int sessionState = 0;
                         try { sessionState = _irsdk.Data.GetInt("SessionState"); } catch { }

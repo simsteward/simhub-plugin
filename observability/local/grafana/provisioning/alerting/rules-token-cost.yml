@@ -1,0 +1,246 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Token & Cost Budget
+    folder: Log Sentinel
+    interval: 1m
+    rules:
+
+      - uid: session-cost-spike
+        title: Session Cost Spike
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [1.0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Single session cost exceeded $1.00
+          description: A Claude session cost more than $1.00 — review for efficiency
+        labels:
+          alertname: session-cost-spike
+          severity: warn
+          trigger_tier: t1
+
+      - uid: session-cost-critical
+        title: Session Cost Critical
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [3.0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Single session cost exceeded $3.00
+          description: Critical cost threshold exceeded — session may be in a runaway loop
+        labels:
+          alertname: session-cost-critical
+          severity: critical
+          trigger_tier: t2
+
+      - uid: daily-spend-warning
+        title: Daily Spend Warning
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'sum_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [24h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [10.0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Rolling 24h spend exceeded $10.00
+          description: Daily spend warning threshold hit — review recent session costs
+        labels:
+          alertname: daily-spend-warning
+          severity: warn
+          trigger_tier: t1
+
+      - uid: daily-spend-critical
+        title: Daily Spend Critical
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 86400, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'sum_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [24h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [25.0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Rolling 24h spend exceeded $25.00
+          description: Critical daily spend threshold hit — immediate review required
+        labels:
+          alertname: daily-spend-critical
+          severity: critical
+          trigger_tier: t2
+
+      - uid: tool-use-flood
+        title: Tool Use Flood
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap tool_calls [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [100], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Tool calls per session exceeded 100
+          description: Unusually high tool call count — possible agentic loop or over-tooling
+        labels:
+          alertname: tool-use-flood
+          severity: warn
+          trigger_tier: t1
+
+      - uid: unexpected-model
+        title: Unexpected Model Used
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-token-metrics"} | json | model!~"claude-opus-4.*|claude-sonnet-4.*|claude-haiku-4.*" [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Unexpected model name in token metrics
+          description: A model field value outside the approved set was detected in claude-token-metrics
+        labels:
+          alertname: unexpected-model
+          severity: warn
+          trigger_tier: t1
+
+      - uid: cache-hit-rate-low
+        title: Cache Hit Rate Low
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'avg_over_time({app="claude-token-metrics"} | json | unwrap cache_read_ratio [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0.2], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 15m
+        annotations:
+          summary: Cache hit rate below 20% over 1 hour
+          description: Low cache read ratio — context caching may be misconfigured or inactive
+        labels:
+          alertname: cache-hit-rate-low
+          severity: info
+          trigger_tier: t1

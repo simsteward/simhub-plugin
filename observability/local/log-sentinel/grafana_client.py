@@ -47,3 +47,18 @@ class GrafanaClient:
             )
         except Exception as e:
             logger.debug("Grafana investigation annotation error: %s", e)
+
+    def annotate_raw(self, title: str, text: str, tags: list[str]):
+        try:
+            requests.post(
+                f"{self.base_url}/api/annotations",
+                auth=self.auth,
+                json={
+                    "time": int(time.time() * 1000),
+                    "tags": ["log-sentinel"] + [t for t in tags if t],
+                    "text": f"<b>{title}</b><br>{text}",
+                },
+                timeout=5,
+            )
+        except Exception as e:
+            logger.debug("Grafana annotate_raw error: %s", e)

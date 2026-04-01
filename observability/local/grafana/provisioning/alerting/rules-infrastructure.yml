@@ -1,0 +1,348 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Infrastructure & Deploy Quality
+    folder: Log Sentinel
+    interval: 1m
+    rules:
+
+      - uid: bridge-start-failed
+        title: Bridge Start Failed
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" | level="ERROR" [5m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Plugin lifecycle ERROR on bridge start
+          description: A plugin_lifecycle ERROR event was detected in the last 5 minutes
+        labels:
+          alertname: bridge-start-failed
+          severity: critical
+          trigger_tier: t1
+
+      - uid: plugin-never-ready
+        title: Plugin Never Ready
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" | message=~".*ready.*" [60m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: Plugin started but never reached ready state
+          description: Plugin lifecycle start event exists but no ready event within 60 minutes
+        labels:
+          alertname: plugin-never-ready
+          severity: warn
+          trigger_tier: t1
+
+      - uid: post-deploy-warn-rate
+        title: High WARN Rate After Deploy
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | level="WARN" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [50], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Elevated WARN rate after deploy
+          description: More than 50 WARN entries in 10 minutes following a lifecycle event
+        labels:
+          alertname: post-deploy-warn-rate
+          severity: warn
+          trigger_tier: t1
+
+      - uid: bridge-failure-post-deploy
+        title: Bridge ERROR After Deploy
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | level="ERROR" [15m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: ERROR in sim-steward within 15 min of plugin start
+          description: Bridge ERROR detected shortly after deploy — may indicate startup regression
+        labels:
+          alertname: bridge-failure-post-deploy
+          severity: critical
+          trigger_tier: t1
+
+      - uid: plugin-slow-start
+        title: Plugin Slow Start
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" | message=~".*start_duration.*" | __error__="" [5m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Plugin startup exceeded 30s threshold
+          description: Time from plugin_lifecycle start to ready exceeded 30 seconds
+        labels:
+          alertname: plugin-slow-start
+          severity: warn
+          trigger_tier: t1
+
+      - uid: error-spike-post-deploy
+        title: Error Spike After Deploy
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | level="ERROR" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [5], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Error count doubled vs prior window after deploy
+          description: Error spike detected in 10-minute window following deploy event
+        labels:
+          alertname: error-spike-post-deploy
+          severity: warn
+          trigger_tier: t1
+
+      - uid: error-spike-general
+        title: General Error Spike
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | level="ERROR" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [10], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: More than 10 ERROR logs in 10-minute window
+          description: General error spike detected — not necessarily deploy-related
+        labels:
+          alertname: error-spike-general
+          severity: warn
+          trigger_tier: t1
+
+      - uid: ollama-unreachable
+        title: Ollama Unreachable
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_health" | ollama_reachable="false" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Ollama is not reachable from log-sentinel
+          description: sentinel_health event recorded ollama_reachable=false
+        labels:
+          alertname: ollama-unreachable
+          severity: critical
+          trigger_tier: t1
+
+      - uid: loki-circuit-open
+        title: Loki Circuit Breaker Open
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_health" | loki_circuit_open="true" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Loki circuit breaker is open in log-sentinel
+          description: sentinel_health event recorded loki_circuit_open=true — Loki queries are failing
+        labels:
+          alertname: loki-circuit-open
+          severity: critical
+          trigger_tier: t1
+
+      - uid: sentinel-cycle-stalled
+        title: Sentinel Cycle Stalled
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 5400, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_cycle" [90m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: No sentinel_cycle event in 90 minutes
+          description: Log sentinel appears to be stalled — no analysis cycles have completed
+        labels:
+          alertname: sentinel-cycle-stalled
+          severity: critical
+          trigger_tier: t1
