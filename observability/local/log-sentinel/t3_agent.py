@@ -59,6 +59,9 @@ class T3Result:
     session_narratives: list[dict]   # list of {session_id, narrative_text, ...}
     model: str
     inference_duration_ms: int
+    input_tokens: int = 0
+    output_tokens: int = 0
+    tokens_per_sec: float = 0.0
     raw_response: str = field(repr=False, default="")
 
 
@@ -139,12 +142,17 @@ class T3Agent:
 
         raw = ""
         infer_ms = 0
+        in_tok = 0
+        out_tok = 0
+        tps = 0.0
         try:
-            raw, infer_ms = self.ollama.generate(
+            t3_ollama = self.ollama.generate(
                 self.config.ollama_model_deep,
                 system + "\n\n" + prompt,
                 think=True,
             )
+            raw, infer_ms = t3_ollama.text, t3_ollama.duration_ms
+            in_tok, out_tok, tps = t3_ollama.input_tokens, t3_ollama.output_tokens, t3_ollama.tokens_per_sec
             self.breaker.record_success()
         except Exception as e:
             self.breaker.record_failure()
@@ -178,6 +186,9 @@ class T3Agent:
             session_narratives=session_narratives,
             model=self.config.ollama_model_deep,
             inference_duration_ms=infer_ms,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            tokens_per_sec=tps,
             raw_response=raw,
         )
 
@@ -217,6 +228,8 @@ class T3Agent:
     def _fetch_sentry_context(self) -> tuple[str, str]:
         issues_text = "(Sentry unavailable)"
         releases_text = "(no release data)"
+
+        sentry_start = time.time()
         try:
             issues = self.sentry.search_issues(query="is:unresolved", limit=20)
             if issues:
@@ -228,9 +241,20 @@ class T3Agent:
                 issues_text = "\n".join(lines)
             else:
                 issues_text = "(no open Sentry issues)"
+            self.loki.push_tool_call(
+                tool="sentry_api", tier="t3",
+                duration_ms=int((time.time() - sentry_start) * 1000),
+                success=True, detail="search_issues", env=self.config.env_label,
+            )
         except Exception as e:
+            self.loki.push_tool_call(
+                tool="sentry_api", tier="t3",
+                duration_ms=int((time.time() - sentry_start) * 1000),
+                success=False, detail=str(e)[:100], env=self.config.env_label,
+            )
             logger.debug("T3 Sentry issues fetch failed: %s", e)
 
+        releases_start = time.time()
         try:
             releases = self.sentry.find_releases(limit=5)
             if releases:
@@ -241,7 +265,17 @@ class T3Agent:
                 releases_text = "\n".join(lines)
             else:
                 releases_text = "(no releases found)"
+            self.loki.push_tool_call(
+                tool="sentry_api", tier="t3",
+                duration_ms=int((time.time() - releases_start) * 1000),
+                success=True, detail="find_releases", env=self.config.env_label,
+            )
         except Exception as e:
+            self.loki.push_tool_call(
+                tool="sentry_api", tier="t3",
+                duration_ms=int((time.time() - releases_start) * 1000),
+                success=False, detail=str(e)[:100], env=self.config.env_label,
+            )
             logger.debug("T3 Sentry releases fetch failed: %s", e)
 
         return issues_text, releases_text

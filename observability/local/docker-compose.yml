@@ -9,9 +9,10 @@ services:
       - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/loki:/loki
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3100/ready"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 30s
 
   loki-gateway:
     image: nginx:1.27-alpine
@@ -76,10 +77,11 @@ services:
       - OLLAMA_URL=http://host.docker.internal:11434
       - OLLAMA_MODEL_FAST=qwen3:8b
       - OLLAMA_MODEL_DEEP=qwen3:32b
-      - SENTINEL_POLL_INTERVAL_SEC=3600
-      - SENTINEL_LOOKBACK_SEC=3600
+      - SENTINEL_T1_INTERVAL_SEC=300
+      - SENTINEL_T2_INTERVAL_SEC=900
+      - SENTINEL_T3_INTERVAL_SEC=7200
+      - SENTINEL_LOOKBACK_SEC=300
       - SENTINEL_T2_ENABLED=true
-      - SENTINEL_T2_PROACTIVE_INTERVAL_SEC=3600
       - SENTINEL_DEDUP_WINDOW_SEC=300
       - SENTINEL_SENTRY_DSN=${SENTINEL_SENTRY_DSN:-}
       - SIMSTEWARD_LOG_ENV=${SIMSTEWARD_LOG_ENV:-local}

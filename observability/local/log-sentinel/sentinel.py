@@ -155,6 +155,13 @@ class Sentinel:
                     "invocation_count": len(t1.invocations),
                     "window_minutes": window_minutes,
                     "trigger_source": t1.trigger_source,
+                    "total_input_tokens": t1.total_input_tokens,
+                    "total_output_tokens": t1.total_output_tokens,
+                    "summary_input_tokens": t1.summary_input_tokens,
+                    "summary_output_tokens": t1.summary_output_tokens,
+                    "anomaly_input_tokens": t1.anomaly_input_tokens,
+                    "anomaly_output_tokens": t1.anomaly_output_tokens,
+                    "tokens_per_sec": t1.tokens_per_sec,
                 }, self.config.env_label)
 
         except Exception as e:

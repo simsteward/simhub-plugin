@@ -3,12 +3,22 @@
 import re
 import time
 import logging
+from dataclasses import dataclass
 
 import requests
 
 logger = logging.getLogger("sentinel.ollama")
 
 _THINK_STRIP = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+@dataclass
+class OllamaResult:
+    text: str
+    duration_ms: int
+    input_tokens: int
+    output_tokens: int
+    tokens_per_sec: float
 
 
 class OllamaClient:
@@ -22,9 +32,9 @@ class OllamaClient:
         prompt: str,
         think: bool = False,
         temperature: float = 0.1,
-    ) -> tuple[str, int]:
+    ) -> OllamaResult:
         """
-        Call Ollama /api/generate. Returns (response_text, duration_ms).
+        Call Ollama /api/generate. Returns OllamaResult with text, timing, and token counts.
         Prepends /think or /no_think for qwen3 models.
         Strips <think>...</think> blocks from output before returning.
         Raises on failure so callers can handle via circuit breaker.
@@ -51,9 +61,21 @@ class OllamaClient:
         if resp.status_code != 200:
             raise RuntimeError(f"Ollama {resp.status_code}: {resp.text[:200]}")
 
-        raw = resp.json().get("response", "")
+        body = resp.json()
+        raw = body.get("response", "")
         cleaned = _THINK_STRIP.sub("", raw).strip()
-        return cleaned, duration_ms
+
+        input_tokens = body.get("prompt_eval_count", 0) or 0
+        output_tokens = body.get("eval_count", 0) or 0
+        tokens_per_sec = (output_tokens / (duration_ms / 1000)) if duration_ms > 0 else 0.0
+
+        return OllamaResult(
+            text=cleaned,
+            duration_ms=duration_ms,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            tokens_per_sec=round(tokens_per_sec, 2),
+        )
 
     def is_available(self) -> bool:
         """Quick availability check — HEAD /api/tags."""

@@ -82,6 +82,22 @@
           "value": "$__all"
         },
         "sort": 1
+      },
+      {
+        "name": "plan_monthly_cost",
+        "label": "Plan Cost ($/mo)",
+        "type": "constant",
+        "query": "100",
+        "hide": 2,
+        "description": "Claude Max 5x monthly flat cost in USD"
+      },
+      {
+        "name": "plan_daily_cost",
+        "label": "Plan Cost ($/day)",
+        "type": "constant",
+        "query": "3.33",
+        "hide": 2,
+        "description": "plan_monthly_cost / 30"
       }
     ]
   },
@@ -297,6 +313,7 @@
     {
       "id": 4,
       "title": "Projected Monthly",
+      "description": "API-equivalent projected monthly cost at current rate. This is NOT your actual bill — you pay $100/month flat on Max 5x. Above $100 = you're saving money vs API pricing.",
       "type": "stat",
       "gridPos": {
         "x": 18,
@@ -355,11 +372,498 @@
     },
     {
       "type": "row",
-      "title": "Spend Trend",
+      "title": "Max Plan Savings",
       "collapsed": false,
       "gridPos": {
         "x": 0,
         "y": 6,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 20,
+      "title": "API-Equivalent Cost",
+      "description": "What you'd pay with a direct API key at retail token rates for the selected time range.",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "legendFormat": "API Cost",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": { "titleSize": 12, "valueSize": 36 },
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "$0.00",
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#73BF69"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#73BF69" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 21,
+      "title": "Plan Cost (monthly)",
+      "description": "Your $100/month Claude Max 5x flat rate.",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 7,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "legendFormat": "API Cost",
+          "queryType": "range",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A * 0 + 100",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": { "titleSize": 12, "valueSize": 36 },
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "$100.00",
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#5794F2" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 22,
+      "title": "Saved vs API Pricing",
+      "description": "How much the Max plan saved you vs paying API rates directly. Positive = you're ahead.",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "legendFormat": "API Cost",
+          "queryType": "range",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A * 0 + 100",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A - $B",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": { "titleSize": 12, "valueSize": 36 },
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "$0.00",
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#F2495C" },
+              { "value": 0, "color": "#73BF69" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 23,
+      "title": "Max Plan ROI",
+      "description": "API-equivalent cost ÷ plan cost. 5× means you got 5× your money's worth vs API pricing.",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 7,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "legendFormat": "API Cost",
+          "queryType": "range",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A * 0 + 100",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A / $B",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": { "titleSize": 12, "valueSize": 36 },
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0.0",
+          "unit": "none",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#F2495C" },
+              { "value": 1, "color": "#FF9830" },
+              { "value": 3, "color": "#73BF69" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "Savings Trend",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 24,
+      "title": "API Cost Per Session",
+      "description": "Each spike = one session's API-equivalent cost. The dashed $100 line = your monthly Max 5x plan cost — once cumulative spend crosses that, you're saving money vs API pricing.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
+          "legendFormat": "API Cost",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#B877D9"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": 3600000,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "USD",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "transparent" },
+              { "value": 100, "color": "#F2495C" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 25,
+      "title": "Session Cost — 7-Day Rolling Average",
+      "description": "Each bar = API-equivalent cost for that interval. Blue dashed line = 7-day rolling average — rising line means heavier usage trend, falling means lighter.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
+          "legendFormat": "Session Cost",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "windowFunctions",
+            "window": { "windowAlignment": 0, "windowSize": 7, "type": "moving" },
+            "alias": "7-day rolling avg",
+            "reduce": { "reducer": "mean" }
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 0,
+            "fillOpacity": 70,
+            "gradientMode": "none",
+            "pointSize": 5,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#73BF69" },
+              { "value": 50, "color": "#FF9830" },
+              { "value": 150, "color": "#F2495C" }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "7-day rolling avg" },
+            "properties": [
+              { "id": "custom.drawStyle", "value": "line" },
+              { "id": "custom.lineWidth", "value": 2 },
+              { "id": "custom.fillOpacity", "value": 0 },
+              { "id": "custom.lineStyle", "value": { "dash": [10, 5], "fill": "dash" } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "title": "Spend Trend",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 29,
         "w": 24,
         "h": 1
       }
@@ -370,7 +874,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 7,
+        "y": 30,
         "w": 24,
         "h": 8
       },
@@ -443,7 +947,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 38,
         "w": 24,
         "h": 1
       }
@@ -454,7 +958,7 @@
       "type": "piechart",
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 39,
         "w": 8,
         "h": 8
       },
@@ -509,7 +1013,7 @@
       "type": "piechart",
       "gridPos": {
         "x": 8,
-        "y": 16,
+        "y": 39,
         "w": 8,
         "h": 8
       },
@@ -564,7 +1068,7 @@
       "type": "piechart",
       "gridPos": {
         "x": 16,
-        "y": 16,
+        "y": 39,
         "w": 8,
         "h": 8
       },
@@ -617,7 +1121,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 24,
+        "y": 47,
         "w": 24,
         "h": 1
       }
@@ -629,7 +1133,7 @@
       "type": "gauge",
       "gridPos": {
         "x": 0,
-        "y": 25,
+        "y": 48,
         "w": 8,
         "h": 7
       },
@@ -718,7 +1222,7 @@
       "type": "stat",
       "gridPos": {
         "x": 8,
-        "y": 25,
+        "y": 48,
         "w": 8,
         "h": 7
       },
@@ -777,7 +1281,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 16,
-        "y": 25,
+        "y": 48,
         "w": 8,
         "h": 7
       },
@@ -865,7 +1369,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 55,
         "w": 24,
         "h": 1
       }
@@ -876,7 +1380,7 @@
       "type": "piechart",
       "gridPos": {
         "x": 0,
-        "y": 33,
+        "y": 56,
         "w": 8,
         "h": 8
       },
@@ -962,7 +1466,7 @@
       "type": "stat",
       "gridPos": {
         "x": 8,
-        "y": 33,
+        "y": 56,
         "w": 5,
         "h": 7
       },
@@ -1021,7 +1525,7 @@
       "type": "stat",
       "gridPos": {
         "x": 13,
-        "y": 33,
+        "y": 56,
         "w": 5,
         "h": 7
       },
@@ -1101,7 +1605,7 @@
       "type": "stat",
       "gridPos": {
         "x": 18,
-        "y": 33,
+        "y": 56,
         "w": 6,
         "h": 7
       },
@@ -1176,11 +1680,150 @@
     },
     {
       "type": "row",
+      "title": "Token Breakdown",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 26,
+      "title": "Token Usage by Type",
+      "description": "Token consumption by type per interval. Context (cache reads) dominates — that's Claude reusing its persistent context window. Output includes extended thinking tokens when thinking mode is on.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 65,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__interval]))",
+          "legendFormat": "Context (cache read)",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_creation_tokens [$__interval]))",
+          "legendFormat": "Cache Write",
+          "queryType": "range"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__interval]))",
+          "legendFormat": "Output (incl. thinking)",
+          "queryType": "range"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__interval]))",
+          "legendFormat": "Input (fresh)",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "pointSize": 5,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Tokens",
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#73BF69" }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Context (cache read)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Cache Write" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Output (incl. thinking)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#B877D9" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Input (fresh)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
       "title": "Model Economics",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 73,
         "w": 24,
         "h": 1
       }
@@ -1191,7 +1834,7 @@
       "type": "barchart",
       "gridPos": {
         "x": 0,
-        "y": 41,
+        "y": 74,
         "w": 12,
         "h": 8
       },
@@ -1250,7 +1893,7 @@
       "type": "barchart",
       "gridPos": {
         "x": 12,
-        "y": 41,
+        "y": 74,
         "w": 12,
         "h": 8
       },
@@ -1309,7 +1952,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 49,
+        "y": 82,
         "w": 24,
         "h": 1
       }
@@ -1320,7 +1963,7 @@
       "type": "table",
       "gridPos": {
         "x": 0,
-        "y": 50,
+        "y": 83,
         "w": 24,
         "h": 10
       },

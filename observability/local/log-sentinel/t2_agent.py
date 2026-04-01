@@ -57,6 +57,9 @@ class T2Result:
     model: str
     inference_duration_ms: int
     logql_gather_duration_ms: int
+    input_tokens: int = 0
+    output_tokens: int = 0
+    tokens_per_sec: float = 0.0
     raw_response: str = field(repr=False, default="")
 
     @property
@@ -105,13 +108,25 @@ class T2Agent:
             return None
 
         # Step 2: read Sentry history for context
+        sentry_start = time.time()
         sentry_context = self._fetch_sentry_context(packet_dicts)
+        self.loki.push_tool_call(
+            tool="sentry_api", tier="t2",
+            duration_ms=int((time.time() - sentry_start) * 1000),
+            success="unavailable" not in sentry_context,
+            detail="search_issues",
+            env=self.config.env_label,
+        )
 
         # Step 3: generate + execute targeted LogQL for additional evidence
         gather_start = time.time()
         queries = self._generate_logql_queries(packet_dicts, lookback_sec // 60)
         logql_results = self._execute_logql_queries(queries, start_ns, end_ns)
         gather_ms = int((time.time() - gather_start) * 1000)
+        self.loki.push_tool_call(
+            tool="loki_logql_gather", tier="t2", duration_ms=gather_ms,
+            success=True, detail=f"{len(queries)} queries", env=self.config.env_label,
+        )
 
         # Step 4: T2 inference
         system = T2_EVIDENCE_SYSTEM.format(stream_guide=self._stream_guide)
@@ -123,12 +138,17 @@ class T2Agent:
 
         raw = ""
         infer_ms = 0
+        in_tok = 0
+        out_tok = 0
+        tps = 0.0
         try:
-            raw, infer_ms = self.ollama.generate(
+            ollama_result = self.ollama.generate(
                 self.config.ollama_model_deep,
                 system + "\n\n" + prompt,
                 think=True,
             )
+            raw, infer_ms = ollama_result.text, ollama_result.duration_ms
+            in_tok, out_tok, tps = ollama_result.input_tokens, ollama_result.output_tokens, ollama_result.tokens_per_sec
             self.breaker.record_success()
         except Exception as e:
             self.breaker.record_failure()
@@ -152,6 +172,9 @@ class T2Agent:
             model=self.config.ollama_model_deep,
             inference_duration_ms=infer_ms,
             logql_gather_duration_ms=gather_ms,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            tokens_per_sec=tps,
             raw_response=raw,
         )
 
@@ -241,12 +264,13 @@ class T2Agent:
             window_minutes=window_minutes,
         )
         try:
-            raw, _ = self.ollama.generate(
+            logql_gen_result = self.ollama.generate(
                 self.config.ollama_model_fast,
                 prompt,
                 think=False,
                 temperature=0.0,
             )
+            raw = logql_gen_result.text
             generated = json.loads(raw) if raw.strip().startswith("[") else []
             if isinstance(generated, list):
                 combined = seeded + [q for q in generated if isinstance(q, str)]

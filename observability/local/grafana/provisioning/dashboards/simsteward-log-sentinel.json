@@ -1,749 +1,373 @@
 {
   "annotations": { "list": [] },
-  "description": "Autonomous log-analysis pipeline — 16 detectors (app + ops), three-tier LLM (T0 detect → T1 deduplicate → T2 investigate). Cycle every 5 min. component=log-sentinel.",
+  "description": "Log-sentinel v3 — T1 triage (qwen3:8b, 5min), T2 investigation (qwen3:32b, 15min), T3 synthesis (qwen3:32b, 2h). Token counts, inference timing, and tool call traces.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
   "links": [],
   "liveNow": false,
-  "panels": [
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "id": 100,
-      "title": "Sentinel Health",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
-      "id": 2,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_cycle\" [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Cycles Completed",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "drawStyle": "line",
-            "fillOpacity": 18,
-            "gradientMode": "opacity",
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "showPoints": "auto",
-            "spanNulls": 3600000
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 10, "x": 6, "y": 1 },
-      "id": 3,
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single", "sort": "none" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_cycle\" | unwrap duration_ms [$__interval]))",
-          "legendFormat": "Avg Cycle Duration",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Cycle Duration",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#F2495C", "value": 1 }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
-      "id": 4,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_detector_run\"} | json | error != \"\" [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Detector Errors",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
-      "id": 101,
-      "title": "Findings Overview",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 18,
-            "gradientMode": "opacity",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "showPoints": "auto",
-            "spanNulls": 3600000,
-            "axisLabel": "Findings",
-            "stacking": { "mode": "normal", "group": "A" }
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "App" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Ops" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }]
-          }
-        ]
-      },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 8 },
-      "id": 17,
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"app\" [$__interval]))",
-          "legendFormat": "App",
-          "queryType": "range",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"ops\" [$__interval]))",
-          "legendFormat": "Ops",
-          "queryType": "range",
-          "refId": "B"
-        }
-      ],
-      "title": "Findings Over Time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
-      "id": 18,
-      "options": {
-        "pieType": "donut",
-        "displayLabels": ["name", "percent"],
-        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
-        "tooltip": { "mode": "single" },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum by (severity) (count_over_time({component=\"log-sentinel\", event=\"sentinel_finding\"} | json [$__range]))",
-          "legendFormat": "{{severity}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Findings by Severity",
-      "type": "piechart"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
-      "id": 102,
-      "title": "App Findings",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 17 },
-      "id": 6,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "{component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"app\"",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "App Findings",
-      "type": "logs"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#FF9830", "value": 5 }, { "color": "#F2495C", "value": 15 }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 17 },
-      "id": 7,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"app\" [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "App Finding Count",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
-      "id": 103,
-      "title": "Ops Findings",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 26 },
-      "id": 8,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "{component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"ops\"",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Ops Findings",
-      "type": "logs"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#FF9830", "value": 5 }, { "color": "#F2495C", "value": 15 }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
-      "id": 9,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_finding\"} | json | category=\"ops\" [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Ops Finding Count",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
-      "id": 110,
-      "title": "Per-Detector Timing",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "auto",
-            "spanNulls": 3600000,
-            "axisLabel": "Duration (ms)"
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 35 },
-      "id": 19,
-      "options": {
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "avg by (detector) (avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_detector_run\" | unwrap duration_ms [$__interval]))",
-          "legendFormat": "{{detector}}",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Detector Duration by Name",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 43 },
-      "id": 5,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "{component=\"log-sentinel\", event=\"sentinel_detector_run\"} | json",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Detector Runs",
-      "type": "logs"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 51 },
-      "id": 104,
-      "title": "T2 LLM Activity",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 52 },
-      "id": 11,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_t2_run\"} [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "T2 Investigations",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#5794F2", "value": null }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 52 },
-      "id": 12,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_t2_run\"} | json | trigger=\"proactive\" [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Proactive Polls",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#8AB8FF", "value": null }, { "color": "#FF9830", "value": 10000 }, { "color": "#F2495C", "value": 30000 }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 52 },
-      "id": 20,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_run\" | unwrap duration_ms [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Avg T2 Duration",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#B877D9", "value": null }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 52 },
-      "id": 21,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_run\" | unwrap tokens_used [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Avg T2 Tokens",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 58 },
-      "id": 10,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "{component=\"log-sentinel\", event=\"sentinel_t2_run\"} | json",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "T2 Run Metrics",
-      "type": "logs"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 66 },
-      "id": 105,
-      "title": "T2 Investigation Reports",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 67 },
-      "id": 13,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "{component=\"log-sentinel\", event=\"sentinel_investigation\"} | json",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Investigation Reports",
-      "type": "logs"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 77 },
-      "id": 106,
-      "title": "Sentry Issues",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 6, "w": 16, "x": 0, "y": 78 },
-      "id": 14,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "{component=\"log-sentinel\", event=\"sentinel_sentry_issue\"} | json",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Sentry Issues Created",
-      "type": "logs"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#5794F2", "value": null }] }
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 78 },
-      "id": 15,
-      "options": {
-        "colorMode": "background-gradient",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "textMode": "value",
-        "text": { "titleSize": 12, "valueSize": 36 },
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "sum(count_over_time({component=\"log-sentinel\", event=\"sentinel_sentry_issue\"} [$__range]))",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Sentry Issues",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 84 },
-      "id": 107,
-      "title": "Process Logs",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 85 },
-      "id": 16,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": { "type": "loki", "uid": "loki_local" },
-          "editorMode": "code",
-          "expr": "{component=\"log-sentinel\", event=\"sentinel_log\"} | json",
-          "queryType": "range",
-          "refId": "A"
-        }
-      ],
-      "title": "Sentinel Process Logs",
-      "type": "logs"
-    }
-  ],
   "refresh": "30s",
+  "panels": [
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 100, "title": "Sentinel Health", "type": "row" },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 }, "id": 1,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "text": { "titleSize": 11, "valueSize": 32 }, "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_cycle\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "T1 Cycles", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 }, "id": 2,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "text": { "titleSize": 11, "valueSize": 32 }, "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "T2 Investigations", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 }, "id": 3,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "text": { "titleSize": 11, "valueSize": 32 }, "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_synthesis\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "T3 Syntheses", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#FF9830", "value": 1 }, { "color": "#F2495C", "value": 3 }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 }, "id": 4,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "text": { "titleSize": 11, "valueSize": 32 }, "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | level=\"ERROR\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Analyst Errors", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null } ] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 }, "id": 5,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "text": { "titleSize": 11, "valueSize": 32 }, "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_tool_call\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Tool Calls", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#F2495C", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 }, "id": 6,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "text": { "titleSize": 11, "valueSize": 32 }, "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_tool_call\" | success=\"false\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Tool Call Failures", "type": "stat"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 }, "id": 101, "title": "Cycle Duration", "type": "row" },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisBorderShow": false, "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "showPoints": "auto", "spanNulls": 600000 }, "unit": "ms" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 7 }, "id": 10,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_cycle\" | unwrap total_duration_ms [$__interval]))", "legendFormat": "Cycle (total)", "queryType": "range", "refId": "A" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap duration_ms [$__interval]))", "legendFormat": "T1 inference", "queryType": "range", "refId": "B" }
+      ],
+      "title": "Cycle Duration (ms)", "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "unit": "ms", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#FF9830", "value": 60000 }, { "color": "#F2495C", "value": 120000 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 7 }, "id": 11,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "max(max_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap duration_ms [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T1 Max Duration", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "unit": "ms", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#FF9830", "value": 120000 }, { "color": "#F2495C", "value": 300000 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 7 }, "id": 12,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "max(max_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | unwrap inference_duration_ms [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T2 Max Inference", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "unit": "ms", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#FF9830", "value": 300000 }, { "color": "#F2495C", "value": 600000 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 11 }, "id": 13,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "max(max_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_synthesis\" | unwrap inference_duration_ms [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T3 Max Inference", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 1, "unit": "s", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null } ] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 11 }, "id": 14,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "max(max_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | unwrap logql_gather_duration_ms [$__range])) / 1000", "queryType": "instant", "refId": "A" }],
+      "title": "T2 Max Gather Time", "type": "stat"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }, "id": 102, "title": "LLM Token Throughput", "type": "row" },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "showPoints": "auto", "spanNulls": 600000 }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }, "id": 20,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap total_output_tokens [$__interval]))", "legendFormat": "T1 output tokens", "queryType": "range", "refId": "A" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap total_input_tokens [$__interval]))", "legendFormat": "T1 input tokens", "queryType": "range", "refId": "B" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | unwrap output_tokens [$__interval]))", "legendFormat": "T2 output tokens", "queryType": "range", "refId": "C" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_synthesis\" | unwrap output_tokens [$__interval]))", "legendFormat": "T3 output tokens", "queryType": "range", "refId": "D" }
+      ],
+      "title": "Tokens per Call (output + input by tier)", "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "showPoints": "auto", "spanNulls": 600000 }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }, "id": 21,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap tokens_per_sec [$__interval]))", "legendFormat": "T1 tok/s (qwen3:8b)", "queryType": "range", "refId": "A" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | unwrap tokens_per_sec [$__interval]))", "legendFormat": "T2 tok/s (qwen3:32b)", "queryType": "range", "refId": "B" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_synthesis\" | unwrap tokens_per_sec [$__interval]))", "legendFormat": "T3 tok/s (qwen3:32b)", "queryType": "range", "refId": "C" }
+      ],
+      "title": "Inference Speed — Tokens / Second by Tier", "type": "timeseries"
+    },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 1, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 24 }, "id": 22,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap tokens_per_sec [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T1 Avg tok/s", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 1, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 24 }, "id": 23,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | unwrap tokens_per_sec [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T2 Avg tok/s", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 24 }, "id": 24,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap total_output_tokens [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T1 Total Output Tokens", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 24 }, "id": 25,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | unwrap output_tokens [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T2 Total Output Tokens", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 24 }, "id": 26,
+      "options": { "colorMode": "background-gradient", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_synthesis\" | unwrap output_tokens [$__range]))", "queryType": "instant", "refId": "A" }],
+      "title": "T3 Total Output Tokens", "type": "stat"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 }, "id": 103, "title": "Tool Call Timing", "type": "row" },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "showPoints": "auto", "spanNulls": 600000 }, "unit": "ms" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 29 }, "id": 30,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_tool_call\" | tool=\"loki_logql_gather\" | unwrap duration_ms [$__interval]))", "legendFormat": "Loki gather (T2)", "queryType": "range", "refId": "A" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_tool_call\" | tool=\"sentry_api\" | tier=\"t2\" | unwrap duration_ms [$__interval]))", "legendFormat": "Sentry API (T2)", "queryType": "range", "refId": "B" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_tool_call\" | tool=\"sentry_api\" | tier=\"t3\" | unwrap duration_ms [$__interval]))", "legendFormat": "Sentry API (T3)", "queryType": "range", "refId": "C" }
+      ],
+      "title": "External Tool Call Duration (ms)", "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "custom": { "align": "auto" }, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 29 }, "id": 31,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "{component=\"log-sentinel\"} | json | event=\"sentinel_tool_call\"", "queryType": "range", "refId": "A" }],
+      "title": "Tool Call Log", "type": "logs"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 }, "id": 104, "title": "Anomaly Pipeline", "type": "row" },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "bars", "fillOpacity": 70, "gradientMode": "none", "lineWidth": 1, "pointSize": 5, "showPoints": "never", "spanNulls": 600000, "stacking": { "group": "A", "mode": "normal" } }, "unit": "short" },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 38 }, "id": 40,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap anomaly_count [$__interval]))", "legendFormat": "Anomalies detected", "queryType": "range", "refId": "A" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap needs_t2_count [$__interval]))", "legendFormat": "Escalated to T2", "queryType": "range", "refId": "B" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap evidence_packet_count [$__interval]))", "legendFormat": "Evidence packets", "queryType": "range", "refId": "C" }
+      ],
+      "title": "Anomalies / Escalations / Evidence per Cycle", "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 38 }, "id": 41,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap anomaly_count [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Total Anomalies", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 38 }, "id": 42,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap needs_t2_count [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "T2 Escalations", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 42 }, "id": 43,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap invocation_count [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Invocations Analyzed", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 42 }, "id": 44,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap evidence_packet_count [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Evidence Packets", "type": "stat"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 }, "id": 105, "title": "T2 & T3 Intelligence", "type": "row" },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 47 }, "id": 50,
+      "options": { "displayLabels": ["name", "value"], "legend": { "displayMode": "list", "placement": "right", "showLegend": true }, "pieType": "pie", "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum by (confidence) (count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | confidence=\"high\" [$__range]))", "legendFormat": "high", "queryType": "range", "refId": "A" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum by (confidence) (count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | confidence=\"medium\" [$__range]))", "legendFormat": "medium", "queryType": "range", "refId": "B" },
+        { "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum by (confidence) (count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | confidence=\"low\" [$__range]))", "legendFormat": "low", "queryType": "range", "refId": "C" }
+      ],
+      "title": "T2 Confidence Distribution", "type": "piechart"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#FF9830", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 47 }, "id": 51,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\" | sentry_worthy=\"true\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Sentry-worthy Findings", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#F2495C", "value": 1 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 47 }, "id": 52,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_synthesis\" | regression_detected=\"True\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "T3 Regressions Detected", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 51 }, "id": 53,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_sentry_issue\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Sentry Issues Created", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": { "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 51 }, "id": 54,
+      "options": { "colorMode": "background-gradient", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "textMode": "value", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | event=\"sentinel_threshold_recommendation\" [$__range]))", "queryType": "range", "refId": "A" }],
+      "title": "Threshold Recommendations", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 47 }, "id": 55,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "{component=\"log-sentinel\"} | json | event=\"sentinel_t2_investigation\"", "queryType": "range", "refId": "A" }],
+      "title": "T2 Investigation Reports", "type": "logs"
+    },
+
+    { "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 55 }, "id": 106, "title": "Raw Analyst Logs", "type": "row" },
+
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 }, "id": 60,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "{component=\"log-sentinel\"} | json | event=\"sentinel_analyst_run\"", "queryType": "range", "refId": "A" }],
+      "title": "T1 Analyst Runs", "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 }, "id": 61,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "{component=\"log-sentinel\"} | json | event=\"sentinel_synthesis\"", "queryType": "range", "refId": "A" }],
+      "title": "T3 Synthesis Runs", "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 64 }, "id": 62,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki_local" }, "editorMode": "code", "expr": "{component=\"log-sentinel\"} | json | event=\"sentinel_cycle\"", "queryType": "range", "refId": "A" }],
+      "title": "Cycle Events", "type": "logs"
+    }
+
+  ],
   "schemaVersion": 39,
-  "tags": ["simsteward", "log-sentinel", "observability"],
+  "tags": ["sentinel", "llm", "observability"],
   "templating": {
     "list": [
       {
-        "current": { "selected": true, "text": "local", "value": "local" },
+        "current": { "selected": false, "text": "local", "value": "local" },
+        "datasource": { "type": "loki", "uid": "loki_local" },
+        "definition": "label_values({app=\"sim-steward\"}, env)",
         "hide": 0,
         "includeAll": false,
-        "label": "env",
+        "multi": false,
         "name": "env",
-        "options": [
-          { "selected": true, "text": "local", "value": "local" },
-          { "selected": false, "text": "production", "value": "production" }
-        ],
-        "query": "local,production",
-        "skipUrlSync": false,
-        "type": "custom"
+        "options": [],
+        "query": "label_values({app=\"sim-steward\"}, env)",
+        "refresh": 2,
+        "type": "query",
+        "label": "Environment"
       }
     ]
   },
   "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SimSteward — Log Sentinel",
+  "title": "SimSteward — Log Sentinel v3",
   "uid": "simsteward-log-sentinel",
-  "version": 1,
-  "weekStart": ""
+  "version": 1
 }

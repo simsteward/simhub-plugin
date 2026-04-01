@@ -167,13 +167,40 @@ class LokiClient:
 
     def push_analyst_run(self, run_data: dict, env: str = "local"):
         tier = run_data.get("tier", "t1")
+        tokens_note = f" tokens={run_data.get('total_output_tokens', run_data.get('output_tokens', '?'))}" if run_data.get("total_output_tokens") or run_data.get("output_tokens") else ""
         entry = {
             "level": "INFO",
-            "message": f"Analyst {tier}: model={run_data.get('model','?')} anomalies={run_data.get('anomaly_count', run_data.get('logql_queries_generated', '?'))} duration={run_data.get('duration_ms','?')}ms",
+            "message": f"Analyst {tier}: model={run_data.get('model','?')} anomalies={run_data.get('anomaly_count', run_data.get('logql_queries_generated', '?'))} duration={run_data.get('duration_ms','?')}ms{tokens_note}",
             "component": "log-sentinel",
             "event": "sentinel_analyst_run",
             "domain": "system",
             **run_data,
+        }
+        self.push(entry, env)
+
+    def push_tool_call(
+        self,
+        tool: str,
+        tier: str,
+        duration_ms: int,
+        success: bool,
+        env: str = "local",
+        detail: str = "",
+        cycle_id: str = "",
+    ):
+        """Push sentinel_tool_call — per external tool invocation (Loki, Sentry, Grafana)."""
+        entry = {
+            "level": "INFO" if success else "WARN",
+            "message": f"Tool call: {tool} [{tier}] {duration_ms}ms {'ok' if success else 'failed'}",
+            "component": "log-sentinel",
+            "event": "sentinel_tool_call",
+            "domain": "system",
+            "tool": tool,
+            "tier": tier,
+            "duration_ms": duration_ms,
+            "success": success,
+            "detail": detail[:200] if detail else "",
+            "cycle_id": cycle_id,
         }
         self.push(entry, env)
 
@@ -255,6 +282,9 @@ class LokiClient:
             "logql_queries_used": t2_result.logql_queries_used,
             "logql_gather_duration_ms": t2_result.logql_gather_duration_ms,
             "inference_duration_ms": t2_result.inference_duration_ms,
+            "input_tokens": getattr(t2_result, "input_tokens", 0),
+            "output_tokens": getattr(t2_result, "output_tokens", 0),
+            "tokens_per_sec": getattr(t2_result, "tokens_per_sec", 0.0),
             "model": t2_result.model,
         }
         self.push(entry, env)
@@ -281,6 +311,9 @@ class LokiClient:
             "threshold_recommendation_count": len(t3_result.threshold_recommendations),
             "model": t3_result.model,
             "inference_duration_ms": t3_result.inference_duration_ms,
+            "input_tokens": getattr(t3_result, "input_tokens", 0),
+            "output_tokens": getattr(t3_result, "output_tokens", 0),
+            "tokens_per_sec": getattr(t3_result, "tokens_per_sec", 0.0),
         }
         self.push(entry, env)
 

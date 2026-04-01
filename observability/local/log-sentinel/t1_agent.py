@@ -39,6 +39,10 @@ class T1Result:
     model: str
     summary_duration_ms: int
     anomaly_duration_ms: int
+    summary_input_tokens: int
+    summary_output_tokens: int
+    anomaly_input_tokens: int
+    anomaly_output_tokens: int
     trigger_source: str          # "scheduled" | "grafana_alert"
     alert_names: list[str]       # T0 alert names that triggered this run
     raw_summary_response: str = field(repr=False, default="")
@@ -51,6 +55,19 @@ class T1Result:
     @property
     def total_duration_ms(self) -> int:
         return self.summary_duration_ms + self.anomaly_duration_ms
+
+    @property
+    def total_input_tokens(self) -> int:
+        return self.summary_input_tokens + self.anomaly_input_tokens
+
+    @property
+    def total_output_tokens(self) -> int:
+        return self.summary_output_tokens + self.anomaly_output_tokens
+
+    @property
+    def tokens_per_sec(self) -> float:
+        secs = self.total_duration_ms / 1000
+        return round(self.total_output_tokens / secs, 2) if secs > 0 else 0.0
 
 
 class T1Agent:
@@ -117,13 +134,17 @@ class T1Agent:
         summary_text = ""
         cycle_notes = ""
         summary_ms = 0
+        summary_in_tok = 0
+        summary_out_tok = 0
         raw_summary = ""
         try:
-            raw_summary, summary_ms = self.ollama.generate(
+            result = self.ollama.generate(
                 self.config.ollama_model_fast,
                 system + "\n\n" + summary_prompt,
                 think=False,
             )
+            raw_summary, summary_ms = result.text, result.duration_ms
+            summary_in_tok, summary_out_tok = result.input_tokens, result.output_tokens
             self.breaker.record_success()
             parsed = _parse_json(raw_summary)
             summary_text = parsed.get("summary", "")
@@ -142,13 +163,17 @@ class T1Agent:
         )
         anomalies = []
         anomaly_ms = 0
+        anomaly_in_tok = 0
+        anomaly_out_tok = 0
         raw_anomaly = ""
         try:
-            raw_anomaly, anomaly_ms = self.ollama.generate(
+            result = self.ollama.generate(
                 self.config.ollama_model_fast,
                 system + "\n\n" + anomaly_prompt,
                 think=True,
             )
+            raw_anomaly, anomaly_ms = result.text, result.duration_ms
+            anomaly_in_tok, anomaly_out_tok = result.input_tokens, result.output_tokens
             self.breaker.record_success()
             parsed = _parse_json(raw_anomaly)
             anomalies = _normalize_anomalies_v3(parsed.get("anomalies", []))
@@ -168,8 +193,9 @@ class T1Agent:
                 except Exception as e:
                     logger.warning("Failed to push evidence packet %s: %s", packet.anomaly_id, e)
 
+        total_out = summary_out_tok + anomaly_out_tok
         logger.info(
-            "T1 [%s]: %d invocations, %d anomalies (%d→T2), %d evidence packets, summary=%dms anomaly=%dms",
+            "T1 [%s]: %d invocations, %d anomalies (%d→T2), %d evidence packets, summary=%dms anomaly=%dms tokens=%d",
             trigger_source,
             len(invocations),
             len(anomalies),
@@ -177,6 +203,7 @@ class T1Agent:
             len(evidence_packets),
             summary_ms,
             anomaly_ms,
+            total_out,
         )
 
         return T1Result(
@@ -188,6 +215,10 @@ class T1Agent:
             model=self.config.ollama_model_fast,
             summary_duration_ms=summary_ms,
             anomaly_duration_ms=anomaly_ms,
+            summary_input_tokens=summary_in_tok,
+            summary_output_tokens=summary_out_tok,
+            anomaly_input_tokens=anomaly_in_tok,
+            anomaly_output_tokens=anomaly_out_tok,
             trigger_source=trigger_source,
             alert_names=alert_names or [],
             raw_summary_response=raw_summary,
