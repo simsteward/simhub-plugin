@@ -1,0 +1,246 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Claude Code Session Health
+    folder: Log Sentinel
+    interval: 1m
+    rules:
+
+      - uid: session-abandoned
+        title: Session Abandoned
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | level="ERROR" [30m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 30m
+        annotations:
+          summary: Claude session started but no activity for 30 minutes
+          description: Session start detected with no activity, errors, or completion events for 30 minutes
+        labels:
+          alertname: session-abandoned
+          severity: warn
+          trigger_tier: t1
+
+      - uid: claude-error-spike
+        title: Claude Error Spike
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | level="ERROR" [5m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [4], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: 5+ ERROR entries in claude-dev-logging in 5 minutes
+          description: Elevated error rate in Claude session logging — possible API or tool failure
+        labels:
+          alertname: claude-error-spike
+          severity: warn
+          trigger_tier: t1
+
+      - uid: permission-flood
+        title: Permission Flood
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | message=~"(?i).*permission.*" [5m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [9], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: 10+ permission-related log entries in 5 minutes
+          description: Possible permission configuration problem or tool permission loop
+        labels:
+          alertname: permission-flood
+          severity: warn
+          trigger_tier: t1
+
+      - uid: subagent-explosion
+        title: Subagent Explosion
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | message=~"(?i).*subagent.*spawn.*" [60m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [19], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Subagent spawn count exceeded 20 in single session
+          description: Unusually high subagent spawning — possible recursive agent loop or over-parallelization
+        labels:
+          alertname: subagent-explosion
+          severity: warn
+          trigger_tier: t2
+
+      - uid: mcp-service-errors
+        title: MCP Service Errors
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | message=~"(?i).*mcp.*error.*|.*error.*mcp.*" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [4], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: 5+ MCP call failures in 10 minutes
+          description: MCP server appears to be failing — multiple call errors detected
+        labels:
+          alertname: mcp-service-errors
+          severity: warn
+          trigger_tier: t1
+
+      - uid: tool-loop-detected
+        title: Tool Loop Detected
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | level="WARN" | message=~"(?i).*tool.*loop.*|.*repeated.*tool.*" [30m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Same tool called 5+ times in session without progress
+          description: Possible stuck agent — repeated tool invocations without forward progress
+        labels:
+          alertname: tool-loop-detected
+          severity: warn
+          trigger_tier: t2
+
+      - uid: session-zero-output
+        title: Session Zero Output
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-token-metrics"} | json [60m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Session completed with token entry but zero assistant messages logged
+          description: Session appears to have run but produced no output — possible silent failure
+        labels:
+          alertname: session-zero-output
+          severity: warn
+          trigger_tier: t1

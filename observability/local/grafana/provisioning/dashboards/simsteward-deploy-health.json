@@ -1,5 +1,6 @@
 {
   "annotations": { "list": [] },
+  "description": "Deploy health — deploy markers, plugin bring-up, bridge start, and error volume. deploy.ps1 pushes event=deploy_marker when SIMSTEWARD_LOKI_URL is set. post_deploy_warn=true means post-deploy tests/*.ps1 failed.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -8,19 +9,146 @@
   "liveNow": false,
   "panels": [
     {
-      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
-      "id": 1,
-      "options": {
-        "code": { "language": "markdown", "showLineNumbers": false, "showMiniMap": false },
-        "content": "**Deploy health** — Correlates `deploy.ps1` with plugin bring-up in Loki.\n\n- **Deploy markers** — Lines pushed at end of `deploy.ps1` when `SIMSTEWARD_LOKI_URL` is set (`event=deploy_marker`). `post_deploy_warn=true` means post-deploy `tests/*.ps1` failed after retry.\n- **Plugin / bridge** — `plugin_ready` and `bridge_start_failed` show whether SimHub loaded the plugin and WebSocket started.\n- **Errors** — Structured ERROR lines; spike after a bad deploy often means SimHub/plugin mismatch or WS failure.\n\nOpen repo `deploy.ps1` console output for copy failures; this dashboard is **telemetry**, not a full deploy log.",
-        "mode": "markdown"
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#5794F2", "value": null }] }
+        },
+        "overrides": []
       },
-      "title": "About",
-      "type": "text"
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 0 },
+      "id": 8,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": { "titleSize": 12, "valueSize": 36 },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({app=\"sim-steward\", env=\"${env}\"} | json | event=\"deploy_marker\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Deploys This Period",
+      "type": "stat"
     },
     {
       "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 3 },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#F2495C", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 0 },
+      "id": 9,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": { "titleSize": 12, "valueSize": 36 },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({app=\"sim-steward\", env=\"${env}\"} | json | event=\"deploy_marker\" | post_deploy_warn=\"true\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Post-Deploy Warnings",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#73BF69", "value": null }, { "color": "#F2495C", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 0 },
+      "id": 10,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": { "titleSize": 12, "valueSize": 36 },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({app=\"sim-steward\", env=\"${env}\"} | json | event=\"bridge_start_failed\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Bridge Start Failures",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "gradientMode": "opacity",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": 3600000,
+            "axisLabel": "Deploys"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 5 },
+      "id": 11,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({app=\"sim-steward\", env=\"${env}\"} | json | event=\"deploy_marker\" [$__interval]))",
+          "legendFormat": "Deploys",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Deploy Frequency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 11 },
       "id": 2,
       "options": {
         "dedupStrategy": "none",
@@ -41,12 +169,12 @@
           "refId": "A"
         }
       ],
-      "title": "Deploy markers (deploy.ps1 → Loki)",
+      "title": "Deploy Markers (deploy.ps1 → Loki)",
       "type": "logs"
     },
     {
       "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 21 },
       "id": 3,
       "options": {
         "dedupStrategy": "none",
@@ -67,12 +195,12 @@
           "refId": "A"
         }
       ],
-      "title": "Plugin / bridge lifecycle",
+      "title": "Plugin / Bridge Lifecycle",
       "type": "logs"
     },
     {
       "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 21 },
       "id": 4,
       "options": {
         "dedupStrategy": "none",
@@ -93,28 +221,30 @@
           "refId": "A"
         }
       ],
-      "title": "WebSocket bridge failures",
+      "title": "WebSocket Bridge Failures",
       "type": "logs"
     },
     {
       "datasource": { "type": "loki", "uid": "loki_local" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": { "mode": "fixed", "fixedColor": "#F2495C" },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "drawStyle": "bars",
-            "fillOpacity": 40,
-            "lineWidth": 1,
-            "showPoints": "never"
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "gradientMode": "opacity",
+            "fillOpacity": 25,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": 3600000,
+            "axisLabel": "Errors"
           },
           "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 30 },
       "id": 5,
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -124,18 +254,18 @@
         {
           "datasource": { "type": "loki", "uid": "loki_local" },
           "editorMode": "code",
-          "expr": "sum(count_over_time({app=\"sim-steward\", env=\"${env}\", level=\"ERROR\"} [5m]))",
-          "legendFormat": "ERROR lines / 5m",
+          "expr": "sum(count_over_time({app=\"sim-steward\", env=\"${env}\", level=\"ERROR\"} [$__interval]))",
+          "legendFormat": "ERROR lines / interval",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "ERROR log volume (5m buckets)",
+      "title": "ERROR Log Volume",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 30 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 38 },
       "id": 6,
       "options": {
         "dedupStrategy": "none",
@@ -156,12 +286,12 @@
           "refId": "A"
         }
       ],
-      "title": "Recent ERROR lines (full)",
+      "title": "Recent ERROR Lines (Full)",
       "type": "logs"
     },
     {
       "datasource": { "type": "loki", "uid": "loki_local" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 42 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 50 },
       "id": 7,
       "options": {
         "dedupStrategy": "none",
@@ -182,7 +312,7 @@
           "refId": "A"
         }
       ],
-      "title": "Failed actions (action_result success=false)",
+      "title": "Failed Actions (action_result success=false)",
       "type": "logs"
     }
   ],
@@ -210,7 +340,7 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Sim Steward — Deploy health",
+  "title": "Sim Steward — Deploy Health",
   "uid": "simsteward-deploy-health",
   "version": 1,
   "weekStart": ""

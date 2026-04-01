@@ -1,0 +1,5 @@
+flask>=3.0.0
+requests>=2.31.0
+schedule>=1.2.0
+sentry-sdk>=2.0.0
+pytest>=8.0.0

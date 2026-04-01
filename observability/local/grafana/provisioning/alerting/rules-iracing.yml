@@ -1,0 +1,354 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: iRacing Session Behavior
+    folder: Log Sentinel
+    interval: 1m
+    rules:
+
+      - uid: session-no-actions
+        title: Session No Actions
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="action_dispatched" [15m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 15m
+        annotations:
+          summary: iRacing session active with zero action_dispatched events
+          description: Session has been active 15+ minutes with no user actions dispatched
+        labels:
+          alertname: session-no-actions
+          severity: warn
+          trigger_tier: t1
+
+      - uid: action-failure-streak
+        title: Action Failure Streak
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="action_result" | level="ERROR" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [2], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: 3+ consecutive action_result errors in session
+          description: Multiple consecutive action failures detected — possible stuck state or feature regression
+        labels:
+          alertname: action-failure-streak
+          severity: critical
+          trigger_tier: t1
+
+      - uid: websocket-disconnect-spike
+        title: WebSocket Disconnect Spike
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="websocket_disconnect" [5m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [2], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: 3+ WebSocket disconnects in 5 minutes
+          description: Elevated WebSocket disconnect rate detected — dashboard connectivity unstable
+        labels:
+          alertname: websocket-disconnect-spike
+          severity: warn
+          trigger_tier: t1
+
+      - uid: incident-detection-zero
+        title: Incident Detection Zero
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="iracing_incident" [30m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 30m
+        annotations:
+          summary: iRacing session active 30+ min with zero incident events
+          description: Incident detection may be broken — no iracing_incident events despite active session
+        labels:
+          alertname: incident-detection-zero
+          severity: warn
+          trigger_tier: t1
+
+      - uid: session-no-end
+        title: Session No End Event
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 14400, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="iracing_session_end" [4h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 4h
+        annotations:
+          summary: iracing_session_start with no iracing_session_end within 4 hours
+          description: Session end event not received — possible session lifecycle tracking failure
+        labels:
+          alertname: session-no-end
+          severity: warn
+          trigger_tier: t1
+
+  - orgId: 1
+    name: Replay & Incident Investigation
+    folder: Log Sentinel
+    interval: 1m
+    rules:
+
+      - uid: replay-no-seeks
+        title: Replay No Seeks
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="iracing_replay_seek" [5m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: Replay started but no seek events in 5 minutes
+          description: Replay mode active with zero iracing_replay_seek events — may indicate broken replay controls
+        labels:
+          alertname: replay-no-seeks
+          severity: warn
+          trigger_tier: t1
+
+      - uid: incident-detection-stall
+        title: Incident Detection Stall in Replay
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="iracing_incident" [30m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 30m
+        annotations:
+          summary: Replay session active 30+ min with zero incident events
+          description: No incidents detected during replay — detector may be broken in replay mode
+        labels:
+          alertname: incident-detection-stall
+          severity: warn
+          trigger_tier: t1
+
+      - uid: incident-camera-stuck
+        title: Incident Camera Stuck
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="iracing_incident" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [2], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Same camera_view on 3+ consecutive incidents
+          description: Camera may be stuck — same camera_view repeated across multiple incident events
+        labels:
+          alertname: incident-camera-stuck
+          severity: info
+          trigger_tier: t1
+
+      - uid: replay-session-no-close
+        title: Replay Session No Close
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 7200, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="iracing_session_end" | mode="replay" [2h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 2h
+        annotations:
+          summary: Replay session start with no session_end within 2 hours
+          description: Replay session lifecycle may be broken — no session end event received
+        labels:
+          alertname: replay-session-no-close
+          severity: warn
+          trigger_tier: t1
+
+      - uid: action-incident-gap
+        title: Action-Incident Gap
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="iracing_incident" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: Incident detected, no action_dispatched within 10 minutes
+          description: User may not have reviewed the incident — no action followed the incident event
+        labels:
+          alertname: action-incident-gap
+          severity: info
+          trigger_tier: t1

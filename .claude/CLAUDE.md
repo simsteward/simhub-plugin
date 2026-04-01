@@ -151,3 +151,30 @@ All session context fields fall back to `"not in session"` (use `SessionLogging.
 - [ ] `iracing_incident` / `incident_detected` log → full uniqueness signature (`unique_user_id`, start/end frame, camera)
 
 **Canonical reference:** [docs/RULES-ActionCoverage.md](../docs/RULES-ActionCoverage.md)
+
+---
+
+## Grafana Alert Covenant
+
+Every behavioral change to the plugin, dashboard, or LLM integration MUST include a Grafana alert review. **Alert silence ≠ alert passing.**
+
+### Change → Domain quick-reference
+
+| Change type | Domain to check |
+|---|---|
+| New `DispatchAction` branch | Domain 3 — `action-failure-streak` thresholds |
+| New iRacing SDK event | Domains 3 + 7 — session/replay rules |
+| New Claude API integration | Domains 4 + 5 — session health + cost |
+| New MCP tool | Domain 4 — `mcp-service-errors`, `tool-loop-detected` |
+| Log event renamed/removed | Search alert YAMLs — alert will go **silent**, not fire |
+| New log event/field | Consider whether a new alert rule is warranted |
+| Sentinel code change | Domain 6 — self-health rules |
+
+### PR Checklist addition
+
+- [ ] Reviewed impacted Grafana alert domains (see table above)
+- [ ] Verified no alert queries break silently if log events were renamed/removed
+- [ ] Considered new alert rule if new log events were added
+
+**Alert YAML files:** `observability/local/grafana/provisioning/alerting/` (46 rules, 8 domains)
+**Canonical reference:** [docs/RULES-GrafanaAlerts.md](../docs/RULES-GrafanaAlerts.md)

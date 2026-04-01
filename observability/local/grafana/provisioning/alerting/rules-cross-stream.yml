@@ -1,0 +1,267 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Cross-Stream Correlation
+    folder: Log Sentinel
+    interval: 1m
+    rules:
+
+      # ws-claude-coinflict: WebSocket disconnect + Claude ERROR in same 5-min window
+      - uid: ws-claude-coinflict
+        title: WebSocket + Claude Error Conflict
+        condition: D
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="websocket_disconnect" [5m])'
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | level="ERROR" [5m])'
+              instant: true
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "$A > 0 && $B > 0"
+              refId: C
+          - refId: D
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: D
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: WebSocket disconnects co-occurring with Claude errors
+          description: WebSocket disconnect and Claude ERROR events detected in the same 5-minute window
+        labels:
+          alertname: ws-claude-coinflict
+          severity: warn
+          trigger_tier: t2
+
+      # session-token-abandon: Claude session ERROR + no token entry for that session
+      - uid: session-token-abandon
+        title: Session Error Without Token Entry
+        condition: D
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | level="ERROR" [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-token-metrics"} | json [1h])'
+              instant: true
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "$A > 0 && $B == 0"
+              refId: C
+          - refId: D
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: D
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: Session ERROR entries with no corresponding token metrics
+          description: Claude session errors present but no token/cost entry — session may have been abandoned or crashed before completion
+        labels:
+          alertname: session-token-abandon
+          severity: warn
+          trigger_tier: t2
+
+      # action-fail-session-fail: action_result errors + Claude session ERROR within 10 min
+      - uid: action-fail-session-fail
+        title: Action Failure + Session Failure
+        condition: D
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="action_result" | level="ERROR" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | level="ERROR" [10m])'
+              instant: true
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "$A > 0 && $B > 0"
+              refId: C
+          - refId: D
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: D
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Plugin action failures coinciding with Claude session errors
+          description: action_result errors and Claude session errors detected within the same 10-minute window — possible cascading failure
+        labels:
+          alertname: action-fail-session-fail
+          severity: critical
+          trigger_tier: t2
+
+      # deploy-triple-signal: 2+ streams elevated error rate within 15 min of plugin lifecycle event
+      - uid: deploy-triple-signal
+        title: Deploy Triple Signal
+        condition: E
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | level="ERROR" [15m])'
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="claude-dev-logging"} | json | level="ERROR" [15m])'
+              instant: true
+              refId: B
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" [15m])'
+              instant: true
+              refId: C
+          - refId: D
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "($A > 5 ? 1 : 0) + ($B > 5 ? 1 : 0) + ($C > 0 ? 1 : 0)"
+              refId: D
+          - refId: E
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: E
+              conditions:
+                - evaluator: { params: [1], type: gt }
+                  operator: { type: and }
+                  query: { params: [D] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Multiple streams showing elevated errors within 15 min of deploy
+          description: Deploy triple signal — plugin lifecycle event plus 2+ streams with elevated error rates
+        labels:
+          alertname: deploy-triple-signal
+          severity: critical
+          trigger_tier: t2
+
+      # cost-spike-tool-flood: Tool call count spike + session cost spike in same cycle
+      - uid: cost-spike-tool-flood
+        title: Cost Spike + Tool Flood
+        condition: D
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap tool_calls [1h])'
+              instant: true
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "$A > 0.5 && $B > 50"
+              refId: C
+          - refId: D
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: D
+              conditions:
+                - evaluator: { params: [0], type: gt }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: High tool call count coinciding with elevated session cost
+          description: Tool use flood and cost spike occurring together — likely agentic loop with real cost impact
+        labels:
+          alertname: cost-spike-tool-flood
+          severity: warn
+          trigger_tier: t1

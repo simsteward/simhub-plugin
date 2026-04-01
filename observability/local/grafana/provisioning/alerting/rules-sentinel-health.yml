@@ -1,0 +1,246 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Sentinel Self-Health
+    folder: Log Sentinel
+    interval: 1m
+    rules:
+
+      - uid: sentinel-stalled
+        title: Sentinel Cycle Stalled (Health)
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 5400, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_cycle" [90m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: No sentinel_cycle event in 90 minutes
+          description: Log sentinel appears stalled — no completed analysis cycles
+        labels:
+          alertname: sentinel-cycle-stalled-health
+          severity: critical
+          trigger_tier: t1
+
+      - uid: detector-error-rate
+        title: Detector Error Rate
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_analyst_run" | level="ERROR" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [2], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Analyst run errors exceeding 3 in a single cycle
+          description: Multiple analysis errors detected — Ollama or Loki connectivity may be failing
+        labels:
+          alertname: detector-error-rate
+          severity: warn
+          trigger_tier: t1
+
+      - uid: t1-slow
+        title: T1 Inference Slow
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'max_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_analyst_run" | tier="t1" | unwrap duration_ms [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [120000], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: T1 inference duration exceeded 120 seconds
+          description: T1 triage is running slower than expected — GPU may be under load or model is too large
+        labels:
+          alertname: t1-slow
+          severity: warn
+          trigger_tier: t1
+
+      - uid: t2-slow
+        title: T2 Inference Slow
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'max_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_t2_investigation" | unwrap inference_duration_ms [30m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [300000], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: T2 inference duration exceeded 300 seconds
+          description: T2 investigation is taking too long — deep model may be under heavy load
+        labels:
+          alertname: t2-slow
+          severity: warn
+          trigger_tier: t1
+
+      - uid: sentry-flood
+        title: Sentry Flood
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_sentry_issue" [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [4], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: More than 5 Sentry-worthy findings in 1 hour
+          description: Sentinel is creating too many Sentry issues — possible false positive storm or real incident
+        labels:
+          alertname: sentry-flood
+          severity: warn
+          trigger_tier: t1
+
+      - uid: findings-flood
+        title: Findings Flood
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_finding" [10m])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [19], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: More than 20 findings in a single cycle
+          description: Finding flood detected — sentinel may be over-sensitive or a real incident is occurring
+        labels:
+          alertname: findings-flood
+          severity: warn
+          trigger_tier: t1
+
+      - uid: zero-findings-48h
+        title: Zero Findings 48h
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 172800, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_finding" [48h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [0], type: lt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: Alerting
+        execErrState: Error
+        for: 1h
+        annotations:
+          summary: No sentinel findings at all in 48 hours
+          description: System may be suppressing findings or the sentinel is not running correctly
+        labels:
+          alertname: zero-findings-48h
+          severity: info
+          trigger_tier: t1

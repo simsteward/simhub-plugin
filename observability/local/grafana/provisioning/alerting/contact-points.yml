@@ -1,0 +1,12 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: log-sentinel-webhook
+    receivers:
+      - uid: log-sentinel-webhook-recv
+        type: webhook
+        settings:
+          url: http://log-sentinel:8081/trigger
+          httpMethod: POST
+        disableResolveMessage: true
