@@ -66,3 +66,6 @@ contextstream-support-case-*.md
 
 # Session metrics (local only)
 logs/claude-session-metrics.jsonl
+
+# Git worktrees
+.worktrees/
