@@ -272,7 +272,7 @@ groups:
         execErrState: Error
         for: 0s
         annotations:
-          summary: T4 GitHub filing failures exceeding 3 in 1 hour
+          summary: T4 GitHub filing failures — 3 or more in 1 hour
           description: Sentinel T4 is failing to file GitHub issues — check gh CLI auth (GITHUB_TOKEN) or rate limits
         labels:
           alertname: t4-filing-failures
