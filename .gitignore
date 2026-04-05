@@ -1,3 +1,6 @@
+# Local ignore folder
+/ignore/
+
 # Build
 bin/
 obj/
@@ -34,6 +37,9 @@ scripts/obs-bridge/node_modules/
 # Cloudflare Worker
 worker/.wrangler/
 worker/node_modules/
+
+# Git worktrees (project-local)
+.worktrees/
 
 # Temp dirs
 temp-mcp-client/
