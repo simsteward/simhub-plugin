@@ -68,7 +68,7 @@ class LokiClient:
     def get_t2_since(self, since_ts_ns: int) -> list[dict]:
         """Return up to 50 sentinel_t2_investigation entries logged after since_ts_ns."""
         end_ns = self.now_ns()
-        logql = '{app="sim-steward"} | json | event="sentinel_t2_investigation"'
+        logql = '{app="sim-steward", component="log-sentinel"} | json | event="sentinel_t2_investigation"'
         try:
             resp = requests.get(
                 f"{self.base_url}/loki/api/v1/query_range",

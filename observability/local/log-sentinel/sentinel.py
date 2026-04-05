@@ -67,7 +67,7 @@ class Sentinel:
         )
 
         self._cycle_num = 0
-        self._last_t3_run_ns: int = 0
+        self._last_t3_run_ns: int = int((time.time() - self.config.t3_interval_sec) * 1e9)
         self._trigger_dedup: dict[str, float] = {}  # alertname → last trigger time.time()
         self._stats = {
             "cycles_completed": 0,
