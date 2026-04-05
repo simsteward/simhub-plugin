@@ -63,6 +63,13 @@ def manual_run_t3():
     return jsonify({"status": "accepted", "message": "T3 cycle started in background"})
 
 
+@app.route("/run_t4", methods=["POST"])
+def manual_run_t4():
+    t = threading.Thread(target=sentinel.run_t4_cycle, daemon=True)
+    t.start()
+    return jsonify({"status": "accepted", "message": "T4 cycle started in background"})
+
+
 @app.route("/trigger", methods=["POST"])
 def grafana_trigger():
     """Receive Grafana alert webhook. Dedup, parse, and dispatch trigger_cycle()."""

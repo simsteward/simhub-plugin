@@ -31,6 +31,11 @@ class Config:
         self.baseline_path = os.environ.get("SENTINEL_BASELINE_PATH", "/data/baselines.json")
         self.t2_gather_rounds = int(os.environ.get("SENTINEL_T2_GATHER_ROUNDS", "2"))
         self.t2_lines_per_query = int(os.environ.get("SENTINEL_T2_LINES_PER_QUERY", "200"))
+        # T4
+        self.t4_enabled = os.environ.get("SENTINEL_T4_ENABLED", "false").lower() == "true"
+        self.t4_interval_sec = int(os.environ.get("SENTINEL_T4_INTERVAL_SEC", "1800"))
+        self.github_repo = os.environ.get("GITHUB_REPO", "")
+        self.github_token = os.environ.get("GITHUB_TOKEN", "")
 
     @classmethod
     def from_env(cls):

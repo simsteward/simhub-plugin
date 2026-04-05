@@ -377,6 +377,44 @@ class LokiClient:
         }
         self.push(entry, env)
 
+    def push_t4_submission(self, submission: dict, env: str = "local"):
+        """Push sentinel_t4_submission — per T4 GitHub issue action."""
+        entry = {
+            "level": "INFO",
+            "message": f"T4 submission: {submission.get('action', '?')} — {submission.get('title', '')[:80]}",
+            "component": "log-sentinel",
+            "event": "sentinel_t4_submission",
+            "domain": "system",
+            **submission,
+        }
+        self.push(entry, env)
+
+    def get_t4_submissions(self, since_ts_ns: int) -> list[dict]:
+        """Return up to 100 sentinel_t4_submission entries logged after since_ts_ns."""
+        end_ns = self.now_ns()
+        logql = '{app="sim-steward", component="log-sentinel"} | json | event="sentinel_t4_submission"'
+        try:
+            resp = requests.get(
+                f"{self.base_url}/loki/api/v1/query_range",
+                params={"query": logql, "start": str(since_ts_ns), "end": str(end_ns), "limit": 100, "direction": "forward"},
+                timeout=self.timeout,
+            )
+            if resp.status_code != 200:
+                logger.warning("get_t4_submissions: Loki returned %d", resp.status_code)
+                return []
+            entries = []
+            for stream in resp.json().get("data", {}).get("result", []):
+                for pair in stream.get("values", []):
+                    if len(pair) >= 2:
+                        try:
+                            entries.append(json.loads(pair[1]))
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+            return entries
+        except Exception as e:
+            logger.warning("get_t4_submissions error: %s", e)
+            return []
+
     def push_trigger(self, alert_data: dict, env: str = "local"):
         """Push sentinel_trigger — per T0 webhook alert received."""
         entry = {

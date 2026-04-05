@@ -15,9 +15,11 @@ from grafana_client import GrafanaClient
 from loki_client import LokiClient
 from ollama_client import OllamaClient
 from sentry_client import SentryClient
+from github_client import GitHubClient
 from t1_agent import T1Agent, T1Result
 from t2_agent import T2Agent, T2Result
 from t3_agent import T3Agent
+from t4_agent import T4Agent, T4Result
 from timeline import TimelineBuilder
 from trace import InvocationBuilder
 
@@ -65,9 +67,12 @@ class Sentinel:
             self.ollama, self.loki, self.grafana, self.sentry,
             self.baseline, self.ollama_breaker, config,
         )
+        self.github = GitHubClient(config.github_repo, config.github_token)
+        self.t4_agent = T4Agent(self.loki, self.github, config)
 
         self._cycle_num = 0
         self._last_t3_run_ns: int = int((time.time() - self.config.t3_interval_sec) * 1e9)
+        self._last_t4_run_ns: int = int((time.time() - self.config.t4_interval_sec) * 1e9)
         self._trigger_dedup: dict[str, float] = {}  # alertname → last trigger time.time()
         self._stats = {
             "cycles_completed": 0,
@@ -95,6 +100,8 @@ class Sentinel:
         schedule.every(self.config.t1_interval_sec).seconds.do(self.run_cycle)
         schedule.every(self.config.t2_interval_sec).seconds.do(self.run_t2_cycle)
         schedule.every(self.config.t3_interval_sec).seconds.do(self.run_t3_cycle)
+        if self.config.t4_enabled:
+            schedule.every(self.config.t4_interval_sec).seconds.do(self.run_t4_cycle)
         while True:
             schedule.run_pending()
             time.sleep(1)
@@ -246,6 +253,25 @@ class Sentinel:
             logger.error("T3 cycle error: %s", e)
         finally:
             self._last_t3_run_ns = int(time.time() * 1e9)
+
+    def run_t4_cycle(self) -> T4Result:
+        """T4 GitHub issue filing cycle."""
+        logger.info("T4: starting GitHub issue filing cycle")
+        start = time.time()
+        result = T4Result(processed=0, created=0, commented=0, skipped=0, duration_ms=0)
+        try:
+            result = self.t4_agent.run(self._last_t4_run_ns)
+            logger.info(
+                "T4: done — processed=%d created=%d commented=%d skipped=%d duration=%dms",
+                result.processed, result.created, result.commented,
+                result.skipped, result.duration_ms,
+            )
+        except Exception as e:
+            logger.error("T4 cycle error: %s", e)
+            result.error = str(e)
+        finally:
+            self._last_t4_run_ns = int(time.time() * 1e9)
+        return result
 
     def trigger_cycle(
         self,
