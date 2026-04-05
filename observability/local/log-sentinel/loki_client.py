@@ -260,7 +260,7 @@ class LokiClient:
         entry = packet.to_loki_dict()
         self.push(entry, env)
 
-    def push_t2_investigation(self, t2_result, packet_dicts: list, env: str = "local"):
+    def push_t2_investigation(self, t2_result: "T2Result", packet_dicts: list, env: str = "local"):
         """Push sentinel_t2_investigation — T2's investigation result."""
         entry = {
             "level": "INFO",
@@ -282,12 +282,12 @@ class LokiClient:
             "logql_queries_used": t2_result.logql_queries_used,
             "logql_gather_duration_ms": t2_result.logql_gather_duration_ms,
             "inference_duration_ms": t2_result.inference_duration_ms,
-            "input_tokens": getattr(t2_result, "input_tokens", 0),
-            "output_tokens": getattr(t2_result, "output_tokens", 0),
-            "tokens_per_sec": getattr(t2_result, "tokens_per_sec", 0.0),
+            "input_tokens": t2_result.input_tokens,
+            "output_tokens": t2_result.output_tokens,
+            "tokens_per_sec": t2_result.tokens_per_sec,
             "model": t2_result.model,
-            "t2_investigation_id": getattr(t2_result, "t2_investigation_id", ""),
-            "source_cycle_ids": getattr(t2_result, "source_cycle_ids", []),
+            "t2_investigation_id": t2_result.t2_investigation_id,
+            "source_cycle_ids": t2_result.source_cycle_ids,
         }
         self.push(entry, env)
 
