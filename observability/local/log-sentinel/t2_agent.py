@@ -342,7 +342,11 @@ class T2Agent:
                 temperature=0.0,
             )
             raw = refine_result.text.strip()
-            parsed = json.loads(raw) if raw.startswith("{") else {}
+            if not raw.startswith("{"):
+                logger.warning("T2 Round 2: fast model returned non-JSON response, skipping follow-up queries")
+                parsed = {}
+            else:
+                parsed = json.loads(raw)
             follow_ups = parsed.get("follow_up_queries", [])
             if isinstance(follow_ups, list):
                 r2_queries = [q for q in follow_ups if isinstance(q, str) and _valid_logql(q)][:3]
