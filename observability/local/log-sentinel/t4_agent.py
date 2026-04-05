@@ -68,6 +68,7 @@ class T4Agent:
 
         for entry in eligible:
             fingerprint = entry.get("sentry_fingerprint", "")
+            title = self._build_title(entry)
             existing = self.github.find_open_issue(fingerprint)
 
             if existing:
@@ -77,12 +78,12 @@ class T4Agent:
                 action = "commented" if ok else "comment_failed"
                 if ok:
                     commented += 1
+                    logger.info("T4: commented on #%d (%s)", existing["number"], fingerprint[:8])
                 else:
                     skipped += 1
+                    logger.warning("T4: comment failed on #%d (%s)", existing["number"], fingerprint[:8])
                 url = existing["url"]
-                logger.info("T4: commented on #%d (%s)", existing["number"], fingerprint[:8])
             else:
-                title = self._build_title(entry)
                 body = self._build_body(entry)
                 labels = self._build_labels(entry)
                 result = self.github.create_issue(title, body, labels)
@@ -100,7 +101,7 @@ class T4Agent:
                 "fingerprint": fingerprint,
                 "url": url,
                 "action": action,
-                "title": self._build_title(entry),
+                "title": title,
                 "t2_investigation_id": entry.get("t2_investigation_id", ""),
                 "confidence": entry.get("confidence", ""),
             }, env=self.config.env_label)
@@ -109,7 +110,7 @@ class T4Agent:
                 "fingerprint": fingerprint,
                 "url": url,
                 "action": action,
-                "title": self._build_title(entry),
+                "title": title,
             })
 
         duration_ms = int((time.time() - start) * 1000)

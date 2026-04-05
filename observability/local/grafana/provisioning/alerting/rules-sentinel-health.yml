@@ -244,3 +244,37 @@ groups:
           alertname: zero-findings-48h
           severity: info
           trigger_tier: t1
+
+      - uid: t4-filing-failures
+        title: T4 GitHub Filing Failures
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: loki_local
+            model:
+              datasource: { type: loki, uid: loki_local }
+              editorMode: code
+              expr: 'count_over_time({app="sim-steward", component="log-sentinel"} | json | event="sentinel_t4_submission" | action=~"create_failed|comment_failed" [1h])'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: classic_conditions
+              refId: B
+              conditions:
+                - evaluator: { params: [2], type: gt }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: T4 GitHub filing failures exceeding 3 in 1 hour
+          description: Sentinel T4 is failing to file GitHub issues — check gh CLI auth (GITHUB_TOKEN) or rate limits
+        labels:
+          alertname: t4-filing-failures
+          severity: warn
+          trigger_tier: t1
