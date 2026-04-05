@@ -29,6 +29,8 @@ class Config:
         self.sentry_org = os.environ.get("SENTRY_ORG", "")
         self.sentry_project = os.environ.get("SENTRY_PROJECT", "")
         self.baseline_path = os.environ.get("SENTINEL_BASELINE_PATH", "/data/baselines.json")
+        self.t2_gather_rounds = int(os.environ.get("SENTINEL_T2_GATHER_ROUNDS", "2"))
+        self.t2_lines_per_query = int(os.environ.get("SENTINEL_T2_LINES_PER_QUERY", "200"))
 
     @classmethod
     def from_env(cls):

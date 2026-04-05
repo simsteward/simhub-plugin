@@ -286,6 +286,8 @@ class LokiClient:
             "output_tokens": getattr(t2_result, "output_tokens", 0),
             "tokens_per_sec": getattr(t2_result, "tokens_per_sec", 0.0),
             "model": t2_result.model,
+            "t2_investigation_id": getattr(t2_result, "t2_investigation_id", ""),
+            "source_cycle_ids": getattr(t2_result, "source_cycle_ids", []),
         }
         self.push(entry, env)
 

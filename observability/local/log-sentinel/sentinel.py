@@ -140,6 +140,7 @@ class Sentinel:
                     samples["claude-token-metrics"],
                     invocations=invocations,
                     trigger_source="scheduled",
+                    cycle_id=cycle_id,
                 )
                 self.loki.push_analyst_run({
                     "cycle_id": cycle_id,
@@ -276,6 +277,7 @@ class Sentinel:
                 alert_context=alert_context,
                 trigger_source="grafana_alert",
                 alert_names=alert_names,
+                cycle_id=str(uuid.uuid4())[:8],
             )
             logger.info(
                 "Trigger T1 complete: %d anomalies, %d evidence_packets, %dms",

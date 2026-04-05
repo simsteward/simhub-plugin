@@ -100,6 +100,7 @@ class T1Agent:
         alert_context: str = "",
         trigger_source: str = "scheduled",
         alert_names: list[str] | None = None,
+        cycle_id: str = "",
     ) -> T1Result:
         window_minutes = max(1, int((end_ns - start_ns) / 1e9 / 60))
         counts_text = "\n".join(f"  {k}: {v}" for k, v in counts.items())
@@ -185,7 +186,7 @@ class T1Agent:
         evidence_packets = []
         if anomalies:
             evidence_packets = self.evidence_builder.build_many(
-                anomalies, invocations, start_ns, end_ns
+                anomalies, invocations, start_ns, end_ns, cycle_id=cycle_id
             )
             for packet in evidence_packets:
                 try:

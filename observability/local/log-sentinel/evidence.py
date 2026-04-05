@@ -36,6 +36,7 @@ class EvidencePacket:
     t1_confidence: float                    # 0.0 to 1.0
     assembled_at_ns: int
     logql_used: str                         # the actual query used to fetch related_log_lines
+    cycle_id: str = ""                      # T1 cycle that produced this packet
 
     def to_loki_dict(self) -> dict:
         """Serializable dict for push to Loki as sentinel_evidence_packet event."""
@@ -58,6 +59,7 @@ class EvidencePacket:
             "invocation_ids": [inv.invocation_id for inv in self.invocations],
             "action_types": list({inv.action_type for inv in self.invocations}),
             "assembled_at_ns": self.assembled_at_ns,
+            "cycle_id": self.cycle_id,
         }
 
     def to_prompt_text(self) -> str:
@@ -111,6 +113,7 @@ class EvidenceBuilder:
         invocations: list[FeatureInvocation],
         start_ns: int,
         end_ns: int,
+        cycle_id: str = "",
     ) -> EvidencePacket:
         """
         Build an EvidencePacket for a single T1 anomaly.
@@ -146,6 +149,7 @@ class EvidenceBuilder:
             t1_confidence=float(anomaly.get("confidence", 0.5)),
             assembled_at_ns=int(time.time() * 1e9),
             logql_used=logql,
+            cycle_id=cycle_id,
         )
 
     def build_many(
@@ -154,12 +158,13 @@ class EvidenceBuilder:
         invocations: list[FeatureInvocation],
         start_ns: int,
         end_ns: int,
+        cycle_id: str = "",
     ) -> list[EvidencePacket]:
         """Build evidence packets for all anomalies. Skips on error."""
         packets = []
         for anomaly in anomalies:
             try:
-                packet = self.build(anomaly, invocations, start_ns, end_ns)
+                packet = self.build(anomaly, invocations, start_ns, end_ns, cycle_id=cycle_id)
                 packets.append(packet)
             except Exception as e:
                 logger.warning("Failed to build evidence for anomaly %s: %s", anomaly.get("id", "?"), e)

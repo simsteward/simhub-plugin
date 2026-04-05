@@ -85,6 +85,8 @@ services:
       - SENTINEL_DEDUP_WINDOW_SEC=300
       - SENTINEL_SENTRY_DSN=${SENTINEL_SENTRY_DSN:-}
       - SIMSTEWARD_LOG_ENV=${SIMSTEWARD_LOG_ENV:-local}
+      - SENTINEL_T2_GATHER_ROUNDS=2
+      - SENTINEL_T2_LINES_PER_QUERY=200
     volumes:
       - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/log-sentinel:/data
     healthcheck:

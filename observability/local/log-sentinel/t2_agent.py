@@ -20,6 +20,7 @@ Input flow:
 import json
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 
 from analyst import _parse_json, _normalize_confidence, _normalize_issue_type, _valid_logql
@@ -31,7 +32,7 @@ from ollama_client import OllamaClient
 from prompts import (
     T2_EVIDENCE_SYSTEM, T2_EVIDENCE_PROMPT,
     build_stream_guide, format_evidence_packets_for_t2, format_logql_results,
-    LOGQL_GEN_SYSTEM, LOGQL_GEN_PROMPT,
+    LOGQL_GEN_SYSTEM, LOGQL_GEN_PROMPT, T2_GATHER_REFINE_PROMPT,
 )
 from sentry_client import SentryClient
 
@@ -61,6 +62,8 @@ class T2Result:
     output_tokens: int = 0
     tokens_per_sec: float = 0.0
     raw_response: str = field(repr=False, default="")
+    t2_investigation_id: str = field(default_factory=lambda: str(uuid.uuid4())[:12])
+    source_cycle_ids: list[str] = field(default_factory=list)
 
     @property
     def total_duration_ms(self) -> int:
@@ -118,10 +121,9 @@ class T2Agent:
             env=self.config.env_label,
         )
 
-        # Step 3: generate + execute targeted LogQL for additional evidence
+        # Step 3: multi-round evidence gathering
         gather_start = time.time()
-        queries = self._generate_logql_queries(packet_dicts, lookback_sec // 60)
-        logql_results = self._execute_logql_queries(queries, start_ns, end_ns)
+        queries, logql_results = self._gather_evidence(packet_dicts, start_ns, end_ns, lookback_sec)
         gather_ms = int((time.time() - gather_start) * 1000)
         self.loki.push_tool_call(
             tool="loki_logql_gather", tier="t2", duration_ms=gather_ms,
@@ -157,6 +159,11 @@ class T2Agent:
         parsed = _parse_json(raw)
         all_queries = queries + list(parsed.get("logql_queries_used", []))
 
+        # Collect source cycle_ids from evidence packets for traceability
+        source_cycle_ids = list({
+            p.get("cycle_id", "") for p in packet_dicts if p.get("cycle_id")
+        })
+
         result = T2Result(
             root_cause=parsed.get("root_cause", "Unable to determine root cause."),
             issue_type=_normalize_issue_type(parsed.get("issue_type", "unknown")),
@@ -176,6 +183,7 @@ class T2Agent:
             output_tokens=out_tok,
             tokens_per_sec=tps,
             raw_response=raw,
+            source_cycle_ids=source_cycle_ids,
         )
 
         # Step 5: push investigation to Loki + Grafana
@@ -280,13 +288,80 @@ class T2Agent:
 
         return [q for q in seeded if _valid_logql(q)][:5]
 
+    def _gather_evidence(
+        self,
+        packet_dicts: list[dict],
+        start_ns: int,
+        end_ns: int,
+        lookback_sec: int,
+    ) -> tuple[list[str], dict[str, list[dict]]]:
+        """
+        Multi-round evidence gathering.
+
+        Round 1: generate up to 5 LogQL queries from T1 anomaly descriptions, execute each.
+        Round 2 (if SENTINEL_T2_GATHER_ROUNDS >= 2): call fast model with round-1 results
+                 to identify gaps, execute up to 3 follow-up queries.
+
+        Returns (all_queries, combined_results).
+        """
+        lines_per_query = self.config.t2_lines_per_query
+        gather_rounds = self.config.t2_gather_rounds
+
+        # Round 1
+        r1_queries = self._generate_logql_queries(packet_dicts, lookback_sec // 60)
+        r1_results = self._execute_logql_queries(r1_queries, start_ns, end_ns, lines_per_query)
+
+        if gather_rounds < 2 or not r1_results:
+            return r1_queries, r1_results
+
+        # Round 2: build short context summary from Round 1 results
+        r1_summary_parts = []
+        for query, lines in r1_results.items():
+            if lines:
+                sample_text = json.dumps(lines[:3], default=str)[:500]
+                r1_summary_parts.append(f"Query: {query[:100]}\nResults (sample): {sample_text}")
+            else:
+                r1_summary_parts.append(f"Query: {query[:100]}\nResults: (0 results)")
+        r1_context = "\n\n".join(r1_summary_parts[:5])
+
+        anomaly_descriptions = "\n".join(
+            f"- {p.get('anomaly_id', '?')}: {p.get('anomaly_description', '')[:80]}"
+            for p in packet_dicts[:5]
+        )
+        refine_prompt = T2_GATHER_REFINE_PROMPT.format(
+            anomaly_descriptions=anomaly_descriptions,
+            round1_results=r1_context,
+        )
+
+        r2_queries: list[str] = []
+        try:
+            refine_result = self.ollama.generate(
+                self.config.ollama_model_fast,
+                refine_prompt,
+                think=False,
+                temperature=0.0,
+            )
+            raw = refine_result.text.strip()
+            parsed = json.loads(raw) if raw.startswith("{") else {}
+            follow_ups = parsed.get("follow_up_queries", [])
+            if isinstance(follow_ups, list):
+                r2_queries = [q for q in follow_ups if isinstance(q, str) and _valid_logql(q)][:3]
+        except Exception as e:
+            logger.warning("T2 Round 2 gap-analysis failed, proceeding with Round 1 only: %s", e)
+
+        r2_results = self._execute_logql_queries(r2_queries, start_ns, end_ns, lines_per_query) if r2_queries else {}
+
+        all_queries = r1_queries + r2_queries
+        combined = {**r1_results, **r2_results}
+        return all_queries, combined
+
     def _execute_logql_queries(
-        self, queries: list[str], start_ns: int, end_ns: int
+        self, queries: list[str], start_ns: int, end_ns: int, limit: int = 50
     ) -> dict[str, list[dict]]:
         results = {}
         for query in queries:
             try:
-                lines = self.loki.query_lines(query, start_ns, end_ns, limit=50)
+                lines = self.loki.query_lines(query, start_ns, end_ns, limit=limit)
                 results[query] = lines
             except Exception as e:
                 logger.debug("T2 LogQL execute failed (%s): %s", query[:60], e)

@@ -334,6 +334,32 @@ Based on all of the above, respond with this JSON schema exactly:
 """
 
 
+# ── v3: T2 Round 2 gap-analysis prompt ───────────────────────────────────────
+
+T2_GATHER_REFINE_PROMPT = """\
+You are a log analysis assistant. You have just executed LogQL queries to investigate anomalies in a SimHub iRacing plugin.
+
+ANOMALIES UNDER INVESTIGATION:
+{anomaly_descriptions}
+
+ROUND 1 QUERY RESULTS:
+{round1_results}
+
+Given the Round 1 query results above, identify what evidence is MISSING to conclusively determine the root cause.
+
+Return JSON only:
+{{"follow_up_queries": ["<logql_query1>", "<logql_query2>", "<logql_query3>"]}}
+
+Rules:
+- Max 3 follow-up queries
+- Focus on gaps: if Round 1 found errors but no stack traces, query for stack traces
+- If Round 1 found nothing, try broader queries with different stream labels
+- Valid streams: app="sim-steward", app="claude-dev-logging", app="claude-token-metrics"
+- Use only valid LogQL syntax
+- Return ONLY the JSON object, no other text\
+"""
+
+
 # ── v3: T3 synthesis prompts ─────────────────────────────────────────────────
 
 T3_SYSTEM = """\
