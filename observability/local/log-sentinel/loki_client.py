@@ -65,6 +65,32 @@ class LokiClient:
         except Exception:
             return []
 
+    def get_t2_since(self, since_ts_ns: int) -> list[dict]:
+        """Return up to 50 sentinel_t2_investigation entries logged after since_ts_ns."""
+        end_ns = self.now_ns()
+        logql = '{app="sim-steward"} | json | event="sentinel_t2_investigation"'
+        try:
+            resp = requests.get(
+                f"{self.base_url}/loki/api/v1/query_range",
+                params={"query": logql, "start": str(since_ts_ns), "end": str(end_ns), "limit": 50, "direction": "forward"},
+                timeout=self.timeout,
+            )
+            if resp.status_code != 200:
+                logger.warning("get_t2_since: Loki returned %d", resp.status_code)
+                return []
+            entries = []
+            for stream in resp.json().get("data", {}).get("result", []):
+                for pair in stream.get("values", []):
+                    if len(pair) >= 2:
+                        try:
+                            entries.append(json.loads(pair[1]))
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+            return entries
+        except Exception as e:
+            logger.warning("get_t2_since error: %s", e)
+            return []
+
     # ── Push API ──
 
     def push(self, entry: dict, env: str = "local"):

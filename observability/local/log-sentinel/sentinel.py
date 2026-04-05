@@ -67,6 +67,7 @@ class Sentinel:
         )
 
         self._cycle_num = 0
+        self._last_t3_run_ns: int = 0
         self._trigger_dedup: dict[str, float] = {}  # alertname → last trigger time.time()
         self._stats = {
             "cycles_completed": 0,
@@ -230,14 +231,21 @@ class Sentinel:
             return
         logger.info("T3 cycle starting (mode=%s)", self.config.sentinel_mode)
         try:
-            result = self.t3_agent.run(trigger="scheduled")
-            self._stats["last_t3_run_ts"] = int(time.time())
-            logger.info(
-                "T3 cycle complete: %d sessions, regression=%s, %dms",
-                result.sessions_analyzed, result.regression_detected, result.inference_duration_ms,
-            )
+            new_t2_findings = self.loki.get_t2_since(self._last_t3_run_ns)
+            if not new_t2_findings:
+                logger.info("T3: no new T2 findings since last run, updating baselines only")
+                self.baseline.compute_and_save()
+            else:
+                result = self.t3_agent.run(trigger="scheduled")
+                self._stats["last_t3_run_ts"] = int(time.time())
+                logger.info(
+                    "T3 cycle complete: %d sessions, regression=%s, %dms",
+                    result.sessions_analyzed, result.regression_detected, result.inference_duration_ms,
+                )
         except Exception as e:
             logger.error("T3 cycle error: %s", e)
+        finally:
+            self._last_t3_run_ns = int(time.time() * 1e9)
 
     def trigger_cycle(
         self,
