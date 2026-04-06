@@ -24,6 +24,6 @@
   "devDependencies": {
     "@secretlint/secretlint-rule-preset-recommend": "^11.4.0",
     "dotenv-cli": "^7.4.4",
-    "secretlint": "^11.4.0"
+    "secretlint": "^11.6.0"
   }
 }
