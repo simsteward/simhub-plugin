@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "claude-cache-context",
-  "title": "Claude Code — Cache & Context Health",
+  "title": "Claude Code \u00e2\u20ac\u201d Cache & Context Health",
   "description": "Cache hit rates, context pressure signals, per-turn token burn, and token budget analysis for Claude Code sessions.",
   "tags": [
     "claude-code",
@@ -120,7 +120,7 @@
     {
       "id": 1,
       "title": "Context from Cache",
-      "description": "% of all context tokens served from cache. >90% is expected — Claude Code reuses a large context window across turns. Every turn hits the cache; this measures how well the cache is being utilized vs fresh input.",
+      "description": "% of all context tokens served from cache. >90% is expected \u00e2\u20ac\u201d Claude Code reuses a large context window across turns. Every turn hits the cache; this measures how well the cache is being utilized vs fresh input.",
       "type": "gauge",
       "gridPos": {
         "x": 0,
@@ -353,7 +353,7 @@
     },
     {
       "id": 4,
-      "title": "Cache Reuse Ratio",
+      "title": "Cache Efficiency %",
       "type": "stat",
       "gridPos": {
         "x": 18,
@@ -395,7 +395,7 @@
             "uid": "__expr__"
           },
           "type": "math",
-          "expression": "$B / $A",
+          "expression": "$B / ($B + $A) * 100",
           "hide": false
         }
       ],
@@ -432,18 +432,26 @@
                 "color": "#f72585"
               },
               {
-                "value": 2,
-                "color": "#c77dff"
+                "value": 30,
+                "color": "#ffd166"
               },
               {
-                "value": 5,
+                "value": 60,
                 "color": "#00d4aa"
+              },
+              {
+                "value": 85,
+                "color": "#c77dff"
               }
             ]
-          }
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         },
         "overrides": []
-      }
+      },
+      "description": "Canonical: cache_read / (cache_read + cache_creation) * 100. What fraction of cache-related tokens were served from cache (cheap) vs freshly written to cache (full price)."
     },
     {
       "type": "row",
@@ -947,7 +955,7 @@
     {
       "id": 11,
       "title": "Per-Turn Token Flow (excl. Cache Read)",
-      "description": "Tokens spent per turn: input, output, and cache creation. Cache Read is excluded — it dominates the scale and is shown separately in Cache Trend above.",
+      "description": "Tokens spent per turn: input, output, and cache creation. Cache Read is excluded \u00e2\u20ac\u201d it dominates the scale and is shown separately in Cache Trend above.",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
