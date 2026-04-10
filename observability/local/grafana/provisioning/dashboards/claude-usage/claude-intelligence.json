@@ -3034,6 +3034,225 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 901,
+      "title": "Output Tokens per $1",
+      "description": "How many output tokens per dollar of API compute cost. Canonical ratio: sum(total_output_tokens) / sum(cost_usd). Higher = more efficient.",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 106,
+        "w": 6,
+        "h": 6
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A / $B",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#c77dff"
+              },
+              {
+                "value": 1000,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 5000,
+                "color": "#ffd166"
+              },
+              {
+                "value": 20000,
+                "color": "#f72585"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Output tok / $1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 902,
+      "title": "Cache Efficiency",
+      "description": "Canonical: cache_read / (cache_read + cache_creation) * 100. Higher = better cache reuse, less generation cost.",
+      "type": "gauge",
+      "gridPos": {
+        "x": 6,
+        "y": 106,
+        "w": 6,
+        "h": 6
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_creation_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A / ($A + $B) * 100",
+          "hide": false
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "thresholds",
+        "displayMode": "gradient",
+        "minVizWidth": 75,
+        "minVizHeight": 75
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#f72585"
+              },
+              {
+                "value": 30,
+                "color": "#ffd166"
+              },
+              {
+                "value": 60,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 85,
+                "color": "#c77dff"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Cache Efficiency %"
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "annotations": {
