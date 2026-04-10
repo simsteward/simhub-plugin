@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Log-sentinel v3 — T1 triage (qwen3:8b, 5min), T2 investigation (qwen3:32b, 15min), T3 synthesis (qwen3:32b, 2h). Token counts, inference timing, and tool call traces.",
+  "description": "Log-sentinel v3 \u00e2\u20ac\u201d T1 triage (qwen3:8b, 5min), T2 investigation (qwen3:32b, 15min), T3 synthesis (qwen3:32b, 2h). Token counts, inference timing, and tool call traces.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -882,7 +882,8 @@
       ],
       "title": "Tokens per Call (output + input by tier)",
       "type": "timeseries",
-      "interval": "1h"
+      "interval": "1h",
+      "description": "Sentinel (Ollama) \u2014 local LLM, not billed. Field name is output_tokens (not total_output_tokens). Not comparable to Claude API token metrics."
     },
     {
       "datasource": {
@@ -966,9 +967,10 @@
           "refId": "C"
         }
       ],
-      "title": "Inference Speed — Tokens / Second by Tier",
+      "title": "Inference Speed \u00e2\u20ac\u201d Tokens / Second by Tier",
       "type": "timeseries",
-      "interval": "1h"
+      "interval": "1h",
+      "description": "Sentinel (Ollama) \u2014 local LLM, not billed. Field name is output_tokens (not total_output_tokens). Not comparable to Claude API token metrics."
     },
     {
       "datasource": {
@@ -1028,7 +1030,8 @@
         }
       ],
       "title": "T1 Avg tok/s",
-      "type": "stat"
+      "type": "stat",
+      "description": "Sentinel (Ollama) \u2014 local LLM, not billed. Field name is output_tokens (not total_output_tokens). Not comparable to Claude API token metrics."
     },
     {
       "datasource": {
@@ -1088,7 +1091,8 @@
         }
       ],
       "title": "T2 Avg tok/s",
-      "type": "stat"
+      "type": "stat",
+      "description": "Sentinel (Ollama) \u2014 local LLM, not billed. Field name is output_tokens (not total_output_tokens). Not comparable to Claude API token metrics."
     },
     {
       "datasource": {
@@ -1148,7 +1152,8 @@
         }
       ],
       "title": "T1 Total Output Tokens",
-      "type": "stat"
+      "type": "stat",
+      "description": "Sentinel (Ollama) \u2014 local LLM, not billed. Field name is output_tokens (not total_output_tokens). Not comparable to Claude API token metrics."
     },
     {
       "datasource": {
@@ -1208,7 +1213,8 @@
         }
       ],
       "title": "T2 Total Output Tokens",
-      "type": "stat"
+      "type": "stat",
+      "description": "Sentinel (Ollama) \u2014 local LLM, not billed. Field name is output_tokens (not total_output_tokens). Not comparable to Claude API token metrics."
     },
     {
       "datasource": {
@@ -1268,7 +1274,8 @@
         }
       ],
       "title": "T3 Total Output Tokens",
-      "type": "stat"
+      "type": "stat",
+      "description": "Sentinel (Ollama) \u2014 local LLM, not billed. Field name is output_tokens (not total_output_tokens). Not comparable to Claude API token metrics."
     },
     {
       "collapsed": false,
@@ -2300,7 +2307,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SimSteward — Log Sentinel v3",
+  "title": "SimSteward \u00e2\u20ac\u201d Log Sentinel v3",
   "uid": "simsteward-log-sentinel",
   "version": 1
 }
