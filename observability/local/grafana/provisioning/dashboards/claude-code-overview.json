@@ -95,7 +95,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json session_id | session_id=~\"$session_id\" | unwrap cost_usd [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json session_id | __error__=\"\" | session_id=~\"$session_id\" | unwrap cost_usd [$__interval]))",
           "legendFormat": "Cost",
           "queryType": "range"
         }
@@ -112,7 +112,9 @@
         },
         "reduceOptions": {
           "values": false,
-          "calcs": ["sum"],
+          "calcs": [
+            "sum"
+          ],
           "fields": ""
         }
       },
@@ -127,9 +129,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "value": null, "color": "#73BF69" },
-              { "value": 5, "color": "#FF9830" },
-              { "value": 20, "color": "#F2495C" }
+              {
+                "value": null,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 5,
+                "color": "#c77dff"
+              },
+              {
+                "value": 20,
+                "color": "#f72585"
+              }
             ]
           }
         },
@@ -158,7 +169,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__interval]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__interval]))",
           "legendFormat": "Tool Calls",
           "queryType": "range"
         }
@@ -186,14 +197,14 @@
           "noValue": "0",
           "color": {
             "mode": "fixed",
-            "fixedColor": "#5794F2"
+            "fixedColor": "#7c6ff7"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "value": null,
-                "color": "#5794F2"
+                "color": "#7c6ff7"
               }
             ]
           }
@@ -223,7 +234,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | session_id=~\"$session_id\" [$__interval]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | __error__=\"\" | session_id=~\"$session_id\" [$__interval]))",
           "legendFormat": "Errors",
           "queryType": "range"
         }
@@ -257,15 +268,15 @@
             "steps": [
               {
                 "value": null,
-                "color": "#73BF69"
+                "color": "#00d4aa"
               },
               {
                 "value": 1,
-                "color": "#FF9830"
+                "color": "#c77dff"
               },
               {
                 "value": 5,
-                "color": "#F2495C"
+                "color": "#f72585"
               }
             ]
           }
@@ -295,7 +306,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"subagent-start\" [$__interval]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type=\"subagent-start\" [$__interval]))",
           "legendFormat": "Agents",
           "queryType": "range"
         }
@@ -323,14 +334,14 @@
           "noValue": "0",
           "color": {
             "mode": "fixed",
-            "fixedColor": "#B877D9"
+            "fixedColor": "#ffd166"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "value": null,
-                "color": "#B877D9"
+                "color": "#ffd166"
               }
             ]
           }
@@ -360,7 +371,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"user-prompt-submit\" [$__interval]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type=\"user-prompt-submit\" [$__interval]))",
           "legendFormat": "Prompts",
           "queryType": "range"
         }
@@ -388,14 +399,14 @@
           "noValue": "0",
           "color": {
             "mode": "fixed",
-            "fixedColor": "#8AB8FF"
+            "fixedColor": "#4cc9f0"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "value": null,
-                "color": "#8AB8FF"
+                "color": "#4cc9f0"
               }
             ]
           }
@@ -425,7 +436,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"permission-request\" [$__interval]))",
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type=\"permission-request\" [$__interval]))",
           "legendFormat": "Permissions",
           "queryType": "range"
         }
@@ -453,14 +464,14 @@
           "noValue": "0",
           "color": {
             "mode": "fixed",
-            "fixedColor": "#FF9830"
+            "fixedColor": "#c77dff"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "value": null,
-                "color": "#FF9830"
+                "color": "#c77dff"
               }
             ]
           }
@@ -502,7 +513,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (tool_name) (rate({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" [$__interval]) * 60)",
+          "expr": "sum by (tool_name) (rate({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" [$__interval]) * 60)",
           "legendFormat": "{{tool_name}}",
           "queryType": "range"
         }
@@ -516,8 +527,8 @@
           ]
         },
         "tooltip": {
-          "mode": "single",
-          "sort": "desc"
+          "mode": "multi",
+          "sort": "none"
         }
       },
       "fieldConfig": {
@@ -527,23 +538,25 @@
           },
           "unit": "calls/min",
           "custom": {
-            "drawStyle": "line",
+            "drawStyle": "bars",
             "lineWidth": 1,
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
+            "fillOpacity": 85,
+            "gradientMode": "none",
             "showPoints": "never",
             "barAlignment": 0,
-            "spanNulls": true,
+            "spanNulls": false,
             "axisBorderShow": false,
             "stacking": {
-              "mode": "normal",
-              "group": "A"
+              "group": "A",
+              "mode": "normal"
             },
-            "lineInterpolation": "smooth"
+            "lineInterpolation": "smooth",
+            "barMaxWidth": 50
           }
         },
         "overrides": []
-      }
+      },
+      "interval": "1h"
     },
     {
       "type": "row",
@@ -578,7 +591,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (component) (count_over_time({app=\"claude-dev-logging\"} | json session_id | session_id=~\"$session_id\" [$__interval]))",
+          "expr": "sum by (component) (count_over_time({app=\"claude-dev-logging\"} | json session_id | __error__=\"\" | session_id=~\"$session_id\" [$__interval]))",
           "legendFormat": "{{component}}",
           "queryType": "range"
         }
@@ -624,7 +637,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#5794F2",
+                  "fixedColor": "#7c6ff7",
                   "mode": "fixed"
                 }
               }
@@ -639,7 +652,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#B877D9",
+                  "fixedColor": "#ffd166",
                   "mode": "fixed"
                 }
               }
@@ -654,7 +667,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#8AB8FF",
+                  "fixedColor": "#4cc9f0",
                   "mode": "fixed"
                 }
               }
@@ -669,7 +682,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#FF6D00",
+                  "fixedColor": "#ff9de2",
                   "mode": "fixed"
                 }
               }
@@ -684,7 +697,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#73BF69",
+                  "fixedColor": "#00d4aa",
                   "mode": "fixed"
                 }
               }
@@ -699,7 +712,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#FF9830",
+                  "fixedColor": "#c77dff",
                   "mode": "fixed"
                 }
               }
@@ -731,7 +744,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (hook_type) (count_over_time({app=\"claude-dev-logging\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type != \"\" [$__range])) / ignoring(hook_type) group_left() sum(count_over_time({app=\"claude-dev-logging\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type != \"\" [$__range])) * 100",
+          "expr": "sum by (hook_type) (count_over_time({app=\"claude-dev-logging\"} | json hook_type, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type != \"\" [$__range])) / ignoring(hook_type) group_left() sum(count_over_time({app=\"claude-dev-logging\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type != \"\" [$__range])) * 100",
           "legendFormat": "{{hook_type}}",
           "queryType": "range"
         }
@@ -855,7 +868,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (short_name) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" | line_format \"{{.tool_name}}\" | regexp \"(?:mcp__)?(?P<short_name>.*)\" [$__range]))",
+          "expr": "sum by (short_name) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, tool_name, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" | tool_name != \"\" | line_format \"{{.tool_name}}\" | regexp \"(?:mcp__)?(?P<short_name>.*)\" [$__range]))",
           "legendFormat": "{{short_name}}",
           "queryType": "range"
         }
@@ -980,7 +993,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (hook_type) (count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type != \"\" [$__range]))",
+          "expr": "sum by (hook_type) (count_over_time({app=\"claude-dev-logging\", component=\"agent\"} | json hook_type, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type != \"\" [$__range]))",
           "legendFormat": "{{hook_type}}",
           "queryType": "range"
         }
@@ -1100,7 +1113,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-dev-logging\"} | json hook_type, session_id | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__interval]) * 60)",
+          "expr": "sum(rate({app=\"claude-dev-logging\"} | json hook_type, session_id | __error__=\"\" | session_id=~\"$session_id\" | hook_type=\"post-tool-use\" [$__interval]) * 60)",
           "legendFormat": "Tool Calls",
           "queryType": "range"
         },
@@ -1110,7 +1123,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | session_id=~\"$session_id\" [$__interval]) * 60)",
+          "expr": "sum(rate({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id | __error__=\"\" | session_id=~\"$session_id\" [$__interval]) * 60)",
           "legendFormat": "Errors",
           "queryType": "range"
         }
@@ -1129,14 +1142,19 @@
         "defaults": {
           "unit": "short",
           "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "gradientMode": "opacity",
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 85,
+            "gradientMode": "none",
             "showPoints": "never",
-            "spanNulls": true,
+            "spanNulls": false,
             "axisBorderShow": false,
-            "lineInterpolation": "smooth"
+            "lineInterpolation": "smooth",
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "barMaxWidth": 50
           }
         },
         "overrides": [
@@ -1149,7 +1167,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#5794F2",
+                  "fixedColor": "#7c6ff7",
                   "mode": "fixed"
                 }
               }
@@ -1164,7 +1182,7 @@
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "#F2495C",
+                  "fixedColor": "#f72585",
                   "mode": "fixed"
                 }
               },
@@ -1175,7 +1193,8 @@
             ]
           }
         ]
-      }
+      },
+      "interval": "1h"
     },
     {
       "type": "row",
@@ -1210,7 +1229,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | hook_type=\"post-tool-use\" [$__range]))",
+          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", component=~\"tool|mcp-.*\"} | json hook_type, session_id | __error__=\"\" | hook_type=\"post-tool-use\" [$__range]))",
           "legendFormat": "{{session_id}}",
           "queryType": "range"
         }
@@ -1272,7 +1291,7 @@
                 "id": "color",
                 "value": {
                   "mode": "fixed",
-                  "fixedColor": "#5794F2"
+                  "fixedColor": "#7c6ff7"
                 }
               }
             ]
@@ -1318,7 +1337,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json session_id [$__range]))",
+          "expr": "sum by (session_id) (count_over_time({app=\"claude-dev-logging\", level=\"ERROR\"} | json | __error__=\"\" session_id [$__range]))",
           "legendFormat": "{{session_id}}",
           "queryType": "range"
         }
@@ -1380,7 +1399,7 @@
                 "id": "color",
                 "value": {
                   "mode": "fixed",
-                  "fixedColor": "#F2495C"
+                  "fixedColor": "#f72585"
                 }
               }
             ]
@@ -1402,6 +1421,330 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "type": "row",
+      "id": 50,
+      "title": "Burn Rate — $/hr & Tokens/min",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 51,
+      "title": "Avg $/hour (This Session)",
+      "description": "API-equivalent spending rate per hour for the selected time range.",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 51,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap cost_usd [$__range])) * 3600",
+          "legendFormat": "$/hr",
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 0.01,
+                "color": "#c77dff"
+              },
+              {
+                "value": 0.1,
+                "color": "#f72585"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 52,
+      "title": "Avg $/minute",
+      "description": "API-equivalent spending rate per minute for the selected time range.",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 51,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap cost_usd [$__range])) * 60",
+          "legendFormat": "$/min",
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 5,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 0.001,
+                "color": "#c77dff"
+              },
+              {
+                "value": 0.01,
+                "color": "#f72585"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 53,
+      "title": "Output Tokens/min",
+      "description": "Claude output token generation rate per minute.",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 51,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap total_output_tokens [$__range])) * 60",
+          "legendFormat": "tokens/min",
+          "queryType": "instant"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 500,
+                "color": "#ffd166"
+              },
+              {
+                "value": 2000,
+                "color": "#f72585"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 54,
+      "title": "Total Tokens/min",
+      "description": "Input + output token rate per minute.",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 51,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap total_input_tokens [$__range])) * 60",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap total_output_tokens [$__range])) * 60",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A + $B",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value",
+        "text": {
+          "titleSize": 12,
+          "valueSize": 36
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 1000,
+                "color": "#ffd166"
+              },
+              {
+                "value": 5000,
+                "color": "#f72585"
+              }
+            ]
+          }
+        },
+        "overrides": []
       }
     }
   ]

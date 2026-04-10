@@ -3,6 +3,8 @@ auth_enabled: false
 server:
   http_listen_port: 3100
   grpc_listen_port: 9096
+  grpc_server_max_send_msg_size: 33554432   # 32MB (default 4MB hits on 30d range queries)
+  grpc_server_max_recv_msg_size: 33554432   # 32MB
 
 common:
   path_prefix: /loki

@@ -17,7 +17,8 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [1h])'
+              # Per-turn cost entries: sum by session_id to get session total, then take max across sessions
+              expr: 'max(sum by (session_id) (sum_over_time({app="claude-token-metrics"} | json session_id | unwrap cost_usd [1h])))'
               instant: true
               refId: A
           - refId: B
@@ -51,7 +52,7 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [1h])'
+              expr: 'max(sum by (session_id) (sum_over_time({app="claude-token-metrics"} | json session_id | unwrap cost_usd [1h])))'
               instant: true
               refId: A
           - refId: B
@@ -85,7 +86,7 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'sum_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [24h])'
+              expr: 'sum(sum_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [24h]))'
               instant: true
               refId: A
           - refId: B
@@ -119,7 +120,7 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'sum_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [24h])'
+              expr: 'sum(sum_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [24h]))'
               instant: true
               refId: A
           - refId: B
@@ -153,7 +154,8 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap tool_calls [1h])'
+              # Sum tool_use_count per session, take max — tool_use_count is the per-turn tool call count
+              expr: 'max(sum by (session_id) (sum_over_time({app="claude-token-metrics"} | json session_id | unwrap tool_use_count [1h])))'
               instant: true
               refId: A
           - refId: B
@@ -221,7 +223,8 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'avg_over_time({app="claude-token-metrics"} | json | unwrap cache_read_ratio [1h])'
+              # Compute cache read ratio inline: cache_read / (cache_read + cache_creation + fresh_input)
+              expr: 'sum(sum_over_time({app="claude-token-metrics"} | json | unwrap total_cache_read_tokens [1h])) / (sum(sum_over_time({app="claude-token-metrics"} | json | unwrap total_cache_read_tokens [1h])) + sum(sum_over_time({app="claude-token-metrics"} | json | unwrap total_cache_creation_tokens [1h])) + sum(sum_over_time({app="claude-token-metrics"} | json | unwrap total_input_tokens [1h])))'
               instant: true
               refId: A
           - refId: B

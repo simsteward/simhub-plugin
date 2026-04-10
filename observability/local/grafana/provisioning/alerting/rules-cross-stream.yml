@@ -186,7 +186,7 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" [15m])'
+              expr: 'count_over_time({app="sim-steward"} | json | event=~"plugin_ready|plugin_started|bridge_starting" [15m])'
               instant: true
               refId: C
           - refId: D
@@ -227,7 +227,8 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap cost_usd [1h])'
+              # Sum cost per session, take max across sessions
+              expr: 'max(sum by (session_id) (sum_over_time({app="claude-token-metrics"} | json session_id | unwrap cost_usd [1h])))'
               instant: true
               refId: A
           - refId: B
@@ -236,7 +237,8 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'max_over_time({app="claude-token-metrics"} | json | unwrap tool_calls [1h])'
+              # Sum tool_use_count per session, take max
+              expr: 'max(sum by (session_id) (sum_over_time({app="claude-token-metrics"} | json session_id | unwrap tool_use_count [1h])))'
               instant: true
               refId: B
           - refId: C

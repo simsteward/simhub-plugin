@@ -17,7 +17,7 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" | level="ERROR" [5m])'
+              expr: 'count_over_time({app="sim-steward"} | json | event="bridge_start_failed" [5m])'
               instant: true
               refId: A
           - refId: B
@@ -51,7 +51,7 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" | message=~".*ready.*" [60m])'
+              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_ready" [60m])'
               instant: true
               refId: A
           - refId: B
@@ -153,7 +153,7 @@ groups:
             model:
               datasource: { type: loki, uid: loki_local }
               editorMode: code
-              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_lifecycle" | message=~".*start_duration.*" | __error__="" [5m])'
+              expr: 'count_over_time({app="sim-steward"} | json | event="plugin_started" [5m])'
               instant: true
               refId: A
           - refId: B
