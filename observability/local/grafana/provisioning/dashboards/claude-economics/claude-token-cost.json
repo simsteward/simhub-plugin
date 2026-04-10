@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "claude-token-cost",
-  "title": "Claude Code — Token & Cost Intelligence",
+  "title": "Claude Code \u00e2\u20ac\u201d Token & Cost Intelligence",
   "description": "Token usage, cost tracking, cache economics, and model efficiency for Claude Code sessions.",
   "tags": [
     "claude-code",
@@ -366,7 +366,7 @@
     {
       "id": 4,
       "title": "Projected Monthly",
-      "description": "API-equivalent projected monthly cost at current rate. This is NOT your actual bill — you pay a flat monthly plan fee. Above your plan cost = you're saving money vs pay-as-you-go API pricing.",
+      "description": "API-equivalent projected monthly cost at current rate. This is NOT your actual bill \u00e2\u20ac\u201d you pay a flat monthly plan fee. Above your plan cost = you're saving money vs pay-as-you-go API pricing.",
       "type": "stat",
       "gridPos": {
         "x": 18,
@@ -676,7 +676,7 @@
     {
       "id": 23,
       "title": "Plan ROI",
-      "description": "API-equivalent retail cost ÷ your plan cost. 1× = break-even. 5× = got 5× your money's worth. Updates when you change the Plan dropdown.",
+      "description": "API-equivalent retail cost \u00c3\u00b7 your plan cost. 1\u00c3\u2014 = break-even. 5\u00c3\u2014 = got 5\u00c3\u2014 your money's worth. Updates when you change the Plan dropdown.",
       "type": "stat",
       "gridPos": {
         "x": 18,
@@ -1177,7 +1177,7 @@
     {
       "id": 9,
       "title": "Context from Cache",
-      "description": "% of all context tokens served from cache. High values are expected — Claude Code reuses a large context window. Every turn hits the cache; this measures token efficiency, not request hit rate.",
+      "description": "% of all context tokens served from cache. High values are expected \u00e2\u20ac\u201d Claude Code reuses a large context window. Every turn hits the cache; this measures token efficiency, not request hit rate.",
       "type": "gauge",
       "gridPos": {
         "x": 0,
@@ -1344,7 +1344,7 @@
     {
       "id": 11,
       "title": "Cache Trend",
-      "description": "Cache Read vs Cache Creation tokens per interval. Cache Creation (right axis) is orders of magnitude smaller — dual axes show both trends clearly.",
+      "description": "Cache Read vs Cache Creation tokens per interval. Cache Creation (right axis) is orders of magnitude smaller \u00e2\u20ac\u201d dual axes show both trends clearly.",
       "type": "timeseries",
       "gridPos": {
         "x": 16,
@@ -1787,7 +1787,7 @@
     {
       "id": 26,
       "title": "Token Usage by Type",
-      "description": "Token consumption by type per interval. Context (cache reads) dominates — that's Claude reusing its persistent context window. Output includes extended thinking tokens when thinking mode is on.",
+      "description": "Token consumption by type per interval. Context (cache reads) dominates \u00e2\u20ac\u201d that's Claude reusing its persistent context window. Output includes extended thinking tokens when thinking mode is on.",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
@@ -2509,7 +2509,7 @@
     {
       "id": 213,
       "title": "Daily Spend Rate",
-      "description": "API-equivalent retail spend rate extrapolated to a full 24 hours at current usage pace. Compare to your plan's daily budget (plan cost ÷ 30) to see if you're on track.",
+      "description": "API-equivalent retail spend rate extrapolated to a full 24 hours at current usage pace. Compare to your plan's daily budget (plan cost \u00c3\u00b7 30) to see if you're on track.",
       "type": "stat",
       "gridPos": {
         "x": 12,
@@ -2875,7 +2875,7 @@
     {
       "id": 2162,
       "title": "P99 Turn Cost",
-      "description": "99th percentile — tail cost. Agentic runaway turns show up here.",
+      "description": "99th percentile \u00e2\u20ac\u201d tail cost. Agentic runaway turns show up here.",
       "type": "stat",
       "gridPos": {
         "x": 22,
@@ -2948,7 +2948,7 @@
     {
       "id": 220,
       "type": "row",
-      "title": "Burn Rate — $/hr & Tokens/min",
+      "title": "Burn Rate \u00e2\u20ac\u201d $/hr & Tokens/min",
       "description": "How fast you are spending at API-equivalent rates. Rate queries average over the selected time window.",
       "collapsed": false,
       "gridPos": {
@@ -3397,7 +3397,7 @@
           },
           "queryType": "range",
           "expr": "avg by (effort) (avg_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval])) * 1000",
-          "legendFormat": "Cost ×1000 USD ({{effort}})"
+          "legendFormat": "Cost \u00c3\u20141000 USD ({{effort}})"
         }
       ],
       "options": {
@@ -3475,9 +3475,9 @@
     },
     {
       "id": 502,
-      "title": "Cache Savings Estimate ($/day)",
+      "title": "Cache Read Tokens \u2014 Daily",
+      "description": "Tokens served from cache per day. Cache reads cost ~10x less than generating new tokens. This is your compute avoided \u2014 not expressed in dollars because the saving depends on model pricing.",
       "type": "timeseries",
-      "description": "Estimated cost savings from cache reads. Cache read tokens cost ~10% of normal input tokens. Savings = (input_rate - cache_read_rate) × cache_read_tokens. Sonnet-4: ~$2.70/M saved per cache read token.",
       "gridPos": {
         "x": 16,
         "y": 250,
@@ -3496,9 +3496,9 @@
             "type": "loki",
             "uid": "loki_local"
           },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__interval]))",
           "queryType": "range",
-          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__interval])) / 1000000 * 2.70",
-          "legendFormat": "~Saved {{model}}"
+          "legendFormat": "Cache Read Tokens / Day"
         }
       ],
       "options": {
@@ -3514,20 +3514,19 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD",
-          "decimals": 3,
+          "unit": "short",
+          "decimals": 0,
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#00d4aa"
           },
           "custom": {
             "drawStyle": "bars",
             "lineWidth": 1,
-            "fillOpacity": 70,
+            "fillOpacity": 80,
             "gradientMode": "none",
             "spanNulls": false,
-            "stacking": {
-              "mode": "normal"
-            }
+            "barMaxWidth": 60
           }
         },
         "overrides": []
@@ -3714,7 +3713,7 @@
           },
           "queryType": "range",
           "expr": "avg(avg_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval])) * 100",
-          "legendFormat": "Avg Cost ×100 USD"
+          "legendFormat": "Avg Cost \u00c3\u2014100 USD"
         }
       ],
       "options": {
@@ -3761,7 +3760,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Avg Cost ×100 USD"
+              "options": "Avg Cost \u00c3\u2014100 USD"
             },
             "properties": [
               {
