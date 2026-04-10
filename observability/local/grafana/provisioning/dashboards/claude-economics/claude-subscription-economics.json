@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "claude-subscription-economics",
-  "title": "Claude AI — Subscription Economics",
+  "title": "Claude AI \u00e2\u20ac\u201d Subscription Economics",
   "description": "True compute cost vs plan cost vs VC subsidy. Shows what you'd pay at API retail rates, what your plan costs (prorated), and how much Anthropic investors are absorbing. Set time range to 30d for monthly comparison. Adjust \"Billing Days\" variable to match your selected range.",
   "tags": [
     "claude-code",
@@ -234,7 +234,7 @@
     {
       "id": 2,
       "title": "Your Plan Cost (Prorated)",
-      "description": "Your flat Claude subscription cost prorated to the selected time window. Formula: plan_monthly / 30 × billing_days. Adjust the \"Billing Days\" variable to match your selected time range.",
+      "description": "Your flat Claude subscription cost prorated to the selected time window. Formula: plan_monthly / 30 \u00c3\u2014 billing_days. Adjust the \"Billing Days\" variable to match your selected time range.",
       "type": "stat",
       "gridPos": {
         "x": 4,
@@ -434,7 +434,7 @@
     {
       "id": 4,
       "title": "Subsidy Multiplier",
-      "description": "API retail cost ÷ prorated plan cost. 1.0 = break even. 3.6 = you got $3.60 of compute per $1 paid. Higher = more VC subsidy.",
+      "description": "API retail cost \u00c3\u00b7 prorated plan cost. 1.0 = break even. 3.6 = you got $3.60 of compute per $1 paid. Higher = more VC subsidy.",
       "type": "stat",
       "gridPos": {
         "x": 12,
@@ -544,7 +544,7 @@
     },
     {
       "id": 5,
-      "title": "You Pay (¢ per $1 API)",
+      "title": "You Pay (\u00c2\u00a2 per $1 API)",
       "description": "Your plan cost as a percentage of API retail cost. 28% = you paid 28 cents for every $1 of compute. Lower % = bigger VC subsidy.",
       "type": "stat",
       "gridPos": {
@@ -656,7 +656,7 @@
     {
       "id": 6,
       "title": "Annualized VC Subsidy",
-      "description": "If current subsidy rate continued for a full year. (True Cost − Plan Cost) / billing_days × 365.",
+      "description": "If current subsidy rate continued for a full year. (True Cost \u00e2\u02c6\u2019 Plan Cost) / billing_days \u00c3\u2014 365.",
       "type": "stat",
       "gridPos": {
         "x": 20,
@@ -879,7 +879,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "What You Pay/Day (plan÷30)"
+                "value": "What You Pay/Day (plan\u00c3\u00b730)"
               },
               {
                 "id": "custom.drawStyle",
@@ -973,7 +973,7 @@
       "id": 102,
       "type": "row",
       "title": "Where the Subsidy Comes From",
-      "description": "Which models, effort levels, and projects generate the most API cost — and therefore the most VC subsidy.",
+      "description": "Which models, effort levels, and projects generate the most API cost \u00e2\u20ac\u201d and therefore the most VC subsidy.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1033,7 +1033,7 @@
     {
       "id": 21,
       "title": "API Cost by Effort Level",
-      "description": "High/Max effort sessions use extended thinking and generate more tokens — these are your biggest subsidy sources.",
+      "description": "High/Max effort sessions use extended thinking and generate more tokens \u00e2\u20ac\u201d these are your biggest subsidy sources.",
       "type": "barchart",
       "gridPos": {
         "x": 6,
@@ -1307,7 +1307,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "What You Pay/Week (plan÷4)"
+                "value": "What You Pay/Week (plan\u00c3\u00b74)"
               },
               {
                 "id": "custom.drawStyle",
@@ -1338,7 +1338,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Weekly Gap (API − Plan Budget)"
+                "value": "Weekly Gap (API \u00e2\u02c6\u2019 Plan Budget)"
               },
               {
                 "id": "color",
@@ -1361,7 +1361,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Weekly Gap (API − Plan Budget)"
+                "value": "Weekly Gap (API \u00e2\u02c6\u2019 Plan Budget)"
               },
               {
                 "id": "color",
@@ -1395,7 +1395,7 @@
     {
       "id": 30,
       "title": "Plan Value Claimed (%)",
-      "description": "API-retail cost as % of monthly plan cost. 100% = you broke even. 350% = VCs covered 2.5x your plan. Higher is more subsidy — not a problem.",
+      "description": "API-retail cost as % of monthly plan cost. 100% = you broke even. 350% = VCs covered 2.5x your plan. Higher is more subsidy \u00e2\u20ac\u201d not a problem.",
       "type": "gauge",
       "gridPos": {
         "x": 0,
@@ -1818,7 +1818,7 @@
     {
       "id": 104,
       "type": "row",
-      "title": "Token Opportunity — Missed Usage Forecast",
+      "title": "Token Opportunity \u00e2\u20ac\u201d Missed Usage Forecast",
       "description": "Are you using your plan's full value? The \"Missed Usage\" chart shows days you left plan value on the table vs days VCs covered you.",
       "collapsed": false,
       "gridPos": {
@@ -2131,7 +2131,7 @@
     },
     {
       "id": 43,
-      "title": "Missed Usage Opportunity — Daily Gap",
+      "title": "Missed Usage Opportunity \u00e2\u20ac\u201d Daily Gap",
       "description": "Purple bars = daily API cost (true compute). Pink line = daily plan budget (plan/30). Yellow bars = daily plan value NOT consumed (positive = under-utilizing). Purple above line = VC-subsidized day. Use this to see when you are leaving plan value on the table vs when VCs are covering you.",
       "type": "timeseries",
       "gridPos": {
@@ -2315,7 +2315,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "## What Would Claude Cost Without VC Funding?\n\nWithout Anthropic's $7.3B in investor capital, you would pay **retail API prices** directly — exactly what the \"True Cost (API Retail)\" stat shows above.\n\n**Anthropic's actual economics (2024–2025):**\n- Gross margin: **−94% in 2024** → investors covered $0.94 of every $1 of API revenue in compute costs\n- Annual investor burn: ~**$3 billion** keeping inference prices below true cost\n- Max plan subscribers consumed **$1,000–$5,000/day** at API retail vs $100/month subscription\n- Your **Subsidy Multiplier** tells you: for every $1 you paid, how many $1 of API compute did you receive?\n\n**The subsidy shrinks over time:**\n- Hardware efficiency + model compression drops inference cost ~**10x per year**\n- Anthropic projects **77% gross margin by 2028** — API retail prices will reflect true cost by then\n- When that happens, subscription plans will either cost more or throttle heavy users\n\n**Bottom line:** The gap between \"True Cost\" and \"Your Plan Cost\" is exactly what VC capital is absorbing right now. The \"Missed Usage Opportunity\" chart shows which days you left plan value on the table vs which days VCs covered your compute.",
+        "content": "## What Would Claude Cost Without VC Funding?\n\nWithout Anthropic's $7.3B in investor capital, you would pay **retail API prices** directly \u00e2\u20ac\u201d exactly what the \"True Cost (API Retail)\" stat shows above.\n\n**Anthropic's actual economics (2024\u00e2\u20ac\u201c2025):**\n- Gross margin: **\u00e2\u02c6\u201994% in 2024** \u00e2\u2020\u2019 investors covered $0.94 of every $1 of API revenue in compute costs\n- Annual investor burn: ~**$3 billion** keeping inference prices below true cost\n- Max plan subscribers consumed **$1,000\u00e2\u20ac\u201c$5,000/day** at API retail vs $100/month subscription\n- Your **Subsidy Multiplier** tells you: for every $1 you paid, how many $1 of API compute did you receive?\n\n**The subsidy shrinks over time:**\n- Hardware efficiency + model compression drops inference cost ~**10x per year**\n- Anthropic projects **77% gross margin by 2028** \u00e2\u20ac\u201d API retail prices will reflect true cost by then\n- When that happens, subscription plans will either cost more or throttle heavy users\n\n**Bottom line:** The gap between \"True Cost\" and \"Your Plan Cost\" is exactly what VC capital is absorbing right now. The \"Missed Usage Opportunity\" chart shows which days you left plan value on the table vs which days VCs covered your compute.",
         "code": {
           "language": "plaintext",
           "showLineNumbers": false
@@ -2657,7 +2657,7 @@
     },
     {
       "id": 47,
-      "title": "Weekly Opportunity Gap — API Cost vs Plan Budget",
+      "title": "Weekly Opportunity Gap \u00e2\u20ac\u201d API Cost vs Plan Budget",
       "description": "Purple bars = weekly API cost. Pink line = weekly plan budget (plan/4). Yellow bars = weekly unused plan value (positive = under-utilized that week). Stacked above pink = VC subsidy week.",
       "type": "timeseries",
       "gridPos": {
@@ -2767,7 +2767,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "What You Pay/Week (plan÷4)"
+                "value": "What You Pay/Week (plan\u00c3\u00b74)"
               },
               {
                 "id": "custom.drawStyle",
@@ -2810,6 +2810,534 @@
               {
                 "id": "custom.fillOpacity",
                 "value": 40
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "Raw Token Consumption",
+      "description": "How many tokens your plan is buying you. Token counts are model-agnostic.",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 106,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 201,
+      "title": "Total Tokens Consumed",
+      "description": "Total input + output tokens in the selected window. Cache tokens excluded. Your raw compute footprint.",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 107,
+        "w": 4,
+        "h": 6
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A + $B",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#4895ef"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#4895ef"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Total Tokens"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 202,
+      "title": "Output Tokens per $1 of Plan",
+      "description": "How many output tokens your plan dollar buys. Formula: sum(output_tokens) / (plan_monthly / 30 * billing_days). Token purchasing power.",
+      "type": "stat",
+      "gridPos": {
+        "x": 4,
+        "y": 107,
+        "w": 4,
+        "h": 6
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A * 0 + ${plan_monthly_cost} / 30 * ${billing_days}",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A / $B",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#c77dff"
+              },
+              {
+                "value": 500,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 2000,
+                "color": "#ffd166"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Output tok / $1 plan"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 203,
+      "title": "Total Tokens per $1 of Plan",
+      "description": "Input + output tokens per dollar of plan cost. Total compute footprint per plan dollar.",
+      "type": "stat",
+      "gridPos": {
+        "x": 8,
+        "y": 107,
+        "w": 4,
+        "h": 6
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range]))",
+          "queryType": "instant",
+          "hide": true
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "$A * 0 + ${plan_monthly_cost} / 30 * ${billing_days}",
+          "hide": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "type": "math",
+          "expression": "($A + $B) / $D",
+          "hide": false
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#c77dff"
+              },
+              {
+                "value": 1000,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 5000,
+                "color": "#ffd166"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Total tok / $1 plan"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 204,
+      "title": "Token Velocity \u2014 Tokens / Hour",
+      "description": "Total token throughput (input + output) per hour. Shows WHEN you consume compute. Spikes = heavy sessions.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 113,
+        "w": 14,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__interval])) * 3600",
+          "queryType": "range",
+          "legendFormat": "Input tok/hr"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__interval])) * 3600",
+          "queryType": "range",
+          "legendFormat": "Output tok/hr"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input tok/hr"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#4895ef"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output tok/hr"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f4a261"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 205,
+      "title": "Input vs Output Token Split",
+      "description": "Output tokens cost 3-5x more than input per token. A high output share = higher cost per total token.",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 14,
+        "y": 113,
+        "w": 10,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "interval": "1d",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "Input Tokens"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__interval]))",
+          "queryType": "range",
+          "legendFormat": "Output Tokens"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "barMaxWidth": 60
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Input Tokens"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#4895ef"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Output Tokens"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f4a261"
+                }
               }
             ]
           }
