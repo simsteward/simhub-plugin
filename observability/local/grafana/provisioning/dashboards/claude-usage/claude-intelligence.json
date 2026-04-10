@@ -114,6 +114,18 @@
         "multi": false,
         "skipUrlSync": false,
         "description": "Your Claude subscription tier. Controls plan cost used in ROI panel. Set CLAUDE_PLAN_TYPE env var in hooks to match."
+      },
+      {
+        "name": "billing_days",
+        "label": "Billing Days in Range",
+        "type": "textbox",
+        "query": "30",
+        "current": {
+          "text": "30",
+          "value": "30"
+        },
+        "hide": 0,
+        "description": "Days in selected time range. Used to prorate plan cost. Default 30 = full month."
       }
     ]
   },
@@ -272,7 +284,7 @@
     {
       "id": 3,
       "title": "Plan ROI",
-      "description": "API-equivalent retail cost \u00c3\u00b7 your plan cost. 1\u00c3\u2014 = break-even. 5\u00c3\u2014 = got 5\u00c3\u2014 your money\u00e2\u20ac\u2122s worth. Change the Plan dropdown to match your tier.",
+      "description": "API retail cost as a multiple of your prorated plan cost. 1.0 = break even. 3.5 = you got $3.50 of compute per $1 paid. Adjust Billing Days to match your time range.",
       "type": "stat",
       "gridPos": {
         "x": 12,
@@ -303,7 +315,7 @@
             "uid": "__expr__"
           },
           "type": "math",
-          "expression": "$A * 0 + ${plan_monthly_cost}",
+          "expression": "$A * 0 + ${plan_monthly_cost} / 30 * ${billing_days}",
           "hide": true
         },
         {
