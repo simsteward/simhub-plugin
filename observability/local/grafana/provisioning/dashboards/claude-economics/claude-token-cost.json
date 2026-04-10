@@ -260,7 +260,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -574,7 +574,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -769,9 +769,9 @@
       }
     },
     {
-      "id": 24,
-      "title": "API Cost Per Session",
-      "description": "API-equivalent retail cost per session over time. Each spike = one session. Compare cumulative spend to your plan cost to see when you break even for the month.",
+      "id": 25,
+      "title": "Total Cost Over Time",
+      "description": "Total API cost across all sessions. Broken into 6-hour buckets.",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
@@ -791,94 +791,7 @@
             "uid": "loki_local"
           },
           "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
-          "legendFormat": "API Cost",
-          "queryType": "range"
-        }
-      ],
-      "transformations": [],
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "currencyUSD",
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#ffd166"
-          },
-          "custom": {
-            "drawStyle": "bars",
-            "lineInterpolation": "smooth",
-            "fillOpacity": 85,
-            "gradientMode": "none",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "USD",
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "dashed"
-            },
-            "barMaxWidth": 50
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "value": null,
-                "color": "transparent"
-              },
-              {
-                "value": 100,
-                "color": "#f72585"
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "interval": "6h"
-    },
-    {
-      "id": 25,
-      "title": "Session Cost — 7-Day Rolling Average",
-      "description": "Each bar = API-equivalent cost for that interval. Blue dashed line = 7-day rolling average — rising line means heavier usage trend, falling means lighter.",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 21,
-        "w": 24,
-        "h": 8
-      },
-      "datasource": {
-        "type": "loki",
-        "uid": "loki_local"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "loki_local"
-          },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
-          "legendFormat": "Session Cost",
+          "legendFormat": "Total Cost",
           "queryType": "range"
         }
       ],
@@ -1863,7 +1776,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -2726,7 +2639,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }

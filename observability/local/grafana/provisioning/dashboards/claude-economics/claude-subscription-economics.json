@@ -299,7 +299,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -398,7 +398,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               },
               {
                 "value": 0,
@@ -509,7 +509,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               },
               {
                 "value": 1,
@@ -632,7 +632,7 @@
               },
               {
                 "value": 10,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -731,7 +731,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               },
               {
                 "value": 0,
@@ -1450,7 +1450,7 @@
         },
         "orientation": "auto",
         "textMode": "auto",
-        "colorMode": "thresholds",
+        "colorMode": "background-gradient",
         "graphMode": "none",
         "justifyMode": "center",
         "displayMode": "gradient",
@@ -1471,7 +1471,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               },
               {
                 "value": 50,
@@ -1586,7 +1586,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               },
               {
                 "value": 50,
@@ -1914,7 +1914,7 @@
               },
               {
                 "value": 30,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -2404,7 +2404,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               },
               {
                 "value": 0,
@@ -2515,7 +2515,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               },
               {
                 "value": 0,
@@ -2634,7 +2634,7 @@
               },
               {
                 "value": 30,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }

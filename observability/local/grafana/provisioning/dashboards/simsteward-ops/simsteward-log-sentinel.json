@@ -55,10 +55,10 @@
       "id": 1,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "text": {
           "titleSize": 11,
           "valueSize": 32
@@ -80,7 +80,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_cycle\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T1 Cycles"
         }
       ],
       "title": "T1 Cycles",
@@ -118,10 +119,10 @@
       "id": 2,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "text": {
           "titleSize": 11,
           "valueSize": 32
@@ -143,7 +144,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_t2_investigation\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T2 Investigations"
         }
       ],
       "title": "T2 Investigations",
@@ -181,10 +183,10 @@
       "id": 3,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "text": {
           "titleSize": 11,
           "valueSize": 32
@@ -206,7 +208,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_synthesis\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T3 Syntheses"
         }
       ],
       "title": "T3 Syntheses",
@@ -252,10 +255,10 @@
       "id": 4,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "text": {
           "titleSize": 11,
           "valueSize": 32
@@ -277,7 +280,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | level=\"ERROR\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Analyst Errors"
         }
       ],
       "title": "Analyst Errors",
@@ -315,10 +319,10 @@
       "id": 5,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "text": {
           "titleSize": 11,
           "valueSize": 32
@@ -340,7 +344,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_tool_call\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Tool Calls"
         }
       ],
       "title": "Tool Calls",
@@ -382,10 +387,10 @@
       "id": 6,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "text": {
           "titleSize": 11,
           "valueSize": 32
@@ -407,7 +412,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_tool_call\" | success=\"false\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Tool Call Failures"
         }
       ],
       "title": "Tool Call Failures",
@@ -563,7 +569,8 @@
           "editorMode": "code",
           "expr": "max(max_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap duration_ms [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T1 Max Duration"
         }
       ],
       "title": "T1 Max Duration",
@@ -631,7 +638,8 @@
           "editorMode": "code",
           "expr": "max(max_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_t2_investigation\" | unwrap inference_duration_ms [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T2 Max Inference"
         }
       ],
       "title": "T2 Max Inference",
@@ -699,7 +707,8 @@
           "editorMode": "code",
           "expr": "max(max_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_synthesis\" | unwrap inference_duration_ms [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T3 Max Inference"
         }
       ],
       "title": "T3 Max Inference",
@@ -759,7 +768,8 @@
           "editorMode": "code",
           "expr": "max(max_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_t2_investigation\" | unwrap logql_gather_duration_ms [$__range])) / 1000",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T2 Max Gather Time"
         }
       ],
       "title": "T2 Max Gather Time",
@@ -995,7 +1005,7 @@
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -1013,7 +1023,8 @@
           "editorMode": "code",
           "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap tokens_per_sec [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T1 Avg tok/s"
         }
       ],
       "title": "T1 Avg tok/s",
@@ -1054,7 +1065,7 @@
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -1072,7 +1083,8 @@
           "editorMode": "code",
           "expr": "avg(avg_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_t2_investigation\" | unwrap tokens_per_sec [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T2 Avg tok/s"
         }
       ],
       "title": "T2 Avg tok/s",
@@ -1113,7 +1125,7 @@
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1131,7 +1143,8 @@
           "editorMode": "code",
           "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap total_output_tokens [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T1 Total Output Tokens"
         }
       ],
       "title": "T1 Total Output Tokens",
@@ -1172,7 +1185,7 @@
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1190,7 +1203,8 @@
           "editorMode": "code",
           "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_t2_investigation\" | unwrap output_tokens [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T2 Total Output Tokens"
         }
       ],
       "title": "T2 Total Output Tokens",
@@ -1231,7 +1245,7 @@
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1249,7 +1263,8 @@
           "editorMode": "code",
           "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_synthesis\" | unwrap output_tokens [$__range]))",
           "queryType": "instant",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T3 Total Output Tokens"
         }
       ],
       "title": "T3 Total Output Tokens",
@@ -1537,10 +1552,10 @@
       "id": 41,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1558,7 +1573,8 @@
           "editorMode": "code",
           "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap anomaly_count [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Total Anomalies"
         }
       ],
       "title": "Total Anomalies",
@@ -1596,10 +1612,10 @@
       "id": 42,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1617,7 +1633,8 @@
           "editorMode": "code",
           "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap needs_t2_count [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T2 Escalations"
         }
       ],
       "title": "T2 Escalations",
@@ -1655,10 +1672,10 @@
       "id": 43,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1676,7 +1693,8 @@
           "editorMode": "code",
           "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap invocation_count [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Invocations Analyzed"
         }
       ],
       "title": "Invocations Analyzed",
@@ -1714,10 +1732,10 @@
       "id": 44,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1735,7 +1753,8 @@
           "editorMode": "code",
           "expr": "sum(sum_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_analyst_run\" | tier=\"t1\" | unwrap evidence_packet_count [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Evidence Packets"
         }
       ],
       "title": "Evidence Packets",
@@ -1863,10 +1882,10 @@
       "id": 51,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1884,7 +1903,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_t2_investigation\" | sentry_worthy=\"true\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Sentry-worthy Findings"
         }
       ],
       "title": "Sentry-worthy Findings",
@@ -1926,10 +1946,10 @@
       "id": 52,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1947,7 +1967,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_synthesis\" | regression_detected=\"True\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "T3 Regressions Detected"
         }
       ],
       "title": "T3 Regressions Detected",
@@ -1985,10 +2006,10 @@
       "id": 53,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -2006,7 +2027,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_sentry_issue\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Sentry Issues Created"
         }
       ],
       "title": "Sentry Issues Created",
@@ -2044,10 +2066,10 @@
       "id": 54,
       "options": {
         "colorMode": "background-gradient",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
-        "textMode": "value",
+        "textMode": "value_and_name",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -2065,7 +2087,8 @@
           "editorMode": "code",
           "expr": "sum(count_over_time({component=\"log-sentinel\"} | json | __error__=\"\" | event=\"sentinel_threshold_recommendation\" [$__range]))",
           "queryType": "range",
-          "refId": "A"
+          "refId": "A",
+          "legendFormat": "Threshold Recommendations"
         }
       ],
       "title": "Threshold Recommendations",

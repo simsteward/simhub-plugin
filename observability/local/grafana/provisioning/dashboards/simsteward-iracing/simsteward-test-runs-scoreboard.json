@@ -1,0 +1,646 @@
+{
+  "uid": "simsteward-test-runs-scoreboard",
+  "title": "SimSteward — Test Runs Scoreboard",
+  "description": "At-a-glance quality scoreboard across all test stages. Dense top stat row + compressed trend rows.",
+  "tags": [
+    "simsteward",
+    "testing",
+    "iracing",
+    "scoreboard"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "title": "Test Run Drill-Down",
+      "url": "/d/simsteward-test-runs",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": false,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ],
+  "panels": [
+
+    {
+      "id": 200,
+      "type": "row",
+      "title": "Overall Health",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 1,
+      "title": "Runs Completed",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_suite_complete\" [$__range]))",
+          "legendFormat": "Runs Completed"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "fixed", "fixedColor": "#c77dff" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#c77dff" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 2,
+      "title": "Cancelled %",
+      "type": "stat",
+      "gridPos": { "x": 3, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_suite_cancelled\" [$__range])) / sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_suite_started\" [$__range])) * 100",
+          "legendFormat": "Cancelled %"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#00d4aa" },
+              { "value": 1,    "color": "#f72585" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 3,
+      "title": "T1 Det % @1x",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_speed_sample\" | json detection_rate_pct=\"fields.detection_rate_pct\", requested_speed=\"fields.requested_speed\" | requested_speed=\"1\" | unwrap detection_rate_pct [$__range]))",
+          "legendFormat": "T1 Det% @1x"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#f72585" },
+              { "value": 60,   "color": "#ffd166" },
+              { "value": 85,   "color": "#00d4aa" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "T1 Det % @16x",
+      "type": "stat",
+      "gridPos": { "x": 9, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_speed_sample\" | json detection_rate_pct=\"fields.detection_rate_pct\", requested_speed=\"fields.requested_speed\" | requested_speed=\"16\" | unwrap detection_rate_pct [$__range]))",
+          "legendFormat": "T1 Det% @16x"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#f72585" },
+              { "value": 30,   "color": "#ffd166" },
+              { "value": 60,   "color": "#00d4aa" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 5,
+      "title": "T7 Perfect Reseek %",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_incident_reseek\" | json matches_within_60_frames=\"fields.matches_within_60_frames\" | matches_within_60_frames=\"3\" [$__range])) / sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_incident_reseek\" [$__range])) * 100",
+          "legendFormat": "T7 Perfect Reseek %"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#f72585" },
+              { "value": 67,   "color": "#ffd166" },
+              { "value": 100,  "color": "#00d4aa" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 6,
+      "title": "T8 Index Success %",
+      "type": "stat",
+      "gridPos": { "x": 15, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_ff_sweep_result\" | json used_draft_rows=\"fields.used_draft_rows\" | used_draft_rows=\"false\" [$__range])) / sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_ff_sweep_result\" [$__range])) * 100",
+          "legendFormat": "T8 Index Success %"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#f72585" },
+              { "value": 100,  "color": "#00d4aa" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 7,
+      "title": "T5b Camera Match %",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "sum(sum_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_camera_view_summary\" | json confirmed_matches=\"fields.confirmed_matches\" | unwrap confirmed_matches [$__range])) / sum(sum_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_camera_view_summary\" | json groups_tested=\"fields.groups_tested\" | unwrap groups_tested [$__range])) * 100",
+          "legendFormat": "T5b Camera Match %"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#f72585" },
+              { "value": 100,  "color": "#00d4aa" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 8,
+      "title": "Preflight Pass %",
+      "type": "stat",
+      "gridPos": { "x": 21, "y": 1, "w": 3, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_preflight_check\" | json all_passed=\"fields.all_passed\" | all_passed=\"true\" [$__range])) / sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_preflight_check\" [$__range])) * 100",
+          "legendFormat": "Preflight Pass %"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#f72585" },
+              { "value": 100,  "color": "#00d4aa" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 201,
+      "type": "row",
+      "title": "Detection Rate Trends",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 10,
+      "title": "T1 Detection Rate % by Speed",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "interval": "6h",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "range",
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_speed_sample\" | json detection_rate_pct=\"fields.detection_rate_pct\", requested_speed=\"fields.requested_speed\" | requested_speed=\"1\" | unwrap detection_rate_pct [$__interval]))",
+          "legendFormat": "1x"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "range",
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_speed_sample\" | json detection_rate_pct=\"fields.detection_rate_pct\", requested_speed=\"fields.requested_speed\" | requested_speed=\"4\" | unwrap detection_rate_pct [$__interval]))",
+          "legendFormat": "4x"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "range",
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_speed_sample\" | json detection_rate_pct=\"fields.detection_rate_pct\", requested_speed=\"fields.requested_speed\" | requested_speed=\"8\" | unwrap detection_rate_pct [$__interval]))",
+          "legendFormat": "8x"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "range",
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_speed_sample\" | json detection_rate_pct=\"fields.detection_rate_pct\", requested_speed=\"fields.requested_speed\" | requested_speed=\"16\" | unwrap detection_rate_pct [$__interval]))",
+          "legendFormat": "16x"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "1x" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#00d4aa" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "4x" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "8x" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#ffd166" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "16x" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } }
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": 202,
+      "type": "row",
+      "title": "Reliability Trends",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 11,
+      "title": "T7 Reseek Pass Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 15, "w": 8, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "interval": "6h",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "range",
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_incident_reseek\" | json matches_within_60_frames=\"fields.matches_within_60_frames\" | matches_within_60_frames=\"3\" [$__interval])) / sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_incident_reseek\" [$__interval])) * 100",
+          "legendFormat": "Perfect Reseek %"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "fixed", "fixedColor": "#c77dff" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 12,
+      "title": "T8 Index Success Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 15, "w": 8, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "interval": "6h",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "range",
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_ff_sweep_result\" | json used_draft_rows=\"fields.used_draft_rows\" | used_draft_rows=\"false\" [$__interval])) / sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_ff_sweep_result\" [$__interval])) * 100",
+          "legendFormat": "Index Success %"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "fixed", "fixedColor": "#ffd166" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 13,
+      "title": "T5b Camera Match Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 15, "w": 8, "h": 6 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "interval": "6h",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "queryType": "range",
+          "expr": "sum(sum_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_camera_view_summary\" | json confirmed_matches=\"fields.confirmed_matches\" | unwrap confirmed_matches [$__interval])) / sum(sum_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"sdk_capture_camera_view_summary\" | json groups_tested=\"fields.groups_tested\" | unwrap groups_tested [$__interval])) * 100",
+          "legendFormat": "Camera Match %"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "fixed", "fixedColor": "#00d4aa" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 203,
+      "type": "row",
+      "title": "Recent Run Log",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 }
+    },
+
+    {
+      "id": 20,
+      "title": "Recent Suite Events",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki_local" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki_local" },
+          "expr": "{app=\"sim-steward\"} | json | __error__=\"\" | event=~\"sdk_capture_suite_complete|sdk_capture_suite_cancelled|sdk_capture_suite_started\"",
+          "legendFormat": "",
+          "maxLines": 5
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    }
+
+  ]
+}

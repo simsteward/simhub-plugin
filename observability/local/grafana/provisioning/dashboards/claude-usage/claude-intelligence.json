@@ -188,7 +188,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -1584,7 +1584,7 @@
             "steps": [
               {
                 "value": null,
-                "color": "#7c6ff7"
+                "color": "#c77dff"
               }
             ]
           }
@@ -2722,6 +2722,300 @@
               {
                 "value": 2000,
                 "color": "#f72585"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 400,
+      "type": "row",
+      "title": "User Engagement — Think Time",
+      "description": "How long the user pauses to review Claude's output before sending the next prompt. Measured from last session-stop to next user-prompt-submit. Longer = more deliberate review.",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 90,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 401,
+      "title": "Avg Think Time",
+      "description": "Average pause between Claude completing a turn and the user sending the next prompt. Higher values suggest the user is spending more time reading/reviewing output.",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 91,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "avg_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, user_think_time_ms, project | __error__=\"\" | hook_type=\"user-prompt-submit\" | user_think_time_ms > 0 | project=~\"$project\" | unwrap user_think_time_ms [$__range])",
+          "queryType": "instant",
+          "legendFormat": "Avg Think Time"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 30000,
+                "color": "#ffd166"
+              },
+              {
+                "value": 120000,
+                "color": "#c77dff"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 402,
+      "title": "Median Think Time",
+      "description": "P50 pause duration. More robust than avg — not skewed by long overnight gaps.",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": {
+        "x": 8,
+        "y": 91,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "quantile_over_time(0.5, {app=\"claude-dev-logging\", component=\"user\"} | json hook_type, user_think_time_ms, project | __error__=\"\" | hook_type=\"user-prompt-submit\" | user_think_time_ms > 0 | project=~\"$project\" | unwrap user_think_time_ms [$__range])",
+          "queryType": "instant",
+          "legendFormat": "Median Think Time"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#00d4aa"
+              },
+              {
+                "value": 30000,
+                "color": "#ffd166"
+              },
+              {
+                "value": 120000,
+                "color": "#c77dff"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 403,
+      "title": "Prompts Measured",
+      "description": "Number of user prompts where think time was captured (requires a prior completed Claude turn in the same session).",
+      "type": "stat",
+      "transparent": true,
+      "gridPos": {
+        "x": 16,
+        "y": 91,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "sum(count_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, user_think_time_ms, project | __error__=\"\" | hook_type=\"user-prompt-submit\" | user_think_time_ms > 0 | project=~\"$project\" [$__range]))",
+          "queryType": "instant",
+          "legendFormat": "Prompts"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "text": {
+          "titleSize": 11,
+          "valueSize": 28
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#4a9eff"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 404,
+      "title": "Think Time Per Prompt Over Time",
+      "description": "Each data point = one user-prompt-submit event with a measured think time. Spikes indicate the user paused longer to review Claude's output before responding. A rising trend signals more deliberate, careful engagement.",
+      "type": "timeseries",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 96,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki_local"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki_local"
+          },
+          "expr": "max_over_time({app=\"claude-dev-logging\", component=\"user\"} | json hook_type, user_think_time_ms, project | __error__=\"\" | hook_type=\"user-prompt-submit\" | user_think_time_ms > 0 | project=~\"$project\" | unwrap user_think_time_ms [$__interval])",
+          "queryType": "range",
+          "legendFormat": "Think Time"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#c77dff"
+          },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 5,
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "spanNulls": false,
+            "showPoints": "always"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "#c77dff"
               }
             ]
           }
