@@ -177,6 +177,9 @@ namespace SimSteward.Plugin
         [JsonProperty("resultsPopulated")]
         public bool ResultsPopulated { get; set; }
 
+        [JsonProperty("seekTargetFrame")]
+        public int SeekTargetFrame { get; set; }
+
         [JsonProperty("error")]
         public string Error { get; set; }
 

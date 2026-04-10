@@ -78,12 +78,20 @@ namespace SimSteward.Plugin
         public const int IncidentFlagMask = 0x80000 | 0x100000;   // furled | repair
         /// <summary>Ticks to wait after ReplaySearch(NextIncident) before reading frame/car data (~2.5 s at 60 Hz).</summary>
         public const int NextIncidentCooldownTicks = 150;
+        /// <summary>Reduced cooldown used during T0 scan when replay is at 1x speed (~1 s at 60 Hz).</summary>
+        public const int T0_PlayModeCooldownTicks = 60;
+        /// <summary>Max total NextIncident calls during T0 scan (includes non-player incidents).</summary>
+        public const int T0_ScanMaxCalls = 60;
+        /// <summary>Minimum T1 sweep frame target — ensures a meaningful baseline even when GT incidents are early in replay.</summary>
+        public const int T1_MinSweepFrames = 18_000; // ~5 min of 1x replay at 60 Hz
         /// <summary>Ticks to wait after CamSwitchPos before reading CamCarIdx (~1 s at 60 Hz).</summary>
         public const int CamSettleTicks = 60;
         /// <summary>Consecutive ticks with ReplayFrameNum ≤ 2 required to confirm frame-zero stability.</summary>
         public const int FrameZeroStableTicks = 4;
         /// <summary>Max ticks to wait for frame-zero before giving up.</summary>
         public const int SeekTimeoutTicks = 600;
+        /// <summary>Max ticks per T1 speed-sweep pass before advancing (~60s at 60Hz). Prevents 30-min runs on long replays at 1x.</summary>
+        public const int SweepTimeoutTicks = 3600;
 
         // ── T0 scan/select constants ──────────────────────────────────────────
         /// <summary>Max NextIncident calls during the T0 incident scan pass.</summary>
@@ -111,6 +119,7 @@ namespace SimSteward.Plugin
         public const string Event60HzSummary        = "sdk_capture_60hz_summary";
         public const string EventPreflightCheck     = "sdk_capture_preflight_check";
         public const string EventPreflightProbe     = "sdk_capture_preflight_probe";
+        public const string EventPreflightL2Seek    = "sdk_capture_preflight_l2_seek";
     }
 
     /// <summary>T0 incident selection algorithm — testable outside SIMHUB_SDK.</summary>

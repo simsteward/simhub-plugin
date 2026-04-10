@@ -72,7 +72,9 @@ namespace SimSteward.Plugin
         /// </summary>
         public static string BuildTestRunQuery(string testRunId, string eventName = null)
         {
-            var q = $"{{app=\"sim-steward\"}}|json|test_run_id=\"{testRunId}\"";
+            // test_run_id is nested under "fields" in LogEntry, so Loki flattens it to fields_test_run_id after |json.
+            // event is a top-level LogEntry property, accessible directly after |json.
+            var q = $"{{app=\"sim-steward\"}}|json|fields_test_run_id=\"{testRunId}\"";
             if (!string.IsNullOrEmpty(eventName))
                 q += $"|event=\"{eventName}\"";
             return q;
@@ -94,7 +96,7 @@ namespace SimSteward.Plugin
         public static string BuildGrafanaExploreUrl(string grafanaBaseUrl, string testRunId, string eventName)
         {
             if (string.IsNullOrEmpty(grafanaBaseUrl) || string.IsNullOrEmpty(testRunId)) return "";
-            var logql = $"{{app=\"sim-steward\"}} |json |test_run_id=\"{testRunId}\"";
+            var logql = $"{{app=\"sim-steward\"}} |json |fields_test_run_id=\"{testRunId}\"";
             if (!string.IsNullOrEmpty(eventName))
                 logql += $" |event=\"{eventName}\"";
             var exprJson = Newtonsoft.Json.JsonConvert.SerializeObject(logql);

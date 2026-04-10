@@ -10,8 +10,10 @@ namespace SimSteward.Plugin
     {
         private readonly object _replayIndexBuildLock = new object();
         private ReplayIndexBuildPhase _replayIndexBuildPhase = ReplayIndexBuildPhase.Idle;
+        private DateTime _lastTelemetryTickUtc = DateTime.MinValue;
         private volatile bool _replayIndexStartRequested;
         private volatile bool _replayIndexCancelRequested;
+        private volatile bool _replayIndexFfComplete;
         private int _replayIndexSavedReplayFrame;
         private int _replayIndexFrameZeroConsecutive;
         private int _replayIndexSeekTelemetryTicks;
@@ -49,6 +51,7 @@ namespace SimSteward.Plugin
         {
             if (_irsdk == null || !_irsdk.IsConnected || _logger == null)
                 return;
+            _lastTelemetryTickUtc = DateTime.UtcNow;
 
             try
             {
@@ -462,7 +465,15 @@ namespace SimSteward.Plugin
                     LogReplayIncidentIndexDetectionsLocked(tick, replaySessionTimeSec);
                 }
 
-                return;
+                // Fallback: force FF completion if IsReplayPlaying never becomes false.
+                // ReplayFrameNumEnd is session-relative (returns 1), so we can't use it.
+                // Instead cap by sample count: 90,000 ticks ≈ 1500s wall clock ≈ 24,000s
+                // of session time at 16x (covers races up to ~6.5h). Only fires after a
+                // minimum FF duration so the replay has had time to play through.
+                if (_replayIndexFfTelemetrySampleCount > 90000)
+                    playing = false; // fall through to completion handling
+                else
+                    return;
             }
 
             int rfn = SafeGetInt("ReplayFrameNum");
@@ -527,6 +538,8 @@ namespace SimSteward.Plugin
             _replayIndexCamMatches = 0;
             _replayIndexCamAttempted = 0;
 
+            _replayIndexFfComplete = true;
+            _logger?.Warn($"[T8_DIAG] FF complete: ffComplete=true camRows={_replayIndexCamRows?.Count ?? -1} transitioning={((_replayIndexCamRows != null && _replayIndexCamRows.Count > 0) ? "CameraValidating" : "Finalize")}");
             if (_replayIndexCamRows != null && _replayIndexCamRows.Count > 0)
                 _replayIndexBuildPhase = ReplayIndexBuildPhase.CameraValidating;
             else
@@ -552,6 +565,7 @@ namespace SimSteward.Plugin
 
         private void ClearReplayIndexBuildTransientLocked()
         {
+            _replayIndexFfComplete = false;
             _replayIndexFfWallClock = null;
             _replayIndexBuildTotalWallClock = null;
             _replayIndexIncidentSamples.Clear();

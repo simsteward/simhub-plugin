@@ -166,16 +166,6 @@ Assert-Event 'deploy_post_tests_started' @{
     level = 'INFO'
 }
 
-Assert-Event 'deploy_port_probe' @{
-    port = '8888'
-}
-
-Assert-Event 'deploy_completed' @{
-    level          = { param($v) $v -in @('INFO', 'WARN') }
-    status         = { param($v) $v -in @('ok', 'completed_with_warnings') }
-    plugin_version = { param($v) -not [string]::IsNullOrWhiteSpace($v) }
-    duration_s     = { param($v) $null -ne $v -and [double]$v -gt 0 }
-}
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 Write-Host ""

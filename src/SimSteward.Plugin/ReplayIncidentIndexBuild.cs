@@ -12,7 +12,7 @@ namespace SimSteward.Plugin
         public const int CarSlotCount = 64;
 
         /// <summary>Default fast-forward multiplier (TR-008); tune empirically.</summary>
-        public const int DefaultFastForwardPlaySpeed = 16;
+        public const int DefaultFastForwardPlaySpeed = 32;
 
         /// <summary>Consecutive telemetry samples with <c>ReplayFrameNum == 0</c> before baseline (TR-004).</summary>
         public const int FrameZeroStableConsecutiveSamples = 4;

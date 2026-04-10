@@ -201,7 +201,7 @@ namespace SimSteward.Plugin
 
             // Fire-and-forget push to Loki — replaces Alloy file-tailing
             if (!string.IsNullOrEmpty(_lokiUrl) && lokiBatch.Length > 0)
-                LokiPushClient.Push(_lokiUrl, "simsteward", _lokiEnv, lokiBatch);
+                LokiPushClient.Push(_lokiUrl, "sim-steward", _lokiEnv, lokiBatch);
         }
 
         private void AppendToFile(string path, string content, Action rotate)

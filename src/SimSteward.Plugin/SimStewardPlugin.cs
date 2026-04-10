@@ -77,8 +77,10 @@ namespace SimSteward.Plugin
         private string _lokiBaseUrl = "";
         private string _grafanaBaseUrl = "";
         private int _replayFrameNumEnd;
-        /// <summary>Replay length (telemetry <c>ReplayFrameNumEnd</c>); 0 if unknown.</summary>
+        /// <summary>Replay length (telemetry <c>ReplayFrameNumEnd</c>); 0 if unknown. Unreliable — session-relative on some builds.</summary>
         private int _replayFrameTotal;
+        /// <summary>Running maximum of <c>ReplayFrameNum</c> seen this session — reliable proxy for end-of-replay frame.</summary>
+        private int _replayFrameMax;
         private string _currentSessionId = "";
         private string _currentSessionSeq = "";
         /// <summary>Latest iRacing session context for structured logs (WebSocket thread reads; DataUpdate writes).</summary>
@@ -379,6 +381,24 @@ namespace SimSteward.Plugin
             return false;
         }
 
+        private string GetSessionTypeFromYaml()
+        {
+            try
+            {
+                var sessionInfo = _irsdk?.Data?.SessionInfo;
+                if (!(sessionInfo?.SessionInfo?.Sessions is IList list)) return "";
+                foreach (var o in list)
+                {
+                    if (o == null) continue;
+                    var typeProp = o.GetType().GetProperty("SessionType");
+                    var sessionType = typeProp?.GetValue(o)?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(sessionType)) return sessionType;
+                }
+            }
+            catch { }
+            return "";
+        }
+
         private PreflightSessionInfo[] ReadSessionListFromYaml()
         {
             try
@@ -426,10 +446,12 @@ namespace SimSteward.Plugin
         {
             try
             {
-                var drivers = _irsdk?.Data?.SessionInfo?.DriverInfo?.Drivers as IList;
+                var driverInfo = _irsdk?.Data?.SessionInfo?.DriverInfo;
+                var drivers = driverInfo?.Drivers as IList;
                 if (drivers == null)
                     return Array.Empty<object>();
-                var playerIdx = SafeGetInt("PlayerCarIdx");
+                // DriverInfo.DriverCarIdx (session YAML) is the authoritative player-car signal.
+                var playerIdx = driverInfo != null ? driverInfo.DriverCarIdx : SafeGetInt("PlayerCarIdx");
                 var list = new System.Collections.Generic.List<object>();
                 foreach (var d in drivers)
                 {
@@ -1349,6 +1371,7 @@ namespace SimSteward.Plugin
 
                 _replayFrameNumEnd = SafeGetInt("ReplayFrameNum");
                 _replayFrameTotal = SafeGetInt("ReplayFrameNumEnd");
+                if (_replayFrameNumEnd > _replayFrameMax) _replayFrameMax = _replayFrameNumEnd;
                 int subId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
                 int parentId = 0;
                 try
@@ -1394,6 +1417,7 @@ namespace SimSteward.Plugin
                 _pluginMode = "Unknown";
                 _replayFrameNumEnd = 0;
                 _replayFrameTotal = 0;
+                _replayFrameMax = 0;
                 _currentSessionId = "";
                 _currentSessionSeq = "";
                 _logCtxSubsession = SessionLogging.NotInSession;
@@ -1419,6 +1443,15 @@ namespace SimSteward.Plugin
             }
 
             var now = DateTime.UtcNow;
+
+            // Fallback: when iRacing replay is paused/ended, OnTelemetryData stops firing.
+            // Drive the suite/preflight tick from DataUpdate so actions aren't lost.
+            if (_irsdk != null && _irsdk.IsConnected &&
+                (now - _lastTelemetryTickUtc).TotalMilliseconds > 500)
+            {
+                try { ProcessDataCaptureSuiteTick(); } catch { }
+            }
+
             if ((now - _lastBroadcastAt).TotalMilliseconds < BroadcastThrottleMs)
                 return;
             _lastBroadcastAt = now;

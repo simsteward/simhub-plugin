@@ -7,6 +7,7 @@
 <style>
 :root {
   --bg: #060608; --surface: rgba(255,255,255,0.025);
+  --surface-2: rgba(255,255,255,0.038);
   --border: rgba(255,255,255,0.07);
   --border-hover: rgba(255,255,255,0.14);
   --accent: #1f9cff; --green: #0ef272; --red: #ff5f5f; --yellow: #ffc840; --cyan: #0dd8ff;
@@ -22,7 +23,7 @@ html { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparen
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
-.wrap { max-width: 1100px; margin: 0 auto; padding: 18px 20px 36px; display: flex; flex-direction: column; gap: 14px; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 18px 20px 36px; display: flex; flex-direction: column; gap: 10px; }
 .topnav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; padding: 6px 0 2px; }
 .topnav a { color: var(--accent); text-decoration: none; transition: opacity 0.15s; }
 .topnav a:hover { opacity: 0.8; text-decoration: underline; }
@@ -31,7 +32,6 @@ html { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparen
 .ws-pill.bad { color: var(--red);   border-color: rgba(255,95,95,0.3); background: rgba(255,95,95,0.05); }
 .banner { padding: 12px 16px; border-radius: var(--r); border: 1px solid var(--border); background: rgba(255,200,64,0.06); font-size: 0.85rem; line-height: 1.5; }
 .banner.err { border-color: rgba(255,95,95,0.35); background: rgba(255,95,95,0.06); }
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 20px; box-shadow: var(--panel-shadow); transition: border-color 0.3s ease; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
 .row:last-child { margin-bottom: 0; }
 .btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text); font-size: 0.82rem; cursor: pointer; transition: all 0.15s ease; }
@@ -45,6 +45,8 @@ html { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparen
 .btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
 .btn.danger:hover { background: rgba(255,95,95,0.12); }
 .btn.sm { padding: 5px 11px; font-size: 0.72rem; }
+.btn.warn { border-color: var(--yellow); color: var(--yellow); background: rgba(255,200,64,0.08); }
+.btn.warn:hover { background: rgba(255,200,64,0.14); border-color: var(--yellow); }
 .progress-bar-wrap { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
 .progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; }
 .meta { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
@@ -54,111 +56,150 @@ html { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparen
 .running-label { animation: pulse 1.4s ease-in-out infinite; color: var(--accent); }
 input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
-/* ── Step panels ──────────────────────────────────────────────── */
-.step { position: relative; border-left: 2px solid transparent; padding-left: 4px; transition: border-color 0.3s ease, opacity 0.3s ease; }
-.step.active { border-left-color: var(--accent); }
-.step.done   { border-left-color: var(--green); }
-.step.future { opacity: 0.4; pointer-events: none; }
-.step-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 7px; font-weight: 500; }
-.step-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); font-size: 0.62rem; font-weight: 700; color: var(--muted); transition: all 0.3s ease; }
-.step.active .step-num { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 8px rgba(31,156,255,0.2); }
-.step.done .step-num   { border-color: var(--green); color: var(--green); box-shadow: 0 0 8px rgba(14,242,114,0.15); }
+/* ── Zone layout ──────────────────────────────────────────────── */
+.zone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--panel-shadow); transition: border-color 0.3s ease; }
 
-/* Section background gradients */
-.step-bg-1 { background: radial-gradient(at 0% 0%, rgba(31,156,255,0.06) 0%, transparent 50%), var(--surface); }
-.step-bg-2 { background: radial-gradient(at 100% 0%, rgba(14,242,114,0.06) 0%, transparent 50%), var(--surface); }
-.step-bg-3 { background: radial-gradient(at 0% 100%, rgba(13,216,255,0.06) 0%, transparent 50%), var(--surface); }
-.step-bg-4 { background: radial-gradient(at 100% 100%, rgba(255,200,64,0.06) 0%, transparent 50%), var(--surface); }
-.step-bg-5 { background: radial-gradient(at 50% 0%, rgba(189,52,254,0.06) 0%, transparent 60%), var(--surface); }
-.step-bg-6 { background: radial-gradient(at 100% 50%, rgba(14,242,114,0.05) 0%, transparent 55%), var(--surface); }
+/* ── Zone 1: Environment bar ──────────────────────────────────── */
+.env-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 0.76rem;
+  box-shadow: var(--panel-shadow);
+}
+.env-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; flex-shrink: 0; }
+.env-divider { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+.env-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.signals { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.sig { display: flex; align-items: center; gap: 5px; }
+.sig-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex-shrink: 0; transition: all 0.3s ease; box-shadow: 0 0 5px rgba(255,95,95,0.3); }
+.sig-dot.ok { background: var(--green); box-shadow: 0 0 5px rgba(14,242,114,0.3); }
+.sig-dot.warn { background: var(--yellow); box-shadow: 0 0 5px rgba(255,200,64,0.3); }
+.sig-label { color: var(--muted); font-size: 0.7rem; }
 
-/* ── Signals ──────────────────────────────────────────────────── */
-.signals { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 0.78rem; }
-.sig { display: flex; align-items: center; gap: 6px; }
-.sig-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; transition: all 0.3s ease; box-shadow: 0 0 6px rgba(255,95,95,0.3); }
-.sig-dot.ok { background: var(--green); box-shadow: 0 0 6px rgba(14,242,114,0.3); }
-.sig-dot.warn { background: var(--yellow); box-shadow: 0 0 6px rgba(255,200,64,0.3); }
-.sig-label { color: var(--muted); font-size: 0.76rem; }
+/* ── Zone 2: Setup (collapsible 2-col) ────────────────────────── */
+.setup-summary {
+  display: none; align-items: center; gap: 12px;
+  padding: 11px 18px;
+  cursor: pointer; user-select: none;
+  font-size: 0.78rem;
+  border-radius: var(--r);
+  transition: background 0.15s;
+}
+.setup-summary:hover { background: rgba(255,255,255,0.02); }
+.setup-expand-hint { font-size: 0.62rem; color: var(--muted); margin-left: auto; flex-shrink: 0; }
+.setup-content { display: grid; grid-template-columns: 1fr 1fr; }
+@media (max-width: 720px) { .setup-content { grid-template-columns: 1fr; } }
+.setup-left { padding: 18px 20px; border-right: 1px solid var(--border); }
+.setup-right { padding: 18px 20px; }
+.setup-col-hdr { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* ── Precondition card ────────────────────────────────────────── */
-.pc-tests { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
-.pc-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 8px; border: 1px solid transparent; transition: border-color 0.3s, background 0.4s; background: transparent; }
+/* ── Precondition rows ────────────────────────────────────────── */
+.pc-tests { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.pc-row { display: flex; align-items: center; gap: 9px; padding: 5px 10px; border-radius: 8px; border: 1px solid transparent; transition: border-color 0.3s, background 0.4s; }
 .pc-row.running { border-color: rgba(31,156,255,0.25); background: linear-gradient(90deg, rgba(31,156,255,0.08) 0%, rgba(31,156,255,0.03) 60%, transparent 100%); }
 .pc-row.pass { background: rgba(14,242,114,0.05); }
 .pc-row.fail { background: rgba(255,95,95,0.08); border-color: rgba(255,95,95,0.25); }
 .pc-row.skip { background: rgba(255,200,64,0.03); }
-.pc-icon { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; transition: background 0.25s, color 0.25s; }
+.pc-icon { width: 17px; height: 17px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 700; flex-shrink: 0; transition: background 0.25s, color 0.25s; }
 .pc-icon.pending  { background: rgba(255,255,255,0.06); color: var(--muted); }
 .pc-icon.running  { background: rgba(31,156,255,0.15); color: var(--accent); }
 .pc-icon.pass     { background: rgba(14,242,114,0.15); color: var(--green); }
 .pc-icon.fail     { background: rgba(255,95,95,0.15); color: var(--red); }
-.pc-icon.skip     { background: rgba(255,200,64,0.1); color: var(--yellow); }
-.pc-name { font-size: 0.82rem; flex: 1; }
-.pc-level { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.pc-detail { font-size: 0.72rem; color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scope-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.76rem; font-weight: 600; border: 1px solid var(--border); color: var(--muted); opacity: 0.35; transition: opacity 0.3s, border-color 0.3s, color 0.3s, background 0.3s; cursor: default; }
+.pc-icon.skip     { background: rgba(255,200,64,0.1);  color: var(--yellow); }
+.pc-name { font-size: 0.78rem; flex: 1; }
+.pc-level { font-size: 0.58rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.pc-detail { font-size: 0.68rem; color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border); color: var(--muted); opacity: 0.35; transition: opacity 0.3s, border-color 0.3s, color 0.3s, background 0.3s; cursor: default; }
 .scope-badge.active { opacity: 1; border-color: var(--accent); color: var(--accent); background: rgba(99,144,255,0.08); }
 @keyframes spin { to { transform: rotate(360deg); } }
-.pc-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+.pc-spinner { display: inline-block; width: 9px; height: 9px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
 /* ── Filter bar ───────────────────────────────────────────────── */
-.filter-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
-.filter-chip { padding: 5px 13px; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.72rem; cursor: pointer; transition: all 0.15s ease; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 12px; }
+.filter-chip { padding: 4px 11px; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.68rem; cursor: pointer; transition: all 0.15s ease; }
 .filter-chip:hover { border-color: var(--accent); color: var(--text); }
 .filter-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
-.filter-input { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: var(--text); font-size: 0.72rem; outline: none; margin-left: auto; width: 170px; transition: border-color 0.2s, box-shadow 0.2s; }
+.filter-input { padding: 4px 11px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: var(--text); font-size: 0.68rem; outline: none; margin-left: auto; width: 140px; transition: border-color 0.2s, box-shadow 0.2s; }
 .filter-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(31,156,255,0.1); }
 .filter-input::placeholder { color: var(--muted); }
+.filter-count { font-size: 0.62rem; color: var(--muted); margin-left: 4px; }
+.filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 0 4px; margin-left: -28px; margin-right: 4px; transition: color 0.15s; z-index: 1; }
+.filter-clear:hover { color: var(--text); }
 
 /* ── Test selection cards ─────────────────────────────────────── */
-.test-groups { display: flex; flex-direction: column; gap: 16px; }
-.test-group-hdr { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding-bottom: 6px; border-bottom: 1px solid var(--border); transition: border-color 0.2s; }
+.test-groups { display: flex; flex-direction: column; gap: 14px; }
+.test-group-hdr { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding-bottom: 5px; border-bottom: 1px solid var(--border); transition: border-color 0.2s; }
 .test-group-hdr:hover { border-bottom-color: var(--border-hover); }
-.test-group-hdr input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
-.test-group-name { font-weight: 600; font-size: 0.88rem; }
-.test-group-count { font-size: 0.72rem; color: var(--muted); }
-.test-group-chevron { font-size: 0.75rem; color: var(--muted); transition: transform 0.25s ease; display: inline-block; }
+.test-group-hdr input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
+.test-group-name { font-weight: 600; font-size: 0.85rem; }
+.test-group-count { font-size: 0.7rem; color: var(--muted); }
+.test-group-chevron { font-size: 0.7rem; color: var(--muted); transition: transform 0.25s ease; display: inline-block; }
 .test-group-chevron.collapsed { transform: rotate(-90deg); }
-.test-group-status { margin-left: auto; font-size: 0.72rem; font-weight: 600; }
-.test-cards { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; overflow: hidden; max-height: 2000px; transition: max-height 0.3s ease, margin-top 0.3s ease, opacity 0.25s ease; opacity: 1; }
+.test-group-status { margin-left: auto; font-size: 0.7rem; font-weight: 600; }
+.test-cards { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; overflow: hidden; max-height: 2000px; transition: max-height 0.3s ease, margin-top 0.3s ease, opacity 0.25s ease; opacity: 1; }
 .test-cards.collapsed { max-height: 0; margin-top: 0; opacity: 0; }
-.test-card { border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); overflow: hidden; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; }
+.test-card { border-radius: 9px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); overflow: hidden; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; }
 .test-card:hover { border-color: var(--border-hover); }
 .test-card.expanded { border-color: rgba(31,156,255,0.2); box-shadow: 0 0 12px rgba(31,156,255,0.06); }
 .test-card.filtered-out { display: none; }
-.test-card-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.15s; user-select: none; }
+.test-card-top { display: flex; align-items: center; gap: 9px; padding: 9px 13px; cursor: pointer; transition: background 0.15s; user-select: none; }
 .test-card-top:hover { background: rgba(255,255,255,0.02); }
 .test-card-top input[type="checkbox"] { flex-shrink: 0; cursor: pointer; }
-.test-card-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.test-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.84rem; }
-.test-name { font-weight: 600; font-size: 0.85rem; }
+.test-card-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.test-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.82rem; }
+.test-name { font-weight: 600; font-size: 0.82rem; }
 .test-card-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; }
-.test-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 99px; font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; border: 1px solid transparent; }
-.test-badge.bg-incident  { color: var(--red);    background: rgba(255,95,95,0.1);  border-color: rgba(255,95,95,0.2); }
-.test-badge.bg-sdk       { color: var(--accent); background: rgba(31,156,255,0.1); border-color: rgba(31,156,255,0.2); }
-.test-badge.bg-camera    { color: var(--cyan);   background: rgba(13,216,255,0.1); border-color: rgba(13,216,255,0.2); }
-.test-badge.bg-session   { color: var(--green);  background: rgba(14,242,114,0.1); border-color: rgba(14,242,114,0.2); }
-.test-badge.bg-disc      { color: var(--yellow); background: rgba(255,200,64,0.1); border-color: rgba(255,200,64,0.2); }
-.test-badge.bg-60hz      { color: #bd34fe;       background: rgba(189,52,254,0.1); border-color: rgba(189,52,254,0.2); }
+.test-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 99px; font-size: 0.58rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; border: 1px solid transparent; }
+.test-badge.bg-incident  { color: var(--red);    background: rgba(255,95,95,0.1);   border-color: rgba(255,95,95,0.2); }
+.test-badge.bg-sdk       { color: var(--accent); background: rgba(31,156,255,0.1);  border-color: rgba(31,156,255,0.2); }
+.test-badge.bg-camera    { color: var(--cyan);   background: rgba(13,216,255,0.1);  border-color: rgba(13,216,255,0.2); }
+.test-badge.bg-session   { color: var(--green);  background: rgba(14,242,114,0.1);  border-color: rgba(14,242,114,0.2); }
+.test-badge.bg-disc      { color: var(--yellow); background: rgba(255,200,64,0.1);  border-color: rgba(255,200,64,0.2); }
+.test-badge.bg-60hz      { color: #bd34fe;       background: rgba(189,52,254,0.1);  border-color: rgba(189,52,254,0.2); }
 .test-badge.bg-depends   { color: #ff9d3d;       background: rgba(255,157,61,0.08); border-color: rgba(255,157,61,0.25); }
-.test-badge.bg-flag      { color: var(--yellow);  background: rgba(255,200,64,0.06); border-color: rgba(255,200,64,0.25); }
+.test-badge.bg-flag      { color: var(--yellow); background: rgba(255,200,64,0.06); border-color: rgba(255,200,64,0.25); }
 .test-card-right { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
 .test-card-pill { flex-shrink: 0; }
-.test-card-chevron { font-size: 0.7rem; color: var(--muted); transition: transform 0.25s ease; }
+.test-card-chevron { font-size: 0.68rem; color: var(--muted); transition: transform 0.25s ease; }
 .test-card.expanded .test-card-chevron { transform: rotate(180deg); }
-.test-card-detail { max-height: 0; overflow: hidden; padding: 0 14px; border-top: 1px solid transparent; background: rgba(0,0,0,0.22); font-size: 0.78rem; line-height: 1.55; opacity: 0; transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.2s ease, border-top-color 0.2s; }
-.test-card-detail.open { max-height: 400px; padding: 12px 14px 14px; border-top-color: var(--border); opacity: 1; }
-.test-detail-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.test-card-detail { max-height: 0; overflow: hidden; padding: 0 13px; border-top: 1px solid transparent; background: rgba(0,0,0,0.22); font-size: 0.78rem; line-height: 1.55; opacity: 0; transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.2s ease, border-top-color 0.2s; }
+.test-card-detail.open { max-height: 400px; padding: 12px 13px 13px; border-top-color: var(--border); opacity: 1; }
+.test-detail-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px; }
 .test-detail-row:last-child { margin-bottom: 0; }
-.test-detail-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); min-width: 72px; flex-shrink: 0; padding-top: 2px; font-weight: 500; }
+.test-detail-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); min-width: 70px; flex-shrink: 0; padding-top: 2px; font-weight: 500; }
 .test-detail-val { font-size: 0.78rem; color: var(--text); }
 .test-detail-val .mono { font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
 .test-detail-substeps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-.test-detail-substep { display: inline-flex; align-items: center; gap: 3px; font-size: 0.68rem; color: var(--muted); padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); }
-.test-detail-substep .substep-num { font-weight: 700; color: rgba(255,255,255,0.25); font-size: 0.6rem; }
+.test-detail-substep { display: inline-flex; align-items: center; gap: 3px; font-size: 0.66rem; color: var(--muted); padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); }
+.test-detail-substep .substep-num { font-weight: 700; color: rgba(255,255,255,0.25); font-size: 0.58rem; }
+
+/* ── Zone 3: Run ──────────────────────────────────────────────── */
+.run-zone { padding: 18px 22px; }
+.run-idle { display: flex; flex-direction: column; gap: 10px; }
+.run-idle-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.run-idle-hint { font-size: 0.76rem; color: var(--muted); }
+.run-active { display: none; flex-direction: column; gap: 8px; }
+.run-active-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.run-phase-label { font-size: 0.8rem; font-weight: 700; }
+.run-step-label { font-size: 0.76rem; color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-elapsed-label { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
+.run-complete { display: none; }
+.run-complete-banner { padding: 16px 20px; border-radius: 10px; border-left: 3px solid var(--muted); background: rgba(255,255,255,0.02); display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.run-complete-banner.all-pass { border-left-color: var(--green); background: rgba(14,242,114,0.03); }
+.run-complete-banner.partial  { border-left-color: var(--yellow); background: rgba(255,200,64,0.03); }
+.run-complete-banner.has-fail { border-left-color: var(--red); background: rgba(255,95,95,0.03); }
+.run-complete-score { font-size: 1.15rem; font-weight: 700; }
+.run-complete-details { font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
+.run-complete-actions { margin-left: auto; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+
+/* ── Zone 4: Results ──────────────────────────────────────────── */
+.results-zone { padding: 18px 20px; }
 
 /* ── Status pills ─────────────────────────────────────────────── */
-.pill { display: inline-block; padding: 4px 11px; border-radius: 99px; font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.pill { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .pill.pending  { color: var(--muted);  background: rgba(255,255,255,0.06); }
 .pill.emitted  { color: var(--cyan);   background: rgba(13,216,255,0.12); }
 .pill.found    { color: var(--accent); background: rgba(31,156,255,0.12); }
@@ -171,20 +212,6 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .result-card.status-tentative-pass { border-color: rgba(14,242,114,0.1); }
 .result-card.status-tentative-fail { border-color: rgba(255,95,95,0.15); }
 
-/* ── Legend ───────────────────────────────────────────────────── */
-.legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.65rem; color: var(--muted); }
-.legend-item { display: flex; align-items: center; gap: 4px; cursor: help; }
-.legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-.legend-swatch.sw-pending  { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); }
-.legend-swatch.sw-running  { background: rgba(31,156,255,0.12); border: 1px solid rgba(31,156,255,0.4); }
-.legend-swatch.sw-emitted  { background: rgba(13,216,255,0.12); border: 1px solid rgba(13,216,255,0.4); }
-.legend-swatch.sw-tentative-pass { background: rgba(14,242,114,0.06); border: 1px dashed rgba(14,242,114,0.3); }
-.legend-swatch.sw-tentative-fail { background: rgba(255,95,95,0.06);  border: 1px dashed rgba(255,95,95,0.3); }
-.legend-swatch.sw-found    { background: rgba(31,156,255,0.12); border: 1px solid rgba(31,156,255,0.4); }
-.legend-swatch.sw-pass     { background: rgba(14,242,114,0.12); border: 1px solid rgba(14,242,114,0.4); }
-.legend-swatch.sw-fail     { background: rgba(255,95,95,0.12);  border: 1px solid rgba(255,95,95,0.4); }
-.legend-swatch.sw-skip     { background: rgba(255,200,64,0.12); border: 1px solid rgba(255,200,64,0.35); }
-
 /* ── Sub-steps ───────────────────────────────────────────────── */
 .substeps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; font-size: 0.68rem; }
 .substep { display: flex; align-items: center; gap: 3px; color: var(--muted); transition: color 0.2s; }
@@ -195,7 +222,7 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .substep.active .substep-dot { animation: pulse 1.4s ease-in-out infinite; }
 
 /* ── Summary bar ──────────────────────────────────────────────── */
-.summary-bar { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.82rem; font-weight: 600; }
+.summary-bar { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.82rem; font-weight: 600; margin-bottom: 12px; }
 .summary-bar .s-pass { color: var(--green); }
 .summary-bar .s-fail { color: var(--red); }
 .summary-bar .s-skip { color: var(--yellow); }
@@ -207,65 +234,44 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .result-cards { display: flex; flex-direction: column; gap: 8px; }
 .result-card { border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
 .result-card:hover { border-color: var(--border-hover); }
-.result-card.status-fail { border-color: rgba(255,95,95,0.25); background: rgba(255,95,95,0.02); }
-.result-card.status-pass { border-color: rgba(14,242,114,0.12); background: rgba(14,242,114,0.015); }
+.result-card.status-fail    { border-color: rgba(255,95,95,0.25);  background: rgba(255,95,95,0.02); }
+.result-card.status-pass    { border-color: rgba(14,242,114,0.12); background: rgba(14,242,114,0.015); }
 .result-card.status-running { border-color: rgba(31,156,255,0.25); background: rgba(31,156,255,0.02); }
-.result-main { display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px; cursor: pointer; transition: background 0.15s; }
+.result-main { display: flex; align-items: flex-start; gap: 14px; padding: 12px 16px; cursor: pointer; transition: background 0.15s; }
 .result-main:hover { background: rgba(255,255,255,0.02); }
 .result-status { flex-shrink: 0; min-width: 72px; }
 .result-body { flex: 1; min-width: 0; }
 .result-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.result-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.88rem; }
-.result-name { font-weight: 600; font-size: 0.88rem; }
-.result-desc { font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
-.result-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 0.78rem; color: var(--muted); }
+.result-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.86rem; }
+.result-name { font-weight: 600; font-size: 0.86rem; }
+.result-desc { font-size: 0.76rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.result-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 0.76rem; color: var(--muted); }
 .result-meta strong { color: var(--text); font-weight: 600; }
-.result-error { color: var(--red); font-size: 0.82rem; margin-top: 5px; font-weight: 500; }
+.result-error { color: var(--red); font-size: 0.8rem; margin-top: 4px; font-weight: 500; }
 .result-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; align-self: center; }
-.result-detail { max-height: 0; overflow: hidden; padding: 0 18px; border-top: 1px solid transparent; background: rgba(0,0,0,0.2); font-size: 0.78rem; line-height: 1.5; opacity: 0; transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.2s ease, border-top-color 0.2s; }
-.result-detail.open { max-height: 500px; padding: 12px 18px 16px; border-top-color: var(--border); opacity: 1; }
+.result-detail { max-height: 0; overflow: hidden; padding: 0 16px; border-top: 1px solid transparent; background: rgba(0,0,0,0.2); font-size: 0.78rem; line-height: 1.5; opacity: 0; transition: max-height 0.4s ease, padding 0.3s ease, opacity 0.2s ease, border-top-color 0.2s; }
+.result-detail.open { max-height: 900px; padding: 14px 16px 16px; border-top-color: var(--border); opacity: 1; }
 .result-detail .mono { word-break: break-all; margin: 6px 0; line-height: 1.5; }
 
-/* ── KPI grid ─────────────────────────────────────────────────── */
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 10px; }
-.kpi-cell { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.18); transition: border-color 0.2s; }
-.kpi-cell:hover { border-color: var(--border-hover); }
-.kpi-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.kpi-val { font-size: 1.15rem; font-weight: 700; margin-top: 4px; }
-
-/* ── Test cases (incident cards) ──────────────────────────────── */
-.incident-card { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); font-size: 0.78rem; cursor: pointer; transition: all 0.15s ease; }
+/* ── Ground truth incidents (embedded in T0 result detail) ─────── */
+.gt-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gt-section-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+.gt-incidents-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.incident-card { display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); font-size: 0.76rem; cursor: pointer; transition: all 0.15s ease; }
 .incident-card:hover { border-color: var(--accent); background: rgba(31,156,255,0.04); }
+.incident-card:active { transform: scale(0.97); }
 .incident-card .ic-idx { font-weight: 700; color: var(--accent); }
-.incident-card .ic-reason { font-size: 0.68rem; color: var(--muted); }
-
-/* ── Grafana confirmation ─────────────────────────────────────── */
-.confirm-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 0.78rem; }
-.confirm-item { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); transition: border-color 0.15s; }
-.confirm-item:hover { border-color: var(--border-hover); }
-.confirm-item .c-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
-.confirm-item .c-dot.ok { background: var(--green); }
-.confirm-item .c-dot.fail { background: var(--red); }
-.confirm-item .c-id { font-family: "Courier New", monospace; font-weight: 600; font-size: 0.72rem; }
-.confirm-summary { font-size: 0.82rem; font-weight: 600; }
-.explore-btn { display: none; }
-.explore-btn.show { display: inline-flex; }
+.incident-card .ic-reason { font-size: 0.66rem; color: var(--muted); }
 
 /* ── Microinteractions ───────────────────────────────────────── */
 @keyframes flash-hl { 0% { background-color: rgba(31,156,255,0.1); } 100% { background-color: transparent; } }
 .flash { animation: flash-hl 0.4s ease-out; }
-@keyframes check-flash { 0% { box-shadow: 0 0 0 3px rgba(31,156,255,0.25); } 100% { box-shadow: 0 0 0 3px transparent; } }
-.check-flash { animation: check-flash 0.4s ease-out; }
 @keyframes copied-pop { 0%,70% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-6px); } }
 .copy-toast { display: inline-block; font-size: 0.65rem; color: var(--green); font-weight: 600; margin-left: 8px; pointer-events: none; animation: copied-pop 1.2s ease-out forwards; }
 @keyframes ws-reconnect { 0% { box-shadow: 0 0 0 0 rgba(14,242,114,0.4); } 70% { box-shadow: 0 0 0 8px rgba(14,242,114,0); } 100% { box-shadow: 0 0 0 0 rgba(14,242,114,0); } }
 .ws-pill.reconnected { animation: ws-reconnect 0.8s ease-out; }
-.incident-card:active { transform: scale(0.97); }
 .result-card.just-expanded { border-color: var(--border-hover); }
 .test-card.toggled { animation: flash-hl 0.35s ease-out; }
-.filter-count { font-size: 0.65rem; color: var(--muted); margin-left: 6px; transition: opacity 0.2s; }
-.filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 0 4px; margin-left: -28px; margin-right: 4px; transition: color 0.15s; z-index: 1; }
-.filter-clear:hover { color: var(--text); }
 </style>
 <script src="https://browser.sentry-cdn.com/9.27.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
 <script>
@@ -285,102 +291,104 @@ Sentry.setTag('dashboard', 'data-capture-suite');
   <nav class="topnav">
     <a href="index.html" id="nav-back" onclick="logUI('nav-back','click','Navigate to main dashboard')">&larr; Sim Steward dashboard</a>
     <span style="color:var(--muted)">SDK Data Capture Suite</span>
-    <span class="mono" id="lbl-version" style="color:var(--muted);font-size:0.65rem"></span>
     <span class="ws-pill bad" id="ws-pill">WS &hellip;</span>
   </nav>
 
   <div class="banner err" id="guard-banner" hidden></div>
 
-  <!-- Step 1: Signals -->
-  <div class="step panel step-bg-1" id="step-1">
-    <div class="step-label"><span class="step-num">1</span> Signals</div>
-    <div class="signals" id="signals">
+  <!-- Zone 1: Environment bar -->
+  <div class="env-bar">
+    <span class="env-label">Environment</span>
+    <span class="env-divider"></span>
+    <div class="signals">
       <span class="sig"><span class="sig-dot" id="sig-ws"></span><span class="sig-label">WS</span></span>
       <span class="sig"><span class="sig-dot" id="sig-plugin"></span><span class="sig-label">Plugin</span></span>
       <span class="sig"><span class="sig-dot" id="sig-simhub"></span><span class="sig-label">SimHub</span></span>
       <span class="sig"><span class="sig-dot" id="sig-grafana"></span><span class="sig-label">Grafana</span></span>
       <span class="sig"><span class="sig-dot" id="sig-replay"></span><span class="sig-label">Replay</span></span>
     </div>
-  </div>
-
-  <!-- Step 2: Pre-test Conditions -->
-  <div class="step panel step-bg-2" id="step-2">
-    <div class="step-label"><span class="step-num">2</span> Pre-test Conditions</div>
-    <div class="row" style="margin-bottom:8px">
-      <span style="font-size:0.78rem;color:var(--muted)">Replay scope:</span>
-      <span class="scope-badge" id="badge-scope-full">Full replay</span>
-      <span class="scope-badge" id="badge-scope-partial">Partial replay</span>
-      <button class="btn primary sm" id="btn-preflight" onclick="runPreflight()" style="margin-left:auto">Check conditions</button>
-      <button class="btn sm" id="btn-preflight-reset" onclick="resetPreflight()">Reset</button>
-    </div>
-    <div style="margin-bottom:6px"><div class="progress-bar-wrap"><div class="progress-bar" id="preflight-progress" style="width:0%;transition:width 0.3s,background 0.3s"></div></div></div>
-    <div class="pc-tests" id="pc-tests"></div>
-    <div class="meta" style="margin-top:6px">
-      Preflight ID: <span class="mono" id="lbl-preflight-id">&mdash;</span>
-      &nbsp;&middot;&nbsp; Level: <strong id="lbl-preflight-level">0</strong>/3
+    <div class="env-right">
+      <span class="mono" id="lbl-version" style="color:var(--muted);font-size:0.65rem"></span>
     </div>
   </div>
 
-  <!-- Step 3: Test Selection -->
-  <div class="step panel step-bg-3" id="step-3">
-    <div class="step-label"><span class="step-num">3</span> Test Selection</div>
-    <div class="filter-bar" id="filter-bar"></div>
-    <div class="test-groups" id="test-select"></div>
-  </div>
-
-  <!-- Step 4: Execute -->
-  <div class="step panel step-bg-4" id="step-4">
-    <div class="step-label"><span class="step-num">4</span> Execute</div>
-    <div class="row">
-      <button class="btn primary large" id="btn-start" onclick="sendStart()" disabled>&#9654; Run Selected Tests</button>
-      <button class="btn danger" id="btn-cancel" onclick="sendAction('cancel')" disabled>&#10005; Cancel</button>
+  <!-- Zone 2: Setup (collapsible 2-col) -->
+  <div class="zone" id="setup-zone">
+    <div class="setup-summary" id="setup-summary" onclick="toggleSetup()">
+      <span id="setup-summary-text"></span>
+      <span class="setup-expand-hint">&#9662; expand</span>
     </div>
-    <div style="margin-top:8px">
-      <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
-      <div class="meta" style="margin-top:5px">
-        Phase: <strong id="lbl-phase">idle</strong>
-        &nbsp;&middot;&nbsp; Step: <strong id="lbl-step">&mdash;</strong>
-        &nbsp;&middot;&nbsp; Elapsed: <strong id="lbl-elapsed">&mdash;</strong>
-        &nbsp;&middot;&nbsp; Run ID: <span class="mono" id="lbl-runid">&mdash;</span>
+    <div class="setup-content" id="setup-content">
+      <div class="setup-left">
+        <div class="setup-col-hdr">
+          Pre-test Conditions
+          <span class="scope-badge" id="badge-scope-full">Full replay</span>
+          <span class="scope-badge" id="badge-scope-partial">Partial replay</span>
+        </div>
+        <div style="margin-bottom:6px"><div class="progress-bar-wrap"><div class="progress-bar" id="preflight-progress" style="width:0%;transition:width 0.3s,background 0.3s"></div></div></div>
+        <div class="pc-tests" id="pc-tests"></div>
+        <div class="meta" style="margin-top:6px">
+          Preflight ID: <span class="mono" id="lbl-preflight-id">&mdash;</span>
+          &nbsp;&middot;&nbsp; Level: <strong id="lbl-preflight-level">0</strong>/3
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn primary sm" id="btn-preflight" onclick="runPreflight()">Check conditions</button>
+          <button class="btn sm" id="btn-preflight-reset" onclick="resetPreflight()">Reset</button>
+        </div>
+      </div>
+      <div class="setup-right">
+        <div class="setup-col-hdr">Test Selection</div>
+        <div class="filter-bar" id="filter-bar"></div>
+        <div class="test-groups" id="test-select"></div>
       </div>
     </div>
   </div>
 
-  <!-- Step 5: Results -->
-  <div class="step panel step-bg-5" id="step-5">
-    <div class="step-label"><span class="step-num">5</span> Results</div>
-    <div class="legend" style="margin-bottom:10px">
-      <span class="legend-item" title="Test has not started yet"><span class="legend-swatch sw-pending"></span> Pending</span>
-      <span class="legend-item" title="Test is currently executing"><span class="legend-swatch sw-running"></span> Running</span>
-      <span class="legend-item" title="Log emitted to Loki, awaiting ingestion"><span class="legend-swatch sw-emitted"></span> Emitted</span>
-      <span class="legend-item" title="Plugin data suggests pass, awaiting Loki confirmation"><span class="legend-swatch sw-tentative-pass"></span> Tentative pass</span>
-      <span class="legend-item" title="Plugin data suggests failure, awaiting Loki confirmation"><span class="legend-swatch sw-tentative-fail"></span> Tentative fail</span>
-      <span class="legend-item" title="Log entry found in Loki, content not yet validated"><span class="legend-swatch sw-found"></span> Found</span>
-      <span class="legend-item" title="Found in Loki and content matches expected values"><span class="legend-swatch sw-pass"></span> Pass</span>
-      <span class="legend-item" title="Not found in Loki, or content does not match expected values"><span class="legend-swatch sw-fail"></span> Fail</span>
-      <span class="legend-item" title="Test was skipped (deselected or dependency not met)"><span class="legend-swatch sw-skip"></span> Skip</span>
+  <!-- Zone 3: Run -->
+  <div class="zone run-zone" id="run-zone">
+    <!-- idle -->
+    <div class="run-idle" id="run-idle">
+      <div class="run-idle-actions">
+        <button class="btn warn large" id="btn-start" onclick="sendStart()" disabled>&#9654; Run Selected Tests</button>
+        <button class="btn danger" id="btn-cancel" onclick="sendAction('cancel')" disabled>&#10005; Cancel</button>
+        <button class="btn sm" id="btn-verify" onclick="sendAction('verify')" disabled title="Re-query Loki for latest results">&#8635; Re-verify</button>
+      </div>
+      <div class="run-idle-hint" id="run-idle-hint">Run pre-test conditions, then select tests and run the suite.</div>
     </div>
-    <div class="summary-bar" id="summary-bar" style="margin-bottom:10px" hidden></div>
-    <div id="test-cases-panel" hidden>
-      <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px">Test Cases (Selected Incidents)</div>
-      <div class="row" id="test-cases-row" style="margin-bottom:12px"></div>
+    <!-- active / awaiting loki -->
+    <div class="run-active" id="run-active">
+      <div class="run-active-row">
+        <span class="running-label run-phase-label" id="lbl-phase">running</span>
+        <span class="run-step-label" id="lbl-step">&mdash;</span>
+        <span class="run-elapsed-label">Elapsed: <strong id="lbl-elapsed">&mdash;</strong></span>
+        <span class="mono" style="color:var(--muted);font-size:0.68rem" id="lbl-runid">&mdash;</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn danger sm" id="btn-cancel-active" onclick="sendAction('cancel')">&#10005; Cancel</button>
+          <button class="btn sm" id="btn-verify-active" onclick="sendAction('verify')" disabled>&#8635; Re-verify</button>
+        </div>
+      </div>
+      <div style="margin-top:6px"><div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div></div>
     </div>
-    <div class="result-cards" id="results-body"></div>
-    <div id="kpi-panel" hidden style="margin-top:12px">
-      <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px">KPIs</div>
-      <div class="kpi-grid" id="kpi-grid"></div>
+    <!-- complete -->
+    <div class="run-complete" id="run-complete">
+      <div class="run-complete-banner" id="run-complete-banner">
+        <div>
+          <div class="run-complete-score" id="run-complete-score"></div>
+          <div class="run-complete-details" id="run-complete-details"></div>
+        </div>
+        <div class="run-complete-actions">
+          <button class="btn sm" id="btn-verify-complete" onclick="sendAction('verify')" title="Re-query Loki">&#8635; Re-verify</button>
+          <a class="btn primary sm" id="btn-grafana" href="#" target="_blank" rel="noopener" style="display:none" onclick="logUI('btn-grafana','click','Open suite in Grafana')">&#11041; Open in Grafana</a>
+          <button class="btn sm" onclick="showSetupExpanded()">&#9998; Edit &amp; rerun</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Step 6: Grafana Confirmation -->
-  <div class="step panel step-bg-6" id="step-6">
-    <div class="step-label"><span class="step-num">6</span> Grafana Confirmation</div>
-    <div class="row">
-      <button class="btn" id="btn-verify" onclick="sendAction('verify')" disabled title="Re-query Loki for latest results">&#8635; Re-verify</button>
-      <a class="btn primary explore-btn" id="btn-grafana" href="#" target="_blank" rel="noopener" onclick="logUI('btn-grafana','click','Open suite in Grafana')">&#11041; Open in Grafana</a>
-      <span class="confirm-summary" id="confirm-summary"></span>
-    </div>
-    <div class="confirm-grid" id="confirm-grid"></div>
+  <!-- Zone 4: Results -->
+  <div class="zone results-zone" id="results-zone" style="display:none">
+    <div class="summary-bar" id="summary-bar" hidden></div>
+    <div class="result-cards" id="results-body"></div>
   </div>
 </div>
 
@@ -397,6 +405,8 @@ let _expandedRows = new Set();
 let _lastStepName = null;
 let _lastPhase = null;
 let _filterDebounce = null;
+let _preflightConfirm = false;
+let _setupCollapsed = false;
 
 // ── Microinteraction helpers ─────────────────────────────────────────
 function logUI(elementId, eventType, message) {
@@ -409,10 +419,12 @@ function logUI(elementId, eventType, message) {
 function flashEl(el, cls, ms) {
   if (!el) return;
   el.classList.remove(cls);
-  void el.offsetWidth; // force reflow
+  void el.offsetWidth;
   el.classList.add(cls);
   setTimeout(function() { el.classList.remove(cls); }, ms || 500);
 }
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
 // ── Test metadata ────────────────────────────────────────────────────
 const TEST_META = {
@@ -426,11 +438,10 @@ const TEST_META = {
   T6:     { name: 'Session Results',         desc: 'Read session results (positions, laps, incidents) from completed replay', event: 'sdk_capture_session_results', pass: '\u2265 1 event', depends: null },
   T7:     { name: 'Incident Re-Seek',        desc: 'Re-seek to T0 ground-truth frames and verify frame numbers match', event: 'sdk_capture_incident_reseek', pass: '\u2265 3 events, \u2265 1 with frame_match=true', depends: 'T0' },
   T8:     { name: 'FF Sweep',                desc: 'Trigger fast-forward incident sweep and verify index events are built', event: 'sdk_capture_ff_sweep_result', pass: 'gt_cars_in_index \u2265 1', depends: null },
-  T_DISC: { name: 'Data Point Discovery',   desc: 'Sweep all Tier 1+2 SDK variables at 4 replay positions for availability map', event: 'sdk_capture_data_discovery', pass: '\u2265 4 events (one per position)', depends: null },
-  T_60Hz: { name: '60 Hz Telemetry Dump',   desc: 'Record 17 telemetry channels at 60 Hz to JSONL (feature-flagged)', event: 'sdk_capture_60hz_summary', pass: 'ticks_recorded > 0', depends: 'SIMSTEWARD_60HZ_TEST_CAPTURE=1' },
+  T_DISC: { name: 'Data Point Discovery',    desc: 'Sweep all Tier 1+2 SDK variables at 4 replay positions for availability map', event: 'sdk_capture_data_discovery', pass: '\u2265 4 events (one per position)', depends: null },
+  T_60Hz: { name: '60 Hz Telemetry Dump',    desc: 'Record 17 telemetry channels at 60 Hz to JSONL (feature-flagged)', event: 'sdk_capture_60hz_summary', pass: 'ticks_recorded > 0', depends: 'SIMSTEWARD_60HZ_TEST_CAPTURE=1' },
 };
 
-// ── Sub-steps per test (maps to SuiteInternalStep enum in plugin) ────
 const TEST_SUBSTEPS = {
   T0:     [{ step: 'T0_Rewind', label: 'Rewind' }, { step: 'T0_FrameZero', label: 'Frame zero' }, { step: 'T0_ScanCooldown', label: 'Scan incidents' }, { step: 'T0_SeekCapture', label: 'Seek' }, { step: 'T0_CaptureSettle', label: 'Capture' }],
   T1:     [{ step: 'T1_Rewind', label: 'Rewind' }, { step: 'T1_FrameZero', label: 'Frame zero' }, { step: 'T1_Sweep', label: 'Speed sweep' }],
@@ -454,10 +465,8 @@ function getActiveTestFromStep(stepName) {
   return m ? m[1] : null;
 }
 
-// ── Tentative pass/fail from KPI values (before Loki confirms) ───────
 function getTentativeStatus(r) {
   if (!r || r.status !== 'emitted') return null;
-  var kl = (r.kpiLabel || '').toLowerCase();
   var kv = (r.kpiValue || '').trim();
   var num = parseFloat(kv);
   switch (r.testId) {
@@ -486,14 +495,13 @@ function buildSubstepsHtml(testId, currentStepName, testStatus) {
   var html = '<div class="substeps">';
   subs.forEach(function(s, i) {
     var cls = 'substep';
-    var icon = '\u25CB'; // ○
+    var icon = '\u25CB';
     if (testStatus === 'pass') { cls += ' done'; icon = '\u2713'; }
     else if (testStatus === 'fail') { cls += ' fail'; icon = '\u2717'; }
-    else if (testStatus === 'skip') { cls += ''; icon = '\u2298'; }
+    else if (testStatus === 'skip') { icon = '\u2298'; }
     else if (isThisTestActive) {
       if (i < currentIdx) { cls += ' done'; icon = '\u2713'; }
       else if (i === currentIdx) { cls += ' active'; icon = ''; }
-      else { cls += ''; }
     }
     html += '<span class="' + cls + '">';
     if (cls.includes('active')) html += '<span class="substep-dot"></span>';
@@ -506,12 +514,12 @@ function buildSubstepsHtml(testId, currentStepName, testStatus) {
 
 // ── Test groups & selection ──────────────────────────────────────────
 const TEST_GROUPS = [
-  { id: 'incident', label: 'Incident Capture', tests: ['T0', 'T1'] },
-  { id: 'sdk',      label: 'SDK Data Capture', tests: ['T2', 'T3', 'T4'] },
-  { id: 'camera',   label: 'Camera Control',   tests: ['T5', 'T5b'] },
-  { id: 'session',  label: 'Session & Validation', tests: ['T6', 'T7', 'T8'] },
-  { id: 'disc',     label: 'Data Discovery',   tests: ['T_DISC'] },
-  { id: '60hz',     label: 'High-Rate Capture', tests: ['T_60Hz'] },
+  { id: 'incident', label: 'Incident Capture',     tests: ['T0', 'T1'] },
+  { id: 'sdk',      label: 'SDK Data Capture',      tests: ['T2', 'T3', 'T4'] },
+  { id: 'camera',   label: 'Camera Control',        tests: ['T5', 'T5b'] },
+  { id: 'session',  label: 'Session & Validation',  tests: ['T6', 'T7', 'T8'] },
+  { id: 'disc',     label: 'Data Discovery',        tests: ['T_DISC'] },
+  { id: '60hz',     label: 'High-Rate Capture',     tests: ['T_60Hz'] },
 ];
 const ALL_TEST_IDS = TEST_GROUPS.flatMap(g => g.tests);
 let selectedTests = new Set(ALL_TEST_IDS);
@@ -520,8 +528,6 @@ let selectedTests = new Set(ALL_TEST_IDS);
 function buildFilterBar() {
   const bar = document.getElementById('filter-bar');
   bar.innerHTML = '';
-  let activeGroupFilter = null;
-
   TEST_GROUPS.forEach(g => {
     const chip = document.createElement('button');
     chip.className = 'filter-chip active';
@@ -590,7 +596,6 @@ function filterTestCards(query) {
   if (countEl) countEl.textContent = q ? visible + '/' + ALL_TEST_IDS.length + ' shown' : '';
 }
 
-// ── Test selection ───────────────────────────────────────────────────
 // ── Badge helpers ─────────────────────────────────────────────────────
 const GROUP_BADGE_CLASS = { incident: 'bg-incident', sdk: 'bg-sdk', camera: 'bg-camera', session: 'bg-session', disc: 'bg-disc', '60hz': 'bg-60hz' };
 const GROUP_BADGE_LABEL = { incident: 'Incident', sdk: 'SDK', camera: 'Camera', session: 'Session', disc: 'Discovery', '60hz': 'High-Rate' };
@@ -601,7 +606,6 @@ function buildTestSelect() {
   el.innerHTML = '';
   TEST_GROUPS.forEach(g => {
     const section = document.createElement('div');
-
     const hdr = document.createElement('div');
     hdr.className = 'test-group-hdr';
     hdr.id = 'grp-hdr-' + g.id;
@@ -656,7 +660,6 @@ function buildTestSelect() {
       card.className = 'test-card';
       card.id = 'tcard-' + t;
 
-      // ── Header row ──
       const top = document.createElement('div');
       top.className = 'test-card-top';
 
@@ -675,8 +678,6 @@ function buildTestSelect() {
       const body = document.createElement('div');
       body.className = 'test-card-body';
       body.innerHTML = '<span class="test-id">' + esc(t) + '</span><span class="test-name">' + esc(meta.name) + '</span>';
-
-      // badges
       const badges = document.createElement('span');
       badges.className = 'test-card-badges';
       if (gid) badges.innerHTML += '<span class="test-badge ' + GROUP_BADGE_CLASS[gid] + '">' + esc(GROUP_BADGE_LABEL[gid]) + '</span>';
@@ -706,13 +707,10 @@ function buildTestSelect() {
         detail.classList.toggle('open');
         logUI('tcard-' + t, 'click', 'Test ' + t + ' ' + (wasExpanded ? 'collapsed' : 'expanded'));
       });
-
       card.appendChild(top);
 
-      // ── Detail panel ──
       const detail = document.createElement('div');
       detail.className = 'test-card-detail';
-
       let detailHTML = '';
       detailHTML += '<div class="test-detail-row"><span class="test-detail-label">Description</span><span class="test-detail-val">' + esc(meta.desc) + '</span></div>';
       detailHTML += '<div class="test-detail-row"><span class="test-detail-label">Signal</span><span class="test-detail-val"><code class="mono">' + esc(meta.event) + '</code></span></div>';
@@ -730,7 +728,6 @@ function buildTestSelect() {
       }
       detail.innerHTML = detailHTML;
       card.appendChild(detail);
-
       cards.appendChild(card);
     });
     section.appendChild(cards);
@@ -787,16 +784,17 @@ function updateSelectionPills(results, currentStepName) {
 
 // ── Precondition mini-tests ──────────────────────────────────────────
 const PC_TESTS = [
-  { id: 'PC_WS',        name: 'WebSocket connected',    level: 1 },
-  { id: 'PC_PLUGIN',    name: 'Plugin responding',       level: 1 },
-  { id: 'PC_SIMHUB',    name: 'SimHub HTTP server',      level: 1 },
-  { id: 'PC_GRAFANA',   name: 'Grafana/Loki configured', level: 1 },
-  { id: 'PC_IRACING',   name: 'iRacing connected',       level: 1 },
-  { id: 'PC_REPLAY',    name: 'Replay mode active',      level: 1 },
+  { id: 'PC_WS',        name: 'WebSocket connected',     level: 1 },
+  { id: 'PC_PLUGIN',    name: 'Plugin responding',        level: 1 },
+  { id: 'PC_SIMHUB',    name: 'SimHub HTTP server',       level: 1 },
+  { id: 'PC_GRAFANA',   name: 'Grafana/Loki configured',  level: 1 },
+  { id: 'PC_IRACING',   name: 'iRacing connected',        level: 1 },
+  { id: 'PC_REPLAY',    name: 'Replay mode active',       level: 1 },
   { id: 'PC_SESSIONS',  name: 'Session map',              level: 1 },
-  { id: 'PC_CHECKERED', name: 'Session completed',       level: 2 },
-  { id: 'PC_RESULTS',   name: 'Results populated',       level: 2 },
-  { id: 'PC_LOKI_RT',   name: 'Loki roundtrip',          level: 3 },
+  { id: 'PC_CHECKERED', name: 'Session completed',        level: 2 },
+  { id: 'PC_RESULTS',   name: 'Results populated',        level: 2 },
+  { id: 'PC_SCOPE',     name: 'Full replay (race)',       level: 2 },
+  { id: 'PC_LOKI_RT',   name: 'Loki roundtrip',           level: 3 },
 ];
 let _replayScope = 'full';
 
@@ -828,22 +826,16 @@ function updatePreconditionCard(pf) {
     const detail = document.getElementById('pc-detail-' + meta.id);
     const row = document.getElementById('pc-row-' + meta.id);
     if (!icon) return;
-
     const status = t ? t.status : 'pending';
     icon.className = 'pc-icon ' + status;
     row.className = 'pc-row' + (status !== 'pending' ? ' ' + status : '');
-
-    // Icon content
     if (status === 'running') icon.innerHTML = '<span class="pc-spinner"></span>';
     else if (status === 'pass') icon.textContent = '\u2713';
     else if (status === 'fail') icon.textContent = '\u2717';
-    else if (status === 'skip') icon.textContent = '\u2014';
     else icon.textContent = '\u2014';
-
     if (detail) detail.textContent = t ? (t.detail || '') : '';
   });
 
-  // Progress bar
   var pfBar = document.getElementById('preflight-progress');
   if (pfBar) {
     var total = tests.length || 1;
@@ -851,7 +843,6 @@ function updatePreconditionCard(pf) {
     var failed = tests.some(function(t) { return t.status === 'fail'; });
     var pct = Math.round((done / total) * 100);
     if (failed) {
-      // Include the failed test in the fill, then stop
       var failedCount = tests.filter(function(t) { return t.status === 'fail'; }).length;
       pct = Math.round(((done + failedCount) / total) * 100);
       pfBar.style.width = pct + '%';
@@ -865,15 +856,11 @@ function updatePreconditionCard(pf) {
     }
   }
 
-  // Correlation ID + level
   document.getElementById('lbl-preflight-id').textContent =
     pf.correlationId ? pf.correlationId.slice(0, 8) + '\u2026' : '\u2014';
   document.getElementById('lbl-preflight-level').textContent = pf.level || 0;
-
-  // Scope badge sync — reflects what the app detected
   updateScopeBadge(pf.replayScope === 'partial' ? 'partial' : 'full');
 
-  // Button text
   const btn = document.getElementById('btn-preflight');
   if (pf.allPassed && pf.level >= 3) {
     btn.textContent = 'All passed \u2713';
@@ -917,7 +904,6 @@ function runPreflight() {
   var btn = document.getElementById('btn-preflight');
   btn.textContent = 'Checking\u2026';
   btn.disabled = true;
-  // Set all precondition rows to running state immediately
   var rows = document.querySelectorAll('.pc-row');
   rows.forEach(function(row) {
     row.classList.add('running');
@@ -929,6 +915,11 @@ function runPreflight() {
 }
 
 function resetPreflight() {
+  _preflightConfirm = false;
+  var btn = document.getElementById('btn-start');
+  btn.classList.remove('primary', 'override-active');
+  btn.classList.add('warn');
+  btn.textContent = '\u25B6 Run Selected Tests';
   send({ action: 'data_capture_suite', arg: 'preflight_reset' });
   send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-preflight-reset', event_type: 'click', message: 'Reset preflight' });
   buildPreconditionRows();
@@ -938,14 +929,182 @@ function resetPreflight() {
   if (idEl) idEl.textContent = '\u2014';
   var lvlEl = document.getElementById('lbl-preflight-level');
   if (lvlEl) lvlEl.textContent = '0';
-  var btn = document.getElementById('btn-preflight');
-  btn.textContent = 'Check conditions';
-  btn.disabled = false;
-  btn.style.color = '';
-  btn.style.borderColor = '';
-  // Flash the reset button briefly
+  var btn2 = document.getElementById('btn-preflight');
+  btn2.textContent = 'Check conditions';
+  btn2.disabled = false;
+  btn2.style.color = '';
+  btn2.style.borderColor = '';
   var resetBtn = document.getElementById('btn-preflight-reset');
   if (resetBtn) { resetBtn.style.borderColor = 'var(--accent)'; setTimeout(function() { resetBtn.style.borderColor = ''; }, 400); }
+}
+
+// ── Setup zone collapse / expand ────────────────────────────────────
+function setSetupCollapsed(collapsed) {
+  _setupCollapsed = collapsed;
+  var summary = document.getElementById('setup-summary');
+  var content = document.getElementById('setup-content');
+  var hint = summary ? summary.querySelector('.setup-expand-hint') : null;
+  if (collapsed) {
+    if (summary) summary.style.display = 'flex';
+    if (content) content.style.display = 'none';
+    if (hint) hint.textContent = '\u25BE expand';
+  } else {
+    if (summary) summary.style.display = 'none';
+    if (content) content.style.display = '';
+  }
+}
+
+function toggleSetup() {
+  setSetupCollapsed(!_setupCollapsed);
+  var hint = document.querySelector('#setup-summary .setup-expand-hint');
+  if (hint) hint.textContent = _setupCollapsed ? '\u25BE expand' : '\u25B4 collapse';
+  logUI('setup-summary', 'click', _setupCollapsed ? 'Setup collapsed' : 'Setup expanded');
+}
+
+function showSetupExpanded() {
+  setSetupCollapsed(false);
+  logUI('btn-rerun', 'click', 'Show setup for rerun');
+}
+
+function updateSetupSummaryText(pf) {
+  var el = document.getElementById('setup-summary-text');
+  if (!el) return;
+  var pfOk = pf && pf.allPassed;
+  var pfIcon = pfOk ? '\u2713' : '\u26A0';
+  var pfColor = pfOk ? 'var(--green)' : 'var(--yellow)';
+  var count = selectedTests.size;
+  var scope = _replayScope === 'full' ? 'Full scope' : 'Partial scope';
+  el.innerHTML =
+    '<span style="color:' + pfColor + '">' + pfIcon + ' ' + (pfOk ? 'Conditions OK' : 'Conditions partial') + '</span>' +
+    ' &nbsp;&middot;&nbsp; ' + count + ' test' + (count !== 1 ? 's' : '') + ' selected' +
+    ' &nbsp;&middot;&nbsp; ' + scope;
+}
+
+// ── Run zone state ───────────────────────────────────────────────────
+function updateRunZone(phase, hardReady, preflightPassed, suite, results) {
+  const idle    = !phase || phase === 'idle';
+  const running = phase === 'running';
+  const waiting = phase === 'awaitingloki';
+  const done    = phase === 'complete' || phase === 'cancelled';
+
+  const elIdle     = document.getElementById('run-idle');
+  const elActive   = document.getElementById('run-active');
+  const elComplete = document.getElementById('run-complete');
+
+  if (elIdle)     elIdle.style.display     = (idle || done) ? 'flex'  : 'none';
+  if (elActive)   elActive.style.display   = (running || waiting) ? 'flex'  : 'none';
+  if (elComplete) elComplete.style.display = done ? 'block' : 'none';
+
+  // Setup zone collapses when a run is active or done
+  if (running || waiting || done) {
+    if (!_setupCollapsed) setSetupCollapsed(true);
+    updateSetupSummaryText(suite && state ? state.preflight : null);
+  }
+
+  // btn-start in idle zone
+  var btnStart = document.getElementById('btn-start');
+  if (btnStart) {
+    btnStart.disabled = !hardReady || !preflightPassed || running || waiting;
+    if (preflightPassed) {
+      btnStart.classList.remove('warn');
+      btnStart.classList.add('primary');
+      if (!running && !waiting) btnStart.textContent = '\u25B6 Run Selected Tests';
+    } else {
+      btnStart.classList.remove('primary');
+      btnStart.classList.add('warn');
+      btnStart.textContent = hardReady ? '\u25B6 Run Pre-test Conditions First' : '\u25B6 Run Selected Tests';
+    }
+  }
+
+  // btn-cancel in idle zone (always disabled when not running)
+  var btnCancel = document.getElementById('btn-cancel');
+  if (btnCancel) btnCancel.disabled = true;
+
+  // btn-verify in idle zone (enabled when done)
+  var btnVerify = document.getElementById('btn-verify');
+  if (btnVerify) btnVerify.disabled = idle || running;
+
+  // Active zone updates
+  if (running || waiting) {
+    var phaseEl = document.getElementById('lbl-phase');
+    if (phaseEl) {
+      phaseEl.textContent = waiting ? 'awaiting Loki\u2026' : phase;
+      phaseEl.className = 'running-label run-phase-label';
+    }
+    // Loki countdown in step label
+    if (waiting) {
+      if (!_lokiPhaseStart) _lokiPhaseStart = Date.now();
+      var remaining = Math.max(0, Math.ceil((LOKI_WAIT_MS - (Date.now() - _lokiPhaseStart)) / 1000));
+      var stepEl = document.getElementById('lbl-step');
+      if (stepEl) stepEl.textContent = 'Loki ingestion wait\u2026 ' + remaining + 's';
+    } else {
+      _lokiPhaseStart = null;
+      var stepEl2 = document.getElementById('lbl-step');
+      if (stepEl2) stepEl2.textContent = (suite && suite.currentStepName) || '\u2014';
+    }
+    var cancelActive = document.getElementById('btn-cancel-active');
+    if (cancelActive) cancelActive.disabled = false;
+    var verifyActive = document.getElementById('btn-verify-active');
+    if (verifyActive) verifyActive.disabled = running;
+  }
+
+  // Elapsed + run ID (visible in active zone)
+  if (suite) {
+    var elEl = document.getElementById('lbl-elapsed');
+    if (elEl) elEl.textContent = suite.elapsedMs > 0 ? (suite.elapsedMs / 1000).toFixed(1) + 's' : '\u2014';
+    var ridEl = document.getElementById('lbl-runid');
+    if (ridEl) ridEl.textContent = suite.testRunId ? suite.testRunId.slice(0, 8) + '\u2026' : '\u2014';
+    var pct = suite.totalSteps > 0 ? Math.min(100, Math.round((suite.currentStep / suite.totalSteps) * 100)) : 0;
+    var pb = document.getElementById('progress-bar');
+    if (pb) pb.style.width = (done ? 100 : pct) + '%';
+  }
+
+  // Complete banner
+  if (done && results && results.length) {
+    updateCompleteBanner(results, suite);
+  }
+
+  // Results zone: show once a run has started
+  var resultsZone = document.getElementById('results-zone');
+  if (resultsZone) {
+    var hasAnything = results && results.length > 0;
+    resultsZone.style.display = hasAnything ? 'block' : 'none';
+  }
+}
+
+function updateCompleteBanner(results, suite) {
+  var banner = document.getElementById('run-complete-banner');
+  var scoreEl = document.getElementById('run-complete-score');
+  var detailsEl = document.getElementById('run-complete-details');
+  var gBtn = document.getElementById('btn-grafana');
+  if (!banner || !scoreEl || !detailsEl) return;
+
+  var pass  = results.filter(r => r.status === 'pass').length;
+  var fail  = results.filter(r => r.status === 'fail').length;
+  var skip  = results.filter(r => r.status === 'skip').length;
+  var total = results.filter(r => r.status !== 'skip').length;
+
+  banner.className = 'run-complete-banner' +
+    (fail > 0 ? ' has-fail' : (pass === total && total > 0 ? ' all-pass' : ' partial'));
+
+  var scoreColor = fail > 0 ? 'var(--red)' : (pass === total && total > 0 ? 'var(--green)' : 'var(--yellow)');
+  scoreEl.innerHTML = '<span style="color:' + scoreColor + '">' + pass + '/' + total + ' passed</span>';
+
+  var parts = [];
+  if (skip > 0) parts.push(skip + ' skipped');
+  if (suite && suite.elapsedMs > 0) parts.push((suite.elapsedMs / 1000).toFixed(1) + 's');
+  if (suite && suite.testRunId) parts.push('<span class="mono" style="color:var(--muted)">' + suite.testRunId.slice(0, 8) + '\u2026</span>');
+  detailsEl.innerHTML = parts.join(' &nbsp;&middot;&nbsp; ');
+
+  if (gBtn) {
+    var suiteGrafanaUrl = suite && (suite.grafanaExploreUrl || buildGrafanaUrl(suite.testRunId));
+    if (suiteGrafanaUrl && suite && suite.testRunId) {
+      gBtn.href = suiteGrafanaUrl;
+      gBtn.style.display = '';
+    } else {
+      gBtn.style.display = 'none';
+    }
+  }
 }
 
 buildPreconditionRows();
@@ -962,7 +1121,6 @@ function connect() {
     if (wasConnected === false) {
       flashEl(document.getElementById('ws-pill'), 'reconnected', 800);
     }
-    // Log after open so send() works
     logUI('ws-pill', 'state_change', 'WebSocket connected');
     if (typeof Sentry !== 'undefined') {
       Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket connected', level: 'info' });
@@ -1009,22 +1167,23 @@ function resetDashboardForNewRun() {
   _lastStepName = null;
   _lastPhase = null;
   _expandedRows.clear();
-  document.getElementById('lbl-phase').textContent = 'starting\u2026';
-  document.getElementById('lbl-phase').className = 'running-label';
-  document.getElementById('lbl-step').textContent = '\u2014';
-  document.getElementById('lbl-elapsed').textContent = '0.0s';
-  document.getElementById('lbl-runid').textContent = '\u2014';
-  document.getElementById('progress-bar').style.width = '0%';
+  var stepEl = document.getElementById('lbl-step');
+  if (stepEl) stepEl.textContent = '\u2014';
+  var elEl = document.getElementById('lbl-elapsed');
+  if (elEl) elEl.textContent = '0.0s';
+  var ridEl = document.getElementById('lbl-runid');
+  if (ridEl) ridEl.textContent = '\u2014';
+  var pb = document.getElementById('progress-bar');
+  if (pb) pb.style.width = '0%';
+  var sb = document.getElementById('summary-bar');
+  if (sb) sb.hidden = true;
   renderIdleResults();
-  document.getElementById('summary-bar').hidden = true;
-  document.getElementById('kpi-panel').hidden = true;
-  document.getElementById('test-cases-panel').hidden = true;
-  document.getElementById('btn-grafana').classList.remove('show');
-  document.getElementById('confirm-grid').innerHTML = '';
-  document.getElementById('confirm-summary').textContent = '';
 }
 
 function sendStart() {
+  const pf = state && state.preflight;
+  const preflightPassed = pf && pf.phase === 'complete' && pf.allPassed;
+  if (!preflightPassed) return; // plugin enforces this; button should already be disabled
   resetDashboardForNewRun();
   const skip = ALL_TEST_IDS.filter(id => !selectedTests.has(id));
   const arg = skip.length ? 'start:' + skip.join(',') : 'start';
@@ -1045,55 +1204,6 @@ function buildGrafanaUrl(runId, eventName) {
   return GRAFANA_BASE + '/explore?orgId=1&left=' + encodeURIComponent(left);
 }
 
-// ── Step state management ────────────────────────────────────────────
-function updateStepStates(phase, ready, preflightPhase) {
-  const steps = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5', 'step-6'];
-
-  function setStep(id, state) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.classList.remove('active', 'done', 'future');
-    if (state) el.classList.add(state);
-  }
-
-  if (!phase || phase === 'idle') {
-    setStep('step-1', ready ? 'done' : 'active');
-    setStep('step-2', preflightPhase === 'complete' ? 'done' : (ready ? 'active' : null));
-    setStep('step-3', 'active');
-    setStep('step-4', null);
-    setStep('step-5', null);
-    setStep('step-6', 'future');
-  } else if (phase === 'running') {
-    setStep('step-1', 'done');
-    setStep('step-2', 'done');
-    setStep('step-3', 'done');
-    setStep('step-4', 'active');
-    setStep('step-5', null);
-    setStep('step-6', 'future');
-  } else if (phase === 'awaitingloki') {
-    setStep('step-1', 'done');
-    setStep('step-2', 'done');
-    setStep('step-3', 'done');
-    setStep('step-4', 'done');
-    setStep('step-5', 'active');
-    setStep('step-6', 'future');
-  } else if (phase === 'complete') {
-    setStep('step-1', 'done');
-    setStep('step-2', 'done');
-    setStep('step-3', 'done');
-    setStep('step-4', 'done');
-    setStep('step-5', 'done');
-    setStep('step-6', 'active');
-  } else if (phase === 'cancelled') {
-    setStep('step-1', 'done');
-    setStep('step-2', 'done');
-    setStep('step-3', 'done');
-    setStep('step-4', null);
-    setStep('step-5', null);
-    setStep('step-6', 'future');
-  }
-}
-
 // ── State handling ───────────────────────────────────────────────────
 function handleState(msg) {
   state = msg;
@@ -1101,36 +1211,31 @@ function handleState(msg) {
   const diag   = msg.diagnostics || {};
   const replay = msg.pluginMode === 'Replay';
 
-  // Version display
+  // Version
   var verEl = document.getElementById('lbl-version');
   if (verEl && msg.pluginVersion) verEl.textContent = 'v' + msg.pluginVersion;
-  if (msg.pluginVersion && typeof Sentry !== 'undefined') {
-    Sentry.setTag('plugin_version', msg.pluginVersion);
-  }
+  if (msg.pluginVersion && typeof Sentry !== 'undefined') Sentry.setTag('plugin_version', msg.pluginVersion);
 
-  // Signals
+  // Signals (Zone 1)
   setSig('sig-ws', _wsOk);
   setSig('sig-plugin', _pluginSeen);
   setSig('sig-simhub', diag.simHubHttpListening);
   setSig('sig-grafana', diag.grafanaConfigured);
   setSig('sig-replay', replay);
 
-  // Replay scope badge — auto-detected from session data
+  // Scope badge
   updateScopeBadge(replay ? (diag.replaySessionCompleted ? 'full' : 'partial') : null);
 
-  // Preflight / Precondition card
+  // Preflight / Precondition card (Zone 2)
   const pf = msg.preflight;
-  const pfPhase = pf ? pf.phase : 'idle';
   updatePreconditionCard(pf);
-
-  // Also update signal dots from preflight results
   if (pf && pf.phase === 'complete') {
     setSig('sig-grafana', pf.grafanaOk);
     setSig('sig-simhub', pf.simHubOk);
   }
 
   const preflightPassed = pf && pf.allPassed;
-  const ready = _wsOk && _pluginSeen && diag.simHubHttpListening && diag.grafanaConfigured && replay && preflightPassed;
+  const hardReady = _wsOk && _pluginSeen && !!diag.irsdkConnected && replay;
 
   // Guard banner
   const guard = document.getElementById('guard-banner');
@@ -1144,70 +1249,25 @@ function handleState(msg) {
   }
 
   const phase = suite ? (suite.phase || 'idle') : 'idle';
-  updateStepStates(phase, ready, pfPhase);
-
-  if (!suite) {
-    document.getElementById('btn-start').disabled = !ready;
-    return;
-  }
-
-  const running = phase === 'running';
-  const waiting = phase === 'awaitingloki';
-  const done    = phase === 'complete' || phase === 'cancelled';
-  const idle    = phase === 'idle';
-
-  document.getElementById('btn-start').disabled  = !ready || running || waiting;
-  document.getElementById('btn-cancel').disabled = !running && !waiting;
-  document.getElementById('btn-verify').disabled = idle || running;
-
-  document.getElementById('lbl-phase').textContent = phase;
-  document.getElementById('lbl-phase').className   = running ? 'running-label' : '';
-
-  // Loki countdown
-  if (waiting) {
-    if (!_lokiPhaseStart) _lokiPhaseStart = Date.now();
-    const remaining = Math.max(0, Math.ceil((LOKI_WAIT_MS - (Date.now() - _lokiPhaseStart)) / 1000));
-    document.getElementById('lbl-step').textContent = 'Loki ingestion wait\u2026 ' + remaining + 's';
-  } else {
-    _lokiPhaseStart = null;
-    document.getElementById('lbl-step').textContent = suite.currentStepName || '\u2014';
-  }
-
-  document.getElementById('lbl-elapsed').textContent = suite.elapsedMs > 0
-    ? (suite.elapsedMs / 1000).toFixed(1) + 's' : '\u2014';
-  document.getElementById('lbl-runid').textContent = suite.testRunId
-    ? suite.testRunId.slice(0, 8) + '\u2026' : '\u2014';
-
-  const pct = suite.totalSteps > 0
-    ? Math.min(100, Math.round((suite.currentStep / suite.totalSteps) * 100)) : 0;
-  document.getElementById('progress-bar').style.width = (done ? 100 : pct) + '%';
-
-  // Grafana link
-  const gBtn = document.getElementById('btn-grafana');
-  const suiteGrafanaUrl = suite.grafanaExploreUrl || buildGrafanaUrl(suite.testRunId);
-  if (suiteGrafanaUrl && suite.testRunId) { gBtn.href = suiteGrafanaUrl; gBtn.classList.add('show'); }
-  else { gBtn.classList.remove('show'); }
-
-  // Results + summary
-  const results = suite.testResults || [];
-  const stepName = suite.currentStepName || null;
+  const results = suite ? (suite.testResults || []) : [];
+  const stepName = suite ? (suite.currentStepName || null) : null;
   const stepChanged = stepName !== _lastStepName || phase !== (_lastPhase || 'idle');
   _lastStepName = stepName;
   _lastPhase = phase;
 
+  updateRunZone(phase, hardReady, preflightPassed, suite, results);
+
+  if (!suite) return;
+
   renderSummary(results);
-  if (stepChanged) renderResults(results, suite.testRunId, running ? stepName : null);
-  renderKpis(results);
-  renderTestCases(suite.selectedIncidents);
+  if (stepChanged) renderResults(results, suite.testRunId, (phase === 'running') ? stepName : null, suite.selectedIncidents);
   updateSelectionPills(results, stepName);
-  renderConfirmation(results, suite.testRunId);
 }
 
 function setSig(id, ok) {
   const el = document.getElementById(id);
   if (el) el.className = 'sig-dot' + (ok ? ' ok' : '');
 }
-
 
 // ── Summary bar ──────────────────────────────────────────────────────
 function renderSummary(results) {
@@ -1243,7 +1303,6 @@ function renderIdleResults(currentStepName) {
     const pillStatus = isRunning ? 'running' : 'pending';
     const card = document.createElement('div');
     card.className = 'result-card status-' + pillStatus;
-
     const main = document.createElement('div');
     main.className = 'result-main';
     main.onclick = () => toggleDetail(id);
@@ -1263,7 +1322,6 @@ function renderIdleResults(currentStepName) {
         buildSubstepsHtml(id, currentStepName, 'pending') +
       '</div>';
     card.appendChild(main);
-
     const detail = document.createElement('div');
     detail.className = 'result-detail';
     detail.id = 'detail-' + id;
@@ -1278,7 +1336,7 @@ function renderIdleResults(currentStepName) {
 }
 
 // ── Result cards (active run) ────────────────────────────────────────
-function renderResults(results, runId, currentStepName) {
+function renderResults(results, runId, currentStepName, selectedIncidents) {
   const container = document.getElementById('results-body');
   if (!results.length) { renderIdleResults(currentStepName); return; }
   container.innerHTML = '';
@@ -1297,9 +1355,8 @@ function renderResults(results, runId, currentStepName) {
     const main = document.createElement('div');
     main.className = 'result-main';
     main.onclick = () => toggleDetail(r.testId);
-
     main.innerHTML =
-      '<div class="result-status"><span class="pill ' + displayStatus + '">' + displayStatus.replace('tentative-', '\u2248 ') + '</span></div>' +
+      '<div class="result-status"><span class="pill ' + displayStatus + '" title="' + statusLegend(displayStatus) + '">' + displayStatus.replace('tentative-', '\u2248 ') + '</span></div>' +
       '<div class="result-body">' +
         '<div class="result-header">' +
           '<span class="result-id">' + esc(r.testId) + '</span>' +
@@ -1326,7 +1383,7 @@ function renderResults(results, runId, currentStepName) {
     detail.id = 'detail-' + r.testId;
     if (_expandedRows.has(r.testId)) detail.classList.add('open');
     const logql = runId ? '{app="sim-steward"} |json |test_run_id="' + runId + '" |event="' + (r.eventName || '') + '"' : '';
-    detail.innerHTML =
+    var detailInner =
       '<div><strong>Event name:</strong> <span class="mono">' + esc(r.eventName || meta.event || '') + '</span></div>' +
       '<div><strong>Pass criteria:</strong> ' + esc(meta.pass || '') + '</div>' +
       (meta.depends ? '<div><strong>Dependency:</strong> ' + esc(meta.depends) + '</div>' : '') +
@@ -1338,9 +1395,51 @@ function renderResults(results, runId, currentStepName) {
         '<button class="btn sm" id="copy-btn-' + esc(r.testId) + '" onclick="copyLogQL(this,' + JSON.stringify(logql).replace(/</g, '\\u003c') + ',\'' + esc(r.testId) + '\');event.stopPropagation()">Copy LogQL</button>' +
         (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="logUI(\'explore-' + esc(r.testId) + '\',\'click\',\'Open Grafana for ' + esc(r.testId) + '\');event.stopPropagation()">Open in Grafana</a>' : '') +
       '</div>';
+
+    // Ground truth incidents embedded in T0 detail
+    if (r.testId === 'T0' && selectedIncidents && selectedIncidents.length) {
+      detailInner += buildGroundTruthHtml(selectedIncidents);
+    }
+
+    detail.innerHTML = detailInner;
     card.appendChild(detail);
     container.appendChild(card);
   });
+}
+
+function buildGroundTruthHtml(incidents) {
+  if (!incidents || !incidents.length) return '';
+  var html = '<div class="gt-section"><div class="gt-section-label">Ground Truth Incidents (selected test cases)</div><div class="gt-incidents-row">';
+  incidents.forEach(inc => {
+    html += '<div class="incident-card" onclick="seekToIncident(' + inc.frame + ',' + inc.index + ');event.stopPropagation()">' +
+      '<span class="ic-idx">' + String.fromCodePoint(0x2460 + inc.index) + '</span>' +
+      '<span>Lap ' + inc.lap + ' \u2014 #' + esc(inc.carNumber) + ' ' + esc(inc.driverName) + '</span>' +
+      '<span class="mono">(frame ' + inc.frame + ')</span>' +
+      '<span class="ic-reason">' + esc(inc.reason) + '</span>' +
+      '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function seekToIncident(frame, index) {
+  send({ action: 'seek_to_incident', arg: String(frame) });
+  logUI('incident-' + index, 'click', 'Seek to incident ' + index + ' frame ' + frame);
+}
+
+function statusLegend(status) {
+  const map = {
+    'pending': 'Test has not started yet',
+    'running': 'Test is currently executing',
+    'emitted': 'Log emitted to Loki, awaiting ingestion',
+    'tentative-pass': 'Plugin data suggests pass, awaiting Loki confirmation',
+    'tentative-fail': 'Plugin data suggests failure, awaiting Loki confirmation',
+    'found': 'Log entry found in Loki, content not yet validated',
+    'pass': 'Found in Loki and content matches expected values',
+    'fail': 'Not found in Loki, or content does not match expected values',
+    'skip': 'Test was skipped (deselected or dependency not met)',
+  };
+  return map[status] || status;
 }
 
 function toggleDetail(testId) {
@@ -1359,8 +1458,6 @@ function toggleDetail(testId) {
   }
 }
 
-function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-
 function copyLogQL(btn, logql, testId) {
   navigator.clipboard.writeText(logql);
   var existing = btn.parentNode.querySelector('.copy-toast');
@@ -1371,76 +1468,6 @@ function copyLogQL(btn, logql, testId) {
   btn.parentNode.insertBefore(toast, btn.nextSibling);
   setTimeout(function() { toast.remove(); }, 1200);
   logUI('copy-logql-' + testId, 'click', 'Copied LogQL for ' + testId);
-}
-
-// ── Test Cases panel ─────────────────────────────────────────────────
-function renderTestCases(incidents) {
-  const panel = document.getElementById('test-cases-panel');
-  if (!incidents || !incidents.length) { panel.hidden = true; return; }
-  panel.hidden = false;
-  const row = document.getElementById('test-cases-row');
-  row.innerHTML = '';
-  incidents.forEach(inc => {
-    const card = document.createElement('div');
-    card.className = 'incident-card';
-    card.onclick = () => {
-      send({ action: 'seek_to_incident', arg: String(inc.frame) });
-      flashEl(card, 'flash', 400);
-      logUI('incident-' + inc.index, 'click', 'Seek to incident ' + inc.index + ' frame ' + inc.frame);
-    };
-    card.innerHTML =
-      '<span class="ic-idx">' + String.fromCodePoint(0x2460 + inc.index) + '</span>' +
-      '<span>Lap ' + inc.lap + ' \u2014 #' + esc(inc.carNumber) + ' ' + esc(inc.driverName) + '</span>' +
-      '<span class="mono">(frame ' + inc.frame + ')</span>' +
-      '<span class="ic-reason">' + esc(inc.reason) + '</span>';
-    row.appendChild(card);
-  });
-}
-
-// ── KPIs ─────────────────────────────────────────────────────────────
-function renderKpis(results) {
-  const hasKpi = results.some(r => r.kpiLabel);
-  const panel  = document.getElementById('kpi-panel');
-  if (!hasKpi) { panel.hidden = true; return; }
-  panel.hidden = false;
-  const grid = document.getElementById('kpi-grid');
-  grid.innerHTML = '';
-  results.forEach(r => {
-    if (!r.kpiLabel) return;
-    const div = document.createElement('div');
-    div.className = 'kpi-cell';
-    div.innerHTML = '<div class="kpi-label">' + esc(r.testId) + ' \u2014 ' + esc(r.kpiLabel) + '</div><div class="kpi-val">' + (esc(r.kpiValue) || '\u2014') + '</div>';
-    grid.appendChild(div);
-  });
-}
-
-// ── Grafana confirmation (Step 6) ────────────────────────────────────
-function renderConfirmation(results, runId) {
-  const grid = document.getElementById('confirm-grid');
-  const summary = document.getElementById('confirm-summary');
-  if (!results.length) { grid.innerHTML = ''; summary.textContent = ''; return; }
-
-  grid.innerHTML = '';
-  let confirmed = 0;
-  let total = 0;
-  results.forEach(r => {
-    if (r.status === 'skip') return;
-    total++;
-    const found = r.lokiCount > 0;
-    if (found) confirmed++;
-    const item = document.createElement('span');
-    item.className = 'confirm-item';
-    item.innerHTML = '<span class="c-dot' + (found ? ' ok' : (r.status === 'pending' || r.status === 'emitted' ? '' : ' fail')) + '"></span><span class="c-id">' + esc(r.testId) + '</span>';
-    grid.appendChild(item);
-  });
-
-  if (total > 0) {
-    const allOk = confirmed === total;
-    const color = allOk ? 'var(--green)' : (confirmed > 0 ? 'var(--yellow)' : 'var(--red)');
-    summary.innerHTML = '<span style="color:' + color + '">' + confirmed + '/' + total + ' confirmed in Loki</span>';
-  } else {
-    summary.textContent = '';
-  }
 }
 
 renderIdleResults();
