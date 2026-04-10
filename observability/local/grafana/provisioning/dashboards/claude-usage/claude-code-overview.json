@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "claude-code-overview",
-  "title": "Claude Code — Session Overview",
+  "title": "Claude Code \u00e2\u20ac\u201d Session Overview",
   "description": "Full observability for Claude Code sessions: tool calls, agents, errors, and cross-session trends.",
   "tags": [
     "claude-code",
@@ -75,7 +75,7 @@
     },
     {
       "id": 20,
-      "title": "Session Cost",
+      "title": "Session Cost (Full Session)",
       "type": "stat",
       "transparent": true,
       "gridPos": {
@@ -145,7 +145,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Total API-equivalent cost for this session, regardless of selected time range. Scoped by session_id \u2014 shows the complete session cost even if it started before the time window."
     },
     {
       "id": 1,
@@ -1093,7 +1094,7 @@
     {
       "id": 14,
       "title": "Tool Calls vs Errors Over Time",
-      "description": "Session health — productive tool call rate alongside error rate.",
+      "description": "Session health \u00e2\u20ac\u201d productive tool call rate alongside error rate.",
       "type": "timeseries",
       "transparent": true,
       "gridPos": {
@@ -1426,7 +1427,7 @@
     {
       "type": "row",
       "id": 50,
-      "title": "Burn Rate — $/hr & Tokens/min",
+      "title": "Burn Rate \u00e2\u20ac\u201d $/hr & Tokens/min",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1457,7 +1458,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap cost_usd [$__range])) * 3600",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | session_id=~\"$session_id\" | unwrap cost_usd [$__range])) * 3600",
           "legendFormat": "$/hr",
           "queryType": "instant"
         }
@@ -1530,7 +1531,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap cost_usd [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | session_id=~\"$session_id\" | unwrap cost_usd [$__range])) * 60",
           "legendFormat": "$/min",
           "queryType": "instant"
         }
@@ -1603,7 +1604,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap total_output_tokens [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | session_id=~\"$session_id\" | unwrap total_output_tokens [$__range])) * 60",
           "legendFormat": "tokens/min",
           "queryType": "instant"
         }
@@ -1676,7 +1677,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap total_input_tokens [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | session_id=~\"$session_id\" | unwrap total_input_tokens [$__range])) * 60",
           "queryType": "instant",
           "hide": true
         },
@@ -1686,7 +1687,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | unwrap total_output_tokens [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | session_id=~\"$session_id\" | unwrap total_output_tokens [$__range])) * 60",
           "queryType": "instant",
           "hide": true
         },
