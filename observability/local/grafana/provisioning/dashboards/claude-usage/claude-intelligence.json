@@ -1,7 +1,7 @@
 {
   "id": null,
   "uid": "claude-intelligence",
-  "title": "Claude Code — Intelligence",
+  "title": "Claude Code \u00e2\u20ac\u201d Intelligence",
   "description": "Comprehensive developer intelligence: session health, cost analysis, token breakdown, and tool usage patterns.",
   "tags": [
     "claude-code",
@@ -217,7 +217,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
           "legendFormat": "API Cost",
           "queryType": "range"
         }
@@ -272,7 +272,7 @@
     {
       "id": 3,
       "title": "Plan ROI",
-      "description": "API-equivalent retail cost ÷ your plan cost. 1× = break-even. 5× = got 5× your money’s worth. Change the Plan dropdown to match your tier.",
+      "description": "API-equivalent retail cost \u00c3\u00b7 your plan cost. 1\u00c3\u2014 = break-even. 5\u00c3\u2014 = got 5\u00c3\u2014 your money\u00e2\u20ac\u2122s worth. Change the Plan dropdown to match your tier.",
       "type": "stat",
       "gridPos": {
         "x": 12,
@@ -291,7 +291,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
           "legendFormat": "API Cost",
           "queryType": "range",
           "hide": true
@@ -367,7 +367,7 @@
     {
       "id": 4,
       "title": "Cache Efficiency",
-      "description": "% of context tokens served from cache. High is good — less quota burn.",
+      "description": "% of context tokens served from cache. High is good \u00e2\u20ac\u201d less quota burn.",
       "type": "stat",
       "gridPos": {
         "x": 18,
@@ -386,7 +386,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__range]))",
           "legendFormat": "Cache Read",
           "queryType": "range",
           "hide": true
@@ -397,7 +397,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_creation_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_creation_tokens [$__range]))",
           "legendFormat": "Cache Write",
           "queryType": "range",
           "hide": true
@@ -408,7 +408,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__range]))",
           "legendFormat": "Input",
           "queryType": "range",
           "hide": true
@@ -630,7 +630,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
           "legendFormat": "API Cost",
           "queryType": "range",
           "hide": true
@@ -725,7 +725,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap assistant_turns [$__range]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap assistant_turns [$__range]))",
           "legendFormat": "Total Turns",
           "queryType": "range",
           "hide": true
@@ -826,7 +826,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
+          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
           "legendFormat": "{{model}}",
           "queryType": "range"
         }
@@ -887,7 +887,7 @@
     {
       "id": 10,
       "title": "Token Usage by Type",
-      "description": "Cache reads dominate — that's your context window in action. Output includes thinking tokens.",
+      "description": "Cache reads dominate \u00e2\u20ac\u201d that's your context window in action. Output includes thinking tokens.",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
@@ -906,7 +906,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_read_tokens [$__interval]))",
           "legendFormat": "Context (cache read)",
           "queryType": "range"
         },
@@ -916,7 +916,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_creation_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_cache_creation_tokens [$__interval]))",
           "legendFormat": "Cache Write",
           "queryType": "range"
         },
@@ -926,7 +926,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__interval]))",
           "legendFormat": "Output",
           "queryType": "range"
         },
@@ -936,7 +936,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__interval]))",
+          "expr": "sum(sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__interval]))",
           "legendFormat": "Input (fresh)",
           "queryType": "range"
         }
@@ -1278,7 +1278,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
+          "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
           "legendFormat": "{{model}}",
           "queryType": "range"
         }
@@ -1408,7 +1408,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
+          "expr": "sum by (project) (sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__interval]))",
           "legendFormat": "{{project}}",
           "queryType": "range"
         }
@@ -1474,7 +1474,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum by (effort) (sum_over_time({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
+          "expr": "sum by (effort) (sum_over_time({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range]))",
           "legendFormat": "{{effort}}",
           "queryType": "instant"
         }
@@ -1909,7 +1909,7 @@
                     "type": "value",
                     "options": {
                       "true": {
-                        "text": "🧠 Yes",
+                        "text": "\u00f0\u0178\u00a7\u00a0 Yes",
                         "color": "#ffd166"
                       }
                     }
@@ -1933,7 +1933,7 @@
     {
       "id": 200,
       "type": "row",
-      "title": "Burn Rate — $/hr & Tokens/min",
+      "title": "Burn Rate \u00e2\u20ac\u201d $/hr & Tokens/min",
       "description": "How fast you are consuming API-equivalent budget. Averages over the selected time window.",
       "collapsed": false,
       "gridPos": {
@@ -1965,7 +1965,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range])) * 3600",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range])) * 3600",
           "legendFormat": "$/hr",
           "queryType": "instant"
         }
@@ -2038,7 +2038,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap cost_usd [$__range])) * 60",
           "legendFormat": "$/min",
           "queryType": "instant"
         }
@@ -2111,7 +2111,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range])) * 60",
           "legendFormat": "tokens/min",
           "queryType": "instant"
         }
@@ -2185,7 +2185,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_input_tokens [$__range])) * 60",
           "queryType": "instant",
           "hide": true
         },
@@ -2195,7 +2195,7 @@
             "type": "loki",
             "uid": "loki_local"
           },
-          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range])) * 60",
+          "expr": "sum(rate({app=\"claude-token-metrics\"} | json | __error__=\"\" | model=~\"$model\" | project=~\"$project\" | effort=~\"$effort\" | unwrap total_output_tokens [$__range])) * 60",
           "queryType": "instant",
           "hide": true
         },
@@ -2260,7 +2260,7 @@
     {
       "id": 300,
       "type": "row",
-      "title": "Tool Performance — Duration & Cost Correlation",
+      "title": "Tool Performance \u00e2\u20ac\u201d Duration & Cost Correlation",
       "description": "How long each tool type takes. Correlates tool execution time with token cost per turn.",
       "collapsed": false,
       "gridPos": {
@@ -2732,7 +2732,7 @@
     {
       "id": 400,
       "type": "row",
-      "title": "User Engagement — Think Time",
+      "title": "User Engagement \u00e2\u20ac\u201d Think Time",
       "description": "How long the user pauses to review Claude's output before sending the next prompt. Measured from last session-stop to next user-prompt-submit. Longer = more deliberate review.",
       "collapsed": false,
       "gridPos": {
@@ -2819,7 +2819,7 @@
     {
       "id": 402,
       "title": "Median Think Time",
-      "description": "P50 pause duration. More robust than avg — not skewed by long overnight gaps.",
+      "description": "P50 pause duration. More robust than avg \u00e2\u20ac\u201d not skewed by long overnight gaps.",
       "type": "stat",
       "transparent": true,
       "gridPos": {
