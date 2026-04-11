@@ -4,7 +4,9 @@ import logging
 import threading
 import time
 
+import sentry_sdk
 from flask import Flask, jsonify, request
+from sentry_sdk.integrations.flask import FlaskIntegration
 
 from config import Config
 from loki_handler import LokiHandler
@@ -21,6 +23,18 @@ config = Config.from_env()
 loki_handler = LokiHandler(config.loki_url, env=config.env_label)
 loki_handler.setLevel(logging.INFO)
 logging.getLogger().addHandler(loki_handler)
+
+# Register Sentry Flask integration so HTTP-level exceptions carry request context.
+# The SentryClient in Sentinel also calls sentry_sdk.init() — that's fine; the SDK
+# is idempotent for the second call when already initialized.
+if config.sentry_dsn:
+    sentry_sdk.init(
+        dsn=config.sentry_dsn,
+        environment=config.env_label,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+    )
 
 app = Flask(__name__)
 sentinel = Sentinel(config)

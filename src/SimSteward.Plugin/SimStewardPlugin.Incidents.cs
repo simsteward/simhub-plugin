@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Sentry;
 
 namespace SimSteward.Plugin
 {
@@ -118,9 +119,11 @@ namespace SimSteward.Plugin
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // ignored — session YAML can be transiently inconsistent
+                // Session YAML can be transiently inconsistent; capture to Sentry so persistent
+                // failures (e.g. iRacing SDK version regressions) surface as a grouped issue.
+                SentrySdk.CaptureException(ex);
             }
         }
 

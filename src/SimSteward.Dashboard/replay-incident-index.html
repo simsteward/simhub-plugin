@@ -76,6 +76,20 @@ Sentry.init({
   integrations: [Sentry.replayIntegration()],
   initialScope: { tags: { dashboard: 'replay-incident-index' } },
 });
+
+function sendDashboardUiEvent({ element_id, event_type, message }) {
+  if (typeof Sentry !== 'undefined') {
+    Sentry.addBreadcrumb({ category: 'ui.' + event_type, message, data: { element_id }, level: 'info' });
+  }
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  try {
+    ws.send(JSON.stringify({ action: 'log', event: 'dashboard_ui_event', element_id, event_type, message }));
+    return true;
+  } catch (err) {
+    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
+    return false;
+  }
+}
 </script>
 </head>
 <body>
@@ -147,11 +161,21 @@ function connectWs() {
     pill.textContent = 'WS …';
     pill.className = 'ws-pill bad';
     ws = new WebSocket(wsUrl());
-    ws.onopen = () => { pill.textContent = 'WS connected'; pill.className = 'ws-pill ok'; };
+    ws.onopen = () => {
+      pill.textContent = 'WS connected'; pill.className = 'ws-pill ok';
+      if (typeof Sentry !== 'undefined') {
+        Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket connected', level: 'info' });
+        Sentry.setTag('ws_connected', true);
+      }
+    };
     ws.onclose = () => {
       ws = null;
       pill.textContent = 'WS reconnecting…';
       pill.className = 'ws-pill bad';
+      if (typeof Sentry !== 'undefined') {
+        Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket disconnected', level: 'warning' });
+        Sentry.setTag('ws_connected', false);
+      }
       setTimeout(connectWs, 3000);
     };
     ws.onerror = () => {};
@@ -178,6 +202,7 @@ function onMsg(m) {
 }
 
 function onState(m) {
+  if (m.pluginVersion && typeof Sentry !== 'undefined') Sentry.setTag('plugin_version', m.pluginVersion);
   const rii = m.replayIncidentIndex;
   lastSessionNum = m.replaySessionNum != null ? m.replaySessionNum : 0;
   if (!rii) return;
@@ -298,15 +323,18 @@ function seekRow(argJson) {
     toast('Seek unavailable (not replay mode).');
     return;
   }
+  sendDashboardUiEvent({ element_id: 'btn-seek', event_type: 'click', message: 'Seek to incident' });
   send('replay_incident_index_seek', argJson);
 }
 
 function sendBuild(verb) {
+  sendDashboardUiEvent({ element_id: 'btn-' + verb, event_type: 'click', message: verb === 'start' ? 'Start index build' : 'Cancel index build' });
   send('replay_incident_index_build', verb);
 }
 
 function toggleRecord() {
   const on = lastIdx && lastIdx.recordMode;
+  sendDashboardUiEvent({ element_id: 'btn-record', event_type: 'click', message: on ? 'Stop recording' : 'Start recording' });
   send('replay_incident_index_record', on ? 'off' : 'on');
 }
 

@@ -9,10 +9,22 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+import sentry_sdk
 from flask import Flask, request, jsonify
+from sentry_sdk.integrations.flask import FlaskIntegration
 
 app = Flask(__name__)
 DB_PATH = os.environ.get("SIMSTEWARD_DB_PATH", "/data/simsteward.db")
+
+_sentry_dsn = os.environ.get("SENTINEL_SENTRY_DSN", "")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        environment=os.environ.get("SIMSTEWARD_LOG_ENV", "local"),
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+    )
 
 
 def get_db():
@@ -170,6 +182,7 @@ def session_complete():
         return jsonify({"ok": True, "sub_session_id": sub_session_id})
     except Exception as e:
         conn.rollback()
+        sentry_sdk.capture_exception(e)
         return jsonify({"error": str(e)}), 500
     finally:
         conn.close()

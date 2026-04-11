@@ -118,18 +118,24 @@ namespace SimSteward.Plugin
         {
             if (!_preflightSnapshot.AllPassed)
             {
-                _logger?.Warn("DataCaptureSuite: cannot start — preflight not passed.");
+                _logger?.Structured("WARN", "simhub-plugin", "suite_cannot_start",
+                    "DataCaptureSuite cannot start — preflight not passed.",
+                    new Dictionary<string, object> { ["reason"] = "preflight_not_passed" }, "lifecycle", null);
                 return;
             }
             if (_irsdk == null || !_irsdk.IsConnected)
             {
-                _logger?.Warn("DataCaptureSuite: cannot start — iRacing not connected.");
+                _logger?.Structured("WARN", "simhub-plugin", "suite_cannot_start",
+                    "DataCaptureSuite cannot start — iRacing not connected.",
+                    new Dictionary<string, object> { ["reason"] = "iracing_not_connected" }, "lifecycle", null);
                 return;
             }
             string simMode = _irsdk.Data?.SessionInfo?.WeekendInfo?.SimMode ?? "";
             if (!string.Equals(simMode, "replay", StringComparison.OrdinalIgnoreCase))
             {
-                _logger?.Warn("DataCaptureSuite: cannot start — not in replay mode.");
+                _logger?.Structured("WARN", "simhub-plugin", "suite_cannot_start",
+                    "DataCaptureSuite cannot start — not in replay mode.",
+                    new Dictionary<string, object> { ["reason"] = "not_replay_mode" }, "lifecycle", null);
                 return;
             }
             _suiteSkipList = new HashSet<string>(skipIds ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
@@ -777,7 +783,14 @@ namespace SimSteward.Plugin
             catch (Exception ex)
             {
                 SentrySdk.CaptureException(ex);
-                _logger?.Warn("DataCaptureSuite T0 rewind: " + ex.Message);
+                _logger?.Structured("WARN", "simhub-plugin", "suite_step_exception",
+                    "DataCaptureSuite T0 rewind: " + ex.Message,
+                    new Dictionary<string, object>
+                    {
+                        ["step"] = "T0_Rewind",
+                        ["exception_type"] = ex.GetType().Name,
+                        ["exception_message"] = ex.Message,
+                    }, "lifecycle", null);
             }
 
             StartReplayIncidentIndexRecordModeLocked("suite_t0");

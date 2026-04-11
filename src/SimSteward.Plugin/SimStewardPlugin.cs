@@ -176,6 +176,70 @@ namespace SimSteward.Plugin
 
         private void OnLogWritten(LogEntry entry)
         {
+            if (entry != null)
+            {
+                // ── Sentry: WARN/ERROR → captured message ─────────────────────────
+                if (entry.Level == "WARN" || entry.Level == "ERROR")
+                {
+                    try
+                    {
+                        var sentryLevel = entry.Level == "ERROR" ? SentryLevel.Error : SentryLevel.Warning;
+                        SentrySdk.CaptureMessage(
+                            $"[{entry.Event ?? entry.Component ?? "plugin"}] {entry.Message}",
+                            scope =>
+                            {
+                                scope.Level = sentryLevel;
+                                if (!string.IsNullOrEmpty(entry.Component))  scope.SetTag("component",   entry.Component);
+                                if (!string.IsNullOrEmpty(entry.Event))      scope.SetTag("event_type",  entry.Event);
+                                if (!string.IsNullOrEmpty(entry.Domain))     scope.SetTag("domain",      entry.Domain);
+                                if (!string.IsNullOrEmpty(entry.SessionId))  scope.SetTag("session_id",  entry.SessionId);
+                                var ctx = new System.Collections.Generic.Dictionary<string, object>
+                                {
+                                    ["level"]       = entry.Level,
+                                    ["component"]   = entry.Component ?? "",
+                                    ["event_type"]  = entry.Event ?? "",
+                                    ["domain"]      = entry.Domain ?? "",
+                                    ["session_id"]  = entry.SessionId ?? "",
+                                    ["session_seq"] = entry.SessionSeq ?? "",
+                                };
+                                if (entry.Fields != null)
+                                    foreach (var kv in entry.Fields) ctx[kv.Key] = kv.Value;
+                                scope.Contexts["plugin_log"] = ctx;
+                                // Fingerprint: group all occurrences of the same event_type into ONE Sentry issue
+                                scope.SetFingerprint(new[]
+                                {
+                                    "simsteward-plugin",
+                                    entry.Component ?? "unknown",
+                                    entry.Event ?? "message",
+                                });
+                            });
+                    }
+                    catch { /* never let Sentry forwarding crash the logging pipeline */ }
+                }
+                // ── Sentry: structured INFO events → breadcrumbs ─────────────────
+                // Gate on entry.Event != null: skip unstructured _logger.Info("...") calls
+                // which have no category and would flood the breadcrumb trail.
+                else if (entry.Level == "INFO" && !string.IsNullOrEmpty(entry.Event))
+                {
+                    try
+                    {
+                        var data = new System.Collections.Generic.Dictionary<string, string>
+                            { ["event_type"] = entry.Event };
+                        if (!string.IsNullOrEmpty(entry.Domain)) data["domain"] = entry.Domain;
+                        if (entry.Fields != null)
+                            foreach (var kv in entry.Fields)
+                                if (kv.Value != null) data[kv.Key] = kv.Value.ToString();
+                        SentrySdk.AddBreadcrumb(
+                            message:  entry.Message ?? entry.Event,
+                            category: entry.Component ?? "plugin",
+                            data:     data,
+                            level:    BreadcrumbLevel.Info);
+                    }
+                    catch { }
+                }
+            }
+
+            // ── Existing: broadcast log entry to dashboard ───────────────────────
             if (entry == null || _bridge == null) return;
             try
             {
@@ -190,6 +254,26 @@ namespace SimSteward.Plugin
 
         private void OnLogWriteError(string eventType, Exception ex)
         {
+            // Capture to Sentry first — log I/O failures are high-priority health signals
+            try
+            {
+                SentrySdk.CaptureMessage($"Log write failed: {eventType}",
+                    scope =>
+                    {
+                        scope.Level = SentryLevel.Error;
+                        scope.SetTag("event_type", eventType);
+                        scope.SetTag("component", "plugin_logger");
+                        scope.Contexts["plugin_log"] = new System.Collections.Generic.Dictionary<string, object>
+                        {
+                            ["error_event_type"] = eventType,
+                            ["exception_message"] = ex?.Message ?? "",
+                            ["exception_type"]    = ex?.GetType().Name ?? "",
+                        };
+                        scope.SetFingerprint(new[] { "simsteward-plugin", "log_write_error", eventType });
+                    });
+            }
+            catch { }
+
             // Write directly to plugin.log to avoid re-entering PluginLogger
             var logPath = _logger?.LogPath;
             if (!string.IsNullOrEmpty(logPath))
@@ -618,6 +702,10 @@ namespace SimSteward.Plugin
                 var parentTx = scope.Transaction;
                 if (parentTx != null)
                     _actionSpan = parentTx.StartChild("action", action ?? "unknown");
+                // Push action context as tags so any CaptureException inside this dispatch
+                // carries searchable action/correlation_id regardless of parent TX presence.
+                scope.SetTag("action",         action ?? "unknown");
+                scope.SetTag("correlation_id", correlationId ?? "");
             });
 
             var dispatchFields = new System.Collections.Generic.Dictionary<string, object>
@@ -980,15 +1068,18 @@ namespace SimSteward.Plugin
 
         private void OnLog(string level, string message, string source)
         {
-            var prefix = "[OVERLAY]";
-            if (!string.IsNullOrEmpty(source)) prefix += " [" + source + "]";
-            var line = prefix + " " + message;
-            if (string.Equals(level, "warn", StringComparison.OrdinalIgnoreCase))
-                _logger?.Warn(line);
-            else if (string.Equals(level, "error", StringComparison.OrdinalIgnoreCase))
-                _logger?.Error(line);
-            else
-                _logger?.Info(line);
+            var structuredLevel = string.Equals(level, "warn",  StringComparison.OrdinalIgnoreCase) ? "WARN"
+                                : string.Equals(level, "error", StringComparison.OrdinalIgnoreCase) ? "ERROR"
+                                : "INFO";
+            var eventType = structuredLevel == "ERROR" ? "overlay_error"
+                          : structuredLevel == "WARN"  ? "overlay_warn"
+                          : "overlay_info";
+            var fields = new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["source"]      = source ?? "",
+                ["raw_message"] = message ?? "",
+            };
+            _logger?.Structured(structuredLevel, "dashboard", eventType, message ?? "", fields, "ui", null);
         }
 
         private void OnDashboardStructuredLog(string eventType, string message, System.Collections.Generic.Dictionary<string, object> fields)
@@ -1156,6 +1247,13 @@ namespace SimSteward.Plugin
                     {
                         sentryEvent.SetTag("plugin_mode", _pluginMode ?? "Unknown");
                         sentryEvent.SetTag("iracing_connected", (_irsdk?.IsConnected ?? false).ToString().ToLowerInvariant());
+                        // Session context — makes every captured event filterable by race session
+                        var sub    = _logCtxSubsession;
+                        var track  = _logCtxTrack;
+                        var sesNum = _logCtxSessionNum;
+                        if (!string.IsNullOrEmpty(sub)    && sub    != SessionLogging.NotInSession) sentryEvent.SetTag("subsession_id", sub);
+                        if (!string.IsNullOrEmpty(track)  && track  != SessionLogging.NotInSession) sentryEvent.SetTag("track",         track);
+                        if (!string.IsNullOrEmpty(sesNum) && sesNum != SessionLogging.NotInSession) sentryEvent.SetTag("session_num",   sesNum);
                         return sentryEvent;
                     });
                 });

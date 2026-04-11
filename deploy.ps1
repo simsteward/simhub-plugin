@@ -86,13 +86,61 @@ function Push-LokiEvent {
     }
 }
 
+# ── Sentry error capture (store API — no sentry-cli required) ────────────────
+# Sends a Sentry error event directly via the DSN store endpoint.
+# Called at each fatal deploy failure so breakages surface in Sentry
+# even when the deploy script terminates before the release-tracking block.
+function Push-SentryError {
+    param(
+        [string]$Message,
+        [string]$Stage,
+        [hashtable]$Extra = @{}
+    )
+    # $script:sentryDsn is set immediately after git info is resolved (see below).
+    if (-not $script:sentryDsn) { return }
+    try {
+        $eventId = [System.Guid]::NewGuid().ToString("N")
+        $tsUnix  = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $tags    = @{
+            stage      = $Stage
+            git_branch = $script:gitBranch
+            git_sha    = $script:gitSha
+            env        = $env:SIMSTEWARD_LOG_ENV
+        }
+        $body = @{
+            event_id  = $eventId
+            timestamp = $tsUnix
+            platform  = 'other'
+            level     = 'error'
+            message   = @{ formatted = $Message }
+            tags      = $tags
+            extra     = $Extra
+        } | ConvertTo-Json -Compress -Depth 5
+        $storeUrl = "https://$($script:sentryDsn.IngestDomain)/api/$($script:sentryDsn.ProjectId)/store/"
+        $hdrs = @{
+            'Content-Type'  = 'application/json'
+            'X-Sentry-Auth' = "Sentry sentry_version=7, sentry_key=$($script:sentryDsn.PublicKey)"
+        }
+        Invoke-RestMethod -Uri $storeUrl -Method Post -Headers $hdrs -Body $body -TimeoutSec 5 | Out-Null
+    } catch {
+        # Non-fatal — deploy must not fail because Sentry is down
+    }
+}
+
 # Resolve git info for deploy context
-$gitBranch = ''
-$gitSha = ''
+$script:gitBranch = ''
+$script:gitSha = ''
 try {
-    $gitBranch = (& git -C $PluginRoot rev-parse --abbrev-ref HEAD 2>$null)
-    $gitSha = (& git -C $PluginRoot rev-parse --short HEAD 2>$null)
+    $script:gitBranch = (& git -C $PluginRoot rev-parse --abbrev-ref HEAD 2>$null)
+    $script:gitSha    = (& git -C $PluginRoot rev-parse --short HEAD 2>$null)
 } catch {}
+$gitBranch = $script:gitBranch
+$gitSha    = $script:gitSha
+
+# Resolve Sentry DSN early so Push-SentryError works from the first failure point.
+# Parse-SentryDsn is defined later in the file but PowerShell parses function
+# definitions before running the script body.
+$script:sentryDsn = Parse-SentryDsn $env:SIMSTEWARD_SENTRY_DSN
 
 # ── EVENT: deploy_started ────────────────────────────────────────────────────
 Push-LokiEvent 'deploy_started' 'INFO' 'Deploy script started' @{
@@ -160,6 +208,7 @@ if (-not $SimHubPath) { $SimHubPath = "C:\Program Files (x86)\SimHub" }
 $SimHubExe = Join-Path $SimHubPath "SimHubWPF.exe"
 if (-not (Test-Path $SimHubExe)) {
     Push-LokiEvent 'deploy_failed' 'ERROR' 'SimHub not found' @{ simhub_path = $SimHubPath }
+    Push-SentryError "Deploy failed: SimHub not found at $SimHubExe" 'simhub_not_found' @{ simhub_path = $SimHubPath }
     Write-Error "SimHub not found at: $SimHubExe. Set SIMHUB_PATH to your SimHub folder."
 }
 Write-Host "SimHub path: $SimHubPath"
@@ -173,6 +222,7 @@ Push-LokiEvent 'deploy_simhub_found' 'INFO' "SimHub located at $SimHubPath" @{
 $DashboardSource = Join-Path $PluginRoot "src\SimSteward.Dashboard\index.html"
 if (-not (Test-Path $DashboardSource)) {
     Push-LokiEvent 'deploy_failed' 'ERROR' 'Dashboard source not found' @{ path = $DashboardSource }
+    Push-SentryError "Deploy failed: Dashboard source not found" 'dashboard_source_missing' @{ path = $DashboardSource }
     Write-Error "Dashboard source not found: $DashboardSource"
 }
 # SimHub serves static HTML from Web/, not DashTemplates/ (DashTemplates requires .djson catalog)
@@ -206,11 +256,13 @@ Push-Location $PluginRoot
 try {
     & dotnet build "src\SimSteward.Plugin\SimSteward.Plugin.csproj" -c Release --nologo -v q
     if ($LASTEXITCODE -ne 0) {
+        $buildFailDuration = [math]::Round(((Get-Date) - $buildStart).TotalSeconds, 1)
         Push-LokiEvent 'deploy_build_result' 'ERROR' "Build failed (exit $LASTEXITCODE)" @{
             status    = 'failed'
             exit_code = $LASTEXITCODE
-            duration_s = [math]::Round(((Get-Date) - $buildStart).TotalSeconds, 1)
+            duration_s = $buildFailDuration
         }
+        Push-SentryError "Deploy failed: dotnet build exited $LASTEXITCODE" 'build_failed' @{ exit_code = $LASTEXITCODE; duration_s = $buildFailDuration }
         throw "Build failed with exit code $LASTEXITCODE."
     }
 } finally { Pop-Location }
@@ -228,6 +280,7 @@ if (-not (Test-Path (Join-Path $outDir "SimSteward.Plugin.dll"))) {
 }
 if (-not (Test-Path (Join-Path $outDir "SimSteward.Plugin.dll"))) {
     Push-LokiEvent 'deploy_failed' 'ERROR' 'Build output not found' @{ out_dir = $outDir }
+    Push-SentryError "Deploy failed: Build output not found" 'build_output_missing' @{ out_dir = $outDir }
     Write-Error "Build output not found. Expected SimSteward.Plugin.dll in bin\Plugin or bin\Plugin\net48"
 }
 
@@ -259,6 +312,7 @@ if (-not $skipTests) {
                         retried    = $true
                         duration_s = $testDuration
                     }
+                    Push-SentryError "Deploy failed: Unit tests failed after retry" 'unit_tests_failed' @{ duration_s = $testDuration }
                     throw "Tests failed after retry. Deploy aborted - 100% pass required."
                 }
             }
@@ -383,6 +437,7 @@ if (Test-Path $readmeSource) {
 }
 if (-not (Test-Path $dashboardTargetFile)) {
     Push-LokiEvent 'deploy_failed' 'ERROR' 'Dashboard copy failed' @{ target = $dashboardTargetFile }
+    Push-SentryError "Deploy failed: Dashboard copy failed" 'dashboard_copy_failed' @{ target = $dashboardTargetFile }
     Write-Error "Dashboard copy failed."
 }
 Push-LokiEvent 'deploy_dashboard_copied' 'INFO' "Copied $($copiedDashboards.Count) dashboard files" @{
@@ -418,6 +473,7 @@ if (-not (Test-DeploySuccess)) {
             status  = 'failed'
             retried = $true
         }
+        Push-SentryError "Deploy failed: File verification failed after retry" 'verify_failed' @{ target_dir = $SimHubPath }
         Write-Error "Deploy failed after retry. Check permissions and disk space."
     }
 }
@@ -463,8 +519,6 @@ function Parse-SentryDsn {
     }
     return $null
 }
-
-$script:sentryDsn = Parse-SentryDsn $env:SIMSTEWARD_SENTRY_DSN
 
 function Push-SentryApi {
     param([string]$Path, [hashtable]$Body)

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using IRSDKSharper;
+using Sentry;
 
 namespace SimSteward.Plugin
 {
@@ -56,7 +57,14 @@ namespace SimSteward.Plugin
             }
             catch (Exception ex)
             {
-                _logger.Warn("replay_incident_index telemetry: " + ex.Message);
+                SentrySdk.CaptureException(ex);
+                _logger.Structured("WARN", "simhub-plugin", "replay_index_telemetry_exception",
+                    "Replay incident index telemetry tick threw: " + ex.Message,
+                    new Dictionary<string, object>
+                    {
+                        ["exception_type"]    = ex.GetType().Name,
+                        ["exception_message"] = ex.Message,
+                    }, "lifecycle", null);
             }
 
             try
@@ -65,7 +73,16 @@ namespace SimSteward.Plugin
             }
             catch (Exception ex)
             {
-                _logger.Warn("data_capture_suite tick: " + ex.Message);
+                SentrySdk.CaptureException(ex);
+                _logger.Structured("WARN", "simhub-plugin", "suite_tick_exception",
+                    "DataCaptureSuite tick threw unexpected exception: " + ex.Message,
+                    new Dictionary<string, object>
+                    {
+                        ["exception_type"]    = ex.GetType().Name,
+                        ["exception_message"] = ex.Message,
+                        ["suite_step"]        = _suiteStep.ToString(),
+                        ["suite_phase"]       = _suitePhase.ToString(),
+                    }, "lifecycle", null);
             }
 
             try
@@ -74,7 +91,14 @@ namespace SimSteward.Plugin
             }
             catch (Exception ex)
             {
-                _logger.Warn("replay_incident_index record sample: " + ex.Message);
+                SentrySdk.CaptureException(ex);
+                _logger.Structured("WARN", "simhub-plugin", "replay_record_sample_exception",
+                    "Replay incident index record sample threw: " + ex.Message,
+                    new Dictionary<string, object>
+                    {
+                        ["exception_type"]    = ex.GetType().Name,
+                        ["exception_message"] = ex.Message,
+                    }, "lifecycle", null);
             }
         }
 
