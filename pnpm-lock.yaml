@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@secretlint/secretlint-rule-preset-recommend':
-        specifier: ^11.4.0
-        version: 11.4.0
+        specifier: ^12.1.0
+        version: 12.1.0
       dotenv-cli:
         specifier: ^7.4.4
         version: 7.4.4
@@ -72,9 +72,9 @@ packages:
   '@secretlint/resolver@11.4.0':
     resolution: {integrity: sha512-PeK3F6U+SOvYcwXh2b97RBghLfOO5euGxaA7UKQe2nWcef9VkcLTX6ni+dRYdPJExOxU6WMWCdfY5yVbhd6aJw==}
 
-  '@secretlint/secretlint-rule-preset-recommend@11.4.0':
-    resolution: {integrity: sha512-Jg6MsrDHYDpeEt9adqO6hLqqJLsGT+D/d87wrQCC+D24e7w07V/zpR07K63YogRtPyPKX0tneKnyR884ji7DSA==}
-    engines: {node: '>=20.0.0'}
+  '@secretlint/secretlint-rule-preset-recommend@12.1.0':
+    resolution: {integrity: sha512-825tWpL0tVw8h7j6HrdrEY3ZkRcOXytv1U8C0EVTvrhKr51eCMOWHYezIPeZJPp5SnWHlZUTO8fZO/DLPB6EYw==}
+    engines: {node: '>=22.0.0'}
 
   '@secretlint/source-creator@11.4.0':
     resolution: {integrity: sha512-j4I1hBBYFbnBVEcj5EEbi4iXT/uK+gg6MBycBo2t2+HPzQ7pg2MDD5aWGHyd5qelrRcCV5Gw4VzMXz/NMKD2Wg==}
@@ -540,7 +540,7 @@ snapshots:
 
   '@secretlint/resolver@11.4.0': {}
 
-  '@secretlint/secretlint-rule-preset-recommend@11.4.0': {}
+  '@secretlint/secretlint-rule-preset-recommend@12.1.0': {}
 
   '@secretlint/source-creator@11.4.0':
     dependencies:
