@@ -139,7 +139,7 @@ class T1Agent:
         raw_summary = ""
         try:
             result = self.ollama.generate(
-                self.config.ollama_model_fast,
+                self.config.ollama_model,
                 system + "\n\n" + summary_prompt,
                 think=False,
             )
@@ -168,7 +168,7 @@ class T1Agent:
         raw_anomaly = ""
         try:
             result = self.ollama.generate(
-                self.config.ollama_model_fast,
+                self.config.ollama_model,
                 system + "\n\n" + anomaly_prompt,
                 think=True,
             )
@@ -212,7 +212,7 @@ class T1Agent:
             anomalies=anomalies,
             invocations=invocations,
             evidence_packets=evidence_packets,
-            model=self.config.ollama_model_fast,
+            model=self.config.ollama_model,
             summary_duration_ms=summary_ms,
             anomaly_duration_ms=anomaly_ms,
             summary_input_tokens=summary_in_tok,

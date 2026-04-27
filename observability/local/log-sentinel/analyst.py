@@ -54,7 +54,10 @@ class T2Result:
     model: str
     inference_duration_ms: int
     logql_gather_duration_ms: int
-    raw_response: str = field(repr=False)
+    information_gaps: str = ""
+    would_help: str = ""
+    evidence_quality: str = "partial"
+    raw_response: str = field(repr=False, default="")
 
     @property
     def total_duration_ms(self) -> int:
@@ -112,7 +115,7 @@ class Analyst:
         raw_summary = ""
         try:
             raw_summary, summary_ms = self.ollama.generate(
-                self.config.ollama_model_fast,
+                self.config.ollama_model,
                 system + "\n\n" + summary_prompt,
                 think=False,
             )
@@ -135,7 +138,7 @@ class Analyst:
         raw_anomaly = ""
         try:
             raw_anomaly, anomaly_ms = self.ollama.generate(
-                self.config.ollama_model_fast,
+                self.config.ollama_model,
                 system + "\n\n" + anomaly_prompt,
                 think=True,
             )
@@ -158,7 +161,7 @@ class Analyst:
             summary=summary_text,
             cycle_notes=cycle_notes,
             anomalies=anomalies,
-            model=self.config.ollama_model_fast,
+            model=self.config.ollama_model,
             summary_duration_ms=summary_ms,
             anomaly_duration_ms=anomaly_ms,
             raw_summary_response=raw_summary,
@@ -209,7 +212,7 @@ class Analyst:
         infer_ms = 0
         try:
             raw, infer_ms = self.ollama.generate(
-                self.config.ollama_model_deep,
+                self.config.ollama_model,
                 system + "\n\n" + prompt,
                 think=True,
             )
@@ -219,18 +222,33 @@ class Analyst:
             logger.error("T2 inference failed: %s", e)
 
         parsed = _parse_json(raw)
+
+        root_cause = parsed.get("root_cause", "")
+        issue_type = _normalize_issue_type(parsed.get("issue_type", "unknown"))
+        confidence = _normalize_confidence(parsed.get("confidence", "low"))
+        evidence_quality = _normalize_evidence_quality(parsed.get("evidence_quality", "partial"))
+
+        _inconclusive = not root_cause or "unable to determine" in root_cause.lower()
+        if _inconclusive or issue_type == "unknown":
+            evidence_quality = "insufficient"
+            if not root_cause:
+                root_cause = "Root cause could not be determined from available evidence."
+
         result = T2Result(
-            root_cause=parsed.get("root_cause", "Unable to determine root cause."),
-            issue_type=_normalize_issue_type(parsed.get("issue_type", "unknown")),
-            confidence=_normalize_confidence(parsed.get("confidence", "low")),
+            root_cause=root_cause,
+            issue_type=issue_type,
+            confidence=confidence,
             correlation=parsed.get("correlation", "No correlations identified."),
             impact=parsed.get("impact", "Impact unknown."),
             recommendation=parsed.get("recommendation", "Investigate manually."),
             logql_queries_used=queries,
             sentry_worthy=bool(parsed.get("sentry_worthy", False)),
-            model=self.config.ollama_model_deep,
+            model=self.config.ollama_model,
             inference_duration_ms=infer_ms,
             logql_gather_duration_ms=gather_ms,
+            information_gaps=parsed.get("information_gaps", ""),
+            would_help=parsed.get("would_help", ""),
+            evidence_quality=evidence_quality,
             raw_response=raw,
         )
 
@@ -263,7 +281,7 @@ class Analyst:
         )
         try:
             raw, _ = self.ollama.generate(
-                self.config.ollama_model_fast,
+                self.config.ollama_model,
                 prompt,
                 think=False,
                 temperature=0.0,
@@ -346,6 +364,10 @@ def _normalize_confidence(v: str) -> str:
 def _normalize_issue_type(v: str) -> str:
     valid = ("error_spike", "config", "regression", "user_behavior", "infra", "unknown")
     return v if v in valid else "unknown"
+
+
+def _normalize_evidence_quality(v: str) -> str:
+    return v if v in ("complete", "partial", "insufficient") else "partial"
 
 
 def _valid_logql(q: str) -> bool:

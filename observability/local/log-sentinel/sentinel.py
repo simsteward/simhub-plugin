@@ -82,13 +82,12 @@ class Sentinel:
     def start(self):
         """Blocking schedule loop."""
         logger.info(
-            "Sentinel v3 started: mode=%s t1=%ds t2=%ds t3=%ds fast=%s deep=%s",
+            "Sentinel v3 started: mode=%s t1=%ds t2=%ds t3=%ds model=%s",
             self.config.sentinel_mode,
             self.config.t1_interval_sec,
             self.config.t2_interval_sec,
             self.config.t3_interval_sec,
-            self.config.ollama_model_fast,
-            self.config.ollama_model_deep,
+            self.config.ollama_model,
         )
         self.run_cycle()
         schedule.every(self.config.t1_interval_sec).seconds.do(self.run_cycle)

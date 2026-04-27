@@ -147,7 +147,7 @@ class T3Agent:
         tps = 0.0
         try:
             t3_ollama = self.ollama.generate(
-                self.config.ollama_model_deep,
+                self.config.ollama_model,
                 system + "\n\n" + prompt,
                 think=True,
             )
@@ -184,7 +184,7 @@ class T3Agent:
             baselines_updated=baselines_updated,
             threshold_recommendations=threshold_recs,
             session_narratives=session_narratives,
-            model=self.config.ollama_model_deep,
+            model=self.config.ollama_model,
             inference_duration_ms=infer_ms,
             input_tokens=in_tok,
             output_tokens=out_tok,

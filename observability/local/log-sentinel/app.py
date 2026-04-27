@@ -135,7 +135,7 @@ def status():
         "t3_interval_sec": config.t3_interval_sec,
         "lookback_sec": config.lookback_sec,
         "t2_enabled": config.t2_enabled,
-        "models": {"fast": config.ollama_model_fast, "deep": config.ollama_model_deep},
+        "models": {"default": config.ollama_model},
         "sentry_enabled": sentinel.sentry.enabled,
         "stats": sentinel._stats,
         "circuit_breakers": {

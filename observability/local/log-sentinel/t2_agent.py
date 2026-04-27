@@ -22,7 +22,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-from analyst import _parse_json, _normalize_confidence, _normalize_issue_type, _valid_logql
+from analyst import _parse_json, _normalize_confidence, _normalize_issue_type, _normalize_evidence_quality, _valid_logql
 from circuit_breaker import CircuitBreaker
 from config import Config
 from grafana_client import GrafanaClient
@@ -57,6 +57,9 @@ class T2Result:
     model: str
     inference_duration_ms: int
     logql_gather_duration_ms: int
+    information_gaps: str = ""
+    would_help: str = ""
+    evidence_quality: str = "partial"
     input_tokens: int = 0
     output_tokens: int = 0
     tokens_per_sec: float = 0.0
@@ -143,7 +146,7 @@ class T2Agent:
         tps = 0.0
         try:
             ollama_result = self.ollama.generate(
-                self.config.ollama_model_deep,
+                self.config.ollama_model,
                 system + "\n\n" + prompt,
                 think=True,
             )
@@ -157,10 +160,22 @@ class T2Agent:
         parsed = _parse_json(raw)
         all_queries = queries + list(parsed.get("logql_queries_used", []))
 
+        root_cause = parsed.get("root_cause", "")
+        issue_type = _normalize_issue_type(parsed.get("issue_type", "unknown"))
+        confidence = _normalize_confidence(parsed.get("confidence", "low"))
+        evidence_quality = _normalize_evidence_quality(parsed.get("evidence_quality", "partial"))
+
+        # Auto-upgrade evidence_quality when LLM produced no useful root cause
+        _inconclusive = not root_cause or "unable to determine" in root_cause.lower()
+        if _inconclusive or issue_type == "unknown":
+            evidence_quality = "insufficient"
+            if not root_cause:
+                root_cause = "Root cause could not be determined from available evidence."
+
         result = T2Result(
-            root_cause=parsed.get("root_cause", "Unable to determine root cause."),
-            issue_type=_normalize_issue_type(parsed.get("issue_type", "unknown")),
-            confidence=_normalize_confidence(parsed.get("confidence", "low")),
+            root_cause=root_cause,
+            issue_type=issue_type,
+            confidence=confidence,
             correlation=parsed.get("correlation", "No correlations identified."),
             impact=parsed.get("impact", "Impact unknown."),
             recommendation=parsed.get("recommendation", "Investigate manually."),
@@ -169,9 +184,12 @@ class T2Agent:
             sentry_fingerprint=str(parsed.get("sentry_fingerprint", ""))[:100],
             evidence_packet_count=len(packet_dicts),
             sentry_event_id=None,
-            model=self.config.ollama_model_deep,
+            model=self.config.ollama_model,
             inference_duration_ms=infer_ms,
             logql_gather_duration_ms=gather_ms,
+            information_gaps=parsed.get("information_gaps", ""),
+            would_help=parsed.get("would_help", ""),
+            evidence_quality=evidence_quality,
             input_tokens=in_tok,
             output_tokens=out_tok,
             tokens_per_sec=tps,
@@ -265,7 +283,7 @@ class T2Agent:
         )
         try:
             logql_gen_result = self.ollama.generate(
-                self.config.ollama_model_fast,
+                self.config.ollama_model,
                 prompt,
                 think=False,
                 temperature=0.0,
@@ -304,11 +322,18 @@ class T2Agent:
     def _annotate_grafana(self, result: T2Result) -> None:
         try:
             severity_tag = "critical" if result.confidence == "high" and result.sentry_worthy else "investigation"
+            gap_html = ""
+            if result.evidence_quality != "complete":
+                if result.information_gaps:
+                    gap_html += f"<b>Information gaps:</b> {result.information_gaps}<br>"
+                if result.would_help:
+                    gap_html += f"<b>Would help:</b> {result.would_help}<br>"
             self.grafana.annotate_raw(
                 title=f"T2 Investigation [{result.confidence}]: {result.root_cause[:80]}",
                 text=(
                     f"<b>Root cause:</b> {result.root_cause}<br>"
                     f"<b>Recommendation:</b> {result.recommendation}<br>"
+                    f"{gap_html}"
                     f"<em>Type: {result.issue_type} | Packets: {result.evidence_packet_count} | "
                     f"Model: {result.model}</em>"
                 ),
