@@ -121,7 +121,7 @@ class T2Agent:
 
         # Step 3: generate + execute targeted LogQL for additional evidence
         gather_start = time.time()
-        queries = self._generate_logql_queries(packet_dicts, lookback_sec // 60)
+        queries = self._generate_logql_queries(packet_dicts)
         logql_results = self._execute_logql_queries(queries, start_ns, end_ns)
         gather_ms = int((time.time() - gather_start) * 1000)
         self.loki.push_tool_call(
@@ -265,22 +265,16 @@ class T2Agent:
         '{app="claude-token-metrics"} | json',
     ]
 
-    def _generate_logql_queries(
-        self,
-        packet_dicts: list[dict],
-        window_minutes: int,
-    ) -> list[str]:
-        # Pull suggested_logql from evidence packets + hardcoded seeds
+    def _generate_logql_queries(self, packet_dicts: list[dict]) -> list[str]:
         from_packets = [
-            p["suggested_logql"] for p in packet_dicts
+            p["suggested_logql"].strip() for p in packet_dicts
             if p.get("suggested_logql") and _valid_logql(p["suggested_logql"])
         ]
-        combined = from_packets + self._SEED_QUERIES
         seen: set[str] = set()
         result = []
-        for q in combined:
+        for q in from_packets + self._SEED_QUERIES:
             q = q.strip()
-            if q not in seen and _valid_logql(q):
+            if q not in seen:
                 seen.add(q)
                 result.append(q)
         return result[:5]

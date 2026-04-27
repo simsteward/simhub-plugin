@@ -13,7 +13,7 @@ Key changes over v2 Analyst.run_t1():
 import logging
 from dataclasses import dataclass, field
 
-from analyst import _parse_json, _normalize_anomalies
+from analyst import _parse_json
 from baseline import BaselineManager
 from circuit_breaker import CircuitBreaker
 from config import Config
@@ -40,8 +40,8 @@ class T1Result:
     duration_ms: int
     input_tokens: int
     output_tokens: int
-    trigger_source: str          # "scheduled" | "grafana_alert"
-    alert_names: list[str]       # T0 alert names that triggered this run
+    trigger_source: str
+    alert_names: list[str]
     raw_response: str = field(repr=False, default="")
 
     @property

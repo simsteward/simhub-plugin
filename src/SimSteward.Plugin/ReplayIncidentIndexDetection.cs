@@ -21,6 +21,9 @@ namespace SimSteward.Plugin
         public const string SourcePlayerIncidentCount = "player_incident_count";
         public const string SourceTrackSurface = "track_surface";
 
+        /// <summary>iRacing SessionFlags bit: checkered flag shown.</summary>
+        public const int CheckeredSessionFlag = 0x0001;
+
         /// <summary>iRacing CarIdxTrackSurface value: car on the racing surface.</summary>
         public const int TrackSurfaceOnTrack  = 4;
         /// <summary>iRacing CarIdxTrackSurface value: car off the racing surface (excursion / incident).</summary>

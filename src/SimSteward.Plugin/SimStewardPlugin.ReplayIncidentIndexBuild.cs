@@ -328,10 +328,13 @@ namespace SimSteward.Plugin
             try { playing = _irsdk.Data.GetBool("IsReplayPlaying"); }
             catch { playing = SafeGetInt("IsReplayPlaying") != 0; }
 
-            // Checkered flag = natural race end; treat as completion.
-            bool checkered = (SafeGetInt("SessionFlags") & 0x0001) != 0;
-            if (checkered)
-                playing = false;
+            bool checkered = false;
+            if (playing)
+            {
+                checkered = (SafeGetInt("SessionFlags") & ReplayIncidentIndexDetection.CheckeredSessionFlag) != 0;
+                if (checkered)
+                    playing = false;
+            }
 
             if (playing)
             {
@@ -399,7 +402,6 @@ namespace SimSteward.Plugin
                 "Replay incident index: fast-forward complete (TR-010/011).", done, "lifecycle", null);
 
             _replayIndexFfWallClock = null;
-            int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
             _replayIndexLastValidationBlock = BuildReplayIndexValidationBlockLocked(_replayIndexIncidentSamples);
             FinalizeReplayIndexBuildLocked();
         }

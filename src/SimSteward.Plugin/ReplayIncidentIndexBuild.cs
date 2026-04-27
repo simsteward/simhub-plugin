@@ -33,9 +33,6 @@ namespace SimSteward.Plugin
         /// <summary>M6 TR-038 / TR-040: batched structured hint for 60Hz record mode (not per-tick).</summary>
         public const string EventRecordWindow = "replay_incident_index_record_window";
 
-        /// <summary>~2.5s at 60Hz telemetry between <c>ReplaySearchSessionTime</c> and <c>CamCarIdx</c> read (TR-025).</summary>
-        public const int CameraValidationCooldownTelemetryTicks = 150;
-
         /// <summary>
         /// Effective SDK sample rate relative to <strong>replay session time</strong> when replay plays at
         /// <paramref name="playSpeed"/>× (real-time poll ~60Hz). NFR-008 / §2.7.
