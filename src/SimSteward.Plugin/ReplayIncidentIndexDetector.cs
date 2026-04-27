@@ -10,7 +10,6 @@ namespace SimSteward.Plugin
     public sealed class ReplayIncidentIndexDetector
     {
         private readonly int[] _prevFlags = new int[ReplayIncidentIndexBuild.CarSlotCount];
-        private readonly int[] _prevFastRepairs = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _prevTrackSurface = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastRepairEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastFurledEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
@@ -18,7 +17,6 @@ namespace SimSteward.Plugin
         private readonly double[] _lastSurfaceEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
 
         private int _prevPlayerIncidents;
-        private readonly List<FastRepairDelta> _fastRepairDeltas = new List<FastRepairDelta>();
 
         private static void ValidateLength(string name, int[] arr, int required)
         {
@@ -29,15 +27,13 @@ namespace SimSteward.Plugin
         /// <summary>
         /// TR-005/006/017 baseline: first <see cref="Process"/> compares against these arrays, not zeros.
         /// </summary>
-        public void Reset(int[] baselineFlags, int baselinePlayerIncidents, int playerCarIdx, int[] baselineFastRepairs, int[] baselineTrackSurface = null)
+        public void Reset(int[] baselineFlags, int baselinePlayerIncidents, int playerCarIdx, int[] baselineTrackSurface = null)
         {
             ValidateLength(nameof(baselineFlags), baselineFlags, ReplayIncidentIndexBuild.CarSlotCount);
-            ValidateLength(nameof(baselineFastRepairs), baselineFastRepairs, ReplayIncidentIndexBuild.CarSlotCount);
             if (playerCarIdx < -1 || playerCarIdx >= ReplayIncidentIndexBuild.CarSlotCount)
                 throw new ArgumentOutOfRangeException(nameof(playerCarIdx));
 
             Array.Copy(baselineFlags, 0, _prevFlags, 0, ReplayIncidentIndexBuild.CarSlotCount);
-            Array.Copy(baselineFastRepairs, 0, _prevFastRepairs, 0, ReplayIncidentIndexBuild.CarSlotCount);
             _prevPlayerIncidents = baselinePlayerIncidents;
 
             if (baselineTrackSurface != null && baselineTrackSurface.Length >= ReplayIncidentIndexBuild.CarSlotCount)
@@ -52,12 +48,7 @@ namespace SimSteward.Plugin
                 _lastPlayerEmitSec[i]  = -1;
                 _lastSurfaceEmitSec[i] = -1;
             }
-
-            _fastRepairDeltas.Clear();
         }
-
-        /// <summary>TR-017 observations since <see cref="Reset"/>.</summary>
-        public IReadOnlyList<FastRepairDelta> FastRepairDeltas => _fastRepairDeltas;
 
         private bool TryTakePrimarySlot(double[] lastEmitByCar, int carIdx, double replaySessionTimeSec)
         {
@@ -73,19 +64,17 @@ namespace SimSteward.Plugin
         }
 
         /// <summary>
-        /// One native SDK sample: compare to previous frame, emit primary incidents and TR-017 side records.
+        /// One native SDK sample: compare to previous frame, emit primary incidents.
         /// </summary>
         public List<IncidentSample> Process(
             double replaySessionTimeSec,
             int[] flags,
             int playerIncidents,
             int playerCarIdx,
-            int[] fastRepairsUsed,
             int replayFrame,
             int[] trackSurface = null)
         {
             ValidateLength(nameof(flags), flags, ReplayIncidentIndexBuild.CarSlotCount);
-            ValidateLength(nameof(fastRepairsUsed), fastRepairsUsed, ReplayIncidentIndexBuild.CarSlotCount);
 
             var results = new List<IncidentSample>();
             int sessionTimeMs = ReplayIncidentIndexDetection.ToSessionTimeMs(replaySessionTimeSec);
@@ -117,20 +106,7 @@ namespace SimSteward.Plugin
                         replayFrame));
                 }
 
-                int prevFr = _prevFastRepairs[i];
-                int currFr = fastRepairsUsed[i];
-                if (currFr > prevFr)
-                {
-                    _fastRepairDeltas.Add(new FastRepairDelta(
-                        i,
-                        sessionTimeMs,
-                        replayFrame,
-                        prevFr,
-                        currFr));
-                }
-
                 _prevFlags[i] = curr;
-                _prevFastRepairs[i] = currFr;
 
                 // Off-track: OnTrack → OffTrack transition for any car (same signal Crew Chief uses)
                 if (trackSurface != null && trackSurface.Length > i)

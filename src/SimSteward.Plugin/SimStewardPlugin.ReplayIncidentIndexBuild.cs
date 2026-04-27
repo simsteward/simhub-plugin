@@ -13,40 +13,29 @@ namespace SimSteward.Plugin
         private DateTime _lastTelemetryTickUtc = DateTime.MinValue;
         private volatile bool _replayIndexStartRequested;
         private volatile bool _replayIndexCancelRequested;
-        private volatile bool _replayIndexFfComplete;
+
         private int _replayIndexSavedReplayFrame;
-        private int _replayIndexFrameZeroConsecutive;
         private int _replayIndexSeekTelemetryTicks;
         private readonly int[] _replayIndexBaselineCarIdxSessionFlags = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private int _replayIndexBaselinePlayerCarMyIncidentCount;
         private int _replayIndexReplayFrameNumEndSnapshot;
         private Stopwatch _replayIndexFfWallClock;
         private long _replayIndexFfTelemetrySampleCount;
-        private int _replayIndexActivePlaySpeed = ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed;
         private readonly ReplayIncidentIndexDetector _replayIndexDetector = new ReplayIncidentIndexDetector();
         private readonly List<IncidentSample> _replayIndexIncidentSamples = new List<IncidentSample>();
-        private readonly int[] _replayIndexBaselineFastRepairsUsed = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexBaselineCarIdxTrackSurface = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _replayIndexScratchCarIdxSessionFlags  = new int[ReplayIncidentIndexBuild.CarSlotCount];
-        private readonly int[] _replayIndexScratchCarIdxFastRepairsUsed = new int[ReplayIncidentIndexBuild.CarSlotCount];
-        private readonly int[] _replayIndexBaselineCarIdxTrackSurface   = new int[ReplayIncidentIndexBuild.CarSlotCount];
-        private readonly int[] _replayIndexScratchCarIdxTrackSurface    = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxTrackSurface  = new int[ReplayIncidentIndexBuild.CarSlotCount];
 
         private Stopwatch _replayIndexBuildTotalWallClock;
         private int _replayIndexSessionNum;
         private ReplayIncidentIndexValidationBlock _replayIndexLastValidationBlock;
-        private List<ReplayIncidentIndexIncidentRow> _replayIndexCamRows;
-        private int _replayIndexCamIdx;
-        private bool _replayIndexCamNeedSeek;
-        private int _replayIndexCamCooldownRemaining;
-        private int _replayIndexCamMatches;
-        private int _replayIndexCamAttempted;
 
         private enum ReplayIndexBuildPhase
         {
             Idle,
             SeekingStart,
-            FastForwarding,
-            CameraValidating
+            FastForwarding
         }
 
         private void OnIrsdkTelemetryDataForReplayIndex()
@@ -63,8 +52,6 @@ namespace SimSteward.Plugin
             {
                 _logger.Warn("replay_incident_index telemetry: " + ex.Message);
             }
-
-
 
             try
             {
@@ -114,18 +101,8 @@ namespace SimSteward.Plugin
                     _replayIndexCancelRequested = false;
                     if (_replayIndexBuildPhase != ReplayIndexBuildPhase.Idle)
                     {
-                        try
-                        {
-                            _irsdk.ReplaySetPlaySpeed(1, false);
-                        }
-                        catch { /* ignored */ }
-                        finally
-                        {
-                            _replayIndexActivePlaySpeed = 1;
-                        }
-
+                        try { _irsdk.ReplaySetPlaySpeed(1, false); } catch { /* ignored */ }
                         TryRestoreReplayIndexSavedFrameLocked();
-
                         var f = new Dictionary<string, object> { ["reason"] = "cancel_requested" };
                         MergeSessionAndRoutingFields(f);
                         _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventBuildCancelled,
@@ -148,7 +125,6 @@ namespace SimSteward.Plugin
                         _logger.Structured("WARN", "simhub-plugin", ReplayIncidentIndexBuild.EventBuildError,
                             "Replay incident index build could not start.", ef, "lifecycle", null);
                     }
-
                     return;
                 }
 
@@ -161,12 +137,6 @@ namespace SimSteward.Plugin
                 if (_replayIndexBuildPhase == ReplayIndexBuildPhase.FastForwarding)
                 {
                     ProcessFastForwardingLocked();
-                    return;
-                }
-
-                if (_replayIndexBuildPhase == ReplayIndexBuildPhase.CameraValidating)
-                {
-                    ProcessCameraValidatingLocked();
                 }
             }
         }
@@ -184,9 +154,7 @@ namespace SimSteward.Plugin
             }
 
             _replayIndexSavedReplayFrame = SafeGetInt("ReplayFrameNum");
-            _replayIndexFrameZeroConsecutive = 0;
             _replayIndexSeekTelemetryTicks = 0;
-            _replayIndexActivePlaySpeed = 1;
             _replayIndexIncidentSamples.Clear();
             _replayIndexBuildTotalWallClock = Stopwatch.StartNew();
 
@@ -236,10 +204,7 @@ namespace SimSteward.Plugin
             }
 
             int frame = SafeGetInt("ReplayFrameNum");
-            _replayIndexFrameZeroConsecutive =
-                ReplayIncidentIndexBuild.NextFrameZeroConsecutiveCount(frame, _replayIndexFrameZeroConsecutive);
-
-            if (_replayIndexFrameZeroConsecutive < ReplayIncidentIndexBuild.FrameZeroStableConsecutiveSamples)
+            if (frame != 0)
                 return;
 
             CaptureBaselineAndStartFastForwardLocked();
@@ -249,57 +214,19 @@ namespace SimSteward.Plugin
         {
             _replayIndexSessionNum = SafeGetInt("SessionNum");
             _replayIndexReplayFrameNumEndSnapshot = SafeGetInt("ReplayFrameNumEnd");
-            for (int i = 0; i < _replayIndexBaselineCarIdxSessionFlags.Length; i++)
-            {
-                try
-                {
-                    _replayIndexBaselineCarIdxSessionFlags[i] = _irsdk.Data.GetInt("CarIdxSessionFlags", i);
-                }
-                catch
-                {
-                    _replayIndexBaselineCarIdxSessionFlags[i] = 0;
-                }
-            }
 
-            try
-            {
-                _replayIndexBaselinePlayerCarMyIncidentCount = _irsdk.Data.GetInt("PlayerCarMyIncidentCount");
-            }
-            catch
-            {
-                _replayIndexBaselinePlayerCarMyIncidentCount = 0;
-            }
+            SafeGetIntPerCar("CarIdxSessionFlags", _replayIndexBaselineCarIdxSessionFlags);
+            SafeGetIntPerCar("CarIdxTrackSurface", _replayIndexBaselineCarIdxTrackSurface);
 
-            for (int i = 0; i < _replayIndexBaselineFastRepairsUsed.Length; i++)
-            {
-                try
-                {
-                    _replayIndexBaselineFastRepairsUsed[i] = _irsdk.Data.GetInt("CarIdxFastRepairsUsed", i);
-                }
-                catch
-                {
-                    _replayIndexBaselineFastRepairsUsed[i] = 0;
-                }
-            }
-
-            for (int i = 0; i < _replayIndexBaselineCarIdxTrackSurface.Length; i++)
-            {
-                try
-                {
-                    _replayIndexBaselineCarIdxTrackSurface[i] = _irsdk.Data.GetInt("CarIdxTrackSurface", i);
-                }
-                catch
-                {
-                    _replayIndexBaselineCarIdxTrackSurface[i] = 0;
-                }
-            }
+            int playerCarMyIncidentCount = 0;
+            try { playerCarMyIncidentCount = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
+            _replayIndexBaselinePlayerCarMyIncidentCount = playerCarMyIncidentCount;
 
             int playerCarIdxBaseline = SafeGetInt("PlayerCarIdx");
             _replayIndexDetector.Reset(
                 _replayIndexBaselineCarIdxSessionFlags,
                 _replayIndexBaselinePlayerCarMyIncidentCount,
                 playerCarIdxBaseline,
-                _replayIndexBaselineFastRepairsUsed,
                 _replayIndexBaselineCarIdxTrackSurface);
 
             var baselineFields = new Dictionary<string, object>
@@ -312,10 +239,9 @@ namespace SimSteward.Plugin
             _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventBaselineReady,
                 "Replay incident index: baseline captured at frame 0 (TR-005–TR-007).", baselineFields, "lifecycle", null);
 
-            _replayIndexActivePlaySpeed = ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed;
             try
             {
-                _irsdk.ReplaySetPlaySpeed(_replayIndexActivePlaySpeed, false);
+                _irsdk.ReplaySetPlaySpeed(ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed, false);
             }
             catch (Exception ex)
             {
@@ -329,11 +255,11 @@ namespace SimSteward.Plugin
                 return;
             }
 
-            double effectiveHz = ReplayIncidentIndexBuild.ComputeEffectiveSessionTimeSampleHz(_replayIndexActivePlaySpeed);
+            double effectiveHz = ReplayIncidentIndexBuild.ComputeEffectiveSessionTimeSampleHz(ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed);
             int reportedSpeed = SafeGetInt("ReplayPlaySpeed");
             var ffStart = new Dictionary<string, object>
             {
-                ["replay_play_speed_requested"] = _replayIndexActivePlaySpeed,
+                ["replay_play_speed_requested"] = ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed,
                 ["replay_play_speed_telemetry"] = reportedSpeed,
                 ["effective_sample_hz_vs_session_time"] = Math.Round(effectiveHz, 4),
                 ["sdk_update_interval_ms"] = _irsdk.UpdateInterval
@@ -399,73 +325,28 @@ namespace SimSteward.Plugin
             _replayIndexFfTelemetrySampleCount++;
 
             bool playing;
-            try
-            {
-                playing = _irsdk.Data.GetBool("IsReplayPlaying");
-            }
-            catch
-            {
-                playing = SafeGetInt("IsReplayPlaying") != 0;
-            }
+            try { playing = _irsdk.Data.GetBool("IsReplayPlaying"); }
+            catch { playing = SafeGetInt("IsReplayPlaying") != 0; }
+
+            // Checkered flag = natural race end; treat as completion.
+            bool checkered = (SafeGetInt("SessionFlags") & 0x0001) != 0;
+            if (checkered)
+                playing = false;
 
             if (playing)
             {
                 double replaySessionTimeSec = 0;
-                try
-                {
-                    replaySessionTimeSec = _irsdk.Data.GetDouble("ReplaySessionTime");
-                }
+                try { replaySessionTimeSec = _irsdk.Data.GetDouble("ReplaySessionTime"); }
                 catch
                 {
-                    try
-                    {
-                        replaySessionTimeSec = _irsdk.Data.GetDouble("SessionTime");
-                    }
-                    catch
-                    {
-                        replaySessionTimeSec = 0;
-                    }
+                    try { replaySessionTimeSec = _irsdk.Data.GetDouble("SessionTime"); } catch { }
                 }
 
-                for (int i = 0; i < ReplayIncidentIndexBuild.CarSlotCount; i++)
-                {
-                    try
-                    {
-                        _replayIndexScratchCarIdxSessionFlags[i] = _irsdk.Data.GetInt("CarIdxSessionFlags", i);
-                    }
-                    catch
-                    {
-                        _replayIndexScratchCarIdxSessionFlags[i] = 0;
-                    }
-
-                    try
-                    {
-                        _replayIndexScratchCarIdxFastRepairsUsed[i] = _irsdk.Data.GetInt("CarIdxFastRepairsUsed", i);
-                    }
-                    catch
-                    {
-                        _replayIndexScratchCarIdxFastRepairsUsed[i] = 0;
-                    }
-
-                    try
-                    {
-                        _replayIndexScratchCarIdxTrackSurface[i] = _irsdk.Data.GetInt("CarIdxTrackSurface", i);
-                    }
-                    catch
-                    {
-                        _replayIndexScratchCarIdxTrackSurface[i] = 0;
-                    }
-                }
+                SafeGetIntPerCar("CarIdxSessionFlags", _replayIndexScratchCarIdxSessionFlags);
+                SafeGetIntPerCar("CarIdxTrackSurface", _replayIndexScratchCarIdxTrackSurface);
 
                 int playerIncidents = 0;
-                try
-                {
-                    playerIncidents = _irsdk.Data.GetInt("PlayerCarMyIncidentCount");
-                }
-                catch
-                {
-                    playerIncidents = 0;
-                }
+                try { playerIncidents = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
 
                 int playerCarIdx = SafeGetInt("PlayerCarIdx");
                 int replayFrame = SafeGetInt("ReplayFrameNum");
@@ -474,7 +355,6 @@ namespace SimSteward.Plugin
                     _replayIndexScratchCarIdxSessionFlags,
                     playerIncidents,
                     playerCarIdx,
-                    _replayIndexScratchCarIdxFastRepairsUsed,
                     replayFrame,
                     _replayIndexScratchCarIdxTrackSurface);
                 if (tick.Count > 0)
@@ -483,85 +363,45 @@ namespace SimSteward.Plugin
                     LogReplayIncidentIndexDetectionsLocked(tick, replaySessionTimeSec);
                 }
 
-                // Fallback: force FF completion if IsReplayPlaying never becomes false.
-                // ReplayFrameNumEnd is session-relative (returns 1), so we can't use it.
-                // Instead cap by sample count: 90,000 ticks ≈ 1500s wall clock ≈ 24,000s
-                // of session time at 16x (covers races up to ~6.5h). Only fires after a
-                // minimum FF duration so the replay has had time to play through.
-                if (_replayIndexFfTelemetrySampleCount > 90000)
-                    playing = false; // fall through to completion handling
-                else
+                // Cap at 90,000 samples (~24h of simulated race time at 32x) as failsafe.
+                if (_replayIndexFfTelemetrySampleCount <= 90000)
                     return;
             }
 
             int rfn = SafeGetInt("ReplayFrameNum");
             int rfe = SafeGetInt("ReplayFrameNumEnd");
             double rst = 0;
-            try
-            {
-                rst = _irsdk.Data.GetDouble("ReplaySessionTime");
-            }
-            catch
-            {
-                try { rst = _irsdk.Data.GetDouble("SessionTime"); } catch { rst = 0; }
-            }
+            try { rst = _irsdk.Data.GetDouble("ReplaySessionTime"); }
+            catch { try { rst = _irsdk.Data.GetDouble("SessionTime"); } catch { } }
 
-            string reason = ReplayIncidentIndexBuild.InferCompletionReason(false, rfn, rfe, rst);
+            string reason = checkered ? "checkered_flag"
+                : ReplayIncidentIndexBuild.InferCompletionReason(false, rfn, rfe, rst);
 
             long wallMs = _replayIndexFfWallClock?.ElapsedMilliseconds ?? 0;
-            int speedUsedForLog = _replayIndexActivePlaySpeed;
-            double effectiveHz = ReplayIncidentIndexBuild.ComputeEffectiveSessionTimeSampleHz(speedUsedForLog);
+            double effectiveHz = ReplayIncidentIndexBuild.ComputeEffectiveSessionTimeSampleHz(ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed);
 
-            try
-            {
-                _irsdk.ReplaySetPlaySpeed(1, false);
-            }
-            catch { /* ignored */ }
-            finally
-            {
-                _replayIndexActivePlaySpeed = 1;
-            }
+            try { _irsdk.ReplaySetPlaySpeed(1, false); } catch { /* ignored */ }
 
             var done = new Dictionary<string, object>
             {
                 ["index_build_time_ms"] = wallMs,
                 ["fast_forward_telemetry_samples"] = _replayIndexFfTelemetrySampleCount,
                 ["completion_reason"] = reason,
-                ["replay_play_speed"] = speedUsedForLog,
+                ["replay_play_speed"] = ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed,
                 ["effective_sample_hz_vs_session_time"] = Math.Round(effectiveHz, 4),
                 ["replay_frame_num_at_end"] = rfn,
                 ["replay_frame_num_end"] = rfe,
                 ["replay_session_time"] = Math.Round(rst, 3),
-                ["detected_incident_samples"] = _replayIndexIncidentSamples.Count,
-                ["fast_repair_delta_events"] = _replayIndexDetector.FastRepairDeltas.Count
+                ["detected_incident_samples"] = _replayIndexIncidentSamples.Count
             };
             MergeSessionAndRoutingFields(done);
             _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventFastForwardComplete,
                 "Replay incident index: fast-forward complete (TR-010/011).", done, "lifecycle", null);
 
             _replayIndexFfWallClock = null;
-
             int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
-            var draft = ReplayIncidentIndexDocumentBuilder.Build(
-                subSessionId,
-                _replayIndexBuildTotalWallClock?.ElapsedMilliseconds ?? 0,
-                _replayIndexIncidentSamples,
-                null,
-                null);
-            _replayIndexCamRows = draft.Incidents;
-            _replayIndexLastValidationBlock = BuildReplayIndexValidationBlockLocked(_replayIndexCamRows);
-            _replayIndexCamIdx = 0;
-            _replayIndexCamNeedSeek = true;
-            _replayIndexCamCooldownRemaining = 0;
-            _replayIndexCamMatches = 0;
-            _replayIndexCamAttempted = 0;
-
-            _replayIndexFfComplete = true;
-            _logger?.Warn($"[T8_DIAG] FF complete: ffComplete=true camRows={_replayIndexCamRows?.Count ?? -1} transitioning={((_replayIndexCamRows != null && _replayIndexCamRows.Count > 0) ? "CameraValidating" : "Finalize")}");
-            if (_replayIndexCamRows != null && _replayIndexCamRows.Count > 0)
-                _replayIndexBuildPhase = ReplayIndexBuildPhase.CameraValidating;
-            else
-                FinalizeReplayIndexBuildLocked();
+            _replayIndexLastValidationBlock = BuildReplayIndexValidationBlockLocked(_replayIndexIncidentSamples);
+            FinalizeReplayIndexBuildLocked();
         }
 
         private void TryRestoreReplayIndexSavedFrameLocked()
@@ -573,40 +413,29 @@ namespace SimSteward.Plugin
                 int f = Math.Max(0, _replayIndexSavedReplayFrame);
                 _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, f);
                 _irsdk.ReplaySetPlaySpeed(1, false);
-                _replayIndexActivePlaySpeed = 1;
             }
-            catch
-            {
-                /* ignored */
-            }
+            catch { /* ignored */ }
         }
 
         private void ClearReplayIndexBuildTransientLocked()
         {
-            _replayIndexFfComplete = false;
             _replayIndexFfWallClock = null;
             _replayIndexBuildTotalWallClock = null;
             _replayIndexIncidentSamples.Clear();
-            _replayIndexCamRows = null;
             _replayIndexLastValidationBlock = null;
-            _replayIndexCamIdx = 0;
-            _replayIndexCamNeedSeek = true;
-            _replayIndexCamCooldownRemaining = 0;
-            _replayIndexCamMatches = 0;
-            _replayIndexCamAttempted = 0;
         }
 
         private ReplayIncidentIndexValidationBlock BuildReplayIndexValidationBlockLocked(
-            IReadOnlyList<ReplayIncidentIndexIncidentRow> rows)
+            IReadOnlyList<IncidentSample> samples)
         {
             var detectedByCar = new Dictionary<int, int>();
-            if (rows != null)
+            if (samples != null)
             {
-                foreach (ReplayIncidentIndexIncidentRow r in rows)
+                foreach (var s in samples)
                 {
-                    if (!detectedByCar.TryGetValue(r.CarIdx, out int c))
+                    if (!detectedByCar.TryGetValue(s.CarIdx, out int c))
                         c = 0;
-                    detectedByCar[r.CarIdx] = c + 1;
+                    detectedByCar[s.CarIdx] = c + 1;
                 }
             }
 
@@ -634,62 +463,10 @@ namespace SimSteward.Plugin
             return vb;
         }
 
-        private void ProcessCameraValidatingLocked()
-        {
-            if (_replayIndexCamRows == null || _replayIndexCamIdx >= _replayIndexCamRows.Count)
-            {
-                FinalizeReplayIndexBuildLocked();
-                return;
-            }
-
-            if (_replayIndexCamNeedSeek)
-            {
-                ReplayIncidentIndexIncidentRow row = _replayIndexCamRows[_replayIndexCamIdx];
-                try
-                {
-                    _irsdk.ReplaySearchSessionTime(_replayIndexSessionNum, row.SessionTimeMs);
-                }
-                catch
-                {
-                    /* ignored */
-                }
-
-                _replayIndexCamNeedSeek = false;
-                _replayIndexCamCooldownRemaining = ReplayIncidentIndexBuild.CameraValidationCooldownTelemetryTicks;
-                return;
-            }
-
-            if (_replayIndexCamCooldownRemaining > 0)
-            {
-                _replayIndexCamCooldownRemaining--;
-                return;
-            }
-
-            int cam = SafeGetInt("CamCarIdx");
-            int expected = _replayIndexCamRows[_replayIndexCamIdx].CarIdx;
-            _replayIndexCamAttempted++;
-            if (cam == expected)
-                _replayIndexCamMatches++;
-
-            _replayIndexCamIdx++;
-            _replayIndexCamNeedSeek = true;
-        }
-
         private void FinalizeReplayIndexBuildLocked()
         {
             int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
             long totalMs = _replayIndexBuildTotalWallClock?.ElapsedMilliseconds ?? 0;
-
-            if (_replayIndexLastValidationBlock != null)
-            {
-                _replayIndexLastValidationBlock.CameraSeekAttempted = _replayIndexCamAttempted;
-                _replayIndexLastValidationBlock.CameraSeekMatches = _replayIndexCamMatches;
-                if (_replayIndexCamAttempted > 0)
-                {
-                    _replayIndexLastValidationBlock.CameraSeekMatchPercent =
-                        Math.Round(100.0 * _replayIndexCamMatches / _replayIndexCamAttempted, 2);
-                }
-            }
 
             string path = ReplayIncidentIndexOutputPaths.GetFilePathForSubSession(subSessionId);
             try
@@ -723,10 +500,7 @@ namespace SimSteward.Plugin
                 ["detected_incident_rows"] = _replayIndexIncidentSamples.Count,
                 ["yaml_results_available"] = _replayIndexLastValidationBlock?.YamlResultsAvailable == true,
                 ["yaml_session_num_used"] = _replayIndexLastValidationBlock?.YamlSessionNumUsed,
-                ["discrepancy_count"] = _replayIndexLastValidationBlock?.Discrepancies?.Count ?? 0,
-                ["camera_seek_attempted"] = _replayIndexCamAttempted,
-                ["camera_seek_matches"] = _replayIndexCamMatches,
-                ["camera_seek_match_percent"] = _replayIndexLastValidationBlock?.CameraSeekMatchPercent
+                ["discrepancy_count"] = _replayIndexLastValidationBlock?.Discrepancies?.Count ?? 0
             };
             if (_replayIndexLastValidationBlock?.YamlParseError != null)
                 summary["yaml_parse_error"] = _replayIndexLastValidationBlock.YamlParseError;
@@ -764,14 +538,7 @@ namespace SimSteward.Plugin
                     return (true, "ok", null);
                 }
 
-                // start
-                if (_replayIndexBuildPhase != ReplayIndexBuildPhase.Idle)
-                {
-                    LogActionResult("replay_incident_index_build", arg, correlationId, false, "build_in_progress");
-                    return (false, null, "build_in_progress");
-                }
-
-                if (_replayIndexStartRequested)
+                if (_replayIndexBuildPhase != ReplayIndexBuildPhase.Idle || _replayIndexStartRequested)
                 {
                     LogActionResult("replay_incident_index_build", arg, correlationId, false, "build_in_progress");
                     return (false, null, "build_in_progress");
@@ -791,6 +558,16 @@ namespace SimSteward.Plugin
 
             LogActionResult("replay_incident_index_build", arg, correlationId, true, "");
             return (true, "ok", null);
+        }
+
+        /// <summary>Read one int per car slot into <paramref name="buffer"/>, defaulting to 0 on any error.</summary>
+        private void SafeGetIntPerCar(string field, int[] buffer)
+        {
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                try { buffer[i] = _irsdk.Data.GetInt(field, i); }
+                catch { buffer[i] = 0; }
+            }
         }
     }
 }

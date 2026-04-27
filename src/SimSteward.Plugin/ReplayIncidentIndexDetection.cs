@@ -69,23 +69,4 @@ namespace SimSteward.Plugin
         public int? IncidentPoints { get; }
         public int ReplayFrame { get; }
     }
-
-    /// <summary>TR-017: fast-repair increment observed between samples (not a TR-020 row).</summary>
-    public readonly struct FastRepairDelta
-    {
-        public FastRepairDelta(int carIdx, int sessionTimeMs, int replayFrame, int previousCount, int currentCount)
-        {
-            CarIdx = carIdx;
-            SessionTimeMs = sessionTimeMs;
-            ReplayFrame = replayFrame;
-            PreviousCount = previousCount;
-            CurrentCount = currentCount;
-        }
-
-        public int CarIdx { get; }
-        public int SessionTimeMs { get; }
-        public int ReplayFrame { get; }
-        public int PreviousCount { get; }
-        public int CurrentCount { get; }
-    }
 }

@@ -39,12 +39,11 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var baseF = Zeros64();
-            var fr = Zeros64();
-            d.Reset(baseF, 0, 0, fr);
+            d.Reset(baseF, 0, 0);
 
             var next = Zeros64();
             next[3] = ReplayIncidentIndexDetection.RepairSessionFlag;
-            var r = d.Process(10.0, next, 0, 0, fr, 100);
+            var r = d.Process(10.0, next, 0, 0, 100);
 
             Assert.Single(r);
             Assert.Equal(3, r[0].CarIdx);
@@ -59,12 +58,11 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var baseF = Zeros64();
-            var fr = Zeros64();
-            d.Reset(baseF, 0, 0, fr);
+            d.Reset(baseF, 0, 0);
 
             var next = Zeros64();
             next[5] = ReplayIncidentIndexDetection.FurledSessionFlag;
-            var r = d.Process(2.0, next, 0, 0, fr, 1);
+            var r = d.Process(2.0, next, 0, 0, 1);
 
             Assert.Single(r);
             Assert.Equal(5, r[0].CarIdx);
@@ -76,12 +74,11 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var baseF = Zeros64();
-            var fr = Zeros64();
-            d.Reset(baseF, 0, 0, fr);
+            d.Reset(baseF, 0, 0);
 
             var next = Zeros64();
             next[7] = ReplayIncidentIndexDetection.RepairSessionFlag | ReplayIncidentIndexDetection.FurledSessionFlag;
-            var r = d.Process(0, next, 0, 0, fr, 0);
+            var r = d.Process(0, next, 0, 0, 0);
 
             Assert.Equal(2, r.Count);
             Assert.Contains(r, x => x.DetectionSource == ReplayIncidentIndexDetection.SourceRepairFlag && x.CarIdx == 7);
@@ -94,19 +91,18 @@ namespace SimSteward.Plugin.Tests
             var d = new ReplayIncidentIndexDetector();
             var baseF = Zeros64();
             baseF[2] = ReplayIncidentIndexDetection.RepairSessionFlag;
-            var fr = Zeros64();
-            d.Reset(baseF, 0, 0, fr);
+            d.Reset(baseF, 0, 0);
 
             var same = (int[])baseF.Clone();
-            Assert.Empty(d.Process(0, same, 0, 0, fr, 0));
+            Assert.Empty(d.Process(0, same, 0, 0, 0));
 
             var cleared = (int[])baseF.Clone();
             cleared[2] = 0;
-            Assert.Empty(d.Process(1, cleared, 0, 0, fr, 1));
+            Assert.Empty(d.Process(1, cleared, 0, 0, 1));
 
             var again = (int[])cleared.Clone();
             again[2] = ReplayIncidentIndexDetection.RepairSessionFlag;
-            var r = d.Process(2, again, 0, 0, fr, 2);
+            var r = d.Process(2, again, 0, 0, 2);
             Assert.Single(r);
             Assert.Equal(ReplayIncidentIndexDetection.SourceRepairFlag, r[0].DetectionSource);
             Assert.Equal(2, r[0].CarIdx);
@@ -120,10 +116,9 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var f = Zeros64();
-            var fr = Zeros64();
-            d.Reset(f, 0, 0, fr);
+            d.Reset(f, 0, 0);
 
-            var r = d.Process(0, f, delta, 0, fr, 0);
+            var r = d.Process(0, f, delta, 0, 0);
             Assert.Single(r);
             Assert.Equal(ReplayIncidentIndexDetection.SourcePlayerIncidentCount, r[0].DetectionSource);
             Assert.Equal(0, r[0].CarIdx);
@@ -135,10 +130,9 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var f = Zeros64();
-            var fr = Zeros64();
-            d.Reset(f, 0, 0, fr);
+            d.Reset(f, 0, 0);
 
-            var r = d.Process(0, f, 3, 1, fr, 0);
+            var r = d.Process(0, f, 3, 1, 0);
             Assert.Single(r);
             Assert.Equal(1, r[0].CarIdx);
             Assert.Null(r[0].IncidentPoints);
@@ -149,13 +143,12 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var f = Zeros64();
-            var fr = Zeros64();
-            d.Reset(f, 0, -1, fr);
+            d.Reset(f, 0, -1);
 
-            var r = d.Process(0, f, 5, 99, fr, 0);
+            var r = d.Process(0, f, 5, 99, 0);
             Assert.Empty(r);
 
-            var r2 = d.Process(1, f, 6, 0, fr, 1);
+            var r2 = d.Process(1, f, 6, 0, 1);
             Assert.Single(r2);
             Assert.Equal(1, r2[0].IncidentPoints);
         }
@@ -165,20 +158,19 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var f = Zeros64();
-            var fr = Zeros64();
-            d.Reset(f, 0, 0, fr);
+            d.Reset(f, 0, 0);
 
             var a = Zeros64();
             a[4] = ReplayIncidentIndexDetection.RepairSessionFlag;
-            Assert.Single(d.Process(0, a, 0, 0, fr, 0));
+            Assert.Single(d.Process(0, a, 0, 0, 0));
 
             var b = Zeros64();
             b[4] = 0;
-            Assert.Empty(d.Process(0.2, b, 0, 0, fr, 1));
+            Assert.Empty(d.Process(0.2, b, 0, 0, 1));
 
             var c = Zeros64();
             c[4] = ReplayIncidentIndexDetection.RepairSessionFlag;
-            Assert.Empty(d.Process(0.5, c, 0, 0, fr, 2));
+            Assert.Empty(d.Process(0.5, c, 0, 0, 2));
         }
 
         [Fact]
@@ -186,19 +178,18 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var f = Zeros64();
-            var fr = Zeros64();
-            d.Reset(f, 0, 0, fr);
+            d.Reset(f, 0, 0);
 
             var a = Zeros64();
             a[4] = ReplayIncidentIndexDetection.RepairSessionFlag;
-            Assert.Single(d.Process(0, a, 0, 0, fr, 0));
+            Assert.Single(d.Process(0, a, 0, 0, 0));
 
             var b = Zeros64();
-            Assert.Empty(d.Process(1.2, b, 0, 0, fr, 1));
+            Assert.Empty(d.Process(1.2, b, 0, 0, 1));
 
             var c = Zeros64();
             c[4] = ReplayIncidentIndexDetection.RepairSessionFlag;
-            var r = d.Process(1.2, c, 0, 0, fr, 2);
+            var r = d.Process(1.2, c, 0, 0, 2);
             Assert.Single(r);
         }
 
@@ -207,42 +198,20 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var f = Zeros64();
-            var fr = Zeros64();
-            d.Reset(f, 0, 0, fr);
+            d.Reset(f, 0, 0);
 
-            var f1 = d.Process(0, f, 1, 0, fr, 0);
+            var f1 = d.Process(0, f, 1, 0, 0);
             Assert.Single(f1);
 
-            var f2 = d.Process(0.1, f, 1, 0, fr, 1);
+            var f2 = d.Process(0.1, f, 1, 0, 1);
             Assert.Empty(f2);
-        }
-
-        [Fact]
-        public void Process_FastRepairIncrement_AppendsFastRepairDelta()
-        {
-            var d = new ReplayIncidentIndexDetector();
-            var f = Zeros64();
-            var fr0 = Zeros64();
-            d.Reset(f, 0, 0, fr0);
-
-            var fr1 = Zeros64();
-            fr1[8] = 1;
-            Assert.Empty(d.Process(5, f, 0, 0, fr1, 7));
-
-            Assert.Single(d.FastRepairDeltas);
-            var x = d.FastRepairDeltas[0];
-            Assert.Equal(8, x.CarIdx);
-            Assert.Equal(5000, x.SessionTimeMs);
-            Assert.Equal(7, x.ReplayFrame);
-            Assert.Equal(0, x.PreviousCount);
-            Assert.Equal(1, x.CurrentCount);
         }
 
         [Fact]
         public void Reset_ThrowsWhenArrayTooShort()
         {
             var d = new ReplayIncidentIndexDetector();
-            Assert.Throws<ArgumentException>(() => d.Reset(new int[10], 0, 0, new int[64]));
+            Assert.Throws<ArgumentException>(() => d.Reset(new int[10], 0, 0));
         }
 
         [Fact]
@@ -250,7 +219,7 @@ namespace SimSteward.Plugin.Tests
         {
             var d = new ReplayIncidentIndexDetector();
             var z = Zeros64();
-            Assert.Throws<ArgumentOutOfRangeException>(() => d.Reset(z, 0, 64, z));
+            Assert.Throws<ArgumentOutOfRangeException>(() => d.Reset(z, 0, 64));
         }
     }
 }

@@ -146,8 +146,6 @@ class Sentinel:
                     "model": t1.model,
                     "think_mode": True,
                     "duration_ms": t1.total_duration_ms,
-                    "summary_duration_ms": t1.summary_duration_ms,
-                    "anomaly_duration_ms": t1.anomaly_duration_ms,
                     "anomaly_count": len(t1.anomalies),
                     "needs_t2_count": sum(1 for a in t1.anomalies if a.get("needs_t2")),
                     "evidence_packet_count": len(t1.evidence_packets),
@@ -156,12 +154,17 @@ class Sentinel:
                     "trigger_source": t1.trigger_source,
                     "total_input_tokens": t1.total_input_tokens,
                     "total_output_tokens": t1.total_output_tokens,
-                    "summary_input_tokens": t1.summary_input_tokens,
-                    "summary_output_tokens": t1.summary_output_tokens,
-                    "anomaly_input_tokens": t1.anomaly_input_tokens,
-                    "anomaly_output_tokens": t1.anomaly_output_tokens,
                     "tokens_per_sec": t1.tokens_per_sec,
                 }, self.config.env_label)
+
+                # Severity-based escalation: don't wait for the scheduled T2/T3 cycles
+                if t1.anomalies:
+                    logger.info("T1 found %d anomalies — escalating to T2 immediately", len(t1.anomalies))
+                    self.run_t2_cycle()
+                    has_critical = any(a.get("severity") == "critical" for a in t1.anomalies)
+                    if has_critical:
+                        logger.info("Critical anomaly detected — escalating to T3 immediately")
+                        self.run_t3_cycle()
 
         except Exception as e:
             error = str(e)
