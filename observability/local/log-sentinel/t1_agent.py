@@ -1,14 +1,4 @@
-"""T1 — Fast triage agent.
-
-Replaces the T1 half of analyst.py for v3.
-Key changes over v2 Analyst.run_t1():
-  - Accepts pre-built FeatureInvocations from InvocationBuilder
-  - Injects BaselineManager context into anomaly prompt
-  - Accepts optional T0 alert context for event-driven runs
-  - Builds EvidencePackets for each anomaly via EvidenceBuilder
-  - Pushes sentinel_evidence_packet events to Loki
-  - T1Result carries invocations + evidence_packets + trigger metadata
-"""
+"""T1 — Fast triage agent: single LLM call producing summary + anomaly list."""
 
 import logging
 from dataclasses import dataclass, field

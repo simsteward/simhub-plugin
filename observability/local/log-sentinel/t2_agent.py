@@ -1,20 +1,12 @@
 """T2 — Deep investigation agent.
 
-Replaces the T2 half of analyst.py for v3.
-Key changes over v2 Analyst.run_t2():
-  - Reads evidence packets from Loki (state store), not from T1Result directly
-  - Queries Sentry for existing issues before forming recommendations
-  - Produces sentinel_t2_investigation events to Loki
-  - Creates Grafana annotation per investigation
-  - Creates Sentry issue if sentry_worthy + high confidence + not already captured
-
 Input flow:
-  Loki {event="sentinel_evidence_packet"} (last 15 min)
-  → SentryClient.search_issues() for each anomaly signature
+  Loki sentinel_evidence_packet events (last 15 min)
+  → Sentry history lookup
+  → hardcoded seed LogQL + T1's suggested_logql
   → qwen3:32b /think
-  → LokiClient.push_t2_investigation()
-  → GrafanaClient.annotate_raw()
-  → SentryClient.capture_message() if warranted
+  → push sentinel_t2_investigation to Loki + Grafana annotation
+  → Sentry issue if sentry_worthy + high confidence
 """
 
 import logging
