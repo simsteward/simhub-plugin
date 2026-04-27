@@ -116,9 +116,7 @@ namespace SimSteward.Plugin
                 drivers = BuildDriverList(),
                 cameraGroups = GetCameraGroupNames(),
                 diagnostics = snapshot.Diagnostics,
-                replayIncidentIndex = snapshot.ReplayIncidentIndex,
-                dataCaptureSuite = snapshot.DataCaptureSuite,
-                preflight = snapshot.Preflight
+                replayIncidentIndex = snapshot.ReplayIncidentIndex
             };
             return JsonConvert.SerializeObject(state);
         }
@@ -275,9 +273,7 @@ namespace SimSteward.Plugin
                 ReplaySessionNum = replaySessionNum,
                 ReplaySessionName = replaySessionName,
                 Diagnostics = BuildDiagnostics(clientCount),
-                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot(),
-                DataCaptureSuite = BuildDataCaptureSuiteSnapshot(),
-                Preflight = _preflightSnapshot
+                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot()
             };
         }
 
@@ -397,49 +393,6 @@ namespace SimSteward.Plugin
             }
             catch { }
             return "";
-        }
-
-        private PreflightSessionInfo[] ReadSessionListFromYaml()
-        {
-            try
-            {
-                var sessionInfo = _irsdk?.Data?.SessionInfo;
-                if (!(sessionInfo?.SessionInfo?.Sessions is IList list) || list.Count == 0)
-                    return null;
-
-                var result = new List<PreflightSessionInfo>();
-                foreach (var o in list)
-                {
-                    if (o == null) continue;
-                    var t = o.GetType();
-                    var numProp    = t.GetProperty("SessionNum");
-                    var nameProp   = t.GetProperty("SessionName");
-                    var typeProp   = t.GetProperty("SessionType");
-                    var officialProp = t.GetProperty("ResultsOfficial");
-
-                    int num = 0;
-                    if (numProp?.GetValue(o) is int n) num = n;
-                    else int.TryParse(numProp?.GetValue(o)?.ToString(), out num);
-
-                    bool official = false;
-                    var offVal = officialProp?.GetValue(o);
-                    if (offVal is int oi) official = oi >= 1;
-                    else if (int.TryParse(offVal?.ToString(), out int op)) official = op >= 1;
-
-                    result.Add(new PreflightSessionInfo
-                    {
-                        SessionNum  = num,
-                        SessionName = nameProp?.GetValue(o)?.ToString() ?? "",
-                        SessionType = typeProp?.GetValue(o)?.ToString() ?? "",
-                        ResultsOfficial = official,
-                    });
-                }
-                return result.Count > 0 ? result.ToArray() : null;
-            }
-            catch
-            {
-                return null;
-            }
         }
 
         private object[] BuildDriverList()
@@ -924,51 +877,6 @@ namespace SimSteward.Plugin
                 }
             }
 
-            if (string.Equals(action, "data_capture_suite", StringComparison.OrdinalIgnoreCase))
-            {
-                var raw      = (arg ?? "").Trim();
-                var colonIdx = raw.IndexOf(':');
-                var verb     = (colonIdx >= 0 ? raw.Substring(0, colonIdx) : raw).ToLowerInvariant();
-                var skipParam = colonIdx >= 0 ? raw.Substring(colonIdx + 1) : "";
-                var skipIds   = string.IsNullOrEmpty(skipParam)
-                    ? Array.Empty<string>()
-                    : skipParam.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                switch (verb)
-                {
-                    case "start":
-                        TryStartDataCaptureSuite(skipIds);
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "preflight":
-                        _preflightRequested = true;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "preflight_scope":
-                        _preflightReplayScope = string.Equals(skipParam, "partial", StringComparison.OrdinalIgnoreCase) ? "partial" : "full";
-                        _preflightSnapshot.ReplayScope = _preflightReplayScope;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "preflight_reset":
-                        _preflightLevel = 0;
-                        _preflightCorrelationId = null;
-                        _preflightSnapshot = new PreflightSnapshot();
-                        _preflightStep = PreflightStep.Idle;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "cancel":
-                        _suiteCancelRequested = true;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "verify":
-                        _suiteEmitCompleteUtc = DateTime.MinValue; // force re-verify on next tick
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    default:
-                        LogActionResult(action, arg, correlationId, false, "bad_arg");
-                        return (false, null, "bad_arg");
-                }
-            }
-
             if (string.Equals(action, "replay_incident_index_seek", StringComparison.OrdinalIgnoreCase))
             {
                 return DispatchReplayIncidentIndexSeek(arg, correlationId);
@@ -1443,14 +1351,6 @@ namespace SimSteward.Plugin
             }
 
             var now = DateTime.UtcNow;
-
-            // Fallback: when iRacing replay is paused/ended, OnTelemetryData stops firing.
-            // Drive the suite/preflight tick from DataUpdate so actions aren't lost.
-            if (_irsdk != null && _irsdk.IsConnected &&
-                (now - _lastTelemetryTickUtc).TotalMilliseconds > 500)
-            {
-                try { ProcessDataCaptureSuiteTick(); } catch { }
-            }
 
             if ((now - _lastBroadcastAt).TotalMilliseconds < BroadcastThrottleMs)
                 return;

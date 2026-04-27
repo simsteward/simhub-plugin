@@ -319,7 +319,39 @@ SENTRY HISTORY (existing issues matching these anomaly signatures):
 ADDITIONAL LOG EVIDENCE (from targeted LogQL queries):
 {logql_results}
 
-Based on all of the above, respond with this JSON schema exactly:
+EXAMPLE — low confidence, partial evidence (follow this pattern when evidence is sparse):
+{{
+  "root_cause": "Replay fast-forward sweep appears stuck at frame 105982 based on repeated T8_DIAG log entries showing the same frame with no advancement over 90 seconds, causing the incident index build to stall.",
+  "issue_type": "regression",
+  "confidence": "low",
+  "correlation": "T8_DIAG logs in sim-steward stream show frame 105982 repeated; no session_end event followed; incident_detection_health absent from stream after frame 105950.",
+  "impact": "Incident detection pipeline stalled — no new incidents will be detected for the current replay session until the sweep completes or is aborted.",
+  "recommendation": "Query {{app='sim-steward'}} | json | event='T8_DIAG' for the last 30 minutes to confirm frame stall. If confirmed, check T8_Poll tick-limit logic for abort condition.",
+  "evidence_quality": "partial",
+  "information_gaps": "No T8_Poll tick_count field present in log entries — cannot confirm tick ceiling was reached. No iracing_replay_seek event after frame 105982 — cannot determine if seek was attempted. incident_detection_health events absent after 21:14:30 UTC — gap of unknown cause.",
+  "would_help": "A LogQL query for {{app='sim-steward'}} | json | event='T8_DIAG' | tick_count > 10000 over the 6-minute stall window would confirm tick ceiling. CPU metrics at 21:14:30 would rule out host resource contention as cause.",
+  "sentry_worthy": false,
+  "sentry_fingerprint": "",
+  "logql_queries_used": ["{{app='sim-steward'}} | json | event='T8_DIAG' | frame='105982'"]
+}}
+
+EXAMPLE — high confidence, complete evidence:
+{{
+  "root_cause": "WebSocket disconnect at 21:03:45 UTC (ws_disconnected event, client=127.0.0.1:54231) caused dashboard to lose session state. No reconnect_attempt event followed within 30 seconds, so the action queue drained silently.",
+  "issue_type": "infra",
+  "confidence": "high",
+  "correlation": "sim-steward stream shows ws_disconnected at 21:03:45; dashboard_ui_event log gap from 21:03:45 to 21:08:12 (4m27s); session_resume event at 21:08:12 confirms user manually refreshed.",
+  "impact": "Dashboard lost live updates for 4m27s; any user actions during that window were silently dropped.",
+  "recommendation": "Add WebSocket reconnect-with-backoff logic in data-capture-suite.js. Set max_reconnect_delay=30s, emit reconnect_attempt log on each retry.",
+  "evidence_quality": "complete",
+  "information_gaps": "",
+  "would_help": "",
+  "sentry_worthy": false,
+  "sentry_fingerprint": "",
+  "logql_queries_used": ["{{app='sim-steward'}} | json | event='ws_disconnected'", "{{app='sim-steward'}} | json | event='session_resume'"]
+}}
+
+Now analyze the actual evidence above and respond with this JSON schema exactly:
 {{
   "root_cause": "<specific root cause referencing evidence from packets and queries>",
   "issue_type": "<error_spike|config|regression|user_behavior|infra|unknown>",
@@ -327,10 +359,15 @@ Based on all of the above, respond with this JSON schema exactly:
   "correlation": "<how events across streams connect — cross-stream evidence>",
   "impact": "<what is affected and how>",
   "recommendation": "<concrete next steps to resolve or monitor — be specific>",
+  "evidence_quality": "<complete|partial|insufficient — complete means you have enough to be certain; partial means you can form a hypothesis but key data is missing; insufficient means the evidence is too sparse to conclude anything>",
+  "information_gaps": "<REQUIRED when confidence is low or evidence_quality is partial/insufficient: list the specific log fields, event types, streams, or time windows that were absent but would have helped. Be precise — e.g. 'no session_start event in sim-steward stream for session 82873160', 'claude-token-metrics has no entries matching this session_id', 'T8_DIAG logs absent during the 6-minute window'. Empty string only if confidence is high and evidence_quality is complete.>",
+  "would_help": "<REQUIRED when confidence is low or evidence_quality is partial/insufficient: describe exactly what data, query result, or observable signal would let you determine the root cause with high confidence — e.g. 'a LogQL query correlating session_id across sim-steward and claude-dev-logging streams', 'CPU/memory samples at the exact timestamp of the bridge error', 'the full stack trace from the OTLP load failure'. Empty string only if confidence is high.>",
   "sentry_worthy": <true if this warrants a Sentry issue — behavioral bugs, patterns, crashes; false otherwise>,
   "sentry_fingerprint": "<short fingerprint slug for Sentry dedup, or empty if not sentry_worthy>",
   "logql_queries_used": []
 }}
+
+IMPORTANT: Never write "Unable to determine root cause." If you genuinely cannot determine the root cause, set confidence to "low", evidence_quality to "insufficient", and use information_gaps and would_help to explain exactly what was missing and what would resolve the ambiguity. Every investigation must be actionable.\
 """
 
 

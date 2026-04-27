@@ -26,8 +26,10 @@ namespace SimSteward.Plugin
         private readonly ReplayIncidentIndexDetector _replayIndexDetector = new ReplayIncidentIndexDetector();
         private readonly List<IncidentSample> _replayIndexIncidentSamples = new List<IncidentSample>();
         private readonly int[] _replayIndexBaselineFastRepairsUsed = new int[ReplayIncidentIndexBuild.CarSlotCount];
-        private readonly int[] _replayIndexScratchCarIdxSessionFlags = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxSessionFlags  = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _replayIndexScratchCarIdxFastRepairsUsed = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexBaselineCarIdxTrackSurface   = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxTrackSurface    = new int[ReplayIncidentIndexBuild.CarSlotCount];
 
         private Stopwatch _replayIndexBuildTotalWallClock;
         private int _replayIndexSessionNum;
@@ -62,14 +64,7 @@ namespace SimSteward.Plugin
                 _logger.Warn("replay_incident_index telemetry: " + ex.Message);
             }
 
-            try
-            {
-                ProcessDataCaptureSuiteTick();
-            }
-            catch (Exception ex)
-            {
-                _logger.Warn("data_capture_suite tick: " + ex.Message);
-            }
+
 
             try
             {
@@ -287,12 +282,25 @@ namespace SimSteward.Plugin
                 }
             }
 
+            for (int i = 0; i < _replayIndexBaselineCarIdxTrackSurface.Length; i++)
+            {
+                try
+                {
+                    _replayIndexBaselineCarIdxTrackSurface[i] = _irsdk.Data.GetInt("CarIdxTrackSurface", i);
+                }
+                catch
+                {
+                    _replayIndexBaselineCarIdxTrackSurface[i] = 0;
+                }
+            }
+
             int playerCarIdxBaseline = SafeGetInt("PlayerCarIdx");
             _replayIndexDetector.Reset(
                 _replayIndexBaselineCarIdxSessionFlags,
                 _replayIndexBaselinePlayerCarMyIncidentCount,
                 playerCarIdxBaseline,
-                _replayIndexBaselineFastRepairsUsed);
+                _replayIndexBaselineFastRepairsUsed,
+                _replayIndexBaselineCarIdxTrackSurface);
 
             var baselineFields = new Dictionary<string, object>
             {
@@ -438,6 +446,15 @@ namespace SimSteward.Plugin
                     {
                         _replayIndexScratchCarIdxFastRepairsUsed[i] = 0;
                     }
+
+                    try
+                    {
+                        _replayIndexScratchCarIdxTrackSurface[i] = _irsdk.Data.GetInt("CarIdxTrackSurface", i);
+                    }
+                    catch
+                    {
+                        _replayIndexScratchCarIdxTrackSurface[i] = 0;
+                    }
                 }
 
                 int playerIncidents = 0;
@@ -458,7 +475,8 @@ namespace SimSteward.Plugin
                     playerIncidents,
                     playerCarIdx,
                     _replayIndexScratchCarIdxFastRepairsUsed,
-                    replayFrame);
+                    replayFrame,
+                    _replayIndexScratchCarIdxTrackSurface);
                 if (tick.Count > 0)
                 {
                     _replayIndexIncidentSamples.AddRange(tick);

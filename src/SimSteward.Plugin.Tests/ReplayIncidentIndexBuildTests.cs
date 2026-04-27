@@ -72,9 +72,9 @@ namespace SimSteward.Plugin.Tests
         }
 
         [Fact]
-        public void DefaultFastForwardPlaySpeed_Is16()
+        public void DefaultFastForwardPlaySpeed_Is32()
         {
-            Assert.Equal(16, ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed);
+            Assert.Equal(32, ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed);
         }
 
         [Fact]

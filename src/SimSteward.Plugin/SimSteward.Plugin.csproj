@@ -29,6 +29,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="archive\DataCaptureSuite.cs" />
+    <Compile Remove="archive\SimStewardPlugin.DataCaptureSuite.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Fleck" Version="1.2.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="IRSDKSharper" Version="1.1.4" />

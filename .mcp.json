@@ -25,7 +25,7 @@
         "CONTEXTSTREAM_SHOW_TIMING": "false",
         "CONTEXTSTREAM_TOOLSET": "standard",
         "CONTEXTSTREAM_TRANSCRIPTS_ENABLED": "false",
-        "CONTEXTSTREAM_USER_AGENT": "contextstream-mcp-rust/0.1.77",
+        "CONTEXTSTREAM_USER_AGENT": "contextstream-mcp-rust/0.1.78",
         "CONTEXTSTREAM_WORKSPACE_ID": "f5c5b873-acfb-47ec-b93b-4acabfa78a8b"
       }
     },

@@ -245,6 +245,10 @@ input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 .result-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.86rem; }
 .result-name { font-weight: 600; font-size: 0.86rem; }
 .result-desc { font-size: 0.76rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.result-context { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.ctx-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 0.65rem; color: var(--muted); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
+.ctx-chip.ctx-cam { border-color: rgba(13,216,255,0.2); color: rgba(13,216,255,0.7); }
+.ctx-chip.ctx-driver { border-color: rgba(255,200,64,0.2); color: rgba(255,200,64,0.7); }
 .result-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 0.76rem; color: var(--muted); }
 .result-meta strong { color: var(--text); font-weight: 600; }
 .result-error { color: var(--red); font-size: 0.8rem; margin-top: 4px; font-weight: 500; }
@@ -329,7 +333,7 @@ Sentry.setTag('dashboard', 'data-capture-suite');
         <div class="pc-tests" id="pc-tests"></div>
         <div class="meta" style="margin-top:6px">
           Preflight ID: <span class="mono" id="lbl-preflight-id">&mdash;</span>
-          &nbsp;&middot;&nbsp; Level: <strong id="lbl-preflight-level">0</strong>/3
+          &nbsp;&middot;&nbsp; Level: <strong id="lbl-preflight-level">0</strong>/4
         </div>
         <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
           <button class="btn primary sm" id="btn-preflight" onclick="runPreflight()">Check conditions</button>
@@ -437,8 +441,9 @@ const TEST_META = {
   T5b:    { name: 'Camera View Cycle',       desc: 'Cycle through all camera groups and log each view', event: 'sdk_capture_camera_view_sample', pass: 'camera_group_name present', depends: null },
   T6:     { name: 'Session Results',         desc: 'Read session results (positions, laps, incidents) from completed replay', event: 'sdk_capture_session_results', pass: '\u2265 1 event', depends: null },
   T7:     { name: 'Incident Re-Seek',        desc: 'Re-seek to T0 ground-truth frames and verify frame numbers match', event: 'sdk_capture_incident_reseek', pass: '\u2265 3 events, \u2265 1 with frame_match=true', depends: 'T0' },
-  T8:     { name: 'FF Sweep',                desc: 'Trigger fast-forward incident sweep and verify index events are built', event: 'sdk_capture_ff_sweep_result', pass: 'gt_cars_in_index \u2265 1', depends: null },
-  T_DISC: { name: 'Data Point Discovery',    desc: 'Sweep all Tier 1+2 SDK variables at 4 replay positions for availability map', event: 'sdk_capture_data_discovery', pass: '\u2265 4 events (one per position)', depends: null },
+  T8:      { name: 'FF Sweep',               desc: 'Trigger fast-forward incident sweep and verify index events are built', event: 'sdk_capture_ff_sweep_result', pass: 'gt_cars_in_index \u2265 1', depends: null },
+  T_INDEX: { name: 'Player Incident Index',  desc: 'NextIncident scan of all player-car incidents in the replay; builds a complete index', event: 'sdk_player_incident_index', pass: 'player_incidents_found \u2265 1', depends: null },
+  T_DISC:  { name: 'Data Point Discovery',   desc: 'Sweep all Tier 1+2 SDK variables at 4 replay positions for availability map', event: 'sdk_capture_data_discovery', pass: '\u2265 4 events (one per position)', depends: null },
   T_60Hz: { name: '60 Hz Telemetry Dump',    desc: 'Record 17 telemetry channels at 60 Hz to JSONL (feature-flagged)', event: 'sdk_capture_60hz_summary', pass: 'ticks_recorded > 0', depends: 'SIMSTEWARD_60HZ_TEST_CAPTURE=1' },
 };
 
@@ -453,6 +458,7 @@ const TEST_SUBSTEPS = {
   T6:     [{ step: 'T6', label: 'Read results' }],
   T7:     [{ step: 'T7_Rewind', label: 'Rewind' }, { step: 'T7_FrameZero', label: 'Frame zero' }, { step: 'T7_Cooldown', label: 'Re-seek' }],
   T8:     [{ step: 'T8_Trigger', label: 'Trigger sweep' }, { step: 'T8_Poll', label: 'Poll' }],
+  T_INDEX: [{ step: 'TINDEX_Rewind', label: 'Rewind' }, { step: 'TINDEX_FrameZero', label: 'Frame zero' }, { step: 'TINDEX_ScanCooldown', label: 'Scan incidents' }, { step: 'TINDEX_Emit', label: 'Emit index' }],
   T_DISC: [{ step: 'TDISC_Seek', label: 'Seek' }, { step: 'TDISC_Settle', label: 'Settle' }, { step: 'TDISC_Capture', label: 'Capture' }],
   T_60Hz: [{ step: '_60hz_record', label: 'Recording' }],
 };
@@ -460,6 +466,7 @@ const TEST_SUBSTEPS = {
 function getActiveTestFromStep(stepName) {
   if (!stepName) return null;
   if (stepName.startsWith('TDISC')) return 'T_DISC';
+  if (stepName.startsWith('TINDEX')) return 'T_INDEX';
   if (stepName.startsWith('T5b')) return 'T5b';
   var m = stepName.match(/^(T\d+)/);
   return m ? m[1] : null;
@@ -479,7 +486,8 @@ function getTentativeStatus(r) {
     case 'T5b':  return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
     case 'T6':   return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
     case 'T7':   return (kv && !kv.startsWith('0')) ? 'tentative-pass' : 'tentative-fail';
-    case 'T8':   return (!isNaN(num) && num >= 1) ? 'tentative-pass' : 'tentative-fail';
+    case 'T8':     return (!isNaN(num) && num >= 1) ? 'tentative-pass' : 'tentative-fail';
+    case 'T_INDEX': return (!isNaN(num) && num >= 1) ? 'tentative-pass' : 'tentative-fail';
     case 'T_DISC': return (!isNaN(num) && num >= 4) ? 'tentative-pass' : 'tentative-fail';
     case 'T_60Hz': return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
     default:     return null;
@@ -514,7 +522,7 @@ function buildSubstepsHtml(testId, currentStepName, testStatus) {
 
 // ── Test groups & selection ──────────────────────────────────────────
 const TEST_GROUPS = [
-  { id: 'incident', label: 'Incident Capture',     tests: ['T0', 'T1'] },
+  { id: 'incident', label: 'Incident Capture',     tests: ['T0', 'T1', 'T_INDEX'] },
   { id: 'sdk',      label: 'SDK Data Capture',      tests: ['T2', 'T3', 'T4'] },
   { id: 'camera',   label: 'Camera Control',        tests: ['T5', 'T5b'] },
   { id: 'session',  label: 'Session & Validation',  tests: ['T6', 'T7', 'T8'] },
@@ -794,7 +802,13 @@ const PC_TESTS = [
   { id: 'PC_CHECKERED', name: 'Session completed',        level: 2 },
   { id: 'PC_RESULTS',   name: 'Results populated',        level: 2 },
   { id: 'PC_SCOPE',     name: 'Full replay (race)',       level: 2 },
-  { id: 'PC_LOKI_RT',   name: 'Loki roundtrip',           level: 3 },
+  { id: 'PC_LOKI_RT',        name: 'Loki roundtrip',           level: 3 },
+  { id: 'PC_PLAYER_INC',    name: 'Player has incidents',     level: 2 },
+  { id: 'PC_CTRL_PAUSE',    name: 'Pause control',            level: 4 },
+  { id: 'PC_CTRL_SEEK',     name: 'Seek-to-start control',    level: 4 },
+  { id: 'PC_CTRL_INCIDENT', name: 'Next-incident control',    level: 4 },
+  { id: 'PC_CTRL_FF',       name: 'Fast-forward control',     level: 4 },
+  { id: 'PC_CTRL_SEEK_FRAME', name: 'Seek-to-frame control',  level: 4 },
 ];
 let _replayScope = 'full';
 
@@ -862,7 +876,7 @@ function updatePreconditionCard(pf) {
   updateScopeBadge(pf.replayScope === 'partial' ? 'partial' : 'full');
 
   const btn = document.getElementById('btn-preflight');
-  if (pf.allPassed && pf.level >= 3) {
+  if (pf.allPassed && pf.level >= 4) {
     btn.textContent = 'All passed \u2713';
     btn.disabled = true;
     btn.style.color = 'var(--green)';
@@ -872,7 +886,7 @@ function updatePreconditionCard(pf) {
     btn.disabled = true;
     btn.style.color = '';
     btn.style.borderColor = '';
-  } else if (pf.level >= 1 && pf.level < 3) {
+  } else if (pf.level >= 1 && pf.level < 4) {
     btn.textContent = 'Deepen check (L' + (pf.level + 1) + ')';
     btn.disabled = false;
     btn.style.color = '';
@@ -1363,6 +1377,10 @@ function renderResults(results, runId, currentStepName, selectedIncidents) {
           '<span class="result-name">' + esc(meta.name) + '</span>' +
         '</div>' +
         '<div class="result-desc">' + esc(meta.desc) + '</div>' +
+        ((r.cameraContext || r.driverContext) ? '<div class="result-context">' +
+          (r.cameraContext ? '<span class="ctx-chip ctx-cam" title="Expected camera context">\uD83D\uDCF7 ' + esc(r.cameraContext) + '</span>' : '') +
+          (r.driverContext ? '<span class="ctx-chip ctx-driver" title="Expected driver context">\uD83C\uDFAF ' + esc(r.driverContext) + '</span>' : '') +
+        '</div>' : '') +
         (r.error ? '<div class="result-error">\u2717 ' + esc(r.error) + '</div>' : '') +
         '<div class="result-meta">' +
           '<span>Event: <strong class="mono">' + esc(meta.event || r.eventName || '') + '</strong></span>' +

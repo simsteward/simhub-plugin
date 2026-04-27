@@ -23,4 +23,9 @@
     <Compile Include="..\..\tests\observability\LokiQueryRangeClient.cs" Link="Observability\LokiQueryRangeClient.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="archive\DataCaptureSuiteTests.cs" />
+    <Compile Remove="archive\DataCaptureSuiteLokiIntegrationTests.cs" />
+  </ItemGroup>
+
 </Project>

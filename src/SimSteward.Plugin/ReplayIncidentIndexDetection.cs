@@ -19,6 +19,12 @@ namespace SimSteward.Plugin
         public const string SourceRepairFlag = "repair_flag";
         public const string SourceFurledFlag = "furled_flag";
         public const string SourcePlayerIncidentCount = "player_incident_count";
+        public const string SourceTrackSurface = "track_surface";
+
+        /// <summary>iRacing CarIdxTrackSurface value: car on the racing surface.</summary>
+        public const int TrackSurfaceOnTrack  = 4;
+        /// <summary>iRacing CarIdxTrackSurface value: car off the racing surface (excursion / incident).</summary>
+        public const int TrackSurfaceOffTrack = 1;
 
         /// <summary>True when masked bits transition 0 → 1 between consecutive samples.</summary>
         public static bool IsRisingEdge(int prevRaw, int currRaw, int mask)

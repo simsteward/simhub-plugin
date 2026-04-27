@@ -1,0 +1,15 @@
+[     267ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/:0
+[     506ms] [WARNING] Deprecation warning: value provided is not in a recognized RFC2822 or ISO format. moment construction falls back to js Date(), which is not reliable across all browsers and versions. Non RFC2822/ISO date formats are discouraged. Please refer to http://momentjs.com/guides/#/warnings/js-date/ for more info.
+Arguments: 
+[0] _isAMomentObject: true, _isUTC: false, _useUTC: false, _l: undefined, _i: Thu, 26 Mar 2026 04:43:23, _f: undefined, _strict: undefined, _locale: [object Object]
+Error
+    at a.createFromInputFallback (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:624:3)
+    at an (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:624:25647)
+    at un (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:624:29355)
+    at aa (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:624:29221)
+    at on (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:624:28938)
+    at sa (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:624:29715)
+    at A (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:624:29748)
+    at a (http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:621:89)
+    at f (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:1:28334)
+    at f (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:4511:50976) @ http://localhost:3000/public/build/6029.0549a3fcb50e73c4b256.js:620

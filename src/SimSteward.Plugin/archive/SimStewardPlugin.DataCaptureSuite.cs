@@ -22,6 +22,7 @@ namespace SimSteward.Plugin
             T6,
             T7_Rewind, T7_FrameZero, T7_Cooldown,
             T8_Trigger, T8_Poll,
+            TINDEX_Rewind, TINDEX_FrameZero, TINDEX_ScanCooldown, TINDEX_Emit,
             TDISC_Seek, TDISC_Settle, TDISC_Capture,
             Done
         }
@@ -48,6 +49,11 @@ namespace SimSteward.Plugin
             Level1_Check,
             Level2_SeekEnd, Level2_SettleEnd, Level2_SeekRestore, Level2_SettleRestore,
             Level3_EmitProbe, Level3_WaitProbe, Level3_QueryProbe,
+            Level4_Pause, Level4_PauseSettle,
+            Level4_SeekStart, Level4_SeekStartSettle,
+            Level4_Incident, Level4_IncidentSettle,
+            Level4_Ff, Level4_FfSettle,
+            Level4_SeekFrame, Level4_SeekFrameSettle,
             Complete
         }
         private volatile bool      _preflightRequested;
@@ -55,7 +61,7 @@ namespace SimSteward.Plugin
         private PreflightStep      _preflightStep = PreflightStep.Idle;
         private int                _preflightSavedFrame;
         private int                _preflightSettleTicks;
-        private int                _preflightLevel;            // 0=not run, 1-3
+        private int                _preflightLevel;            // 0=not run, 1-4
         private string             _preflightCorrelationId;
         private string             _preflightReplayScope = "full";
         private int                _preflightProbeWaitTicks;
@@ -64,6 +70,12 @@ namespace SimSteward.Plugin
         private List<Newtonsoft.Json.Linq.JObject> _preflightL2Lines;
         private int                _preflightDwellTicks;
         private string             _suitePreflightCorrelationId;
+
+        // Level 4 control probe fields
+        private int _preflightL4PreCmdFrame;      // frame snapshot before a command is issued
+        private int _preflightL4FfStartFrame;     // frame when FF was issued
+        private int _preflightL4FrameZeroConsec;  // consecutive ticks with ReplayFrameNum ≤ 2
+        private int _preflightL4SeekFrameTarget;  // target for SeekFrame test
 
         // T0 scan/select/capture
         private List<(int frame, int lap, int carIdx)> _suiteScanCandidates;     // player-car incidents only
@@ -76,8 +88,12 @@ namespace SimSteward.Plugin
         private int  _suitePreNextIncidentFrame;   // frame before last NextIncident call
         private int  _suiteStuckNextIncidentCount; // consecutive ignored NextIncident calls
         private bool _suiteNextIncidentPending;    // waiting for pause-settle before issuing NextIncident
-        private bool _suiteScanPlaying;           // replay is at 1x during T0 scan; skip pause-settle for next call
-        private int  _suiteScanCallCount;         // total NextIncident calls issued during T0 scan
+        private int  _suiteScanCallCount;         // total NextIncident calls issued during T0/T_INDEX scan
+
+        // T_INDEX: player incident index
+        private List<(int frame, int lap, int camCarIdx)> _suiteIndexCandidates;
+        private int  _suiteIndexScanCallCount;
+        private int  _suiteIndexFirstScanFrame;
 
         // T_60Hz: high-rate capture
         private bool _suite60HzEnabled;
@@ -116,6 +132,13 @@ namespace SimSteward.Plugin
         private bool _suiteFfSweepTriggered;
         private int  _suiteT8PollTicks;
         private bool _suiteT8BuildWasRunning;
+        private int  _suiteT8PlayNudgeCount;
+        private int  _suiteT8TimeoutTicks;
+        private int  _suiteT8LastFrameSnapshot;
+        private int  _suiteT8LastFrameSnapshotTick;
+        private int  _suiteT8SlowRateCount;
+        private bool _suiteT8GraceTickPending;  // 1-tick grace after timeout: let ReplayIncidentIndexBuild finish its tick
+        private int  _suiteT8FrameAtEndTicks;   // consecutive ticks with frame >= _replayFrameMax-500 (end-of-replay detection)
 
         // Sentry performance tracing
         private ITransactionTracer _sentryTx;
@@ -320,6 +343,11 @@ namespace SimSteward.Plugin
                 new PreflightMiniTest { Id = "PC_SCOPE",      Name = "Full replay (race)",      Level = 2 },
                 new PreflightMiniTest { Id = "PC_PLAYER_INC", Name = "Player has incidents",    Level = 2 },
                 new PreflightMiniTest { Id = "PC_LOKI_RT",    Name = "Loki roundtrip",          Level = 3 },
+                new PreflightMiniTest { Id = "PC_CTRL_PAUSE",      Name = "Pause control",         Level = 4 },
+                new PreflightMiniTest { Id = "PC_CTRL_SEEK",       Name = "Seek-to-start control", Level = 4 },
+                new PreflightMiniTest { Id = "PC_CTRL_INCIDENT",   Name = "Next-incident control", Level = 4 },
+                new PreflightMiniTest { Id = "PC_CTRL_FF",         Name = "Fast-forward control",  Level = 4 },
+                new PreflightMiniTest { Id = "PC_CTRL_SEEK_FRAME", Name = "Seek-to-frame control", Level = 4 },
             };
         }
 
@@ -329,7 +357,7 @@ namespace SimSteward.Plugin
         private void BeginPreflight()
         {
             // Always run all levels in one pass
-            int targetLevel = 3;
+            int targetLevel = 4;
 
             // Generate correlation ID on first run or reset
             if (string.IsNullOrEmpty(_preflightCorrelationId))
@@ -427,19 +455,18 @@ namespace SimSteward.Plugin
                         return;
                     }
 
-                    // Seek to near end of replay — scope is determined from what we find there.
-                    // Avoid the very last frame: ReplaySearch(ToEnd) lands at frame 0 on some replays.
-                    int seekTarget = bestFrameTotal > 300 ? bestFrameTotal - 300 : bestFrameTotal - 10;
-                    _preflightSnapshot.SeekTargetFrame = seekTarget;
+                    // Seek to the end of the replay using ReplaySearch(ToEnd) — this correctly
+                    // lands at the actual end of race content regardless of multi-session replays.
+                    // The old ReplaySetPlayPosition(Begin, frameTotal-300) approach landed in the
+                    // "dead zone" after the race ended (SessionState=0) for multi-session replays.
+                    // If ToEnd bugs out and lands at frame 0, we fall back in Level2_SettleEnd.
+                    _preflightSnapshot.SeekTargetFrame = bestFrameTotal;
                     _preflightSettleTicks = 0;
                     _preflightDwellTicks  = 0;
                     try
                     {
-                        // Pause before seeking — required for cross-session seeks (e.g. Practice → end of Race).
-                        // Unlike T0/T_DISC (which seek within current session), preflight seeks to the
-                        // absolute end of the replay which may be in a different session.
                         _irsdk.ReplaySetPlaySpeed(0, false);
-                        _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, seekTarget);
+                        _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.ToEnd);
                     }
                     catch (Exception ex)
                     {
@@ -460,10 +487,20 @@ namespace SimSteward.Plugin
                 {
                     _preflightSettleTicks++;
                     int frame = SafeGetInt("ReplayFrameNum");
-                    int seekTarget = _preflightSnapshot.SeekTargetFrame;
-                    // Wait until the replay has arrived within 30 frames of the target, or timeout at 600 ticks (~10s).
-                    bool arrivedAtTarget = seekTarget > 0 && Math.Abs(frame - seekTarget) <= 30;
-                    if (arrivedAtTarget || _preflightSettleTicks > 600)
+                    int bestFrameTotal2 = Math.Max(_replayFrameTotal, _replayFrameMax);
+                    // ToEnd seek: wait for frame to stabilise (not near zero) or timeout after ~10s.
+                    // If ToEnd bugs out and lands at frame 0, fall back to position-based seek.
+                    bool settled = _preflightSettleTicks > 120 && frame > 100;
+                    if (!settled && _preflightSettleTicks == 120 && frame <= 10 && bestFrameTotal2 > 300)
+                    {
+                        // ToEnd landed at frame 0 — fall back to position-based seek
+                        int fallbackTarget = bestFrameTotal2 - 3000 > 0 ? bestFrameTotal2 - 3000 : bestFrameTotal2 / 2;
+                        _preflightSnapshot.SeekTargetFrame = fallbackTarget;
+                        try { _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, fallbackTarget); } catch { }
+                        _preflightSettleTicks = 0;
+                        break;
+                    }
+                    if (settled || _preflightSettleTicks > 600)
                     {
                         // Dwell at the target for 60 ticks (~1s) so the seek is visually perceptible
                         _preflightDwellTicks++;
@@ -494,9 +531,23 @@ namespace SimSteward.Plugin
                         SetPfTest("PC_RESULTS", resultsOk, resultsOk ? "ResultsPositions found" : "No ResultsPositions");
                         SetPfTest("PC_SCOPE", isFull, isFull ? "Full replay: race detected" : "Partial replay: no checkered state detected");
 
-                        // Player incident count — hard gate: T0 can only capture ground truth if player had incidents
+                        // Player incident count — soft gate: T0/T1/T7/T_INDEX auto-skipped when 0.
+                        // Telemetry (PlayerCarMyIncidentCount) is unreliable in replay — falls back to YAML ResultsPositions.
                         int playerIncCount = 0;
                         try { playerIncCount = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
+                        if (playerIncCount == 0)
+                        {
+                            try
+                            {
+                                int playerCarIdx2 = SafeGetInt("PlayerCarIdx");
+                                string yaml2      = _irsdk?.Data?.SessionInfoYaml ?? "";
+                                int    sessNum2   = SafeGetInt("SessionNum");
+                                if (ReplayIncidentIndexResultsYaml.TryParseOfficialIncidentsByCarIdx(
+                                        yaml2, sessNum2, out var byCarIdx2, out _, out _) && byCarIdx2 != null)
+                                    byCarIdx2.TryGetValue(playerCarIdx2, out playerIncCount);
+                            }
+                            catch { }
+                        }
                         SetPfTest("PC_PLAYER_INC", playerIncCount > 0,
                             playerIncCount > 0 ? playerIncCount + " incident(s)" : "0 incidents — choose a replay where the player had incidents");
 
@@ -506,19 +557,22 @@ namespace SimSteward.Plugin
                         // Emit L2 seek event to Loki so PC_LOKI_RT can verify it
                         var l2Fields = new Dictionary<string, object>
                         {
-                            ["preflight_correlation_id"] = _preflightCorrelationId,
-                            ["seek_target_frame"]        = seekTarget,
-                            ["actual_frame_at_read"]     = frame,
-                            ["session_state_at_end"]     = sessionState,
-                            ["checkered_ok"]             = checkeredOk,
-                            ["checkered_flag_bit"]       = checkeredFlagBit,
-                            ["results_populated"]        = resultsOk,
-                            ["results_official"]         = resultsOfficialOk,
-                            ["session_type"]             = sessionType,
-                            ["replay_frame_total"]       = _replayFrameTotal,
-                            ["replay_scope_detected"]    = _preflightReplayScope,
-                            ["domain"]                   = "test",
-                            ["testing"]                  = "true",
+                            ["preflight_correlation_id"]    = _preflightCorrelationId,
+                            ["seek_target_frame"]           = _preflightSnapshot.SeekTargetFrame,
+                            ["actual_frame_at_read"]        = frame,
+                            ["session_state_at_end"]        = sessionState,
+                            ["checkered_ok"]                = checkeredOk,
+                            ["checkered_flag_bit"]          = checkeredFlagBit,
+                            ["results_populated"]           = resultsOk,
+                            ["results_official"]            = resultsOfficialOk,
+                            ["session_type"]                = sessionType,
+                            ["replay_frame_total"]          = _replayFrameTotal,
+                            ["replay_scope_detected"]       = _preflightReplayScope,
+                            ["player_car_my_incident_count"] = playerIncCount,
+                            ["replay_play_speed"]           = SafeGetInt("ReplayPlaySpeed"),
+                            ["is_replay_playing"]           = SafeGetInt("IsReplayPlaying"),
+                            ["domain"]                      = "test",
+                            ["testing"]                     = "true",
                         };
                         MergeSessionAndRoutingFields(l2Fields);
                         _logger?.Structured("INFO", "simhub-plugin",
@@ -647,6 +701,177 @@ namespace SimSteward.Plugin
                                     : $"Seek landed at invalid session (state=0, frame={logActualFrame})";
                         SetPfTest("PC_LOKI_RT", allOk, detail);
                     }
+
+                    // ── Transition to Level 4 (replay control probes) ──
+                    // Gate: only run Level 4 if iRacing is still connected and in replay mode.
+                    if (_preflightLevel >= 4 && AllLevelPassed(1))
+                    {
+                        foreach (var t in _preflightSnapshot.MiniTests)
+                            if (t.Level == 4) t.Status = "running";
+                        _preflightSettleTicks        = 0;
+                        _preflightL4PreCmdFrame      = 0;
+                        _preflightL4FfStartFrame     = 0;
+                        _preflightL4FrameZeroConsec  = 0;
+                        _preflightL4SeekFrameTarget  = 0;
+                        _preflightStep = PreflightStep.Level4_Pause;
+                    }
+                    else
+                    {
+                        CompletePreflight();
+                    }
+                    break;
+                }
+
+                // ── Level 4: replay control probes ───────────────────────────────────
+                case PreflightStep.Level4_Pause:
+                {
+                    _preflightL4PreCmdFrame = SafeGetInt("ReplayFrameNum");
+                    try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_PauseSettle;
+                    break;
+                }
+
+                case PreflightStep.Level4_PauseSettle:
+                {
+                    _preflightSettleTicks++;
+                    int  playSpeed  = SafeGetInt("ReplayPlaySpeed");
+                    bool captured   = playSpeed == 0;
+                    int  frameNow   = SafeGetInt("ReplayFrameNum");
+                    bool correct    = captured && frameNow <= _preflightL4PreCmdFrame + 5;
+                    // Evaluate once captured or at timeout (90 ticks ~1.5s)
+                    if (!captured && _preflightSettleTicks < 90) break;
+                    string pauseDetail = captured && correct ? $"ReplayPlaySpeed=0 frame={frameNow}"
+                        : !captured ? $"pause_not_captured: speed={playSpeed}"
+                        : $"pause_frame_still_advancing: was={_preflightL4PreCmdFrame} now={frameNow}";
+                    SetPfTest("PC_CTRL_PAUSE", captured && correct, pauseDetail);
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_SeekStart;
+                    break;
+                }
+
+                case PreflightStep.Level4_SeekStart:
+                {
+                    try { _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.ToStart); } catch { }
+                    _preflightL4FrameZeroConsec = 0;
+                    _preflightSettleTicks       = 0;
+                    _preflightStep = PreflightStep.Level4_SeekStartSettle;
+                    break;
+                }
+
+                case PreflightStep.Level4_SeekStartSettle:
+                {
+                    _preflightSettleTicks++;
+                    int seekFrame = SafeGetInt("ReplayFrameNum");
+                    if (seekFrame <= 2) _preflightL4FrameZeroConsec++;
+                    else                _preflightL4FrameZeroConsec = 0;
+
+                    bool seekStable = _preflightL4FrameZeroConsec >= 4;
+                    bool seekTimeout = _preflightSettleTicks >= 600;
+                    if (!seekStable && !seekTimeout) break;
+
+                    bool seekCorrect = seekStable && seekFrame <= 2;
+                    string seekDetail = seekCorrect ? $"frame=0 stable (consec={_preflightL4FrameZeroConsec})"
+                        : seekTimeout && !seekStable ? $"seek_not_captured: frame={seekFrame} after {_preflightSettleTicks} ticks"
+                        : $"seek_frame_unstable: frame={seekFrame}";
+                    SetPfTest("PC_CTRL_SEEK", seekCorrect, seekDetail);
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_Incident;
+                    break;
+                }
+
+                case PreflightStep.Level4_Incident:
+                {
+                    // Skip if SEEK failed — we need to be at frame 0 for this test to be meaningful
+                    if (PfTest("PC_CTRL_SEEK")?.Status != "pass")
+                    {
+                        var skipTest = PfTest("PC_CTRL_INCIDENT");
+                        if (skipTest != null) { skipTest.Status = "skip"; skipTest.Detail = "skip:seek_failed"; }
+                        _preflightStep = PreflightStep.Level4_Ff;
+                        break;
+                    }
+                    _preflightL4PreCmdFrame = SafeGetInt("ReplayFrameNum");
+                    try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+                    try { _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.NextIncident); } catch { }
+                    try { _irsdk.ReplaySetPlaySpeed(1, false); } catch { }
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_IncidentSettle;
+                    break;
+                }
+
+                case PreflightStep.Level4_IncidentSettle:
+                {
+                    _preflightSettleTicks++;
+                    if (_preflightSettleTicks < 150) break;
+
+                    int incFrame    = SafeGetInt("ReplayFrameNum");
+                    int camCarIdx   = SafeGetInt("CamCarIdx");
+                    int frameEnd    = Math.Max(_replayFrameMax, _replayFrameTotal);
+                    bool captured   = incFrame - _preflightL4PreCmdFrame > 100;
+                    bool camValid   = camCarIdx >= 0 && camCarIdx < 64;
+                    bool inBounds   = frameEnd <= 0 || incFrame < frameEnd;
+                    bool incCorrect = captured && camValid && inBounds;
+                    string incDetail = incCorrect ? $"frame jumped to {incFrame} camCarIdx={camCarIdx}"
+                        : !captured ? $"incident_not_captured: frame={incFrame} start={_preflightL4PreCmdFrame}"
+                        : !camValid ? $"incident_camcar_invalid: CamCarIdx={camCarIdx}"
+                        : $"incident_out_of_bounds: frame={incFrame} frameEnd={frameEnd}";
+                    SetPfTest("PC_CTRL_INCIDENT", incCorrect, incDetail);
+                    try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_Ff;
+                    break;
+                }
+
+                case PreflightStep.Level4_Ff:
+                {
+                    _preflightL4FfStartFrame = SafeGetInt("ReplayFrameNum");
+                    try { _irsdk.ReplaySetPlaySpeed(32, false); } catch { }
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_FfSettle;
+                    break;
+                }
+
+                case PreflightStep.Level4_FfSettle:
+                {
+                    _preflightSettleTicks++;
+                    if (_preflightSettleTicks < 60) break;
+
+                    int ffFrame   = SafeGetInt("ReplayFrameNum");
+                    int ffDelta   = ffFrame - _preflightL4FfStartFrame;
+                    bool ffCaptured = ffDelta > 100;
+                    int  ffRate   = _preflightSettleTicks > 0 ? ffDelta / _preflightSettleTicks : 0;
+                    bool ffCorrect = ffCaptured && ffRate >= DataCaptureSuiteConstants.T8_SlowRateThreshold;
+                    string ffDetail = ffCorrect ? $"delta={ffDelta} rate={ffRate}fps"
+                        : !ffCaptured ? $"ff_not_captured: delta={ffDelta}"
+                        : $"ff_rate_too_slow: rate={ffRate}fps (expected>={DataCaptureSuiteConstants.T8_SlowRateThreshold})";
+                    SetPfTest("PC_CTRL_FF", ffCorrect, ffDetail);
+                    try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_SeekFrame;
+                    break;
+                }
+
+                case PreflightStep.Level4_SeekFrame:
+                {
+                    _preflightL4SeekFrameTarget = _preflightSavedFrame;
+                    try { _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, _preflightL4SeekFrameTarget); } catch { }
+                    _preflightSettleTicks = 0;
+                    _preflightStep = PreflightStep.Level4_SeekFrameSettle;
+                    break;
+                }
+
+                case PreflightStep.Level4_SeekFrameSettle:
+                {
+                    _preflightSettleTicks++;
+                    int sfFrame   = SafeGetInt("ReplayFrameNum");
+                    bool onTarget = Math.Abs(sfFrame - _preflightL4SeekFrameTarget) <= 50;
+                    bool sfTimeout = _preflightSettleTicks >= 120;
+                    if (!onTarget && !sfTimeout) break;
+
+                    bool sfCorrect = onTarget;
+                    string sfDetail = sfCorrect ? $"frame={sfFrame} target={_preflightL4SeekFrameTarget} within tolerance"
+                        : $"seek_frame_missed: frame={sfFrame} vs target={_preflightL4SeekFrameTarget} diff={Math.Abs(sfFrame - _preflightL4SeekFrameTarget)}";
+                    SetPfTest("PC_CTRL_SEEK_FRAME", sfCorrect, sfDetail);
                     CompletePreflight();
                     break;
                 }
@@ -677,11 +902,10 @@ namespace SimSteward.Plugin
         private void CompletePreflight()
         {
             // Determine allPassed: all tests at completed levels must be pass or skip.
-            // Soft gates: PC_LOKI_RT (Loki may be down), PC_CHECKERED, PC_SCOPE (partial replays ok).
-            // Hard gates: everything else — PC_IRACING, PC_REPLAY, PC_SESSIONS, PC_RESULTS, PC_PLAYER_INC.
-            // PC_PLAYER_INC is a hard gate: T0 requires player incidents for ground truth capture.
+            // Soft gates: PC_LOKI_RT (Loki may be down), PC_CHECKERED, PC_SCOPE (partial replays ok),
+            //             PC_PLAYER_INC (0 incidents → auto-skip incident tests, don't block everything).
             static bool IsSoftGate(string id) =>
-                id == "PC_LOKI_RT" || id == "PC_CHECKERED" || id == "PC_SCOPE";
+                id == "PC_LOKI_RT" || id == "PC_CHECKERED" || id == "PC_SCOPE" || id == "PC_PLAYER_INC";
             bool allPassed = true;
             foreach (var t in _preflightSnapshot.MiniTests)
             {
@@ -742,17 +966,18 @@ namespace SimSteward.Plugin
         {
             _suiteResults = new[]
             {
-                new DataCaptureSuiteTestResult { TestId = "T0",  Name = "Ground Truth Capture",    EventName = DataCaptureSuiteConstants.EventGroundTruth },
-                new DataCaptureSuiteTestResult { TestId = "T1",  Name = "Speed Sweep Detection",   EventName = DataCaptureSuiteConstants.EventSpeedSample },
-                new DataCaptureSuiteTestResult { TestId = "T2",  Name = "Variable Inventory",      EventName = DataCaptureSuiteConstants.EventVariableInventory },
-                new DataCaptureSuiteTestResult { TestId = "T3",  Name = "Player Data Snapshot",    EventName = DataCaptureSuiteConstants.EventPlayerSnapshot },
-                new DataCaptureSuiteTestResult { TestId = "T4",  Name = "Driver Roster",           EventName = DataCaptureSuiteConstants.EventDriverRoster },
-                new DataCaptureSuiteTestResult { TestId = "T5",  Name = "Camera Switch",           EventName = DataCaptureSuiteConstants.EventCameraSwitchDriver },
-                new DataCaptureSuiteTestResult { TestId = "T5b", Name = "Camera View Cycle",       EventName = DataCaptureSuiteConstants.EventCameraViewSample },
-                new DataCaptureSuiteTestResult { TestId = "T6",  Name = "Session Results",         EventName = DataCaptureSuiteConstants.EventSessionResults },
-                new DataCaptureSuiteTestResult { TestId = "T7",  Name = "Incident Re-Seek",        EventName = DataCaptureSuiteConstants.EventIncidentReseek },
-                new DataCaptureSuiteTestResult { TestId = "T8",    Name = "FF Sweep",                EventName = DataCaptureSuiteConstants.EventFfSweepResult },
-                new DataCaptureSuiteTestResult { TestId = "T_DISC", Name = "Data Point Discovery",  EventName = DataCaptureSuiteConstants.EventDataDiscovery },
+                new DataCaptureSuiteTestResult { TestId = "T0",      Name = "Ground Truth Capture",   EventName = DataCaptureSuiteConstants.EventGroundTruth,        CameraContext = "incident", DriverContext = "player" },
+                new DataCaptureSuiteTestResult { TestId = "T1",      Name = "Speed Sweep Detection",  EventName = DataCaptureSuiteConstants.EventSpeedSample,        CameraContext = "incident", DriverContext = "player" },
+                new DataCaptureSuiteTestResult { TestId = "T2",      Name = "Variable Inventory",     EventName = DataCaptureSuiteConstants.EventVariableInventory },
+                new DataCaptureSuiteTestResult { TestId = "T3",      Name = "Player Data Snapshot",   EventName = DataCaptureSuiteConstants.EventPlayerSnapshot,     CameraContext = "player",   DriverContext = "player" },
+                new DataCaptureSuiteTestResult { TestId = "T4",      Name = "Driver Roster",          EventName = DataCaptureSuiteConstants.EventDriverRoster },
+                new DataCaptureSuiteTestResult { TestId = "T5",      Name = "Camera Switch",          EventName = DataCaptureSuiteConstants.EventCameraSwitchDriver, CameraContext = "other",    DriverContext = "other" },
+                new DataCaptureSuiteTestResult { TestId = "T5b",     Name = "Camera View Cycle",      EventName = DataCaptureSuiteConstants.EventCameraViewSample,   CameraContext = "other",    DriverContext = "other" },
+                new DataCaptureSuiteTestResult { TestId = "T6",      Name = "Session Results",        EventName = DataCaptureSuiteConstants.EventSessionResults },
+                new DataCaptureSuiteTestResult { TestId = "T7",      Name = "Incident Re-Seek",       EventName = DataCaptureSuiteConstants.EventIncidentReseek,     CameraContext = "incident", DriverContext = "player" },
+                new DataCaptureSuiteTestResult { TestId = "T8",      Name = "FF Sweep",               EventName = DataCaptureSuiteConstants.EventFfSweepResult },
+                new DataCaptureSuiteTestResult { TestId = "T_INDEX", Name = "Player Incident Index",  EventName = DataCaptureSuiteConstants.EventPlayerIncidentIndex, CameraContext = "incident", DriverContext = "player" },
+                new DataCaptureSuiteTestResult { TestId = "T_DISC",  Name = "Data Point Discovery",   EventName = DataCaptureSuiteConstants.EventDataDiscovery },
             };
 
             // Append T_60Hz only when feature flag is set
@@ -778,13 +1003,23 @@ namespace SimSteward.Plugin
             _suiteReseekCapture       = new GroundTruthIncident[3];
             _suiteReseekIdx           = 0;
             _suiteSpeedSweepIdx       = 0;
-            _suiteFfSweepTriggered    = false;
-            _suiteT8PollTicks         = 0;
-            _suiteT8BuildWasRunning   = false;
+            _suiteFfSweepTriggered         = false;
+            _suiteT8PollTicks              = 0;
+            _suiteT8BuildWasRunning        = false;
+            _suiteT8PlayNudgeCount         = 0;
+            _suiteT8TimeoutTicks           = DataCaptureSuiteConstants.T8_MaxTimeoutTicks;
+            _suiteT8LastFrameSnapshot      = 0;
+            _suiteT8LastFrameSnapshotTick  = 0;
+            _suiteT8SlowRateCount          = 0;
+            _suiteT8GraceTickPending       = false;
+            _suiteT8FrameAtEndTicks        = 0;
             _suiteCamGroupsVisited.Clear();
             _lokiReadUrl = _lokiBaseUrl;
             _suiteDiscPositionIdx = 0;
             _suiteDiscTargetFrames = null;
+            _suiteIndexCandidates     = null;
+            _suiteIndexScanCallCount  = 0;
+            _suiteIndexFirstScanFrame = -1;
 
             // 60Hz feature flag
             _suite60HzEnabled = string.Equals(
@@ -795,6 +1030,20 @@ namespace SimSteward.Plugin
                 _suite60HzRecorder = new HighRateTelemetryRecorder(_suiteTestRunId, _pluginDataPath);
 
             InitSuiteResults();
+
+            // Auto-skip incident tests when player had 0 incidents (PC_PLAYER_INC soft-failed).
+            // T0, T1, T7, T_INDEX all require player incidents for ground truth / index capture.
+            var pfIncTest = _preflightSnapshot?.MiniTests != null
+                ? Array.Find(_preflightSnapshot.MiniTests, t => t.Id == "PC_PLAYER_INC")
+                : null;
+            if (pfIncTest != null && pfIncTest.Status != "pass")
+            {
+                _suiteSkipList.Add("T0");
+                _suiteSkipList.Add("T1");
+                _suiteSkipList.Add("T7");
+                _suiteSkipList.Add("T_INDEX");
+                _logger?.Warn("DataCaptureSuite: PC_PLAYER_INC not passed — auto-skipping T0, T1, T7, T_INDEX.");
+            }
 
             _suiteStep  = SuiteInternalStep.T0_Rewind;
             _suitePhase = DataCaptureSuitePhase.Running;
@@ -840,9 +1089,13 @@ namespace SimSteward.Plugin
                 case SuiteInternalStep.T7_Rewind:    TickT7_Rewind();    break;
                 case SuiteInternalStep.T7_FrameZero: TickT7_FrameZero(); break;
                 case SuiteInternalStep.T7_Cooldown:  TickT7_Cooldown();  break;
-                case SuiteInternalStep.T8_Trigger:     TickT8_Trigger();     break;
-                case SuiteInternalStep.T8_Poll:        TickT8_Poll();        break;
-                case SuiteInternalStep.TDISC_Seek:     TickTDISC_Seek();     break;
+                case SuiteInternalStep.T8_Trigger:        TickT8_Trigger();        break;
+                case SuiteInternalStep.T8_Poll:           TickT8_Poll();           break;
+                case SuiteInternalStep.TINDEX_Rewind:     TickTINDEX_Rewind();     break;
+                case SuiteInternalStep.TINDEX_FrameZero:  TickTINDEX_FrameZero();  break;
+                case SuiteInternalStep.TINDEX_ScanCooldown: TickTINDEX_ScanCooldown(); break;
+                case SuiteInternalStep.TINDEX_Emit:       TickTINDEX_Emit();       break;
+                case SuiteInternalStep.TDISC_Seek:        TickTDISC_Seek();        break;
                 case SuiteInternalStep.TDISC_Settle:   TickTDISC_Settle();   break;
                 case SuiteInternalStep.TDISC_Capture:  TickTDISC_Capture();  break;
                 case SuiteInternalStep.Done:           TransitionToLoki();   break;
@@ -894,7 +1147,6 @@ namespace SimSteward.Plugin
             _suitePreNextIncidentFrame     = -1;
             _suiteStuckNextIncidentCount   = 0;
             _suiteNextIncidentPending      = false;
-            _suiteScanPlaying              = false;
             _suiteScanCallCount            = 0;
             _suiteFrameZeroConsecutive     = 0;
             _suiteSeekTimeoutTicks         = 0;
@@ -926,7 +1178,7 @@ namespace SimSteward.Plugin
             // short settle window (15 ticks) inside TickT0_ScanCooldown.
             _suitePreNextIncidentFrame = frame;
             _suiteNextIncidentPending  = true;
-            _suiteSeekCooldownTicks    = 15;  // pause-settle window
+            _suiteSeekCooldownTicks    = DataCaptureSuiteConstants.NextIncidentPauseSettleTicks;
             try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
             _suiteStep = SuiteInternalStep.T0_ScanCooldown;
         }
@@ -941,24 +1193,20 @@ namespace SimSteward.Plugin
             {
                 _suiteNextIncidentPending  = false;
                 _suitePreNextIncidentFrame = SafeGetInt("ReplayFrameNum");
-                // Use shorter cooldown when playing at 1x — 60 ticks (~1s) is enough for iRacing to settle after a jump.
                 _suiteSeekCooldownTicks    = DataCaptureSuiteConstants.T0_PlayModeCooldownTicks;
                 _suiteScanCallCount++;
                 try { _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.NextIncident); } catch { }
-                try { _irsdk.ReplaySetPlaySpeed(1, false); } catch { } // keep telemetry at 60Hz
-                _suiteScanPlaying = true;
+                try { _irsdk.ReplaySetPlaySpeed(1, false); } catch { } // resume for 60Hz telemetry during settle
                 return;
             }
 
             int frame     = SafeGetInt("ReplayFrameNum");
             int camCarIdx = SafeGetInt("CamCarIdx");
 
-            // Stuck-detection: when replay is paused, a frame delta < 300 means NextIncident didn't jump.
-            // When _suiteScanPlaying (replay at 1x), the replay naturally advances ~NextIncidentCooldownTicks
-            // frames during the cooldown, so frameDelta ≈ 150 regardless of whether NextIncident jumped.
-            // Stuck detection via frame delta is unreliable in playing mode — rely on wraparound instead.
+            // Stuck-detection: if NextIncident didn't seek (frame advanced only naturally at 1x),
+            // frameDelta ≈ T0_PlayModeCooldownTicks (60). A successful seek jumps hundreds of frames.
             int frameDelta = _suitePreNextIncidentFrame >= 0 ? Math.Abs(frame - _suitePreNextIncidentFrame) : int.MaxValue;
-            bool stuckCall = !_suiteScanPlaying && frameDelta < 300;
+            bool stuckCall = frameDelta < 300;
             if (stuckCall)
             {
                 _suiteStuckNextIncidentCount++;
@@ -980,11 +1228,10 @@ namespace SimSteward.Plugin
                     _suiteStep = SuiteInternalStep.T0_SeekCapture;
                     return;
                 }
-                // Re-issue: pause first (in case replay drifted), then use pause-settle pattern
-                _suiteScanPlaying = false;
+                // Re-issue with pause-settle
                 try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
                 _suiteNextIncidentPending  = true;
-                _suiteSeekCooldownTicks    = 15;
+                _suiteSeekCooldownTicks    = DataCaptureSuiteConstants.NextIncidentPauseSettleTicks;
                 return;
             }
             _suiteStuckNextIncidentCount = 0; // reset on successful jump
@@ -1033,25 +1280,12 @@ namespace SimSteward.Plugin
                 return;
             }
 
-            // Scan next incident.
-            // If already playing at 1x (from a prior resume), call NextIncident directly — no pause-settle
-            // needed since we're not transitioning from a stopped state. Pausing between incidents
-            // at low telemetry rate (~1Hz) would add ~15s per incident.
-            if (_suiteScanPlaying)
-            {
-                _suitePreNextIncidentFrame = SafeGetInt("ReplayFrameNum");
-                _suiteSeekCooldownTicks    = DataCaptureSuiteConstants.T0_PlayModeCooldownTicks;
-                _suiteScanCallCount++;
-                try { _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.NextIncident); } catch { }
-                // Replay stays at 1x; no need to call ReplaySetPlaySpeed again
-            }
-            else
-            {
-                // Not playing yet — use pause-settle to avoid issuing NextIncident in same tick as pause
-                try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
-                _suiteNextIncidentPending = true;
-                _suiteSeekCooldownTicks   = 15;
-            }
+            // Always pause before the next NextIncident call.
+            // Issuing NextIncident while the replay is playing causes iRacing to randomly seek
+            // instead of jumping to the next incident.
+            try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+            _suiteNextIncidentPending = true;
+            _suiteSeekCooldownTicks   = DataCaptureSuiteConstants.NextIncidentPauseSettleTicks;
         }
 
         private void TickT0_SeekCapture()
@@ -1689,18 +1923,43 @@ namespace SimSteward.Plugin
 
         private void TickT8_Trigger()
         {
-            if (TrySkipTest("T8", SuiteInternalStep.Done)) return;
+            if (TrySkipTest("T8", SuiteInternalStep.TINDEX_Rewind)) return;
             if (_suiteFfSweepTriggered) { _suiteStep = SuiteInternalStep.T8_Poll; return; }
-            _suiteFfSweepTriggered  = true;
-            _suiteT8PollTicks       = 0;
-            _suiteT8BuildWasRunning = false;
+            _suiteFfSweepTriggered       = true;
+            _suiteT8PollTicks            = 0;
+            _suiteT8BuildWasRunning      = false;
+            _suiteT8PlayNudgeCount       = 0;
+            _suiteT8SlowRateCount        = 0;
+            _suiteT8GraceTickPending     = false;
+            _suiteT8FrameAtEndTicks      = 0;
+            _suiteT8LastFrameSnapshot    = SafeGetInt("ReplayFrameNum");
+            _suiteT8LastFrameSnapshotTick = 0;
+
+            // Compute dynamic timeout from replay length: 3x expected sweep time at 32x + 30s baseline.
+            // ReplayFrameNumEnd is unreliable (returns session-relative or stale values); prefer _replayFrameMax
+            // which tracks the max ReplayFrameNum seen across all ticks (reliable absolute frame count).
+            // Multiplier is 3x (not 2x) because actual FF rate is typically ~16 frames/tick, not 32.
+            // Clamped between T8_MinTimeoutTicks and T8_MaxTimeoutTicks.
+            int frameNumEnd = _replayFrameMax > 0 ? _replayFrameMax : Math.Max(SafeGetInt("ReplayFrameNumEnd"), _replayFrameTotal);
+            int expectedSweepTicks = frameNumEnd > 0
+                ? frameNumEnd / ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed
+                : 9000;
+            _suiteT8TimeoutTicks = Math.Min(
+                Math.Max(expectedSweepTicks * 3 + 1800, DataCaptureSuiteConstants.T8_MinTimeoutTicks),
+                DataCaptureSuiteConstants.T8_MaxTimeoutTicks);
+            _logger?.Warn($"[T8_DIAG] trigger: frameNumEnd={frameNumEnd} expectedSweepTicks={expectedSweepTicks} timeoutTicks={_suiteT8TimeoutTicks}");
+
+            // T7 leaves the replay paused. Resume at 1x before triggering the build so that
+            // ReplaySearch(ToStart) and the subsequent ReplaySetPlaySpeed(32) actually take effect.
+            // iRacing silently ignores speed commands issued while paused from the SDK callback thread.
+            try { _irsdk.ReplaySetPlaySpeed(1, false); } catch { }
 
             var (success, _, err) = DispatchReplayIncidentIndexBuild("start", _suiteTestRunId);
             if (!success)
             {
                 SuiteResult("T8").Status = "fail";
                 SuiteResult("T8").Error  = err ?? "trigger_failed";
-                _suiteStep = SuiteInternalStep.TDISC_Seek;
+                _suiteStep = SuiteInternalStep.TINDEX_Rewind;
                 return;
             }
             _suiteStep = SuiteInternalStep.T8_Poll;
@@ -1726,22 +1985,97 @@ namespace SimSteward.Plugin
             //   (b) FF sweep done and now camera validating (_replayIndexFfComplete set before
             //       transitioning to CameraValidating) — T8 only needs the incident CarIdx data
             //       from the FF sweep; camera validation adds timing context but isn't required.
+            //   (c) Frame has been stuck at the end of the replay for 300+ ticks — ffComplete
+            //       signal is delayed (ReplayIncidentIndexBuild runs after T8_Poll in DataUpdate);
+            //       being at the replay end for 5+ seconds is sufficient evidence of completion.
+            bool frameAtEnd = _replayFrameMax > 0 && SafeGetInt("ReplayFrameNum") >= _replayFrameMax - 500;
+            if (frameAtEnd) _suiteT8FrameAtEndTicks++;
+            else            _suiteT8FrameAtEndTicks = 0;
+
             bool buildDone =
                 (buildPhase == ReplayIndexBuildPhase.Idle && (_suiteT8BuildWasRunning || _suiteT8PollTicks >= 30)) ||
-                (ffComplete && _suiteT8BuildWasRunning && buildPhase == ReplayIndexBuildPhase.CameraValidating);
+                (ffComplete && _suiteT8BuildWasRunning && buildPhase == ReplayIndexBuildPhase.CameraValidating) ||
+                (_suiteT8BuildWasRunning && _suiteT8FrameAtEndTicks >= 300);
 
             if (!buildDone)
             {
-                // Periodic diagnostic log every 10k ticks
-                if (_suiteT8PollTicks % 10000 == 0)
-                    _logger?.Warn($"[T8_DIAG] poll ticks={_suiteT8PollTicks} phase={buildPhase} ffComplete={ffComplete} wasRunning={_suiteT8BuildWasRunning}");
+                int currentFrame = SafeGetInt("ReplayFrameNum");
 
-                // Still running — timeout if we've waited too long
-                if (_suiteT8PollTicks > 120000)
+                // Periodic diagnostic log every ~5s (300 ticks)
+                if (_suiteT8PollTicks % 300 == 0)
+                    _logger?.Warn($"[T8_DIAG] poll ticks={_suiteT8PollTicks}/{_suiteT8TimeoutTicks} phase={buildPhase} ffComplete={ffComplete} wasRunning={_suiteT8BuildWasRunning} nudges={_suiteT8PlayNudgeCount} frame={currentFrame}");
+
+                if (buildPhase == ReplayIndexBuildPhase.FastForwarding)
                 {
+                    // Watchdog A: replay not playing at all — nudge up to 3 times then abort.
+                    bool isPlaying = SafeGetInt("IsReplayPlaying") != 0;
+                    if (!isPlaying && _suiteT8PollTicks % 300 == 0)
+                    {
+                        if (_suiteT8PlayNudgeCount >= 3)
+                        {
+                            _logger?.Warn($"[T8_DIAG] replay not playing after {_suiteT8PlayNudgeCount} nudges — aborting T8");
+                            SuiteResult("T8").Status = "fail";
+                            SuiteResult("T8").Error  = "replay_not_playing";
+                            _suiteStep = SuiteInternalStep.TINDEX_Rewind;
+                            return;
+                        }
+                        _suiteT8PlayNudgeCount++;
+                        _logger?.Warn($"[T8_DIAG] replay paused during FF sweep — nudge #{_suiteT8PlayNudgeCount}, re-issuing play speed");
+                        try { _irsdk.ReplaySetPlaySpeed(32, false); } catch { }
+                    }
+
+                    // Watchdog B: replay is playing but at the wrong speed (1x instead of 32x).
+                    // Check frame advancement rate every T8_RateCheckIntervalTicks ticks.
+                    // Skip the abort if frame is near the end of the replay — the sweep completed
+                    // but ffComplete hasn't signalled yet; we just need to wait a bit longer.
+                    bool frameNearEnd = frameAtEnd; // already computed above using SafeGetInt("ReplayFrameNum")
+                    if (_suiteT8PollTicks % DataCaptureSuiteConstants.T8_RateCheckIntervalTicks == 0 && _suiteT8PollTicks > 0)
+                    {
+                        int ticksSinceSnapshot = _suiteT8PollTicks - _suiteT8LastFrameSnapshotTick;
+                        if (ticksSinceSnapshot > 0)
+                        {
+                            int frameDelta = currentFrame - _suiteT8LastFrameSnapshot;
+                            int ratePerTick = frameDelta / ticksSinceSnapshot;
+                            if (ratePerTick < DataCaptureSuiteConstants.T8_SlowRateThreshold && !frameNearEnd)
+                            {
+                                _suiteT8SlowRateCount++;
+                                _logger?.Warn($"[T8_DIAG] replay speed stuck? rate={ratePerTick} frames/tick (expected ~32) slowCount={_suiteT8SlowRateCount}");
+                                if (_suiteT8SlowRateCount >= DataCaptureSuiteConstants.T8_SlowRateAbortCount)
+                                {
+                                    _logger?.Warn($"[T8_DIAG] aborting T8 - replay running at wrong speed ({ratePerTick} frames/tick)");
+                                    SuiteResult("T8").Status = "fail";
+                                    SuiteResult("T8").Error  = "replay_speed_stuck";
+                                    _suiteStep = SuiteInternalStep.TINDEX_Rewind;
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                if (frameNearEnd && ratePerTick < DataCaptureSuiteConstants.T8_SlowRateThreshold)
+                                    _logger?.Warn($"[T8_DIAG] frame near end ({currentFrame}/{_replayFrameMax}) - skipping slow-rate abort, waiting for ffComplete");
+                                _suiteT8SlowRateCount = 0;
+                            }
+                        }
+                        _suiteT8LastFrameSnapshot     = currentFrame;
+                        _suiteT8LastFrameSnapshotTick = _suiteT8PollTicks;
+                    }
+                }
+
+                // Still running — timeout if we've waited too long.
+                // ReplayIncidentIndexBuild runs AFTER TickT8_Poll in the same DataUpdate tick, so
+                // ffComplete may be set on the same tick we declare timeout. Give it one grace tick:
+                // the next call to TickT8_Poll will see buildDone=true at the top and succeed.
+                if (_suiteT8PollTicks > _suiteT8TimeoutTicks)
+                {
+                    if (!_suiteT8GraceTickPending)
+                    {
+                        _suiteT8GraceTickPending = true;
+                        return; // one extra tick for ReplayIncidentIndexBuild to finish
+                    }
+                    _logger?.Warn($"[T8_DIAG] timeout after {_suiteT8PollTicks} ticks (limit={_suiteT8TimeoutTicks})");
                     SuiteResult("T8").Status = "fail";
                     SuiteResult("T8").Error  = "timeout";
-                    _suiteStep = SuiteInternalStep.TDISC_Seek;
+                    _suiteStep = SuiteInternalStep.TINDEX_Rewind;
                 }
                 return;
             }
@@ -1792,6 +2126,153 @@ namespace SimSteward.Plugin
             SuiteResult("T8").Status   = "emitted";
             SuiteResult("T8").KpiLabel = "gt_cars_in_index";
             SuiteResult("T8").KpiValue = gtCarsInIndex.ToString();
+            _suiteStep = SuiteInternalStep.TINDEX_Rewind;
+        }
+
+        // ── T_INDEX: Player Incident Index ───────────────────────────────────
+
+        private void TickTINDEX_Rewind()
+        {
+            if (TrySkipTest("T_INDEX", SuiteInternalStep.TDISC_Seek)) return;
+            try
+            {
+                _irsdk.ReplaySetPlaySpeed(0, false);
+                _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.ToStart);
+            }
+            catch (Exception ex) { _logger?.Warn("DataCaptureSuite T_INDEX rewind: " + ex.Message); }
+
+            _suiteIndexCandidates     = new List<(int, int, int)>();
+            _suiteIndexScanCallCount  = 0;
+            _suiteIndexFirstScanFrame = -1;
+            _suitePreNextIncidentFrame     = -1;
+            _suiteStuckNextIncidentCount   = 0;
+            _suiteNextIncidentPending      = true;
+            _suiteSeekCooldownTicks        = DataCaptureSuiteConstants.NextIncidentPauseSettleTicks;
+            _suiteFrameZeroConsecutive     = 0;
+            _suiteSeekTimeoutTicks         = 0;
+            _suiteStep = SuiteInternalStep.TINDEX_FrameZero;
+        }
+
+        private void TickTINDEX_FrameZero()
+        {
+            _suiteSeekTimeoutTicks++;
+            if (_suiteSeekTimeoutTicks > DataCaptureSuiteConstants.SeekTimeoutTicks)
+            {
+                SuiteResult("T_INDEX").Status = "fail";
+                SuiteResult("T_INDEX").Error  = "frame_zero_timeout";
+                _suiteStep = SuiteInternalStep.TDISC_Seek;
+                return;
+            }
+
+            int frame = SafeGetInt("ReplayFrameNum");
+            if (frame <= 2) _suiteFrameZeroConsecutive++;
+            else            _suiteFrameZeroConsecutive = 0;
+            if (_suiteFrameZeroConsecutive < DataCaptureSuiteConstants.FrameZeroStableTicks) return;
+
+            _suitePreNextIncidentFrame = frame;
+            _suiteNextIncidentPending  = true;
+            _suiteSeekCooldownTicks    = DataCaptureSuiteConstants.NextIncidentPauseSettleTicks;
+            try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+            _suiteStep = SuiteInternalStep.TINDEX_ScanCooldown;
+        }
+
+        private void TickTINDEX_ScanCooldown()
+        {
+            if (--_suiteSeekCooldownTicks > 0) return;
+
+            // Pause-settle: issue NextIncident now that pause has settled
+            if (_suiteNextIncidentPending)
+            {
+                _suiteNextIncidentPending  = false;
+                _suitePreNextIncidentFrame = SafeGetInt("ReplayFrameNum");
+                _suiteSeekCooldownTicks    = DataCaptureSuiteConstants.T0_PlayModeCooldownTicks;
+                _suiteIndexScanCallCount++;
+                try { _irsdk.ReplaySearch(IRacingSdkEnum.RpySrchMode.NextIncident); } catch { }
+                try { _irsdk.ReplaySetPlaySpeed(1, false); } catch { }
+                return;
+            }
+
+            int frame     = SafeGetInt("ReplayFrameNum");
+            int camCarIdx = SafeGetInt("CamCarIdx");
+
+            // Stuck detection: frameDelta < 300 means seek didn't jump
+            int frameDelta = _suitePreNextIncidentFrame >= 0 ? Math.Abs(frame - _suitePreNextIncidentFrame) : int.MaxValue;
+            if (frameDelta < 300)
+            {
+                _suiteStuckNextIncidentCount++;
+                _logger?.Warn($"DataCaptureSuite T_INDEX: NextIncident ignored (delta={frameDelta}, stuck={_suiteStuckNextIncidentCount})");
+                if (_suiteStuckNextIncidentCount >= 3)
+                {
+                    _suiteStep = SuiteInternalStep.TINDEX_Emit;
+                    return;
+                }
+                try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+                _suiteNextIncidentPending = true;
+                _suiteSeekCooldownTicks   = DataCaptureSuiteConstants.NextIncidentPauseSettleTicks;
+                return;
+            }
+            _suiteStuckNextIncidentCount = 0;
+
+            int lap = -1;
+            try { lap = _irsdk.Data.GetInt("CarIdxLap", camCarIdx); } catch { }
+
+            // Wraparound detection
+            if (_suiteIndexFirstScanFrame < 0) _suiteIndexFirstScanFrame = frame;
+            bool wrapped         = _suiteIndexScanCallCount > 3 && frame <= _suiteIndexFirstScanFrame + DataCaptureSuiteConstants.T0_SeekSettleTolerance;
+            bool reachedCallLimit = _suiteIndexScanCallCount >= DataCaptureSuiteConstants.T0_ScanMaxCalls;
+
+            if (!wrapped)
+                _suiteIndexCandidates.Add((frame, lap, camCarIdx));
+
+            if (wrapped || reachedCallLimit)
+            {
+                _suiteStep = SuiteInternalStep.TINDEX_Emit;
+                return;
+            }
+
+            // Next incident — always pause first
+            try { _irsdk.ReplaySetPlaySpeed(0, false); } catch { }
+            _suiteNextIncidentPending = true;
+            _suiteSeekCooldownTicks   = DataCaptureSuiteConstants.NextIncidentPauseSettleTicks;
+        }
+
+        private void TickTINDEX_Emit()
+        {
+            int playerCarIdx    = _suitePlayerCarIdx;
+            int totalFound      = _suiteIndexCandidates?.Count ?? 0;
+            int playerFound     = _suiteIndexCandidates?.Count(c => c.camCarIdx == playerCarIdx) ?? 0;
+
+            // Build incident array for the log
+            var incidentList = new System.Collections.Generic.List<object>();
+            if (_suiteIndexCandidates != null)
+            {
+                foreach (var (f, lap, cam) in _suiteIndexCandidates)
+                {
+                    ResolveDriverFromCarIdx(cam, out string driverName, out string carNumber, out string custId);
+                    incidentList.Add(new
+                    {
+                        frame        = f,
+                        lap          = lap,
+                        cam_car_idx  = cam,
+                        is_player    = cam == playerCarIdx,
+                        driver_name  = driverName,
+                        car_number   = carNumber,
+                    });
+                }
+            }
+
+            var fields = BuildTestFields("T_INDEX");
+            fields["player_car_idx"]       = playerCarIdx;
+            fields["incidents_found"]      = totalFound;
+            fields["player_incidents_found"] = playerFound;
+            fields["incidents"]            = Newtonsoft.Json.JsonConvert.SerializeObject(incidentList);
+            MergeSessionAndRoutingFields(fields);
+            _logger?.Structured("INFO", "simhub-plugin", DataCaptureSuiteConstants.EventPlayerIncidentIndex,
+                $"Player incident index: {playerFound} player incidents, {totalFound} total.", fields, "test", null);
+
+            SuiteResult("T_INDEX").Status   = "emitted";
+            SuiteResult("T_INDEX").KpiLabel = "player_incidents_found";
+            SuiteResult("T_INDEX").KpiValue = playerFound.ToString();
             _suiteStep = SuiteInternalStep.TDISC_Seek;
         }
 
@@ -2065,6 +2546,11 @@ namespace SimSteward.Plugin
                     // and produced at least 1 incident (player car via player_incident_count).
                     bool ok = lines.Any(j => int.TryParse(LF(j, "total_incidents_in_index"), out int t) && t >= 1);
                     return ok ? (true, null) : (false, "total_incidents_in_index<1");
+                }
+                case "T_INDEX":
+                {
+                    bool ok = lines.Any(j => int.TryParse(LF(j, "player_incidents_found"), out int n) && n >= 1);
+                    return ok ? (true, null) : (false, "player_incidents_found<1");
                 }
                 case "T_DISC":
                     return lines.Count >= 4

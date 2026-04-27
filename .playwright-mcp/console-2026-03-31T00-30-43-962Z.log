@@ -1,0 +1,9 @@
+[     283ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/claude-cache-context/claude-cache-context?orgId=1&from=now-7d&to=now&refresh=off:0
+[     302ms] Error: Invalid interval string, has to be either unit-less or end with one of the following units: "y, M, w, d, h, m, s, ms"
+    at M (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:1:35507)
+    at Module.O (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:1:35859)
+    at isAllowedInterval (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:335:12430)
+    at y (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:529:92045)
+    at u.initTimeFromUrl (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:529:94524)
+    at u.init (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:529:93084)
+    at http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:529:146673

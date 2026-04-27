@@ -1,0 +1,124 @@
+[     764ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/claude-token-cost?from=now-30d&to=now&orgId=1&viewPanel=216:0
+[  340536ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Connection closed before receiving a handshake response @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  343691ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  348039ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  353142ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  356388ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  363319ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1773201514109&to=1775793514109&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  363319ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  363334ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q112_1:0
+[  373792ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  379299ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  393364ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1773201544112&to=1775793544112&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  393364ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  393365ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q113_1:0
+[  396454ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  416684ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  423324ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1773201574126&to=1775793574126&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  423324ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  423340ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q114_1:0
+[  433991ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  453352ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1773201604129&to=1775793604129&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  453352ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  453367ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q115_1:0
+[  456268ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  461753ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  468966ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  483351ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1773201634139&to=1775793634139&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  483351ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  483352ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q116_1:0
+[  485891ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  505247ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  513352ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1773201664149&to=1775793664149&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  513353ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  513353ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q117_1:0
+[  524368ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  531535ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  543379ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1773201694163&to=1775793694163&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  543379ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  543379ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q118_1:0
+[  557383ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  569594ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Connection closed before receiving a handshake response @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[  571057ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/annotations?from=1773201724173&to=1775793724173&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[  571057ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[  571058ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q119_1:0

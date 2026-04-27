@@ -34,6 +34,10 @@ namespace SimSteward.Plugin
         [JsonProperty("error")]     public string Error     { get; set; }
         [JsonProperty("lokiCount")] public int    LokiCount { get; set; }
         [JsonProperty("grafanaEventUrl")] public string GrafanaEventUrl { get; set; }
+        /// <summary>What camera state the test expects: "player", "other", "incident", or null (any).</summary>
+        [JsonProperty("cameraContext")] public string CameraContext { get; set; }
+        /// <summary>Which driver the test focuses on: "player", "other", or null (any).</summary>
+        [JsonProperty("driverContext")] public string DriverContext { get; set; }
     }
 
     /// <summary>Summary of a selected ground-truth incident for dashboard display.</summary>
@@ -78,7 +82,9 @@ namespace SimSteward.Plugin
         public const int IncidentFlagMask = 0x80000 | 0x100000;   // furled | repair
         /// <summary>Ticks to wait after ReplaySearch(NextIncident) before reading frame/car data (~2.5 s at 60 Hz).</summary>
         public const int NextIncidentCooldownTicks = 150;
-        /// <summary>Reduced cooldown used during T0 scan when replay is at 1x speed (~1 s at 60 Hz).</summary>
+        /// <summary>Ticks to wait after pausing before issuing NextIncident (pause must take effect first).</summary>
+        public const int NextIncidentPauseSettleTicks = 30;
+        /// <summary>Ticks at 1x replay speed after NextIncident before reading frame/CamCarIdx (~1 s at 60 Hz).</summary>
         public const int T0_PlayModeCooldownTicks = 60;
         /// <summary>Max total NextIncident calls during T0 scan (includes non-player incidents).</summary>
         public const int T0_ScanMaxCalls = 60;
@@ -92,6 +98,18 @@ namespace SimSteward.Plugin
         public const int SeekTimeoutTicks = 600;
         /// <summary>Max ticks per T1 speed-sweep pass before advancing (~60s at 60Hz). Prevents 30-min runs on long replays at 1x.</summary>
         public const int SweepTimeoutTicks = 3600;
+
+        // ── T8 FF sweep timeout constants ─────────────────────────────────────
+        /// <summary>Maximum dynamic timeout ticks for T8 FF sweep (cap at 6 min regardless of replay length).</summary>
+        public const int T8_MaxTimeoutTicks = 21600;
+        /// <summary>Minimum dynamic timeout ticks for T8 FF sweep.</summary>
+        public const int T8_MinTimeoutTicks = 3600;
+        /// <summary>Frames-per-tick rate below which T8 replay is considered stuck at wrong speed (~32 expected at 32x).</summary>
+        public const int T8_SlowRateThreshold = 4;
+        /// <summary>Ticks between T8 frame-rate checks (used for slow-speed detection).</summary>
+        public const int T8_RateCheckIntervalTicks = 600;
+        /// <summary>Consecutive slow-rate checks required before aborting T8.</summary>
+        public const int T8_SlowRateAbortCount = 2;
 
         // ── T0 scan/select constants ──────────────────────────────────────────
         /// <summary>Max NextIncident calls during the T0 incident scan pass.</summary>
@@ -112,7 +130,8 @@ namespace SimSteward.Plugin
         public const string EventCameraViewSummary  = "sdk_capture_camera_view_summary";
         public const string EventSessionResults     = "sdk_capture_session_results";
         public const string EventIncidentReseek     = "sdk_capture_incident_reseek";
-        public const string EventFfSweepResult      = "sdk_capture_ff_sweep_result";
+        public const string EventFfSweepResult         = "sdk_capture_ff_sweep_result";
+        public const string EventPlayerIncidentIndex  = "sdk_player_incident_index";
         public const string EventSuiteStarted       = "sdk_capture_suite_started";
         public const string EventSuiteComplete      = "sdk_capture_suite_complete";
         public const string EventDataDiscovery      = "sdk_capture_data_discovery";

@@ -22,7 +22,7 @@ class OllamaResult:
 
 
 class OllamaClient:
-    def __init__(self, base_url: str, timeout: int = 300):
+    def __init__(self, base_url: str, timeout: int = 600):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
@@ -51,7 +51,7 @@ class OllamaClient:
                 "stream": False,
                 "options": {
                     "temperature": temperature,
-                    "num_predict": 2048,
+                    "num_predict": 1536,
                 },
             },
             timeout=self.timeout,
