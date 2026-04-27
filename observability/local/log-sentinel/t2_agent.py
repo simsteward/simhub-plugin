@@ -17,7 +17,6 @@ Input flow:
   → SentryClient.capture_message() if warranted
 """
 
-import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -31,7 +30,6 @@ from ollama_client import OllamaClient
 from prompts import (
     T2_EVIDENCE_SYSTEM, T2_EVIDENCE_PROMPT,
     build_stream_guide, format_evidence_packets_for_t2, format_logql_results,
-    LOGQL_GEN_SYSTEM, LOGQL_GEN_PROMPT,
 )
 from sentry_client import SentryClient
 
@@ -259,44 +257,33 @@ class T2Agent:
             logger.debug("Sentry context fetch failed: %s", e)
             return "(Sentry unavailable)"
 
+    # Hardcoded seed queries run every T2 cycle — no LLM needed
+    _SEED_QUERIES = [
+        '{app="sim-steward"} | json | level = "error"',
+        '{app="sim-steward"} | json | domain = "action" | action_result != ""',
+        '{app="claude-dev-logging"} | json | level = "error"',
+        '{app="claude-token-metrics"} | json',
+    ]
+
     def _generate_logql_queries(
         self,
         packet_dicts: list[dict],
         window_minutes: int,
     ) -> list[str]:
-        # Seed with suggested_logql from evidence packets
-        seeded = [
+        # Pull suggested_logql from evidence packets + hardcoded seeds
+        from_packets = [
             p["suggested_logql"] for p in packet_dicts
             if p.get("suggested_logql") and _valid_logql(p["suggested_logql"])
         ]
-
-        if not packet_dicts:
-            return seeded[:5]
-
-        anomaly_descriptions = "\n".join(
-            f"- {p.get('anomaly_id', '?')}: {p.get('anomaly_description', '')[:80]}"
-            for p in packet_dicts[:5]
-        )
-        prompt = LOGQL_GEN_SYSTEM + "\n\n" + LOGQL_GEN_PROMPT.format(
-            anomaly_descriptions=anomaly_descriptions,
-            window_minutes=window_minutes,
-        )
-        try:
-            logql_gen_result = self.ollama.generate(
-                self.config.ollama_model,
-                prompt,
-                think=False,
-                temperature=0.0,
-            )
-            raw = logql_gen_result.text
-            generated = json.loads(raw) if raw.strip().startswith("[") else []
-            if isinstance(generated, list):
-                combined = seeded + [q for q in generated if isinstance(q, str)]
-                return [q.strip() for q in combined if _valid_logql(q)][:5]
-        except Exception as e:
-            logger.debug("T2 LogQL gen failed: %s", e)
-
-        return [q for q in seeded if _valid_logql(q)][:5]
+        combined = from_packets + self._SEED_QUERIES
+        seen: set[str] = set()
+        result = []
+        for q in combined:
+            q = q.strip()
+            if q not in seen and _valid_logql(q):
+                seen.add(q)
+                result.append(q)
+        return result[:5]
 
     def _execute_logql_queries(
         self, queries: list[str], start_ns: int, end_ns: int

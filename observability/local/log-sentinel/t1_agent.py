@@ -21,7 +21,7 @@ from evidence import EvidenceBuilder, EvidencePacket
 from loki_client import LokiClient
 from ollama_client import OllamaClient
 from prompts import (
-    T1_SYSTEM, T1_SUMMARY_PROMPT, T1_ANOMALY_PROMPT_V3,
+    T1_SYSTEM, T1_PROMPT,
     build_stream_guide, format_log_sample, format_invocations,
 )
 from trace import FeatureInvocation
@@ -37,16 +37,12 @@ class T1Result:
     invocations: list[FeatureInvocation]
     evidence_packets: list[EvidencePacket]
     model: str
-    summary_duration_ms: int
-    anomaly_duration_ms: int
-    summary_input_tokens: int
-    summary_output_tokens: int
-    anomaly_input_tokens: int
-    anomaly_output_tokens: int
+    duration_ms: int
+    input_tokens: int
+    output_tokens: int
     trigger_source: str          # "scheduled" | "grafana_alert"
     alert_names: list[str]       # T0 alert names that triggered this run
-    raw_summary_response: str = field(repr=False, default="")
-    raw_anomaly_response: str = field(repr=False, default="")
+    raw_response: str = field(repr=False, default="")
 
     @property
     def needs_t2(self) -> bool:
@@ -54,20 +50,20 @@ class T1Result:
 
     @property
     def total_duration_ms(self) -> int:
-        return self.summary_duration_ms + self.anomaly_duration_ms
+        return self.duration_ms
 
     @property
     def total_input_tokens(self) -> int:
-        return self.summary_input_tokens + self.anomaly_input_tokens
+        return self.input_tokens
 
     @property
     def total_output_tokens(self) -> int:
-        return self.summary_output_tokens + self.anomaly_output_tokens
+        return self.output_tokens
 
     @property
     def tokens_per_sec(self) -> float:
-        secs = self.total_duration_ms / 1000
-        return round(self.total_output_tokens / secs, 2) if secs > 0 else 0.0
+        secs = self.duration_ms / 1000
+        return round(self.output_tokens / secs, 2) if secs > 0 else 0.0
 
 
 class T1Agent:
@@ -117,7 +113,6 @@ class T1Agent:
         baseline_context = self.baseline.get_prompt_context()
         system = T1_SYSTEM.format(stream_guide=self._stream_guide)
 
-        # Optional T0 alert context prefix — injected into both calls
         alert_prefix = ""
         if alert_context:
             alert_prefix = (
@@ -125,61 +120,37 @@ class T1Agent:
                 "→ Focus investigation on this signal. Do not suppress even if recent history is quiet.\n\n"
             )
 
-        # Call A: summary (/no_think — fast)
-        summary_prompt = alert_prefix + T1_SUMMARY_PROMPT.format(
+        prompt = alert_prefix + T1_PROMPT.format(
             window_minutes=window_minutes,
-            counts=counts_text,
-            **samples,
-        )
-        summary_text = ""
-        cycle_notes = ""
-        summary_ms = 0
-        summary_in_tok = 0
-        summary_out_tok = 0
-        raw_summary = ""
-        try:
-            result = self.ollama.generate(
-                self.config.ollama_model,
-                system + "\n\n" + summary_prompt,
-                think=False,
-            )
-            raw_summary, summary_ms = result.text, result.duration_ms
-            summary_in_tok, summary_out_tok = result.input_tokens, result.output_tokens
-            self.breaker.record_success()
-            parsed = _parse_json(raw_summary)
-            summary_text = parsed.get("summary", "")
-            cycle_notes = parsed.get("cycle_notes", "")
-        except Exception as e:
-            self.breaker.record_failure()
-            logger.error("T1 summary call failed: %s", e)
-
-        # Call B: anomaly scan (/think) — invocations + baseline context included
-        anomaly_prompt = alert_prefix + T1_ANOMALY_PROMPT_V3.format(
-            summary=summary_text or "(summary unavailable)",
             counts=counts_text,
             invocations_text=invocations_text,
             baseline_context=baseline_context,
             **samples,
         )
+
+        summary_text = ""
+        cycle_notes = ""
         anomalies = []
-        anomaly_ms = 0
-        anomaly_in_tok = 0
-        anomaly_out_tok = 0
-        raw_anomaly = ""
+        duration_ms = 0
+        in_tok = 0
+        out_tok = 0
+        raw = ""
         try:
             result = self.ollama.generate(
                 self.config.ollama_model,
-                system + "\n\n" + anomaly_prompt,
+                system + "\n\n" + prompt,
                 think=True,
             )
-            raw_anomaly, anomaly_ms = result.text, result.duration_ms
-            anomaly_in_tok, anomaly_out_tok = result.input_tokens, result.output_tokens
+            raw, duration_ms = result.text, result.duration_ms
+            in_tok, out_tok = result.input_tokens, result.output_tokens
             self.breaker.record_success()
-            parsed = _parse_json(raw_anomaly)
+            parsed = _parse_json(raw)
+            summary_text = parsed.get("summary", "")
+            cycle_notes = parsed.get("cycle_notes", "")
             anomalies = _normalize_anomalies_v3(parsed.get("anomalies", []))
         except Exception as e:
             self.breaker.record_failure()
-            logger.error("T1 anomaly call failed: %s", e)
+            logger.error("T1 call failed: %s", e)
 
         # Build evidence packets for each anomaly, push to Loki
         evidence_packets = []
@@ -193,17 +164,15 @@ class T1Agent:
                 except Exception as e:
                     logger.warning("Failed to push evidence packet %s: %s", packet.anomaly_id, e)
 
-        total_out = summary_out_tok + anomaly_out_tok
         logger.info(
-            "T1 [%s]: %d invocations, %d anomalies (%d→T2), %d evidence packets, summary=%dms anomaly=%dms tokens=%d",
+            "T1 [%s]: %d invocations, %d anomalies (%d→T2), %d evidence packets, %dms tokens=%d",
             trigger_source,
             len(invocations),
             len(anomalies),
             sum(1 for a in anomalies if a.get("needs_t2")),
             len(evidence_packets),
-            summary_ms,
-            anomaly_ms,
-            total_out,
+            duration_ms,
+            out_tok,
         )
 
         return T1Result(
@@ -213,16 +182,12 @@ class T1Agent:
             invocations=invocations,
             evidence_packets=evidence_packets,
             model=self.config.ollama_model,
-            summary_duration_ms=summary_ms,
-            anomaly_duration_ms=anomaly_ms,
-            summary_input_tokens=summary_in_tok,
-            summary_output_tokens=summary_out_tok,
-            anomaly_input_tokens=anomaly_in_tok,
-            anomaly_output_tokens=anomaly_out_tok,
+            duration_ms=duration_ms,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
             trigger_source=trigger_source,
             alert_names=alert_names or [],
-            raw_summary_response=raw_summary,
-            raw_anomaly_response=raw_anomaly,
+            raw_response=raw,
         )
 
 

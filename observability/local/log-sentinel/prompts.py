@@ -32,7 +32,7 @@ Stream guide:
 Always respond with valid JSON only. No markdown, no explanation outside the JSON object.\
 """
 
-T1_SUMMARY_PROMPT = """\
+T1_PROMPT = """\
 Analyze the following log activity from the past {window_minutes} minutes.
 
 LOG COUNTS (total lines per stream):
@@ -47,11 +47,42 @@ RECENT LOGS — claude-dev-logging ({claude_dev_count} lines shown):
 RECENT LOGS — claude-token-metrics ({claude_token_count} lines shown):
 {claude_token_sample}
 
+FEATURE INVOCATIONS (user actions traced end-to-end this window):
+{invocations_text}
+
+BASELINE CONTEXT (historical normal values — use to judge what is anomalous):
+{baseline_context}
+
+Analyze for anomalies. Look for:
+- Error spikes or unexpected ERROR/WARN levels
+- Failed feature invocations (action_type FAILED)
+- Gaps in expected activity (e.g. session started but no actions followed)
+- Unusual token costs or AI session patterns
+- WebSocket disconnects, action failures, plugin crashes
+- Metrics exceeding baselines by 3x or more
+- Anything deviating from historical normal operation
+
 Respond with this JSON schema exactly:
 {{
   "summary": "<2-3 sentence narrative of what happened this window>",
-  "cycle_notes": "<anything unusual worth flagging for deeper analysis, or empty string>"
+  "cycle_notes": "<anything unusual worth flagging for deeper analysis, or empty string>",
+  "anomalies": [
+    {{
+      "id": "<short-slug-no-spaces>",
+      "stream": "<sim-steward|claude-dev-logging|claude-token-metrics>",
+      "event_type": "<specific event type if relevant, or empty string>",
+      "description": "<what you noticed and why it is anomalous>",
+      "severity": "<info|warn|critical>",
+      "needs_t2": <true|false>,
+      "hypothesis": "<one-sentence best-guess root cause, or empty string>",
+      "confidence": <0.0 to 1.0>,
+      "trace_id": "<trace_id if anomaly is linked to a specific invocation, else empty>",
+      "suggested_logql": "<a LogQL query to investigate further, or empty string>"
+    }}
+  ]
 }}
+
+Return an empty anomalies array if nothing looks wrong. Do not invent anomalies.
 """
 
 T1_ANOMALY_PROMPT = """\
@@ -238,61 +269,6 @@ def format_evidence_packets_for_t2(packet_dicts: list[dict]) -> str:
             lines.append(f"    suggested_logql: {p['suggested_logql'][:120]}")
         lines.append("")
     return "\n".join(lines)
-
-
-# ── v3: T1 anomaly prompt with invocations + baseline context ────────────────
-
-T1_ANOMALY_PROMPT_V3 = """\
-You have already summarized this window:
-{summary}
-
-FEATURE INVOCATIONS (user actions traced end-to-end this window):
-{invocations_text}
-
-BASELINE CONTEXT (historical normal values — use to judge what is anomalous):
-{baseline_context}
-
-Now analyze the logs for anomalies. Look for:
-- Error spikes or unexpected ERROR/WARN levels
-- Failed feature invocations (action_type FAILED)
-- Gaps in expected activity (e.g. session started but no actions followed)
-- Unusual token costs or AI session patterns
-- WebSocket disconnects, action failures, plugin crashes
-- Metrics exceeding baselines by 3x or more
-- Anything deviating from historical normal operation
-
-LOG COUNTS:
-{counts}
-
-RECENT LOGS — sim-steward:
-{sim_steward_sample}
-
-RECENT LOGS — claude-dev-logging:
-{claude_dev_sample}
-
-RECENT LOGS — claude-token-metrics:
-{claude_token_sample}
-
-Respond with this JSON schema exactly:
-{{
-  "anomalies": [
-    {{
-      "id": "<short-slug-no-spaces>",
-      "stream": "<sim-steward|claude-dev-logging|claude-token-metrics>",
-      "event_type": "<specific event type if relevant, or empty string>",
-      "description": "<what you noticed and why it is anomalous>",
-      "severity": "<info|warn|critical>",
-      "needs_t2": <true|false>,
-      "hypothesis": "<one-sentence best-guess root cause, or empty string>",
-      "confidence": <0.0 to 1.0>,
-      "trace_id": "<trace_id if anomaly is linked to a specific invocation, else empty>",
-      "suggested_logql": "<a LogQL query to investigate further, or empty string>"
-    }}
-  ]
-}}
-
-Return an empty anomalies array if nothing looks wrong. Do not invent anomalies.
-"""
 
 
 # ── v3: T2 evidence-packet prompts ──────────────────────────────────────────

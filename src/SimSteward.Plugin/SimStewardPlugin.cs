@@ -1105,7 +1105,6 @@ namespace SimSteward.Plugin
             SentrySdk.AddBreadcrumb("Plugin started", "lifecycle");
 
             pluginManager.AddProperty("SimSteward.PluginMode", GetType(), "Unknown");
-            pluginManager.AddProperty("SimSteward.IncidentCount", GetType(), 0);
             pluginManager.AddProperty("SimSteward.ClientCount", GetType(), 0);
 
             var wsPort = DefaultPort;
@@ -1189,7 +1188,6 @@ namespace SimSteward.Plugin
                     _replayIncidentIndexPrereqLogKey = "";
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_disconnected", "iRacing disconnected.", null, "lifecycle", null);
                 };
-                _irsdk.OnSessionInfo += OnIrsdkSessionInfo;
                 _irsdk.OnTelemetryData += OnIrsdkTelemetryDataForReplayIndex;
                 _irsdk.Start();
                 _logger.Structured("INFO", "simhub-plugin", "irsdk_started", "iRacing SDK started.", null, "lifecycle", null);
@@ -1338,7 +1336,6 @@ namespace SimSteward.Plugin
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
-            pluginManager.SetPropertyValue("SimSteward.IncidentCount", GetType(), _yamlIncidentCount);
             pluginManager.SetPropertyValue("SimSteward.ClientCount", GetType(), clientCount);
 
             if (_bridge == null) return;
@@ -1428,7 +1425,6 @@ namespace SimSteward.Plugin
                 try
                 {
                     _irsdk.OnTelemetryData -= OnIrsdkTelemetryDataForReplayIndex;
-                    _irsdk.OnSessionInfo -= OnIrsdkSessionInfo;
                     _irsdk.Stop();
                 }
                 catch (Exception ex)
