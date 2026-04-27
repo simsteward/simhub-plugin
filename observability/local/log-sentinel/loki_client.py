@@ -215,29 +215,6 @@ class LokiClient:
         }
         self.push(entry, env)
 
-    def push_investigation_v2(self, t2_result, anomalies: list, env: str = "local"):
-        from analyst import T2Result
-        entry = {
-            "level": "INFO",
-            "message": f"Investigation [{t2_result.confidence}]: {t2_result.root_cause[:120]}",
-            "component": "log-sentinel",
-            "event": "sentinel_investigation",
-            "domain": "system",
-            "anomaly_ids": [a.get("id", "") for a in anomalies if a.get("needs_t2")],
-            "root_cause": t2_result.root_cause,
-            "issue_type": t2_result.issue_type,
-            "confidence": t2_result.confidence,
-            "correlation": t2_result.correlation,
-            "impact": t2_result.impact,
-            "recommendation": t2_result.recommendation,
-            "logql_queries_used": t2_result.logql_queries_used,
-            "logql_gather_duration_ms": t2_result.logql_gather_duration_ms,
-            "inference_duration_ms": t2_result.inference_duration_ms,
-            "sentry_worthy": t2_result.sentry_worthy,
-            "model": t2_result.model,
-        }
-        self.push(entry, env)
-
     def annotate_raw(self, *args, **kwargs):
         """Stub — annotate_raw is called on grafana_client, not loki_client."""
         pass

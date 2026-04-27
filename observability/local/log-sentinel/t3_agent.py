@@ -22,7 +22,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from analyst import _parse_json
+from utils import _parse_json
 from baseline import BaselineManager
 from circuit_breaker import CircuitBreaker
 from config import Config

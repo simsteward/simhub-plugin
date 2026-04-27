@@ -13,7 +13,7 @@ Key changes over v2 Analyst.run_t1():
 import logging
 from dataclasses import dataclass, field
 
-from analyst import _parse_json
+from utils import _parse_json
 from baseline import BaselineManager
 from circuit_breaker import CircuitBreaker
 from config import Config

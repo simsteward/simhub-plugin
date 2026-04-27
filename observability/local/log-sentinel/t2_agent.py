@@ -21,7 +21,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-from analyst import _parse_json, _normalize_confidence, _normalize_issue_type, _normalize_evidence_quality, _valid_logql
+from utils import _parse_json, _normalize_confidence, _normalize_issue_type, _normalize_evidence_quality, _valid_logql
 from circuit_breaker import CircuitBreaker
 from config import Config
 from grafana_client import GrafanaClient
