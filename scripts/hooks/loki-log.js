@@ -327,6 +327,7 @@ function extractTokensIncremental(transcriptPath, sessionId) {
         tool_use_count:        delta.tools,
       },
       total: formatTokenResult(accum),
+      chunk, // raw new bytes — reused by extractToolAttribution so we don't re-read
     };
   } catch { return null; }
 }
@@ -343,6 +344,108 @@ function formatTokenResult(accum) {
     model:                       accum.model || undefined,
     thinking:                    accum.thinking || false,
   };
+}
+
+// --- Per-tool token attribution ---
+// Walks the new transcript chunk to pair each tool round with the token delta it caused.
+// A "tool round" = one assistant message calling tools → tool results → next assistant message.
+// The delta = total_input(next assistant) - total_input(prev assistant), where
+// total_input = input_tokens + cache_creation_input_tokens + cache_read_input_tokens.
+// For parallel tool calls (multiple tool_results in one user message), emits:
+//   - one group event (full delta, parallel_tool_count)
+//   - one per-tool event each (delta / count, equal split)
+function extractToolAttribution(chunk, sessionId, project) {
+  try {
+    const lines = chunk.split('\n').filter(Boolean);
+    const records = [];
+
+    let prevAssistant = null; // { uuid, usage, toolUseMap: { [id]: name } }
+    let pendingTools  = [];   // [{ id, name }] — tools called by prevAssistant
+
+    function totalInput(u) {
+      return (u.input_tokens || 0)
+           + (u.cache_creation_input_tokens || 0)
+           + (u.cache_read_input_tokens     || 0);
+    }
+
+    for (const line of lines) {
+      let obj;
+      try { obj = JSON.parse(line); } catch { continue; }
+
+      if (obj.type === 'assistant' && obj.message && obj.message.usage) {
+        const usage   = obj.message.usage;
+        const content = Array.isArray(obj.message.content) ? obj.message.content : [];
+
+        // If previous assistant called tools and results came back, attribute the delta.
+        if (prevAssistant && pendingTools.length > 0) {
+          const delta      = totalInput(usage) - totalInput(prevAssistant.usage);
+          const toolCount  = pendingTools.length;
+          const perTool    = toolCount > 1 ? Math.round(delta / toolCount) : delta;
+
+          // Group event — full delta, all tools in this round
+          records.push({
+            event:                'claude_tool_token_attribution',
+            attribution_type:     'group',
+            session_id:           sessionId,
+            project,
+            machine,
+            env:                  envLabel,
+            assistant_uuid_before: prevAssistant.uuid,
+            assistant_uuid_after:  obj.uuid,
+            tools:                pendingTools.map(t => t.name),
+            tool_use_ids:         pendingTools.map(t => t.id),
+            parallel_tool_count:  toolCount,
+            total_input_delta:    delta,
+            input_tokens_delta:         (usage.input_tokens                  || 0) - (prevAssistant.usage.input_tokens                  || 0),
+            cache_creation_delta:       (usage.cache_creation_input_tokens   || 0) - (prevAssistant.usage.cache_creation_input_tokens   || 0),
+            cache_read_delta:           (usage.cache_read_input_tokens        || 0) - (prevAssistant.usage.cache_read_input_tokens        || 0),
+          });
+
+          // Per-tool events — equal split
+          for (const tool of pendingTools) {
+            records.push({
+              event:               'claude_tool_token_attribution',
+              attribution_type:    'per_tool',
+              session_id:          sessionId,
+              project,
+              machine,
+              env:                 envLabel,
+              tool_use_id:         tool.id,
+              tool_name:           tool.name,
+              parallel_tool_count: toolCount,
+              total_input_delta:   perTool,
+            });
+          }
+        }
+
+        // Build tool_use map for tools this assistant is about to call
+        const toolUseMap = {};
+        for (const c of content) {
+          if (c && c.type === 'tool_use' && c.id) toolUseMap[c.id] = c.name || 'unknown';
+        }
+
+        prevAssistant = { uuid: obj.uuid || '', usage, toolUseMap };
+        pendingTools  = [];
+      }
+
+      else if (obj.type === 'user' && obj.message && prevAssistant) {
+        const content = obj.message.content;
+        if (Array.isArray(content)) {
+          for (const c of content) {
+            if (c && c.type === 'tool_result' && c.tool_use_id) {
+              const name = prevAssistant.toolUseMap[c.tool_use_id] || 'unknown';
+              // Deduplicate: only add if not already pending (shouldn't happen, but safe)
+              if (!pendingTools.find(t => t.id === c.tool_use_id)) {
+                pendingTools.push({ id: c.tool_use_id, name });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return records;
+  } catch { return []; }
 }
 
 function cleanupTokenFiles(sessionId) {
@@ -789,6 +892,18 @@ process.stdin.on('end', () => {
             tool_time_ms:                totalToolTimeMs || undefined,
           }))
         );
+      }
+
+      // --- Per-tool token attribution ---
+      // Uses the same chunk already read by extractTokensIncremental (no second disk read).
+      if (result.chunk) {
+        const attributions = extractToolAttribution(result.chunk, sessionId, project);
+        for (const attr of attributions) {
+          pushToLoki(
+            { app: 'claude-dev-logging', env: envLabel, component: 'tool-attribution', level: 'INFO' },
+            scrubSecrets(JSON.stringify(attr))
+          );
+        }
       }
     }
   }
