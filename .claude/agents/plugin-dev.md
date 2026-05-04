@@ -22,6 +22,7 @@ C# specialist for `src/SimSteward.Plugin/` (.NET 4.8). Implement + test. Do not 
 | `ReplayIncidentIndexDocumentModel.cs` | JSON model |
 | `ReplayIncidentIndexFingerprint.cs` | Uniqueness |
 | `PluginState.cs` | `ReplayIncidentIndexDashboardSnapshot` WS state shape |
+| `CaptureManifest.cs` | `CaptureManifest` / `CaptureManifestEntry` / `CaptureClipEntry` sealed model |
 | `src/SimSteward.Plugin.Tests/` | Xunit — all new public behaviour needs coverage |
 
 ## Key constants
@@ -57,6 +58,16 @@ Fallbacks: `SessionLogging.NotInSession` (strings) · `SessionLogging.LapUnknown
 
 ## Defer to sim-expert
 Before implementing new iRacing data capture or SimHub property/action binding — wait for a sim-expert spec (source / cadence / fallback / channel / caveats). Do not guess SDK var names or YAML paths.
+
+## Build-for-future constraints (Phase 2 / Cloudflare D1 alignment)
+Apply these in all CaptureManifest work — do NOT implement Cloudflare yet, but design as if D1 is the target:
+- Field names must be D1-aligned: `session_time_ms`, `incident_points`, `detection_source`, `pushed_to_queue`
+- Clips are always a `clips[]` array on the entry — camera is a clip attribute, not an incident attribute
+- Every manifest write goes through `FlushCaptureManifestIfDirty()` — never synchronous in `DataUpdate()`
+- Capture drain checks `_replayIndexBuildActive` before any SDK call — no collision during fast-forward
+- `incident_committed` logs use `domain: SessionLogging.DomainCapture` ("capture") — not "action"
+- `subSessionId == 0` (offline session) uses `offline:yyyyMMdd` key in fingerprint to prevent cross-session collision
+- `pushedToQueue = false` is the ledger flag that Phase 2 drain will flip after successful queue write
 
 ## Flag to steward
 New `DispatchAction` → Domain 3 · New iRacing SDK handler → Domains 3+7 · Log event renamed → search Grafana Cloud rules

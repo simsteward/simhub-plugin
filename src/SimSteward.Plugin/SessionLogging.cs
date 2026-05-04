@@ -11,6 +11,13 @@ namespace SimSteward.Plugin
     {
         public const string NotInSession = "not in session";
 
+        public const string DomainAction = "action";
+        public const string DomainIracing = "iracing";
+        public const string DomainUi = "ui";
+        public const string DomainSystem = "system";
+        public const string DomainLifecycle = "lifecycle";
+        public const string DomainCapture = "capture";
+
         /// <summary>Telemetry lap not available (disconnected, invalid car index, or read failure).</summary>
         public const int LapUnknown = -1;
 

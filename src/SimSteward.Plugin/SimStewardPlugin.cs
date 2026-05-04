@@ -99,6 +99,25 @@ namespace SimSteward.Plugin
         private bool _autoWalkActive;
         private int _autoWalkPlayUntilFrame;
         private const int AutoWalkPlayFrames = 360;
+
+        private CaptureManifest _captureManifest;
+        private bool _captureManifestDirty;
+        private int _captureManifestFlushTickCounter;
+        private const int CaptureManifestFlushIntervalTicks = 300; // ~5s at 60Hz
+        private readonly System.Collections.Generic.Queue<CaptureTask> _captureQueue = new System.Collections.Generic.Queue<CaptureTask>();
+        private int _captureQueueDrainTickCounter;
+        private const int CaptureQueueDrainIntervalTicks = 120; // ~2s at 60Hz
+
+        private struct CaptureTask
+        {
+            public string Fingerprint;
+            public int CarIdx;
+            public long SessionTimeMs;
+            public int Lap;
+            public int IncidentPoints;
+            public string DetectionSource;
+            public int ReplayFrame;
+        }
 #endif
 
 #if SIMHUB_SDK
@@ -518,6 +537,13 @@ namespace SimSteward.Plugin
             [JsonProperty("camera")] public string camera { get; set; }
             /// <summary>Incident car number from dashboard (for Loki fingerprint / CustID lookup).</summary>
             [JsonProperty("car")] public int? car { get; set; }
+            // Extended fields — dashboard passes these from the index row (all optional for backward compat)
+            [JsonProperty("fingerprint")] public string fingerprint { get; set; }
+            [JsonProperty("sessionTimeMs")] public long? sessionTimeMs { get; set; }
+            [JsonProperty("carIdx")] public int? carIdx { get; set; }
+            [JsonProperty("lap")] public int? lap { get; set; }
+            [JsonProperty("incidentPoints")] public int? incidentPoints { get; set; }
+            [JsonProperty("detectionSource")] public string detectionSource { get; set; }
         }
 
         /// <summary>
@@ -896,6 +922,71 @@ namespace SimSteward.Plugin
                     }
                     _irsdk.ReplaySetPlaySpeed(1, false);
                     sw.Stop();
+
+                    // Write to CaptureManifest
+                    long sessionTimeMsResolved = parsed.sessionTimeMs ?? ResolveSessionTimeMsFromFrame(parsed.frame);
+                    string fp = !string.IsNullOrEmpty(parsed.fingerprint)
+                        ? parsed.fingerprint
+                        : ReplayIncidentIndexFingerprint.ComputeHexV1(
+                            (int)Math.Min(_captureManifest?.SubSessionId ?? GetCurrentSubSessionIdForCapture(), int.MaxValue),
+                            parsed.carIdx ?? parsed.car ?? 0,
+                            (int)Math.Min(Math.Max(sessionTimeMsResolved, 0), int.MaxValue),
+                            parsed.detectionSource ?? "manual",
+                            parsed.incidentPoints);
+
+                    long subSessId = GetCurrentSubSessionIdForCapture();
+                    if (_captureManifest == null || _captureManifest.SubSessionId != subSessId)
+                    {
+                        _captureManifest = new CaptureManifest
+                        {
+                            SubSessionId = subSessId,
+                            GeneratedAt = DateTimeOffset.UtcNow.ToString("o")
+                        };
+                    }
+
+                    var cameraView = parsed.camera ?? "";
+                    var nowStr = DateTimeOffset.UtcNow.ToString("o");
+                    var existingEntry = _captureManifest.Entries.Find(e => e.Fingerprint == fp);
+                    if (existingEntry != null)
+                    {
+                        if (!existingEntry.Clips.Exists(c => c.CameraView == cameraView))
+                            existingEntry.Clips.Add(new CaptureClipEntry { CameraView = cameraView, CapturedAt = nowStr });
+                    }
+                    else
+                    {
+                        _captureManifest.Entries.Add(new CaptureManifestEntry
+                        {
+                            Fingerprint = fp,
+                            CarIdx = parsed.carIdx ?? parsed.car ?? 0,
+                            SessionNum = SafeGetInt("SessionNum"),
+                            SessionTimeMs = sessionTimeMsResolved,
+                            Lap = parsed.lap ?? SessionLogging.LapUnknown,
+                            IncidentPoints = parsed.incidentPoints ?? 0,
+                            DetectionSource = parsed.detectionSource ?? "manual",
+                            PushedToQueue = false,
+                            CapturedAt = nowStr,
+                            Clips = new System.Collections.Generic.List<CaptureClipEntry>
+                            {
+                                new CaptureClipEntry { CameraView = cameraView, CapturedAt = nowStr }
+                            }
+                        });
+                    }
+                    _captureManifestDirty = true;
+
+                    var captureFields = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["fingerprint"] = fp,
+                        ["car_idx"] = parsed.carIdx ?? parsed.car ?? 0,
+                        ["session_time_ms"] = sessionTimeMsResolved,
+                        ["lap"] = parsed.lap ?? SessionLogging.LapUnknown,
+                        ["incident_points"] = parsed.incidentPoints ?? 0,
+                        ["detection_source"] = parsed.detectionSource ?? "manual",
+                        ["camera_view"] = cameraView
+                    };
+                    MergeSessionAndRoutingFields(captureFields);
+                    _logger?.Structured("INFO", "CaptureManifest", "incident_committed",
+                        $"Incident committed fingerprint:{fp}", captureFields, domain: SessionLogging.DomainCapture);
+
                     LogActionResult(action, arg, correlationId, true, "", BuildCaptureIncidentSupplement(parsed, sw.ElapsedMilliseconds));
                     return (true, "ok", null);
                 }
@@ -1010,6 +1101,75 @@ namespace SimSteward.Plugin
             {
                 _autoWalkActive = false;
                 LogActionResult(action, arg, correlationId, true, "");
+                return (true, "ok", null);
+            }
+
+            if (string.Equals(action, "capture_all_incidents", StringComparison.OrdinalIgnoreCase))
+            {
+                var corrId = Guid.NewGuid().ToString("N");
+                var fields = new System.Collections.Generic.Dictionary<string, object>
+                {
+                    ["action"] = action, ["arg"] = arg ?? "", ["correlation_id"] = corrId
+                };
+                MergeSessionAndRoutingFields(fields);
+                _logger?.Structured("INFO", "DispatchAction", "action_dispatched",
+                    "Action:capture_all_incidents", fields, domain: SessionLogging.DomainAction);
+
+                var incidents = _replayIndexDashboardCachedRoot?.Incidents;
+                if (incidents == null || incidents.Count == 0)
+                {
+                    fields["success"] = false;
+                    fields["error"] = "no_index";
+                    _logger?.Structured("INFO", "DispatchAction", "action_result",
+                        "Action:capture_all_incidents result:no_index", fields, domain: SessionLogging.DomainAction);
+                    return (false, null, "no_index");
+                }
+
+                int playerCarIdx = SafeGetInt("PlayerCarIdx");
+                var toEnqueue = playerCarIdx >= 0
+                    ? incidents.Where(r => r.CarIdx == playerCarIdx).ToList()
+                    : incidents.ToList();
+
+                int queued = 0;
+                foreach (var row in toEnqueue)
+                {
+                    _captureQueue.Enqueue(new CaptureTask
+                    {
+                        Fingerprint = row.Fingerprint,
+                        CarIdx = row.CarIdx,
+                        SessionTimeMs = row.SessionTimeMs,
+                        Lap = row.Lap,
+                        IncidentPoints = row.IncidentPoints ?? 0,
+                        DetectionSource = row.DetectionSource ?? "",
+                        ReplayFrame = row.ReplayFrame
+                    });
+                    queued++;
+                }
+
+                fields["success"] = true;
+                fields["queued"] = queued;
+                fields["player_car_idx"] = playerCarIdx;
+                _logger?.Structured("INFO", "DispatchAction", "action_result",
+                    $"Action:capture_all_incidents result:ok queued:{queued}", fields, domain: SessionLogging.DomainAction);
+                return (true, $"queued:{queued}", null);
+            }
+
+            if (string.Equals(action, "capture_cancel", StringComparison.OrdinalIgnoreCase))
+            {
+                var corrId = correlationId ?? Guid.NewGuid().ToString("N");
+                var fields = new System.Collections.Generic.Dictionary<string, object>
+                {
+                    ["action"] = action, ["arg"] = arg ?? "", ["correlation_id"] = corrId
+                };
+                MergeSessionAndRoutingFields(fields);
+                _logger?.Structured("INFO", "simhub-plugin", "action_dispatched",
+                    "Action:capture_cancel", fields, domain: SessionLogging.DomainAction);
+                int cleared = _captureQueue.Count;
+                _captureQueue.Clear();
+                fields["success"] = true;
+                fields["cleared"] = cleared;
+                _logger?.Structured("INFO", "simhub-plugin", "action_result",
+                    "Action:capture_cancel result:ok", fields, domain: SessionLogging.DomainAction);
                 return (true, "ok", null);
             }
 
@@ -1384,6 +1544,13 @@ namespace SimSteward.Plugin
                 }
 
                 if (_autoWalkActive) ProcessAutoWalkTick();
+                ProcessCaptureQueueTick();
+
+                if (++_captureManifestFlushTickCounter >= CaptureManifestFlushIntervalTicks)
+                {
+                    _captureManifestFlushTickCounter = 0;
+                    FlushCaptureManifestIfDirty();
+                }
             }
             else
             {
@@ -1468,7 +1635,125 @@ namespace SimSteward.Plugin
             }
         }
 
+        private long ResolveSessionTimeMsFromFrame(int frame)
+        {
+            var incidents = _replayIndexDashboardCachedRoot?.Incidents;
+            if (incidents == null) return -1;
+            foreach (var inc in incidents)
+            {
+                if (inc.ReplayFrame == frame)
+                    return inc.SessionTimeMs;
+            }
+            return -1;
+        }
+
+        private string GetCaptureManifestPath(long subSessionId)
+        {
+            var dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "SimHub", "SimSteward");
+            System.IO.Directory.CreateDirectory(dir);
+            return System.IO.Path.Combine(dir, $"{subSessionId}-capture-manifest.json");
+        }
+
+        private void FlushCaptureManifestIfDirty()
+        {
+            if (!_captureManifestDirty || _captureManifest == null) return;
+            _captureManifestDirty = false;
+            var manifest = _captureManifest;
+            var path = GetCaptureManifestPath(manifest.SubSessionId);
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(manifest,
+                        Newtonsoft.Json.Formatting.Indented);
+                    System.IO.File.WriteAllText(path, json);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.Structured("WARN", "CaptureManifest", "capture_manifest_flush_error",
+                        $"Failed to flush manifest: {ex.Message}",
+                        new System.Collections.Generic.Dictionary<string, object> { ["error"] = ex.Message },
+                        domain: SessionLogging.DomainCapture);
+                }
+            });
+        }
+
+        private long GetCurrentSubSessionIdForCapture()
+        {
+            try
+            {
+                var info = _irsdk?.Data?.SessionInfo?.WeekendInfo;
+                if (info == null) return 0;
+                var prop = info.GetType().GetProperty("SubSessionID");
+                if (prop != null)
+                {
+                    var v = prop.GetValue(info);
+                    return v != null ? System.Convert.ToInt64(v) : 0;
+                }
+            }
+            catch { }
+            return 0;
+        }
+
 #if SIMHUB_SDK
+        private void ProcessCaptureQueueTick()
+        {
+            if (_replayIndexBuildPhase != ReplayIndexBuildPhase.Idle) return;
+            if (_captureQueue.Count == 0) return;
+            if (++_captureQueueDrainTickCounter < CaptureQueueDrainIntervalTicks) return;
+            _captureQueueDrainTickCounter = 0;
+            if (IsSeekThrottled()) return;
+
+            var task = _captureQueue.Dequeue();
+
+            long subSessId = GetCurrentSubSessionIdForCapture();
+            if (_captureManifest == null || _captureManifest.SubSessionId != subSessId)
+            {
+                _captureManifest = new CaptureManifest
+                {
+                    SubSessionId = subSessId,
+                    GeneratedAt = DateTimeOffset.UtcNow.ToString("o")
+                };
+            }
+
+            var existing = _captureManifest.Entries.Find(e => e.Fingerprint == task.Fingerprint);
+            if (existing == null)
+            {
+                var now = DateTimeOffset.UtcNow.ToString("o");
+                _captureManifest.Entries.Add(new CaptureManifestEntry
+                {
+                    Fingerprint = task.Fingerprint,
+                    CarIdx = task.CarIdx,
+                    SessionNum = SafeGetInt("SessionNum"),
+                    SessionTimeMs = task.SessionTimeMs,
+                    Lap = task.Lap,
+                    IncidentPoints = task.IncidentPoints,
+                    DetectionSource = task.DetectionSource,
+                    PushedToQueue = false,
+                    CapturedAt = now,
+                    Clips = new System.Collections.Generic.List<CaptureClipEntry>()
+                });
+                _captureManifestDirty = true;
+
+                var captureFields = new System.Collections.Generic.Dictionary<string, object>
+                {
+                    ["fingerprint"] = task.Fingerprint,
+                    ["car_idx"] = task.CarIdx,
+                    ["session_time_ms"] = task.SessionTimeMs,
+                    ["lap"] = task.Lap,
+                    ["incident_points"] = task.IncidentPoints,
+                    ["detection_source"] = task.DetectionSource,
+                    ["queue_remaining"] = _captureQueue.Count
+                };
+                MergeSessionAndRoutingFields(captureFields);
+                _logger?.Structured("INFO", "CaptureManifest", "incident_committed",
+                    $"Auto-captured fingerprint:{task.Fingerprint}", captureFields,
+                    domain: SessionLogging.DomainCapture);
+            }
+        }
+
         private void ProcessAutoWalkTick()
         {
             if (!_autoWalkActive || _irsdk == null || !_irsdk.IsConnected) return;

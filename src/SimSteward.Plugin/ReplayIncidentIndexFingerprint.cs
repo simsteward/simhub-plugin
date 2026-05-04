@@ -10,6 +10,8 @@ namespace SimSteward.Plugin
         /// <summary>
         /// Builds <c>v1|{subSessionId}|{carIdx}|{sessionTimeMs}|{detectionSource}|{points}</c>
         /// where points is a decimal string or the literal <c>null</c>.
+        /// When <paramref name="subSessionId"/> is 0 (offline session), uses a date-scoped key
+        /// to prevent cross-session collision.
         /// </summary>
         public static string BuildCanonicalV1(
             int subSessionId,
@@ -18,11 +20,16 @@ namespace SimSteward.Plugin
             string detectionSource,
             int? incidentPoints)
         {
+            // subSessionId=0 means offline session — use date-scoped key to prevent cross-session collision
+            var effectiveSubSessionId = subSessionId == 0
+                ? $"offline:{DateTimeOffset.UtcNow:yyyyMMdd}"
+                : subSessionId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
             string points = incidentPoints.HasValue
                 ? incidentPoints.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 : "null";
             return "v1|"
-                + subSessionId.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
+                + effectiveSubSessionId + "|"
                 + carIdx.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
                 + sessionTimeMs.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
                 + (detectionSource ?? "") + "|"

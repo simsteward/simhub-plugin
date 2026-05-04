@@ -29,7 +29,7 @@ Never skip rule-checker before a commit.
 Domain 6 deleted. No local YAML. 39 rules total.
 
 ## Log domains
-`lifecycle` · `action` (DispatchAction) · `ui` (dashboard-only) · `iracing` · `system`
+`lifecycle` · `action` (DispatchAction) · `ui` (dashboard-only) · `iracing` · `system` · `capture` (CaptureManifest / incident_committed)
 
 ## ContextStream
 - Search: `mcp__contextstream__search(mode="auto"|"keyword"|"pattern", query="...")` — no Grep/Glob
