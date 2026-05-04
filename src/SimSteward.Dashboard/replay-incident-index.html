@@ -109,6 +109,7 @@ Sentry.init({
     <div class="row">
       <button type="button" class="btn" id="btn-walk-start" onclick="walkStart()" disabled>▶ Auto-walk</button>
       <button type="button" class="btn danger" id="btn-walk-stop" onclick="walkStop()" disabled>■ Stop walk</button>
+      <button type="button" class="btn" id="btn-capture-all" onclick="captureAll()" disabled style="white-space:nowrap">Capture all mine</button>
     </div>
   </div>
 
@@ -301,13 +302,24 @@ function renderTable(rii) {
       '<td class="mono">' + r.sessionTimeMs + ' <span style="color:var(--muted)">(' + fmtMs(r.sessionTimeMs) + ')</span></td>' +
       '<td>' + (r.detectionSource || '') + '</td>' +
       '<td>' + pts + '</td>' +
-      '<td><button type="button" class="btn primary" style="padding:4px 8px;font-size:0.65rem" data-seek="' +
-      encodeURIComponent(arg) + '" onclick="window._riiSeek(this)">Seek</button></td></tr>';
+      '<td style="white-space:nowrap">' +
+      '<button type="button" class="btn primary" style="padding:4px 8px;font-size:0.65rem;white-space:nowrap" data-seek="' +
+      encodeURIComponent(arg) + '" onclick="window._riiSeek(this)">Seek</button>' +
+      ' <button type="button" class="btn" style="padding:4px 8px;font-size:0.65rem;white-space:nowrap" data-cap="' +
+      encodeURIComponent(JSON.stringify({frame:r.replayFrame??-1,camera:'',car:r.carIdx,fingerprint:r.fingerprint||'',sessionTimeMs:r.sessionTimeMs??-1,carIdx:r.carIdx,lap:r.lap??-1,incidentPoints:r.incidentPoints??0,detectionSource:r.detectionSource||''})) +
+      '" onclick="window._riiCapture(this)">Capture</button>' +
+      '</td></tr>';
   }).join('');
 }
 
 window._riiSeek = function (btn) {
   seekRow(decodeURIComponent(btn.getAttribute('data-seek')));
+};
+
+window._riiCapture = function (btn) {
+  const argJson = decodeURIComponent(btn.getAttribute('data-cap'));
+  send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-row-capture', event_type:'click', message:'Capture incident row', domain:'ui'}));
+  send('capture_incident', argJson);
 };
 
 function seekRow(argJson) {
@@ -367,6 +379,11 @@ function walkStop() {
   send('index_walk_stop', '');
 }
 
+function captureAll() {
+  send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-capture-all', event_type:'click', message:'Capture all my incidents', domain:'ui'}));
+  send('capture_all_incidents', '');
+}
+
 function updateNavigatePanel(rii, diag) {
   const connected = diag && diag.irsdkConnected;
   const replayOk = connected && rii && rii.isReplayMode;
@@ -379,6 +396,7 @@ function updateNavigatePanel(rii, diag) {
   document.getElementById('btn-next-incident').disabled = !hasIndex;
   document.getElementById('btn-walk-start').disabled = !hasIndex || walking;
   document.getElementById('btn-walk-stop').disabled = !walking;
+  document.getElementById('btn-capture-all').disabled = !connected;
   document.getElementById('cursor-display').textContent =
     count > 0 && cursor >= 0 ? '#' + (cursor + 1) + ' of ' + count : (count > 0 ? '— of ' + count : '—');
 }
