@@ -62,7 +62,6 @@ namespace SimSteward.Plugin
         private volatile bool _simHubHttpListening;
         private volatile string _dashboardPingStatus = "—";
         private DateTime _lastDashboardPingUtc = DateTime.MinValue;
-        private DateTime _lastAgentHttpDebugUtc = DateTime.MinValue;
         private int _dataUpdateTick;
         private SystemMetricsSampler _resourceSampler;
         private DateTime _nextResourceSampleUtc = DateTime.MaxValue;
@@ -214,6 +213,8 @@ namespace SimSteward.Plugin
                 _bridge?.Broadcast(JsonConvert.SerializeObject(msg), "logEvents");
             }
             catch { }
+
+            try { if (ex != null) SentrySdk.CaptureException(ex); } catch { }
         }
 
         private void WriteBroadcastError(string context, Exception ex)
@@ -969,21 +970,6 @@ namespace SimSteward.Plugin
                 return;
             _lastDashboardPingUtc = now;
 
-            // #region agent log
-            if ((now - _lastAgentHttpDebugUtc).TotalSeconds >= DashboardPingIntervalSec)
-            {
-                _lastAgentHttpDebugUtc = now;
-                var ep8888 = listeners.Where(e => e.Port == 8888).Select(e => e.Address.ToString() + ":" + e.Port).ToArray();
-                WriteAgentHttpDebug("H1,H2,H4", "simhub_http_listeners_8888", new Dictionary<string, object>
-                {
-                    ["count"] = ep8888.Length,
-                    ["endpoints"] = string.Join(";", ep8888),
-                    ["simHubHttpListening"] = _simHubHttpListening,
-                    ["hint_localhost_ipv6"] = "If browser uses localhost and refuses, try http://127.0.0.1:8888/... (H2)"
-                });
-            }
-            // #endregion
-
             Task.Run(() =>
             {
                 const string pingUrl = "http://127.0.0.1:8888/Web/sim-steward-dash/index.html";
@@ -997,59 +983,15 @@ namespace SimSteward.Plugin
                     _dashboardPingStatus = response.IsSuccessStatusCode
                         ? $"OK ({(int)response.StatusCode})"
                         : $"HTTP {(int)response.StatusCode}";
-                    // #region agent log
-                    WriteAgentHttpDebug("H3", "dashboard_ping_ok", new Dictionary<string, object>
-                    {
-                        ["url"] = pingUrl,
-                        ["statusCode"] = (int)response.StatusCode,
-                        ["success"] = response.IsSuccessStatusCode
-                    });
-                    // #endregion
                 }
                 catch (Exception ex)
                 {
                     SentrySdk.CaptureException(ex);
                     _dashboardPingStatus = "Error: " + ex.Message;
-                    // #region agent log
-                    WriteAgentHttpDebug("H1,H3,H5", "dashboard_ping_error", new Dictionary<string, object>
-                    {
-                        ["url"] = pingUrl,
-                        ["error"] = ex.GetType().Name,
-                        ["message"] = ex.Message
-                    });
-                    // #endregion
                 }
             });
         }
 
-        // #region agent log
-        private void WriteAgentHttpDebug(string hypothesisId, string message, Dictionary<string, object> data)
-        {
-            try
-            {
-                var baseDir = !string.IsNullOrEmpty(_pluginDataPath)
-                    ? _pluginDataPath
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SimHubWpf", "PluginsData", "SimSteward");
-                Directory.CreateDirectory(baseDir);
-                var envPath = Environment.GetEnvironmentVariable("SIMSTEWARD_DEBUG_LOG_PATH");
-                var path = !string.IsNullOrWhiteSpace(envPath) ? envPath.Trim() : Path.Combine(baseDir, "debug-959be8.log");
-                var payload = new Dictionary<string, object>
-                {
-                    ["sessionId"] = "959be8",
-                    ["hypothesisId"] = hypothesisId,
-                    ["location"] = "SimStewardPlugin.cs:RefreshDependencyChecks",
-                    ["message"] = message,
-                    ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    ["data"] = data
-                };
-                File.AppendAllText(path, JsonConvert.SerializeObject(payload) + "\n", Encoding.UTF8);
-            }
-            catch
-            {
-                // ignore
-            }
-        }
-        // #endregion
 #endif
 
 #if SIMHUB_SDK
@@ -1078,10 +1020,12 @@ namespace SimSteward.Plugin
                 _sentryDisposable = SentrySdk.Init(o =>
                 {
                     o.Dsn = sentryDsn;
-                    o.Environment = "local";
+                    o.Environment = Environment.GetEnvironmentVariable("SIMSTEWARD_LOG_ENV") ?? "local";
                     o.Release = PluginVersionInfo.Display;
                     o.TracesSampleRate = 1.0;
                     o.IsGlobalModeEnabled = true;
+                    o.AutoSessionTracking = false;
+                    o.MaxBreadcrumbs = 100;
                     o.SetBeforeSend((sentryEvent, hint) =>
                     {
                         sentryEvent.SetTag("plugin_mode", _pluginMode ?? "Unknown");
@@ -1233,6 +1177,8 @@ namespace SimSteward.Plugin
 
         public void DataUpdate(PluginManager pluginManager, ref GameData data)
         {
+            try
+            {
             _dataUpdateTick++;
             if (_dataUpdateTick % DependencyCheckIntervalTicks == 0)
                 RefreshDependencyChecks();
@@ -1355,6 +1301,12 @@ namespace SimSteward.Plugin
 
             var snapshot = BuildPluginSnapshot();
             _bridge.BroadcastState(BuildStateJson(snapshot));
+            }
+            catch (Exception ex)
+            {
+                try { SentrySdk.CaptureException(ex); } catch { }
+                try { _logger?.Error("DataUpdate top-level exception", ex); } catch { }
+            }
         }
 
         private int SafeGetInt(string name)
@@ -1398,6 +1350,7 @@ namespace SimSteward.Plugin
         {
             _logger?.Structured("INFO", "simhub-plugin", "plugin_stopped", "SimSteward plugin End.", null, "lifecycle", null);
 
+            try { SentrySdk.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult(); } catch { }
             try { _sentryDisposable?.Dispose(); } catch { }
             _sentryDisposable = null;
 

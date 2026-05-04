@@ -40,12 +40,14 @@ SimSteward.Plugin (C# / .NET 4.8 / SimHub)
     │         src/SimSteward.Dashboard/replay-incident-index.html (replay incident index / M6)
     │         served by SimHub HTTP → Web/sim-steward-dash/
     │
-    └──→ Grafana Loki (optional)
-              plugin → HTTPS POST to SIMSTEWARD_LOKI_URL (single endpoint)
-    └──→ OTLP metrics (optional)
-              plugin → localhost:4317 → OpenTelemetry Collector → Prometheus (:9090)
-              local Docker stack: observability/local/
+    └──→ Grafana Cloud Loki
+              plugin → HTTPS POST to SIMSTEWARD_LOKI_URL (logs-prod-036.grafana.net)
+              Basic auth via SIMSTEWARD_LOKI_USER + SIMSTEWARD_LOKI_TOKEN
+    └──→ Sentry.io
+              unhandled exceptions + breadcrumbs (SIMSTEWARD_SENTRY_DSN)
 ```
+
+Cloud-only: there is no local Loki, Grafana, or Sentinel stack. Logs and errors flow directly to Grafana Cloud + Sentry.
 
 ---
 
@@ -66,9 +68,8 @@ docs/                         Documentation (start with docs/README.md)
   DATA-ROUTING-OBSERVABILITY.md  Events vs high-rate telemetry (Loki vs OTel/metrics)
   TROUBLESHOOTING.md          Runtime issues, deploy, logs
 
-observability/local/          Local Grafana + Loki + Prometheus + OTel Collector Docker stack
 tests/                        PowerShell integration tests
-scripts/                      obs-bridge, Loki helpers, deploy utilities
+scripts/                      Loki query, deploy, secrets utilities; hooks/ for Claude Code -> Loki
 deploy.ps1                    Build + deploy to local SimHub
 ```
 
@@ -107,13 +108,29 @@ http://localhost:8888/Web/sim-steward-dash/replay-incident-index.html
 
 Both pages connect to the plugin WebSocket on port **19847** (`window.location.hostname`, so LAN clients use the same host). Optional: `?token=` / `?wsToken=` when `SIMSTEWARD_WS_TOKEN` is set.
 
-### Local observability (optional)
+### Cloud observability
 
-```powershell
-.\scripts\run-simhub-local-observability.ps1
+Logs go directly to Grafana Cloud Loki and errors to Sentry. Configure `.env` with:
+
+```env
+SIMSTEWARD_LOKI_URL=https://logs-prod-036.grafana.net
+SIMSTEWARD_LOKI_USER=<numeric org id>
+SIMSTEWARD_LOKI_TOKEN=<glc_... API token>
+SIMSTEWARD_SENTRY_DSN=<from Sentry UI>
+SIMSTEWARD_LOG_ENV=production
 ```
 
-Starts Grafana + Loki via Docker. See [docs/observability-local.md](docs/observability-local.md).
+Query plugin logs in Grafana Cloud:
+
+```logql
+{app="simsteward-plugin"} | json
+```
+
+Query Claude Code dev events (if hooks are wired in `.claude/settings.json`):
+
+```logql
+{app="claude-dev-logging"}
+```
 
 ---
 

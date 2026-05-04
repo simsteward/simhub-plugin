@@ -81,7 +81,12 @@ function loadEnv() {
 }
 loadEnv();
 
-const lokiUrl = (process.env.SIMSTEWARD_LOKI_URL || 'http://localhost:3100').replace(/\/+$/, '');
+const rawLokiUrl = (process.env.SIMSTEWARD_LOKI_URL || '').replace(/\/+$/, '');
+if (!rawLokiUrl || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(rawLokiUrl)) {
+  // Cloud-only: no local fallback. Exit silently if SIMSTEWARD_LOKI_URL is unset or points at localhost.
+  process.exit(0);
+}
+const lokiUrl = rawLokiUrl;
 const envLabel = process.env.SIMSTEWARD_LOG_ENV || 'local';
 const machine = process.env.COMPUTERNAME || os.hostname() || 'unknown';
 

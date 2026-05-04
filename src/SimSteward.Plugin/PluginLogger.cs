@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
+using Sentry;
 
 namespace SimSteward.Plugin
 {
@@ -60,6 +62,8 @@ namespace SimSteward.Plugin
         private readonly string _logPath;
         private readonly string _jsonLogPath;
         private readonly string _lokiUrl;
+        private readonly string _lokiUser;
+        private readonly string _lokiToken;
         private readonly string _lokiEnv;
         private readonly object _lock = new object();
         private readonly Queue<LogEntry> _ring = new Queue<LogEntry>();
@@ -77,6 +81,8 @@ namespace SimSteward.Plugin
             _logPath = string.IsNullOrEmpty(basePath) ? null : Path.Combine(basePath, "plugin.log");
             _jsonLogPath = string.IsNullOrEmpty(basePath) ? null : Path.Combine(basePath, "plugin-structured.jsonl");
             _lokiUrl = Environment.GetEnvironmentVariable("SIMSTEWARD_LOKI_URL");
+            _lokiUser = Environment.GetEnvironmentVariable("SIMSTEWARD_LOKI_USER");
+            _lokiToken = Environment.GetEnvironmentVariable("SIMSTEWARD_LOKI_TOKEN");
             _lokiEnv = Environment.GetEnvironmentVariable("SIMSTEWARD_LOG_ENV") ?? "local";
             IsDebugMode = isDebugMode;
             if (!string.IsNullOrEmpty(basePath))
@@ -167,6 +173,22 @@ namespace SimSteward.Plugin
                 _lokiBuffer.Enqueue(entry);
             }
 
+            try
+            {
+                var level = entry.Level == "ERROR" ? BreadcrumbLevel.Error
+                          : entry.Level == "WARN"  ? BreadcrumbLevel.Warning
+                          : BreadcrumbLevel.Info;
+                var data = entry.Fields?.ToDictionary(
+                    k => k.Key,
+                    v => v.Value?.ToString() ?? string.Empty);
+                SentrySdk.AddBreadcrumb(
+                    message: entry.Message,
+                    category: entry.Component ?? entry.Domain,
+                    level: level,
+                    data: data);
+            }
+            catch { }
+
             try { LogWritten?.Invoke(entry); } catch { }
         }
 
@@ -201,7 +223,7 @@ namespace SimSteward.Plugin
 
             // Fire-and-forget push to Loki — replaces Alloy file-tailing
             if (!string.IsNullOrEmpty(_lokiUrl) && lokiBatch.Length > 0)
-                LokiPushClient.Push(_lokiUrl, "sim-steward", _lokiEnv, lokiBatch);
+                LokiPushClient.Push(_lokiUrl, "sim-steward", _lokiEnv, lokiBatch, _lokiUser, _lokiToken);
         }
 
         private void AppendToFile(string path, string content, Action rotate)
