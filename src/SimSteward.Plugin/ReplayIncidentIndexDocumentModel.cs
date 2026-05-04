@@ -46,6 +46,9 @@ namespace SimSteward.Plugin
 
         [JsonProperty("incidentPoints")]
         public int? IncidentPoints { get; set; }
+
+        [JsonProperty("lap")]
+        public int Lap { get; set; } = -1;
     }
 
     public sealed class ReplayIncidentIndexValidationBlock
@@ -118,7 +121,8 @@ namespace SimSteward.Plugin
                     CarIdx = s.CarIdx,
                     SessionTimeMs = s.SessionTimeMs,
                     DetectionSource = s.DetectionSource,
-                    IncidentPoints = s.IncidentPoints
+                    IncidentPoints = s.IncidentPoints,
+                    Lap = s.Lap
                 });
 
                 string key = s.CarIdx.ToString(System.Globalization.CultureInfo.InvariantCulture);

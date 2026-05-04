@@ -26,6 +26,7 @@ namespace SimSteward.Plugin
         private readonly int[] _replayIndexBaselineCarIdxTrackSurface = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _replayIndexScratchCarIdxSessionFlags  = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _replayIndexScratchCarIdxTrackSurface  = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxLap           = new int[ReplayIncidentIndexBuild.CarSlotCount];
 
         private Stopwatch _replayIndexBuildTotalWallClock;
         private int _replayIndexSessionNum;
@@ -300,7 +301,8 @@ namespace SimSteward.Plugin
                         ["detection_source"] = s.DetectionSource,
                         ["replay_frame"] = s.ReplayFrame,
                         ["replay_session_time"] = Math.Round(replaySessionTimeSec, 6),
-                        ["incident_points"] = s.IncidentPoints.HasValue ? (object)s.IncidentPoints.Value : null
+                        ["incident_points"] = s.IncidentPoints.HasValue ? (object)s.IncidentPoints.Value : null,
+                        ["lap"] = s.Lap
                     };
 
                     MergeSessionAndRoutingFields(fields);
@@ -347,6 +349,7 @@ namespace SimSteward.Plugin
 
                 SafeGetIntPerCar("CarIdxSessionFlags", _replayIndexScratchCarIdxSessionFlags);
                 SafeGetIntPerCar("CarIdxTrackSurface", _replayIndexScratchCarIdxTrackSurface);
+                SafeGetIntPerCar("CarIdxLap", _replayIndexScratchCarIdxLap);
 
                 int playerIncidents = 0;
                 try { playerIncidents = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
@@ -359,7 +362,8 @@ namespace SimSteward.Plugin
                     playerIncidents,
                     playerCarIdx,
                     replayFrame,
-                    _replayIndexScratchCarIdxTrackSurface);
+                    _replayIndexScratchCarIdxTrackSurface,
+                    _replayIndexScratchCarIdxLap);
                 if (tick.Count > 0)
                 {
                     _replayIndexIncidentSamples.AddRange(tick);

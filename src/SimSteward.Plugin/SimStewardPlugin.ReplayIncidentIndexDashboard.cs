@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using IRSDKSharper;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -99,6 +100,10 @@ namespace SimSteward.Plugin
                 snap.Index = _replayIndexDashboardCachedRoot;
             else
                 snap.Index = null;
+
+            snap.CursorIdx = _incidentCursor;
+            snap.IncidentCount = _replayIndexDashboardCachedRoot?.Incidents?.Count ?? 0;
+            snap.AutoWalkActive = _autoWalkActive;
 
             return snap;
         }
@@ -334,6 +339,13 @@ namespace SimSteward.Plugin
                 sessionNum = 0;
             }
 
+            if (IsSeekThrottled())
+            {
+                LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                return (false, null, "seek_throttled");
+            }
+            MarkSeekIssued();
+
             if (_irsdk == null || !_irsdk.IsConnected)
             {
                 LogActionResult(action, arg, correlationId, false, "not_connected");
@@ -356,9 +368,17 @@ namespace SimSteward.Plugin
                 }
             }
 
+            int carIdx = -1;
+            if (jo["carIdx"] != null && jo["carIdx"].Type != JTokenType.Null)
+            {
+                try { carIdx = jo["carIdx"].Value<int>(); } catch { }
+            }
+
             try
             {
                 _irsdk.ReplaySearchSessionTime(sessionNum, sessionTimeMs);
+                if (carIdx >= 0)
+                    _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, carIdx, 0, 0);
                 LogActionResult(action, arg, correlationId, true, "");
                 return (true, "ok", null);
             }

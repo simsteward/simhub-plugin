@@ -94,6 +94,11 @@ namespace SimSteward.Plugin
         private volatile string _logCtxSessionYamlFingerprint = "";
 
         private int _lastSessionInfoUpdateForYamlFingerprint = -1;
+        private DateTime _lastSeekIssuedUtc = DateTime.MinValue;
+        private int _incidentCursor = -1;
+        private bool _autoWalkActive;
+        private int _autoWalkPlayUntilFrame;
+        private const int AutoWalkPlayFrames = 360;
 #endif
 
 #if SIMHUB_SDK
@@ -480,6 +485,11 @@ namespace SimSteward.Plugin
             _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, carPos, groupNum, 0);
         }
 
+        private bool IsSeekThrottled() =>
+            (DateTime.UtcNow - _lastSeekIssuedUtc).TotalMilliseconds < 750;
+        private void MarkSeekIssued() =>
+            _lastSeekIssuedUtc = DateTime.UtcNow;
+
         private void LogActionResult(string action, string arg, string correlationId, bool success, string error, System.Collections.Generic.Dictionary<string, object> supplementalFields = null)
         {
             var resultFields = new System.Collections.Generic.Dictionary<string, object>
@@ -707,6 +717,13 @@ namespace SimSteward.Plugin
                     return (false, null, err);
                 }
 
+                if (IsSeekThrottled())
+                {
+                    LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                    return (false, null, "seek_throttled");
+                }
+                MarkSeekIssued();
+
                 if (_irsdk == null || !_irsdk.IsConnected)
                 {
                     const string err = "not_connected";
@@ -775,6 +792,13 @@ namespace SimSteward.Plugin
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
                 }
+
+                if (IsSeekThrottled())
+                {
+                    LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                    return (false, null, "seek_throttled");
+                }
+                MarkSeekIssued();
 
                 if (_irsdk == null || !_irsdk.IsConnected)
                 {
@@ -848,6 +872,12 @@ namespace SimSteward.Plugin
                     LogActionResult(action, arg, correlationId, false, "bad_arg");
                     return (false, null, "bad_arg");
                 }
+                if (IsSeekThrottled())
+                {
+                    LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                    return (false, null, "seek_throttled");
+                }
+                MarkSeekIssued();
                 if (_irsdk == null || !_irsdk.IsConnected)
                 {
                     var supOff = BuildCaptureIncidentSupplement(parsed, 0);
@@ -891,6 +921,96 @@ namespace SimSteward.Plugin
             if (string.Equals(action, "replay_incident_index_build", StringComparison.OrdinalIgnoreCase))
             {
                 return DispatchReplayIncidentIndexBuild(arg, correlationId);
+            }
+
+            if (string.Equals(action, "index_next_incident", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "index_prev_incident", StringComparison.OrdinalIgnoreCase))
+            {
+                bool isNext = string.Equals(action, "index_next_incident", StringComparison.OrdinalIgnoreCase);
+                var incidents = _replayIndexDashboardCachedRoot?.Incidents;
+                if (incidents == null || incidents.Count == 0)
+                {
+                    LogActionResult(action, arg, correlationId, false, "no_index");
+                    return (false, null, "no_index");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                string simMode2 = _irsdk.Data?.SessionInfo?.WeekendInfo?.SimMode ?? "";
+                if (!string.Equals(simMode2, "replay", StringComparison.OrdinalIgnoreCase))
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_replay_mode");
+                    return (false, null, "not_replay_mode");
+                }
+                if (IsSeekThrottled())
+                {
+                    LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                    return (false, null, "seek_throttled");
+                }
+                if (_incidentCursor < 0) _incidentCursor = 0;
+                else if (isNext) _incidentCursor = (_incidentCursor + 1) % incidents.Count;
+                else _incidentCursor = (_incidentCursor - 1 + incidents.Count) % incidents.Count;
+                var row = incidents[_incidentCursor];
+                int sessionNumCursor = SafeGetInt("SessionNum");
+                try
+                {
+                    MarkSeekIssued();
+                    _irsdk.ReplaySearchSessionTime(sessionNumCursor, row.SessionTimeMs);
+                    _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, row.CarIdx, 0, 0);
+                    var supFields = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["cursor_idx"] = _incidentCursor,
+                        ["incident_count"] = incidents.Count,
+                        ["car_idx"] = row.CarIdx,
+                        ["session_time_ms"] = row.SessionTimeMs
+                    };
+                    LogActionResult(action, arg, correlationId, true, "", supFields);
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    LogActionResult(action, arg, correlationId, false, ex.Message ?? "seek_failed");
+                    return (false, null, ex.Message ?? "seek_failed");
+                }
+            }
+
+            if (string.Equals(action, "index_walk_start", StringComparison.OrdinalIgnoreCase))
+            {
+                var incidents = _replayIndexDashboardCachedRoot?.Incidents;
+                if (incidents == null || incidents.Count == 0)
+                {
+                    LogActionResult(action, arg, correlationId, false, "no_index");
+                    return (false, null, "no_index");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                _autoWalkActive = true;
+                if (_incidentCursor < 0) _incidentCursor = 0;
+                _autoWalkPlayUntilFrame = SafeGetInt("ReplayFrameNum") + AutoWalkPlayFrames;
+                var walkRow = incidents[_incidentCursor];
+                int snWalk = SafeGetInt("SessionNum");
+                try
+                {
+                    MarkSeekIssued();
+                    _irsdk.ReplaySearchSessionTime(snWalk, walkRow.SessionTimeMs);
+                    _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, walkRow.CarIdx, 0, 0);
+                }
+                catch (Exception ex) { SentrySdk.CaptureException(ex); }
+                LogActionResult(action, arg, correlationId, true, "");
+                return (true, "ok", null);
+            }
+
+            if (string.Equals(action, "index_walk_stop", StringComparison.OrdinalIgnoreCase))
+            {
+                _autoWalkActive = false;
+                LogActionResult(action, arg, correlationId, true, "");
+                return (true, "ok", null);
             }
 
             LogActionResult(action, arg, correlationId, false, "not_supported");
@@ -1262,6 +1382,8 @@ namespace SimSteward.Plugin
                 {
                     _logCtxSessionYamlFingerprint = "";
                 }
+
+                if (_autoWalkActive) ProcessAutoWalkTick();
             }
             else
             {
@@ -1345,6 +1467,31 @@ namespace SimSteward.Plugin
                 return SessionLogging.LapUnknown;
             }
         }
+
+#if SIMHUB_SDK
+        private void ProcessAutoWalkTick()
+        {
+            if (!_autoWalkActive || _irsdk == null || !_irsdk.IsConnected) return;
+            var incidents = _replayIndexDashboardCachedRoot?.Incidents;
+            if (incidents == null || incidents.Count == 0) { _autoWalkActive = false; return; }
+            int frame = SafeGetInt("ReplayFrameNum");
+            if (frame < _autoWalkPlayUntilFrame) return;
+            int next = _incidentCursor + 1;
+            if (next >= incidents.Count) { _autoWalkActive = false; return; }
+            _incidentCursor = next;
+            if (IsSeekThrottled()) return;
+            _autoWalkPlayUntilFrame = frame + AutoWalkPlayFrames;
+            var row = incidents[_incidentCursor];
+            int sn = SafeGetInt("SessionNum");
+            try
+            {
+                MarkSeekIssued();
+                _irsdk.ReplaySearchSessionTime(sn, row.SessionTimeMs);
+                _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, row.CarIdx, 0, 0);
+            }
+            catch (Exception ex) { SentrySdk.CaptureException(ex); }
+        }
+#endif
 
         public void End(PluginManager pluginManager)
         {

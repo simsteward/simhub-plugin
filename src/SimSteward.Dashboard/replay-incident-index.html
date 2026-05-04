@@ -99,6 +99,19 @@ Sentry.init({
     <div class="meta" id="record-path" style="margin-top:6px"></div>
   </div>
 
+  <div class="panel" id="navigate-panel">
+    <div class="panel-title">Navigate incidents</div>
+    <div class="row">
+      <button type="button" class="btn" id="btn-prev-incident" onclick="navIncident('prev')" disabled>← Prev</button>
+      <button type="button" class="btn primary" id="btn-next-incident" onclick="navIncident('next')" disabled>Next →</button>
+      <span class="meta" id="cursor-display" style="margin-left:4px">—</span>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="btn-walk-start" onclick="walkStart()" disabled>▶ Auto-walk</button>
+      <button type="button" class="btn danger" id="btn-walk-stop" onclick="walkStop()" disabled>■ Stop walk</button>
+    </div>
+  </div>
+
   <div class="panel" id="summary-panel">
     <div class="panel-title">Summary (TR-022)</div>
     <div class="grid-summary" id="summary-grid"></div>
@@ -112,6 +125,7 @@ Sentry.init({
           <tr>
             <th data-k="fingerprint">fingerprint</th>
             <th data-k="carIdx">carIdx</th>
+            <th data-k="lap">lap</th>
             <th data-k="sessionTimeMs">sessionTimeMs</th>
             <th data-k="detectionSource">detectionSource</th>
             <th data-k="incidentPoints">incidentPoints</th>
@@ -140,6 +154,7 @@ let lastIdx = null;
 let lastSessionNum = 0;
 let sortKey = 'sessionTimeMs';
 let sortDir = 1;
+let lastSeekAt = 0;
 
 function connectWs() {
   const pill = document.getElementById('ws-pill');
@@ -186,6 +201,7 @@ function onState(m) {
   renderBuild(rii);
   renderSummary(rii);
   renderTable(rii);
+  updateNavigatePanel(rii, m.diagnostics);
   document.getElementById('btn-record').classList.toggle('on', !!rii.recordMode);
   const rp = rii.recordSamplePath || '';
   document.getElementById('record-path').textContent = rp ? ('Record file: ' + rp) : '';
@@ -277,10 +293,11 @@ function renderTable(rii) {
   });
   tb.innerHTML = rows.map((r) => {
     const pts = r.incidentPoints == null ? 'null' : String(r.incidentPoints);
-    const arg = JSON.stringify({ sessionTimeMs: r.sessionTimeMs, sessionNum: lastSessionNum });
+    const arg = JSON.stringify({ sessionTimeMs: r.sessionTimeMs, sessionNum: lastSessionNum, carIdx: r.carIdx });
     return '<tr>' +
       '<td class="mono fp" title="' + (r.fingerprint || '') + '">' + fpShort(r.fingerprint) + '</td>' +
       '<td>' + r.carIdx + '</td>' +
+      '<td>' + (r.lap != null && r.lap !== -1 ? r.lap : '—') + '</td>' +
       '<td class="mono">' + r.sessionTimeMs + ' <span style="color:var(--muted)">(' + fmtMs(r.sessionTimeMs) + ')</span></td>' +
       '<td>' + (r.detectionSource || '') + '</td>' +
       '<td>' + pts + '</td>' +
@@ -298,6 +315,8 @@ function seekRow(argJson) {
     toast('Seek unavailable (not replay mode).');
     return;
   }
+  if (Date.now() - lastSeekAt < 800) { toast('Seek cooldown — wait a moment.'); return; }
+  lastSeekAt = Date.now();
   send('replay_incident_index_seek', argJson);
 }
 
@@ -329,6 +348,39 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(toast._id);
   toast._id = setTimeout(() => t.classList.remove('show'), 3800);
+}
+
+function navIncident(dir) {
+  if (Date.now() - lastSeekAt < 800) { toast('Seek cooldown.'); return; }
+  lastSeekAt = Date.now();
+  send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-'+dir+'-incident', event_type:'click', message:dir+' incident', domain:'ui'}));
+  send(dir === 'next' ? 'index_next_incident' : 'index_prev_incident', '');
+}
+
+function walkStart() {
+  send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-walk-start', event_type:'click', message:'auto-walk start', domain:'ui'}));
+  send('index_walk_start', '');
+}
+
+function walkStop() {
+  send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-walk-stop', event_type:'click', message:'auto-walk stop', domain:'ui'}));
+  send('index_walk_stop', '');
+}
+
+function updateNavigatePanel(rii, diag) {
+  const connected = diag && diag.irsdkConnected;
+  const replayOk = connected && rii && rii.isReplayMode;
+  const hasIndex = replayOk && rii.incidentCount > 0;
+  const cursor = rii && rii.cursorIdx != null ? rii.cursorIdx : -1;
+  const count = rii && rii.incidentCount != null ? rii.incidentCount : 0;
+  const walking = rii && rii.autoWalkActive;
+
+  document.getElementById('btn-prev-incident').disabled = !hasIndex;
+  document.getElementById('btn-next-incident').disabled = !hasIndex;
+  document.getElementById('btn-walk-start').disabled = !hasIndex || walking;
+  document.getElementById('btn-walk-stop').disabled = !walking;
+  document.getElementById('cursor-display').textContent =
+    count > 0 && cursor >= 0 ? '#' + (cursor + 1) + ' of ' + count : (count > 0 ? '— of ' + count : '—');
 }
 
 document.querySelectorAll('th[data-k]').forEach((th) => {

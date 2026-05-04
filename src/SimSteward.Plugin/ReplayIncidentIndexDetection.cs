@@ -57,13 +57,15 @@ namespace SimSteward.Plugin
             int sessionTimeMs,
             string detectionSource,
             int? incidentPoints,
-            int replayFrame)
+            int replayFrame,
+            int lap = SessionLogging.LapUnknown)
         {
             CarIdx = carIdx;
             SessionTimeMs = sessionTimeMs;
             DetectionSource = detectionSource ?? "";
             IncidentPoints = incidentPoints;
             ReplayFrame = replayFrame;
+            Lap = lap;
         }
 
         public int CarIdx { get; }
@@ -71,5 +73,6 @@ namespace SimSteward.Plugin
         public string DetectionSource { get; }
         public int? IncidentPoints { get; }
         public int ReplayFrame { get; }
+        public int Lap { get; }
     }
 }

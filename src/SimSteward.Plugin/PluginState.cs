@@ -151,5 +151,14 @@ namespace SimSteward.Plugin
 
         [JsonProperty("index")]
         public ReplayIncidentIndexFileRoot Index { get; set; }
+
+        [JsonProperty("cursorIdx")]
+        public int CursorIdx { get; set; } = -1;
+
+        [JsonProperty("incidentCount")]
+        public int IncidentCount { get; set; }
+
+        [JsonProperty("autoWalkActive")]
+        public bool AutoWalkActive { get; set; }
     }
 }

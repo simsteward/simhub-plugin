@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Sim Steward — Incidents</title>
+<style>
+:root {
+  --bg:#080808; --surface:rgba(255,255,255,0.03); --border:rgba(255,255,255,0.08);
+  --accent:#1f9cff; --green:#0ef272; --red:#ff5f5f; --yellow:#ffc840;
+  --text:#f0f0f0; --muted:rgba(240,240,240,0.4); --r:10px;
+  font-family:"Segoe UI",system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text)}
+.panel{
+  width:280px; padding:10px 12px; background:var(--surface);
+  border:1px solid var(--border); border-radius:var(--r);
+  display:flex; flex-direction:column; gap:8px;
+}
+.header{display:flex;align-items:center;justify-content:space-between}
+.label{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);white-space:nowrap}
+.ws-pill{
+  font-size:0.62rem;padding:2px 8px;border-radius:99px;border:1px solid var(--border);white-space:nowrap;
+}
+.ws-pill.ok{color:var(--green);border-color:rgba(14,242,114,0.35)}
+.ws-pill.bad{color:var(--red);border-color:rgba(255,95,95,0.35)}
+.counter{font-size:1.6rem;font-weight:700;color:var(--accent);white-space:nowrap;line-height:1}
+.incident-info{font-size:0.68rem;color:var(--muted);white-space:nowrap;min-height:1em}
+.btn-row{display:flex;gap:6px}
+.btn{
+  flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:8px;
+  background:rgba(255,255,255,0.04);color:var(--text);font-size:0.78rem;
+  cursor:pointer;white-space:nowrap;
+}
+.btn:disabled{opacity:0.35;cursor:not-allowed}
+.btn.primary{border-color:var(--accent);color:var(--accent);background:rgba(31,156,255,0.08)}
+.btn.danger{border-color:var(--red);color:var(--red);background:rgba(255,95,95,0.06)}
+.btn.active{border-color:var(--yellow);color:var(--yellow);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="header">
+    <span class="label">Incidents</span>
+    <span class="ws-pill bad" id="ws-pill">WS …</span>
+  </div>
+  <div class="counter" id="counter">—</div>
+  <div class="incident-info" id="incident-info">No index loaded</div>
+  <div class="btn-row">
+    <button type="button" class="btn" id="btn-prev" disabled onclick="navIncident('prev')">← Prev</button>
+    <button type="button" class="btn primary" id="btn-next" disabled onclick="navIncident('next')">Next →</button>
+  </div>
+  <div class="btn-row">
+    <button type="button" class="btn" id="btn-walk" disabled onclick="toggleWalk()">▶ Walk</button>
+  </div>
+</div>
+<script>
+const WS_PORT = 19847;
+let ws = null;
+let lastSeekAt = 0;
+let _walking = false;
+let _hasIndex = false;
+let _replayOk = false;
+
+function connectWs() {
+  const pill = document.getElementById('ws-pill');
+  pill.textContent = 'WS …'; pill.className = 'ws-pill bad';
+  try {
+    const h = window.location.hostname || 'localhost';
+    ws = new WebSocket('ws://' + h + ':' + WS_PORT);
+    ws.onopen = () => { pill.textContent = 'WS OK'; pill.className = 'ws-pill ok'; };
+    ws.onclose = () => { ws = null; pill.textContent = 'WS …'; pill.className = 'ws-pill bad'; setTimeout(connectWs, 3000); };
+    ws.onerror = () => {};
+    ws.onmessage = (e) => { try { onMsg(JSON.parse(e.data)); } catch(err) {} };
+  } catch(err) { setTimeout(connectWs, 3000); }
+}
+
+function send(action, arg) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({action, arg: arg ?? ''}));
+}
+
+function onMsg(m) {
+  if (!m || m.type !== 'state') return;
+  const rii = m.replayIncidentIndex;
+  const diag = m.diagnostics;
+  const connected = diag && diag.irsdkConnected;
+  _replayOk = connected && rii && rii.isReplayMode;
+  _hasIndex = _replayOk && rii && rii.incidentCount > 0;
+  _walking = rii && rii.autoWalkActive;
+
+  const cursor = rii && rii.cursorIdx != null ? rii.cursorIdx : -1;
+  const count = rii && rii.incidentCount != null ? rii.incidentCount : 0;
+  document.getElementById('counter').textContent =
+    count > 0 && cursor >= 0 ? '#' + (cursor + 1) + ' of ' + count : count > 0 ? '— of ' + count : '—';
+
+  if (_hasIndex && cursor >= 0 && rii.index && rii.index.incidents) {
+    const row = rii.index.incidents[cursor];
+    if (row) {
+      const lap = row.lap != null && row.lap !== -1 ? 'Lap ' + row.lap : '';
+      const t = row.sessionTimeMs != null ? fmtMs(row.sessionTimeMs) : '';
+      document.getElementById('incident-info').textContent =
+        'Car #' + row.carIdx + (lap ? ' · ' + lap : '') + (t ? ' · ' + t : '');
+    }
+  } else {
+    document.getElementById('incident-info').textContent = _replayOk ? 'No index — run a build' : 'Not in replay mode';
+  }
+
+  document.getElementById('btn-prev').disabled = !_hasIndex;
+  document.getElementById('btn-next').disabled = !_hasIndex;
+  const walkBtn = document.getElementById('btn-walk');
+  walkBtn.disabled = !_hasIndex;
+  if (_walking) { walkBtn.textContent = '■ Stop'; walkBtn.className = 'btn active'; }
+  else { walkBtn.textContent = '▶ Walk'; walkBtn.className = 'btn'; }
+}
+
+function fmtMs(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+function navIncident(dir) {
+  if (!_hasIndex) return;
+  if (Date.now() - lastSeekAt < 800) return;
+  lastSeekAt = Date.now();
+  send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-'+dir, event_type:'click', message:dir+' incident', domain:'ui'}));
+  send(dir === 'next' ? 'index_next_incident' : 'index_prev_incident', '');
+}
+
+function toggleWalk() {
+  if (!_hasIndex) return;
+  if (_walking) {
+    send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-walk', event_type:'click', message:'walk stop', domain:'ui'}));
+    send('index_walk_stop', '');
+  } else {
+    send('log', JSON.stringify({event:'dashboard_ui_event', element_id:'btn-walk', event_type:'click', message:'walk start', domain:'ui'}));
+    send('index_walk_start', '');
+  }
+}
+
+connectWs();
+</script>
+</body>
+</html>

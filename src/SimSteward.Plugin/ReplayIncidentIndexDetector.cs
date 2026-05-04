@@ -72,7 +72,8 @@ namespace SimSteward.Plugin
             int playerIncidents,
             int playerCarIdx,
             int replayFrame,
-            int[] trackSurface = null)
+            int[] trackSurface = null,
+            int[] carIdxLap = null)
         {
             ValidateLength(nameof(flags), flags, ReplayIncidentIndexBuild.CarSlotCount);
 
@@ -92,7 +93,8 @@ namespace SimSteward.Plugin
                         sessionTimeMs,
                         ReplayIncidentIndexDetection.SourceRepairFlag,
                         null,
-                        replayFrame));
+                        replayFrame,
+                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown));
                 }
 
                 if (ReplayIncidentIndexDetection.IsRisingEdge(prev, curr, ReplayIncidentIndexDetection.FurledSessionFlag)
@@ -103,7 +105,8 @@ namespace SimSteward.Plugin
                         sessionTimeMs,
                         ReplayIncidentIndexDetection.SourceFurledFlag,
                         null,
-                        replayFrame));
+                        replayFrame,
+                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown));
                 }
 
                 _prevFlags[i] = curr;
@@ -122,7 +125,8 @@ namespace SimSteward.Plugin
                             sessionTimeMs,
                             ReplayIncidentIndexDetection.SourceTrackSurface,
                             null,
-                            replayFrame));
+                            replayFrame,
+                            carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown));
                     }
                     _prevTrackSurface[i] = currSurf;
                 }
@@ -140,7 +144,8 @@ namespace SimSteward.Plugin
                         sessionTimeMs,
                         ReplayIncidentIndexDetection.SourcePlayerIncidentCount,
                         points,
-                        replayFrame));
+                        replayFrame,
+                        carIdxLap != null && playerCarIdx < carIdxLap.Length ? carIdxLap[playerCarIdx] : SessionLogging.LapUnknown));
                 }
 
                 _prevPlayerIncidents = playerIncidents;
