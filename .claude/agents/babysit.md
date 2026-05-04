@@ -68,8 +68,9 @@ AUTH_HEADER="Authorization: Bearer $TOKEN"
 
 # --- Loki (logs) ---
 LOKI_UID="${GRAFANA_LOKI_DATASOURCE_UID:-loki_local}"
-END_NS=$(date +%s)000000000
-START_NS=$(( $(date +%s) - 7200 ))000000000
+NOW=$(date +%s)
+END_NS="${NOW}000000000"
+START_NS="$(( NOW - 7200 ))000000000"
 
 curl -s -H "$AUTH_HEADER" \
   "$GRAFANA_URL/api/datasources/proxy/uid/$LOKI_UID/loki/api/v1/query_range?query=%7Bapp%3D%22sim-steward%22%7D&limit=100&start=$START_NS&end=$END_NS"
@@ -227,7 +228,7 @@ Everything else (`session_id`, `car_idx`, `driver_name`, `correlation_id`, `acti
 {app="sim-steward"} | json | event =~ "plugin_started|plugin_ready|iracing_connected|iracing_disconnected|plugin_stopped"
 
 # All incidents
-{app="sim-steward", component="tracker"} | json | event = "incident_detected"
+{app="sim-steward"} | json | event = "incident_detected"
 
 # Failed actions only
 {app="sim-steward", component="simhub-plugin"} | json | event = "action_result" | success = "false"
@@ -279,7 +280,7 @@ count_over_time({app="sim-steward"} | json | event = "action_result" [5m])
 rate({app="sim-steward", level="ERROR"} [5m])
 
 # Incident rate
-count_over_time({app="sim-steward", component="tracker"} | json | event = "incident_detected" [5m])
+count_over_time({app="sim-steward"} | json | event = "incident_detected" [5m])
 
 # Action failure rate
 count_over_time({app="sim-steward"} | json | event = "action_result" | success = "false" [5m])
@@ -305,7 +306,7 @@ count_over_time({app="sim-steward"} | json | event = "action_result" | success =
 {app="sim-steward"} | json | subsession_id = "12345"
 
 # Incidents for a specific driver
-{app="sim-steward", component="tracker"} | json | event = "incident_detected" | unique_user_id = "67890"
+{app="sim-steward"} | json | event = "incident_detected" | unique_user_id = "67890"
 
 # Session results (merge chunks by session_id)
 {app="sim-steward"} | json | event = "session_end_datapoints_results" | session_id = "<id>"
@@ -366,111 +367,87 @@ topk(5, rate(simsteward_actions_total[5m]))
 count({job="sim-steward"})
 ```
 
-### Common Sim Steward Metric Patterns
+### Placeholder Metric Names
+
+> **No custom Prometheus metrics exist yet.** The plugin is .NET Framework 4.8 with no Prometheus exporter. When instrumented, expect names like below. Until then, use `host_resource_sample` Loki events for CPU/memory/GC data.
 
 ```promql
-# Process metrics (Go/dotnet runtime)
-process_resident_memory_bytes{job="sim-steward"}
-process_cpu_seconds_total{job="sim-steward"}
-
-# GC / heap (if exposed)
-dotnet_gc_heap_size_bytes{job="sim-steward"}
-dotnet_gc_collection_count_total{job="sim-steward"}
-
-# Custom counters (if instrumented)
-simsteward_actions_total
-simsteward_actions_failed_total
-simsteward_incidents_detected_total
-simsteward_ws_connections_active
-
-# Custom histograms (if instrumented)
-simsteward_action_duration_seconds_bucket
-simsteward_action_duration_seconds_sum
-simsteward_action_duration_seconds_count
+# These are EXAMPLES for when a Prometheus exporter is added:
+# process_resident_memory_bytes{job="sim-steward"}
+# process_cpu_seconds_total{job="sim-steward"}
+# dotnet_gc_heap_size_bytes{job="sim-steward"}
 ```
 
-### Alerting Patterns (useful for watch tasks)
+### Alerting Patterns (generic PromQL reference)
 
 ```promql
-# Error rate above threshold
-rate(simsteward_actions_failed_total[5m]) > 0.1
+# Threshold alert (replace metric_name with actual metric)
+metric_name > threshold_value
 
-# Memory above 500MB
-process_resident_memory_bytes{job="sim-steward"} > 500 * 1024 * 1024
-
-# No data in 5 minutes (absent)
+# No data in 5 minutes
 absent(up{job="sim-steward"})
 
-# Sudden rate change (derivative)
-deriv(simsteward_actions_total[5m])
+# Rate change detection
+deriv(some_counter[5m])
 ```
 
-## Task Inbox Pattern
+## Watch Task Pattern
 
-Other agents delegate watch tasks to the babysit agent. A watch task has:
+The orchestrator invokes babysit with a specific watch task. There is no message queue — the orchestrator describes what to check in the prompt. A watch task includes:
 
 | Field | Description |
 |-------|-------------|
-| **requester** | Which agent is asking (e.g. `deployer`, `orchestrator`) |
+| **requester** | Which agent triggered this (e.g. `deployer`, `orchestrator`) |
 | **watch_type** | `threshold`, `pattern`, `absence`, `correlation`, `rate_change` |
-| **query** | LogQL or PromQL query to execute |
-| **query_type** | `logql` or `promql` |
-| **condition** | What triggers a finding (e.g. "count > 0", "rate drops to 0", "no results in 5m") |
+| **query** | LogQL query to execute (PromQL when Prometheus is added) |
+| **condition** | What triggers a finding (e.g. "count > 0", "no results in 5m") |
 | **lookback** | Time window to query (e.g. "5m", "1h", "2h") |
-| **report_to** | How to surface findings (inline response, summary table) |
 
 ### Example Watch Tasks
 
 **Post-deploy health (from deployer):**
-- Watch for `action_result` with `success = "false"` in the 10 minutes after deploy (LogQL)
-- Watch for `level = "ERROR"` spike (count > 3 in 5m) (LogQL)
-- Confirm `plugin_ready` appears within 2 minutes of `plugin_started` (LogQL)
-- Check `process_resident_memory_bytes` stays below 500MB post-deploy (PromQL)
+- Watch for `action_result` with `success = "false"` in the 10 minutes after deploy
+- Watch for `level = "ERROR"` spike (count > 3 in 5m)
+- Confirm `plugin_ready` appears within 2 minutes of `plugin_started`
+- Check `host_resource_sample` for `process_working_set_mb` > 500
 
 **Incident tracking during replay index build (from orchestrator):**
-- Watch `replay_incident_index_detection` rate during build (LogQL)
-- Report if `replay_incident_index_build_error` appears (LogQL)
-- Confirm `replay_incident_index_fast_forward_complete` fires with `completion_reason = "replay_finished"` (LogQL)
+- Watch `replay_incident_index_detection` count during build
+- Report if `replay_incident_index_build_error` appears
+- Confirm `replay_incident_index_fast_forward_complete` fires with `completion_reason = "replay_finished"`
 
 **Correlation audit (from log-compliance):**
-- Find `action_dispatched` entries without a matching `action_result` (same `correlation_id`) (LogQL)
+- Find `action_dispatched` entries without a matching `action_result` (same `correlation_id`)
 - Report orphaned correlations with timestamps and action names
 
 **Resource monitoring (from observability):**
-- Watch `host_resource_sample` for `process_working_set_mb` > 500 or `process_cpu_pct` > 80 (LogQL)
-- Track `gc_heap_mb` trend over a session — rising = potential leak (LogQL)
-- Monitor `process_resident_memory_bytes` and `dotnet_gc_heap_size_bytes` trends (PromQL)
-- Alert if `rate(process_cpu_seconds_total[5m])` exceeds threshold (PromQL)
-
-**Session completeness (from orchestrator):**
-- After `checkered_detected`, confirm `session_digest` appears within 30s (LogQL)
-- If `session_capture_skipped` appears, report the `error` field (LogQL)
+- Watch `host_resource_sample` for `process_working_set_mb` > 500 or `process_cpu_pct` > 80
+- Track `gc_heap_mb` trend over a session — rising = potential leak
 
 ## Output Formats
 
 ### Summary Report
 
 ```
-## Log & Metrics Watch Report
+## Log Watch Report
 
 ### Time Range
 - From: <start> To: <end>
-- Loki queries: N | Prometheus queries: M
+- Queries executed: N
 
 ### Findings
-| # | Source | Severity | Event/Metric | Count/Value | Detail |
-|---|--------|----------|--------------|-------------|--------|
-| 1 | Loki | ERROR | action_result failures | 3 | seek: timeout, capture: null ref |
-| 2 | Loki | WARN | orphaned correlation | 1 | id=abc-123 dispatched but no result |
-| 3 | Prom | WARN | memory_bytes | 480MB | approaching 500MB threshold |
-| 4 | Loki | OK | plugin_ready confirmed | 1 | 4.2s after plugin_started |
+| # | Severity | Event | Count | Detail |
+|---|----------|-------|-------|--------|
+| 1 | ERROR | action_result failures | 3 | seek: timeout, capture: null ref |
+| 2 | WARN | orphaned correlation | 1 | id=abc-123 dispatched but no result |
+| 3 | WARN | host_resource_sample | 2 | process_working_set_mb > 500 |
+| 4 | OK | plugin_ready confirmed | 1 | 4.2s after plugin_started |
 
 ### Trend
 - Action volume: ~12/min (normal)
-- Error rate: 0.5/min (elevated)
+- Error count: 3 in last 2h (elevated)
 - Incident detection rate: 2.1/min during replay
-- Memory: 340MB → 480MB over 1h (rising)
-- CPU: avg 12% (stable)
+- Memory (from host_resource_sample): 340MB → 480MB over 1h (rising)
 ```
 
 ### Detail Report (for a specific query)
@@ -499,7 +476,7 @@ Other agents delegate watch tasks to the babysit agent. A watch task has:
 ## Timeseries: incident_detected rate (last 1h, 5m buckets)
 
 ### LogQL
-count_over_time({app="sim-steward", component="tracker"} | json | event = "incident_detected" [5m])
+count_over_time({app="sim-steward"} | json | event = "incident_detected" [5m])
 
 ### Data
 | Bucket | Count |
@@ -515,28 +492,27 @@ count_over_time({app="sim-steward", component="tracker"} | json | event = "incid
 - Baseline rate outside replay: ~0-1 per 5m
 ```
 
-### Metrics Report (Prometheus)
+### Resource Report (from host_resource_sample logs)
 
 ```
-## Metrics: process health (last 2h)
+## Resource Trend: process health (last 2h)
 
-### PromQL
-process_resident_memory_bytes{job="sim-steward"}
-rate(process_cpu_seconds_total{job="sim-steward"}[5m])
+### LogQL
+{app="sim-steward"} | json | event = "host_resource_sample"
 
-### Data
-| Time | Memory (MB) | CPU (%) |
-|------|-------------|---------|
-| 14:00 | 320 | 8.2 |
-| 14:15 | 345 | 11.4 |
-| 14:30 | 380 | 15.1 |
-| 14:45 | 410 | 12.3 |
-| 15:00 | 480 | 9.8 |
+### Data (sampled every ~60s)
+| Time | Memory (MB) | CPU (%) | GC Heap (MB) |
+|------|-------------|---------|--------------|
+| 14:00 | 320 | 8.2 | 180 |
+| 14:15 | 345 | 11.4 | 195 |
+| 14:30 | 380 | 15.1 | 220 |
+| 14:45 | 410 | 12.3 | 240 |
+| 15:00 | 480 | 9.8 | 280 |
 
 ### Interpretation
 - Memory rising steadily: +160MB over 2h (~1.3MB/min)
 - CPU spikes correlate with replay index build (14:15-14:30)
-- Memory trend suggests possible leak — recommend GC investigation
+- GC heap tracking memory rise — possible leak; recommend GC investigation
 ```
 
 ### Correlation Trace Report
@@ -558,13 +534,13 @@ rate(process_cpu_seconds_total{job="sim-steward"}[5m])
 
 | Concern | grafana-poller | babysit |
 |---------|---------------|---------|
-| **Purpose** | One-shot format validation | Persistent pattern monitoring |
-| **When** | After deploy; periodic health check | Continuous; on-demand from other agents |
-| **Queries** | Fixed validation queries (LogQL) | Ad-hoc LogQL AND PromQL for any question |
-| **Checks** | Field presence, schema compliance, correlation pairs | Anomalies, trends, rates, regressions, metrics |
-| **Output** | Validation report (pass/fail per field) | Watch reports, summaries, traces, metric trends |
+| **Purpose** | One-shot format validation | On-demand pattern analysis |
+| **When** | After deploy; periodic health check | When something needs investigation or monitoring |
+| **Queries** | Fixed validation queries | Ad-hoc LogQL for any question |
+| **Checks** | Field presence, schema compliance, correlation pairs | Anomalies, trends, rates, regressions, resource spikes |
+| **Output** | Pass/fail per field | Watch reports, summaries, traces, resource trends |
 
-If you need to **validate log format**, call **grafana-poller**. If you need to **understand what happened** or **track metrics**, call **babysit**.
+If you need to **validate log schema**, call **grafana-poller**. If you need to **understand what happened**, call **babysit**.
 
 ## Rules
 
