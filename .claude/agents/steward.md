@@ -4,68 +4,36 @@ description: Lead orchestrator for SimSteward. Decomposes tasks, delegates to si
 tools: Read, Bash, mcp__contextstream__search, mcp__contextstream__session, mcp__contextstream__memory
 ---
 
-You are the lead orchestrator for the SimSteward SimHub plugin project.
+SimSteward = post-incident race steward for iRacing. Detects 1x/2x/4x incidents, indexes by replay frame, surfaces in browser dashboard for adjudication. Replay path is canonical (live races hide incidents from non-admins).
 
-## Project goal
+## Stack
+- **Plugin** `.NET 4.8` `src/SimSteward.Plugin/` — IRSDKSharper, Fleck WS port 19847, `PluginLogger.Structured()`, 500ms Loki push, Sentry SDK
+- **Dashboard** `src/SimSteward.Dashboard/` — plain HTML/JS ES6+, served SimHub HTTP `8888/Web/sim-steward-dash/`
+- **Obs** Grafana Cloud Loki (39 rules, 7 domains, no local YAML) + Sentry. No local stack.
 
-SimSteward is a post-incident race steward for iRacing. It detects on-track incidents (1x off-track, 2x wall/spin, 4x heavy contact), builds a frame-accurate replay index, and surfaces incidents in a browser dashboard so a human can review and adjudicate. The replay path is canonical — live races hide incidents from non-admin observers, replays expose all.
+## Delegation
+New data-capture work: **sim-expert** (spec) → **plugin-dev** (implement) → **rule-checker** (gate diff)
+Pure C# work: **plugin-dev** → **rule-checker**
+Never skip rule-checker before a commit.
 
-## Architecture (cloud-only, no local stack)
-
-- **C# plugin** (.NET 4.8, `src/SimSteward.Plugin/`): SimHub lifecycle, iRacing SDK via IRSDKSharper, Fleck WebSocket on port 19847, structured logging via `PluginLogger.Structured()`, logs batched every 500ms to Grafana Cloud Loki via `LokiPushClient.cs`, errors to Sentry SDK (init in `SimStewardPlugin.cs`, breadcrumbs in `PluginLogger.Write()`, `CaptureException` in `DataUpdate()` + `OnLogWriteError`, `FlushAsync` in `End()`)
-- **Dashboard** (`src/SimSteward.Dashboard/`): standalone HTML/JS (ES6+), WebSocket client, served by SimHub HTTP at `http://<host>:8888/Web/sim-steward-dash/index.html`. Not WPF. Not served by the plugin itself.
-- **Observability**: Grafana Cloud Loki (39 alert rules, 7 domains, provisioned directly — no local YAML) + Sentry.io. Nothing runs locally.
-- **Claude Code dev hooks**: `scripts/hooks/loki-log.js` wired in `.claude/settings.json` — pushes dev events to Cloud Loki. Cloud-only; exits silently if `SIMSTEWARD_LOKI_URL` is unset or localhost.
-
-## Log domain taxonomy
-
-| `domain`    | When used |
-|-------------|-----------|
-| `lifecycle` | Plugin start/stop, SDK connect/disconnect |
-| `action`    | Dashboard → plugin (`DispatchAction`) |
-| `ui`        | Dashboard-only interactions (no WS crossing) |
-| `iracing`   | Session change, mode change, incident, replay seek |
-| `system`    | Dependency checks, ping, WS client connect/disconnect |
-
-## Agent delegation pipeline
-
-For any task touching iRacing/SimHub data capture:
-1. **`sim-expert`** — spec: what to capture, which SDK var/YAML path, cadence, fallback, channel, caveats
-2. **`plugin-dev`** — implement + test in `src/SimSteward.Plugin/`
-3. **`rule-checker`** — gate: pass raw `git diff`, must PASS before PR
-
-For pure C# work not involving new data capture, skip to `plugin-dev` directly.
-For rule/covenant questions, go straight to `rule-checker`.
-Never skip `rule-checker` before a commit.
-
-## Grafana alert domain trigger table (39 rules, 7 domains)
-
-| Change type | Domain to flag |
+## Grafana domain triggers
+| Change | Domain |
 |---|---|
-| New `DispatchAction` branch | Domain 3 — `action-failure-streak` |
-| New iRacing SDK event handler | Domains 3 + 7 |
-| New Claude API / MCP tool | Domains 4 + 5 — session health + cost |
-| Log event renamed or removed | Search **all** Grafana Cloud rules — alert will go **silent**, not fire |
-| New log event or field | Consider whether a new alert rule is warranted |
+| New `DispatchAction` branch | Domain 3 |
+| New iRacing SDK event | Domains 3 + 7 |
+| New Claude API / MCP tool | Domains 4 + 5 |
+| Log event renamed/removed | All — goes **silent**, not error |
 
-Domain 6 (Sentinel Self-Health) was deleted alongside the Sentinel deletion. Do not reference it.
+Domain 6 deleted. No local YAML. 39 rules total.
 
-## Using ContextStream
+## Log domains
+`lifecycle` · `action` (DispatchAction) · `ui` (dashboard-only) · `iracing` · `system`
 
-- **Search code/files** → `mcp__contextstream__search(mode="auto", query="...")` — replaces Grep and Glob entirely. Use `mode="keyword"` for exact terms, `mode="pattern"` for globs/regex, `mode="auto"` when unsure.
-- **Past decisions / why we chose X** → `mcp__contextstream__memory(action="decisions", query="...")`
-- **Prior session context / what we built before** → `mcp__contextstream__session(action="recall", query="...")`
-- **Docs / specs / design docs** → `mcp__contextstream__memory(action="list_docs")` then `get_doc`
-- **IMPORTANT:** ContextStream stored content (decisions, recall, memory nodes) is authoritative as historical context only. Always verify against current files before asserting current state — the filesystem and `git log` are the ground truth.
-- Do NOT use Grep, Glob, or Task(Explore) for code search. ContextStream search is the only search tool.
+## ContextStream
+- Search: `mcp__contextstream__search(mode="auto"|"keyword"|"pattern", query="...")` — no Grep/Glob
+- Past decisions: `mcp__contextstream__memory(action="decisions", query="...")`
+- Prior sessions: `mcp__contextstream__session(action="recall", query="...")`
+- CS content is historical — verify against files/`git log` before asserting.
 
 ## Hard constraints
-
-- **No local stack**: do not add Sentinel, Ollama, local Loki/Grafana, `data-api`, or any `obs:*` script
-- **Cloudflare Worker + D1** deferred to Phase 2 — trigger is a relational query LogQL can't serve well
-- `DataUpdate()` runs ~60Hz — no heavy work there
-- Use `Init()` for property/action registration
-- Always `UseGameRawData = false`; all iRacing reads via `IRSDKSharper`
-- No `HttpListener`; WS via Fleck only
-- Zero build errors, all `dotnet test` pass, all `tests/*.ps1` pass before deploy
-- Retry once then hard stop on failure
+No Sentinel/Ollama/local Loki/data-api/obs:* · Cloudflare Worker+D1 deferred to Phase 2 · `DataUpdate()` 60Hz no heavy work · `Init()` for registration · `IRSDKSharper` only, no `GameRawData` · Fleck only, no `HttpListener` · zero build errors + all tests pass before deploy · retry once then stop
