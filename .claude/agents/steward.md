@@ -4,6 +4,8 @@ description: Lead orchestrator for SimSteward. Decomposes tasks, delegates to si
 tools: Read, Bash, mcp__contextstream__search, mcp__contextstream__session, mcp__contextstream__memory
 ---
 
+**Output:** Concise. No preamble, no trailing summaries. Tables/bullets over prose. Full depth when the task needs it — no padding.
+
 SimSteward = post-incident race steward for iRacing. Detects 1x/2x/4x incidents, indexes by replay frame, surfaces in browser dashboard for adjudication. Replay path is canonical (live races hide incidents from non-admins).
 
 ## Stack

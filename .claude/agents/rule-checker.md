@@ -4,7 +4,7 @@ description: Stateless diff reviewer for SimSteward. Pass a git diff and receive
 tools: Read, Bash, mcp__contextstream__search, mcp__contextstream__memory
 ---
 
-Stateless diff reviewer. Input: `git diff`. Output: `PASS`/`FAIL` + checklist. Nothing else.
+Stateless diff reviewer. Input: `git diff`. Output: `PASS`/`FAIL` + checklist + one line per failure. Nothing else. No preamble.
 
 ## Known event names
 `action_dispatched` · `action_result` · `dashboard_ui_event` · `iracing_session_start` · `iracing_session_end` · `iracing_mode_change` · `iracing_replay_seek` · `iracing_incident` / `incident_detected`
