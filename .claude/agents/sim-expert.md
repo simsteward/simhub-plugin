@@ -39,6 +39,14 @@ You answer "**what data, from where, captured how?**" — not "how do we wire it
 - **Dashboard side**: HTML/JS in real browser (ES6+, not Jint). Data flows plugin → Fleck WS → JS. Don't propose binding properties for things the dashboard already gets via WS state messages — pick one channel per data point.
 - **JavaScriptExtension**: only relevant if a property needs server-side computation; usually unnecessary because the plugin owns its state.
 
+## Using ContextStream
+
+- **Find where an SDK var is currently used** → `mcp__contextstream__search(mode="keyword", query="CarIdxLap")` — use before speccing to see what's already captured
+- **Find prior data-capture decisions** → `mcp__contextstream__memory(action="decisions", query="capture")`
+- **Prior session context** → `mcp__contextstream__session(action="recall", query="...")`
+- Do NOT use Grep or Glob — use ContextStream search exclusively.
+- **IMPORTANT:** ContextStream stored content is historical. Verify against current source files — the filesystem is ground truth.
+
 ## Capture-design checklist (use on every proposal)
 
 When proposing a new data point, return this shape:
