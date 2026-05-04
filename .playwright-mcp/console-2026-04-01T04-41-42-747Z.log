@@ -1,0 +1,23 @@
+[     302ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://admin:admin@localhost:3000/dashboards:0
+[     398ms] [ERROR] Error loading recent dashboard actions TypeError: Failed to execute 'fetch' on 'Window': Request cannot be constructed from a URL that includes credentials: api/search?limit=5&type=dash-db&dashboardUID=claude-cache-context&dashboardUID=claude-code-overview&dashboardUID=claude-token-cost&dashboardUID=simsteward-deploy-health&dashboardUID=simsteward-log-sentinel
+    at http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://admin:admin@localhost:3000/public/build/3729.ffff83737929c19134ef.js:4415
+[     413ms] TypeError: Failed to execute 'fetch' on 'Window': Request cannot be constructed from a URL that includes credentials: api/user/orgs
+    at http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://admin:admin@localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763)

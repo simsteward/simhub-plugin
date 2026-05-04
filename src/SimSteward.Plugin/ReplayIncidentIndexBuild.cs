@@ -12,7 +12,7 @@ namespace SimSteward.Plugin
         public const int CarSlotCount = 64;
 
         /// <summary>Default fast-forward multiplier (TR-008); tune empirically.</summary>
-        public const int DefaultFastForwardPlaySpeed = 16;
+        public const int DefaultFastForwardPlaySpeed = 32;
 
         /// <summary>Consecutive telemetry samples with <c>ReplayFrameNum == 0</c> before baseline (TR-004).</summary>
         public const int FrameZeroStableConsecutiveSamples = 4;
@@ -32,9 +32,6 @@ namespace SimSteward.Plugin
 
         /// <summary>M6 TR-038 / TR-040: batched structured hint for 60Hz record mode (not per-tick).</summary>
         public const string EventRecordWindow = "replay_incident_index_record_window";
-
-        /// <summary>~2.5s at 60Hz telemetry between <c>ReplaySearchSessionTime</c> and <c>CamCarIdx</c> read (TR-025).</summary>
-        public const int CameraValidationCooldownTelemetryTicks = 150;
 
         /// <summary>
         /// Effective SDK sample rate relative to <strong>replay session time</strong> when replay plays at

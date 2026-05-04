@@ -19,6 +19,15 @@ namespace SimSteward.Plugin
         public const string SourceRepairFlag = "repair_flag";
         public const string SourceFurledFlag = "furled_flag";
         public const string SourcePlayerIncidentCount = "player_incident_count";
+        public const string SourceTrackSurface = "track_surface";
+
+        /// <summary>iRacing SessionFlags bit: checkered flag shown.</summary>
+        public const int CheckeredSessionFlag = 0x0001;
+
+        /// <summary>iRacing CarIdxTrackSurface value: car on the racing surface.</summary>
+        public const int TrackSurfaceOnTrack  = 4;
+        /// <summary>iRacing CarIdxTrackSurface value: car off the racing surface (excursion / incident).</summary>
+        public const int TrackSurfaceOffTrack = 1;
 
         /// <summary>True when masked bits transition 0 → 1 between consecutive samples.</summary>
         public static bool IsRisingEdge(int prevRaw, int currRaw, int mask)
@@ -62,24 +71,5 @@ namespace SimSteward.Plugin
         public string DetectionSource { get; }
         public int? IncidentPoints { get; }
         public int ReplayFrame { get; }
-    }
-
-    /// <summary>TR-017: fast-repair increment observed between samples (not a TR-020 row).</summary>
-    public readonly struct FastRepairDelta
-    {
-        public FastRepairDelta(int carIdx, int sessionTimeMs, int replayFrame, int previousCount, int currentCount)
-        {
-            CarIdx = carIdx;
-            SessionTimeMs = sessionTimeMs;
-            ReplayFrame = replayFrame;
-            PreviousCount = previousCount;
-            CurrentCount = currentCount;
-        }
-
-        public int CarIdx { get; }
-        public int SessionTimeMs { get; }
-        public int ReplayFrame { get; }
-        public int PreviousCount { get; }
-        public int CurrentCount { get; }
     }
 }

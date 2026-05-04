@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Sim Steward — SDK Data Capture Suite</title>
+<style>
+:root {
+  --bg: #060608; --surface: rgba(255,255,255,0.025);
+  --surface-2: rgba(255,255,255,0.038);
+  --border: rgba(255,255,255,0.07);
+  --border-hover: rgba(255,255,255,0.14);
+  --accent: #1f9cff; --green: #0ef272; --red: #ff5f5f; --yellow: #ffc840; --cyan: #0dd8ff;
+  --text: #eaeaea; --muted: rgba(240,240,240,0.42);
+  --r: 12px;
+  --panel-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 18px 20px 36px; display: flex; flex-direction: column; gap: 10px; }
+.topnav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; padding: 6px 0 2px; }
+.topnav a { color: var(--accent); text-decoration: none; transition: opacity 0.15s; }
+.topnav a:hover { opacity: 0.8; text-decoration: underline; }
+.ws-pill { margin-left: auto; font-size: 0.72rem; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); transition: all 0.3s ease; }
+.ws-pill.ok  { color: var(--green); border-color: rgba(14,242,114,0.3); background: rgba(14,242,114,0.06); }
+.ws-pill.bad { color: var(--red);   border-color: rgba(255,95,95,0.3); background: rgba(255,95,95,0.05); }
+.banner { padding: 12px 16px; border-radius: var(--r); border: 1px solid var(--border); background: rgba(255,200,64,0.06); font-size: 0.85rem; line-height: 1.5; }
+.banner.err { border-color: rgba(255,95,95,0.35); background: rgba(255,95,95,0.06); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.row:last-child { margin-bottom: 0; }
+.btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04); color: var(--text); font-size: 0.82rem; cursor: pointer; transition: all 0.15s ease; }
+.btn:hover { border-color: var(--accent); background: rgba(31,156,255,0.06); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--border); background: rgba(255,255,255,0.04); transform: none; }
+.btn.primary { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
+.btn.primary:hover { background: rgba(31,156,255,0.14); }
+.btn.primary.large { font-size: 0.92rem; font-weight: 600; padding: 11px 24px; border-width: 2px; letter-spacing: 0.01em; }
+.btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
+.btn.danger:hover { background: rgba(255,95,95,0.12); }
+.btn.sm { padding: 5px 11px; font-size: 0.72rem; }
+.btn.warn { border-color: var(--yellow); color: var(--yellow); background: rgba(255,200,64,0.08); }
+.btn.warn:hover { background: rgba(255,200,64,0.14); border-color: var(--yellow); }
+.progress-bar-wrap { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; }
+.meta { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+.meta strong { color: var(--text); font-weight: 600; }
+.mono { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-size: 0.72rem; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+.running-label { animation: pulse 1.4s ease-in-out infinite; color: var(--accent); }
+input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+
+/* ── Zone layout ──────────────────────────────────────────────── */
+.zone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--panel-shadow); transition: border-color 0.3s ease; }
+
+/* ── Zone 1: Environment bar ──────────────────────────────────── */
+.env-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 0.76rem;
+  box-shadow: var(--panel-shadow);
+}
+.env-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; flex-shrink: 0; }
+.env-divider { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+.env-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.signals { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.sig { display: flex; align-items: center; gap: 5px; }
+.sig-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex-shrink: 0; transition: all 0.3s ease; box-shadow: 0 0 5px rgba(255,95,95,0.3); }
+.sig-dot.ok { background: var(--green); box-shadow: 0 0 5px rgba(14,242,114,0.3); }
+.sig-dot.warn { background: var(--yellow); box-shadow: 0 0 5px rgba(255,200,64,0.3); }
+.sig-label { color: var(--muted); font-size: 0.7rem; }
+
+/* ── Zone 2: Setup (collapsible 2-col) ────────────────────────── */
+.setup-summary {
+  display: none; align-items: center; gap: 12px;
+  padding: 11px 18px;
+  cursor: pointer; user-select: none;
+  font-size: 0.78rem;
+  border-radius: var(--r);
+  transition: background 0.15s;
+}
+.setup-summary:hover { background: rgba(255,255,255,0.02); }
+.setup-expand-hint { font-size: 0.62rem; color: var(--muted); margin-left: auto; flex-shrink: 0; }
+.setup-content { display: grid; grid-template-columns: 1fr 1fr; }
+@media (max-width: 720px) { .setup-content { grid-template-columns: 1fr; } }
+.setup-left { padding: 18px 20px; border-right: 1px solid var(--border); }
+.setup-right { padding: 18px 20px; }
+.setup-col-hdr { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Precondition rows ────────────────────────────────────────── */
+.pc-tests { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.pc-row { display: flex; align-items: center; gap: 9px; padding: 5px 10px; border-radius: 8px; border: 1px solid transparent; transition: border-color 0.3s, background 0.4s; }
+.pc-row.running { border-color: rgba(31,156,255,0.25); background: linear-gradient(90deg, rgba(31,156,255,0.08) 0%, rgba(31,156,255,0.03) 60%, transparent 100%); }
+.pc-row.pass { background: rgba(14,242,114,0.05); }
+.pc-row.fail { background: rgba(255,95,95,0.08); border-color: rgba(255,95,95,0.25); }
+.pc-row.skip { background: rgba(255,200,64,0.03); }
+.pc-icon { width: 17px; height: 17px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 700; flex-shrink: 0; transition: background 0.25s, color 0.25s; }
+.pc-icon.pending  { background: rgba(255,255,255,0.06); color: var(--muted); }
+.pc-icon.running  { background: rgba(31,156,255,0.15); color: var(--accent); }
+.pc-icon.pass     { background: rgba(14,242,114,0.15); color: var(--green); }
+.pc-icon.fail     { background: rgba(255,95,95,0.15); color: var(--red); }
+.pc-icon.skip     { background: rgba(255,200,64,0.1);  color: var(--yellow); }
+.pc-name { font-size: 0.78rem; flex: 1; }
+.pc-level { font-size: 0.58rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.pc-detail { font-size: 0.68rem; color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border); color: var(--muted); opacity: 0.35; transition: opacity 0.3s, border-color 0.3s, color 0.3s, background 0.3s; cursor: default; }
+.scope-badge.active { opacity: 1; border-color: var(--accent); color: var(--accent); background: rgba(99,144,255,0.08); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pc-spinner { display: inline-block; width: 9px; height: 9px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+/* ── Filter bar ───────────────────────────────────────────────── */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 12px; }
+.filter-chip { padding: 4px 11px; border-radius: 99px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 0.68rem; cursor: pointer; transition: all 0.15s ease; }
+.filter-chip:hover { border-color: var(--accent); color: var(--text); }
+.filter-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
+.filter-input { padding: 4px 11px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); color: var(--text); font-size: 0.68rem; outline: none; margin-left: auto; width: 140px; transition: border-color 0.2s, box-shadow 0.2s; }
+.filter-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(31,156,255,0.1); }
+.filter-input::placeholder { color: var(--muted); }
+.filter-count { font-size: 0.62rem; color: var(--muted); margin-left: 4px; }
+.filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 0 4px; margin-left: -28px; margin-right: 4px; transition: color 0.15s; z-index: 1; }
+.filter-clear:hover { color: var(--text); }
+
+/* ── Test selection cards ─────────────────────────────────────── */
+.test-groups { display: flex; flex-direction: column; gap: 14px; }
+.test-group-hdr { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; padding-bottom: 5px; border-bottom: 1px solid var(--border); transition: border-color 0.2s; }
+.test-group-hdr:hover { border-bottom-color: var(--border-hover); }
+.test-group-hdr input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
+.test-group-name { font-weight: 600; font-size: 0.85rem; }
+.test-group-count { font-size: 0.7rem; color: var(--muted); }
+.test-group-chevron { font-size: 0.7rem; color: var(--muted); transition: transform 0.25s ease; display: inline-block; }
+.test-group-chevron.collapsed { transform: rotate(-90deg); }
+.test-group-status { margin-left: auto; font-size: 0.7rem; font-weight: 600; }
+.test-cards { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; overflow: hidden; max-height: 2000px; transition: max-height 0.3s ease, margin-top 0.3s ease, opacity 0.25s ease; opacity: 1; }
+.test-cards.collapsed { max-height: 0; margin-top: 0; opacity: 0; }
+.test-card { border-radius: 9px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); overflow: hidden; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; }
+.test-card:hover { border-color: var(--border-hover); }
+.test-card.expanded { border-color: rgba(31,156,255,0.2); box-shadow: 0 0 12px rgba(31,156,255,0.06); }
+.test-card.filtered-out { display: none; }
+.test-card-top { display: flex; align-items: center; gap: 9px; padding: 9px 13px; cursor: pointer; transition: background 0.15s; user-select: none; }
+.test-card-top:hover { background: rgba(255,255,255,0.02); }
+.test-card-top input[type="checkbox"] { flex-shrink: 0; cursor: pointer; }
+.test-card-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.test-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.82rem; }
+.test-name { font-weight: 600; font-size: 0.82rem; }
+.test-card-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; }
+.test-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 99px; font-size: 0.58rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; border: 1px solid transparent; }
+.test-badge.bg-incident  { color: var(--red);    background: rgba(255,95,95,0.1);   border-color: rgba(255,95,95,0.2); }
+.test-badge.bg-sdk       { color: var(--accent); background: rgba(31,156,255,0.1);  border-color: rgba(31,156,255,0.2); }
+.test-badge.bg-camera    { color: var(--cyan);   background: rgba(13,216,255,0.1);  border-color: rgba(13,216,255,0.2); }
+.test-badge.bg-session   { color: var(--green);  background: rgba(14,242,114,0.1);  border-color: rgba(14,242,114,0.2); }
+.test-badge.bg-disc      { color: var(--yellow); background: rgba(255,200,64,0.1);  border-color: rgba(255,200,64,0.2); }
+.test-badge.bg-60hz      { color: #bd34fe;       background: rgba(189,52,254,0.1);  border-color: rgba(189,52,254,0.2); }
+.test-badge.bg-depends   { color: #ff9d3d;       background: rgba(255,157,61,0.08); border-color: rgba(255,157,61,0.25); }
+.test-badge.bg-flag      { color: var(--yellow); background: rgba(255,200,64,0.06); border-color: rgba(255,200,64,0.25); }
+.test-card-right { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
+.test-card-pill { flex-shrink: 0; }
+.test-card-chevron { font-size: 0.68rem; color: var(--muted); transition: transform 0.25s ease; }
+.test-card.expanded .test-card-chevron { transform: rotate(180deg); }
+.test-card-detail { max-height: 0; overflow: hidden; padding: 0 13px; border-top: 1px solid transparent; background: rgba(0,0,0,0.22); font-size: 0.78rem; line-height: 1.55; opacity: 0; transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.2s ease, border-top-color 0.2s; }
+.test-card-detail.open { max-height: 400px; padding: 12px 13px 13px; border-top-color: var(--border); opacity: 1; }
+.test-detail-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px; }
+.test-detail-row:last-child { margin-bottom: 0; }
+.test-detail-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); min-width: 70px; flex-shrink: 0; padding-top: 2px; font-weight: 500; }
+.test-detail-val { font-size: 0.78rem; color: var(--text); }
+.test-detail-val .mono { font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
+.test-detail-substeps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.test-detail-substep { display: inline-flex; align-items: center; gap: 3px; font-size: 0.66rem; color: var(--muted); padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); }
+.test-detail-substep .substep-num { font-weight: 700; color: rgba(255,255,255,0.25); font-size: 0.58rem; }
+
+/* ── Zone 3: Run ──────────────────────────────────────────────── */
+.run-zone { padding: 18px 22px; }
+.run-idle { display: flex; flex-direction: column; gap: 10px; }
+.run-idle-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.run-idle-hint { font-size: 0.76rem; color: var(--muted); }
+.run-active { display: none; flex-direction: column; gap: 8px; }
+.run-active-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.run-phase-label { font-size: 0.8rem; font-weight: 700; }
+.run-step-label { font-size: 0.76rem; color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-elapsed-label { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
+.run-complete { display: none; }
+.run-complete-banner { padding: 16px 20px; border-radius: 10px; border-left: 3px solid var(--muted); background: rgba(255,255,255,0.02); display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.run-complete-banner.all-pass { border-left-color: var(--green); background: rgba(14,242,114,0.03); }
+.run-complete-banner.partial  { border-left-color: var(--yellow); background: rgba(255,200,64,0.03); }
+.run-complete-banner.has-fail { border-left-color: var(--red); background: rgba(255,95,95,0.03); }
+.run-complete-score { font-size: 1.15rem; font-weight: 700; }
+.run-complete-details { font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
+.run-complete-actions { margin-left: auto; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+
+/* ── Zone 4: Results ──────────────────────────────────────────── */
+.results-zone { padding: 18px 20px; }
+
+/* ── Status pills ─────────────────────────────────────────────── */
+.pill { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.pill.pending  { color: var(--muted);  background: rgba(255,255,255,0.06); }
+.pill.emitted  { color: var(--cyan);   background: rgba(13,216,255,0.12); }
+.pill.found    { color: var(--accent); background: rgba(31,156,255,0.12); }
+.pill.pass     { color: var(--green);  background: rgba(14,242,114,0.12); }
+.pill.fail     { color: var(--red);    background: rgba(255,95,95,0.12); }
+.pill.skip     { color: var(--yellow); background: rgba(255,200,64,0.12); }
+.pill.running  { color: var(--accent); background: rgba(31,156,255,0.12); animation: pulse 1.4s ease-in-out infinite; }
+.pill.tentative-pass { color: rgba(14,242,114,0.55); background: rgba(14,242,114,0.06); border: 1px dashed rgba(14,242,114,0.3); }
+.pill.tentative-fail { color: rgba(255,95,95,0.55);  background: rgba(255,95,95,0.06);  border: 1px dashed rgba(255,95,95,0.3); }
+.result-card.status-tentative-pass { border-color: rgba(14,242,114,0.1); }
+.result-card.status-tentative-fail { border-color: rgba(255,95,95,0.15); }
+
+/* ── Sub-steps ───────────────────────────────────────────────── */
+.substeps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; font-size: 0.68rem; }
+.substep { display: flex; align-items: center; gap: 3px; color: var(--muted); transition: color 0.2s; }
+.substep.done { color: var(--green); }
+.substep.active { color: var(--accent); }
+.substep.fail { color: var(--red); }
+.substep-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.substep.active .substep-dot { animation: pulse 1.4s ease-in-out infinite; }
+
+/* ── Summary bar ──────────────────────────────────────────────── */
+.summary-bar { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.82rem; font-weight: 600; margin-bottom: 12px; }
+.summary-bar .s-pass { color: var(--green); }
+.summary-bar .s-fail { color: var(--red); }
+.summary-bar .s-skip { color: var(--yellow); }
+.summary-bar .s-found { color: var(--accent); }
+.summary-bar .s-emitted { color: var(--cyan); }
+.summary-bar .s-pending { color: var(--muted); }
+
+/* ── Result cards ─────────────────────────────────────────────── */
+.result-cards { display: flex; flex-direction: column; gap: 8px; }
+.result-card { border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,0.12); overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
+.result-card:hover { border-color: var(--border-hover); }
+.result-card.status-fail    { border-color: rgba(255,95,95,0.25);  background: rgba(255,95,95,0.02); }
+.result-card.status-pass    { border-color: rgba(14,242,114,0.12); background: rgba(14,242,114,0.015); }
+.result-card.status-running { border-color: rgba(31,156,255,0.25); background: rgba(31,156,255,0.02); }
+.result-main { display: flex; align-items: flex-start; gap: 14px; padding: 12px 16px; cursor: pointer; transition: background 0.15s; }
+.result-main:hover { background: rgba(255,255,255,0.02); }
+.result-status { flex-shrink: 0; min-width: 72px; }
+.result-body { flex: 1; min-width: 0; }
+.result-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.result-id { font-family: "Cascadia Code", "Fira Code", "Courier New", monospace; font-weight: 700; color: var(--accent); font-size: 0.86rem; }
+.result-name { font-weight: 600; font-size: 0.86rem; }
+.result-desc { font-size: 0.76rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.result-context { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.ctx-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 0.65rem; color: var(--muted); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
+.ctx-chip.ctx-cam { border-color: rgba(13,216,255,0.2); color: rgba(13,216,255,0.7); }
+.ctx-chip.ctx-driver { border-color: rgba(255,200,64,0.2); color: rgba(255,200,64,0.7); }
+.result-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 0.76rem; color: var(--muted); }
+.result-meta strong { color: var(--text); font-weight: 600; }
+.result-error { color: var(--red); font-size: 0.8rem; margin-top: 4px; font-weight: 500; }
+.result-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; align-self: center; }
+.result-detail { max-height: 0; overflow: hidden; padding: 0 16px; border-top: 1px solid transparent; background: rgba(0,0,0,0.2); font-size: 0.78rem; line-height: 1.5; opacity: 0; transition: max-height 0.4s ease, padding 0.3s ease, opacity 0.2s ease, border-top-color 0.2s; }
+.result-detail.open { max-height: 900px; padding: 14px 16px 16px; border-top-color: var(--border); opacity: 1; }
+.result-detail .mono { word-break: break-all; margin: 6px 0; line-height: 1.5; }
+
+/* ── Ground truth incidents (embedded in T0 result detail) ─────── */
+.gt-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gt-section-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+.gt-incidents-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.incident-card { display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.15); font-size: 0.76rem; cursor: pointer; transition: all 0.15s ease; }
+.incident-card:hover { border-color: var(--accent); background: rgba(31,156,255,0.04); }
+.incident-card:active { transform: scale(0.97); }
+.incident-card .ic-idx { font-weight: 700; color: var(--accent); }
+.incident-card .ic-reason { font-size: 0.66rem; color: var(--muted); }
+
+/* ── Microinteractions ───────────────────────────────────────── */
+@keyframes flash-hl { 0% { background-color: rgba(31,156,255,0.1); } 100% { background-color: transparent; } }
+.flash { animation: flash-hl 0.4s ease-out; }
+@keyframes copied-pop { 0%,70% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-6px); } }
+.copy-toast { display: inline-block; font-size: 0.65rem; color: var(--green); font-weight: 600; margin-left: 8px; pointer-events: none; animation: copied-pop 1.2s ease-out forwards; }
+@keyframes ws-reconnect { 0% { box-shadow: 0 0 0 0 rgba(14,242,114,0.4); } 70% { box-shadow: 0 0 0 8px rgba(14,242,114,0); } 100% { box-shadow: 0 0 0 0 rgba(14,242,114,0); } }
+.ws-pill.reconnected { animation: ws-reconnect 0.8s ease-out; }
+.result-card.just-expanded { border-color: var(--border-hover); }
+.test-card.toggled { animation: flash-hl 0.35s ease-out; }
+</style>
+<script src="https://browser.sentry-cdn.com/9.27.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+<script>
+Sentry.init({
+  dsn: 'https://46ad94b35a51979ba4223eeffe38f5c8@o4511097126780928.ingest.us.sentry.io/4511103122210816',
+  environment: 'local',
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [Sentry.replayIntegration()],
+});
+Sentry.setTag('dashboard', 'data-capture-suite');
+</script>
+</head>
+<body>
+<div class="wrap">
+  <nav class="topnav">
+    <a href="index.html" id="nav-back" onclick="logUI('nav-back','click','Navigate to main dashboard')">&larr; Sim Steward dashboard</a>
+    <span style="color:var(--muted)">SDK Data Capture Suite</span>
+    <span class="ws-pill bad" id="ws-pill">WS &hellip;</span>
+  </nav>
+
+  <div class="banner err" id="guard-banner" hidden></div>
+
+  <!-- Zone 1: Environment bar -->
+  <div class="env-bar">
+    <span class="env-label">Environment</span>
+    <span class="env-divider"></span>
+    <div class="signals">
+      <span class="sig"><span class="sig-dot" id="sig-ws"></span><span class="sig-label">WS</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-plugin"></span><span class="sig-label">Plugin</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-simhub"></span><span class="sig-label">SimHub</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-grafana"></span><span class="sig-label">Grafana</span></span>
+      <span class="sig"><span class="sig-dot" id="sig-replay"></span><span class="sig-label">Replay</span></span>
+    </div>
+    <div class="env-right">
+      <span class="mono" id="lbl-version" style="color:var(--muted);font-size:0.65rem"></span>
+    </div>
+  </div>
+
+  <!-- Zone 2: Setup (collapsible 2-col) -->
+  <div class="zone" id="setup-zone">
+    <div class="setup-summary" id="setup-summary" onclick="toggleSetup()">
+      <span id="setup-summary-text"></span>
+      <span class="setup-expand-hint">&#9662; expand</span>
+    </div>
+    <div class="setup-content" id="setup-content">
+      <div class="setup-left">
+        <div class="setup-col-hdr">
+          Pre-test Conditions
+          <span class="scope-badge" id="badge-scope-full">Full replay</span>
+          <span class="scope-badge" id="badge-scope-partial">Partial replay</span>
+        </div>
+        <div style="margin-bottom:6px"><div class="progress-bar-wrap"><div class="progress-bar" id="preflight-progress" style="width:0%;transition:width 0.3s,background 0.3s"></div></div></div>
+        <div class="pc-tests" id="pc-tests"></div>
+        <div class="meta" style="margin-top:6px">
+          Preflight ID: <span class="mono" id="lbl-preflight-id">&mdash;</span>
+          &nbsp;&middot;&nbsp; Level: <strong id="lbl-preflight-level">0</strong>/4
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn primary sm" id="btn-preflight" onclick="runPreflight()">Check conditions</button>
+          <button class="btn sm" id="btn-preflight-reset" onclick="resetPreflight()">Reset</button>
+        </div>
+      </div>
+      <div class="setup-right">
+        <div class="setup-col-hdr">Test Selection</div>
+        <div class="filter-bar" id="filter-bar"></div>
+        <div class="test-groups" id="test-select"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone 3: Run -->
+  <div class="zone run-zone" id="run-zone">
+    <!-- idle -->
+    <div class="run-idle" id="run-idle">
+      <div class="run-idle-actions">
+        <button class="btn warn large" id="btn-start" onclick="sendStart()" disabled>&#9654; Run Selected Tests</button>
+        <button class="btn danger" id="btn-cancel" onclick="sendAction('cancel')" disabled>&#10005; Cancel</button>
+        <button class="btn sm" id="btn-verify" onclick="sendAction('verify')" disabled title="Re-query Loki for latest results">&#8635; Re-verify</button>
+      </div>
+      <div class="run-idle-hint" id="run-idle-hint">Run pre-test conditions, then select tests and run the suite.</div>
+    </div>
+    <!-- active / awaiting loki -->
+    <div class="run-active" id="run-active">
+      <div class="run-active-row">
+        <span class="running-label run-phase-label" id="lbl-phase">running</span>
+        <span class="run-step-label" id="lbl-step">&mdash;</span>
+        <span class="run-elapsed-label">Elapsed: <strong id="lbl-elapsed">&mdash;</strong></span>
+        <span class="mono" style="color:var(--muted);font-size:0.68rem" id="lbl-runid">&mdash;</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn danger sm" id="btn-cancel-active" onclick="sendAction('cancel')">&#10005; Cancel</button>
+          <button class="btn sm" id="btn-verify-active" onclick="sendAction('verify')" disabled>&#8635; Re-verify</button>
+        </div>
+      </div>
+      <div style="margin-top:6px"><div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div></div>
+    </div>
+    <!-- complete -->
+    <div class="run-complete" id="run-complete">
+      <div class="run-complete-banner" id="run-complete-banner">
+        <div>
+          <div class="run-complete-score" id="run-complete-score"></div>
+          <div class="run-complete-details" id="run-complete-details"></div>
+        </div>
+        <div class="run-complete-actions">
+          <button class="btn sm" id="btn-verify-complete" onclick="sendAction('verify')" title="Re-query Loki">&#8635; Re-verify</button>
+          <a class="btn primary sm" id="btn-grafana" href="#" target="_blank" rel="noopener" style="display:none" onclick="logUI('btn-grafana','click','Open suite in Grafana')">&#11041; Open in Grafana</a>
+          <button class="btn sm" onclick="showSetupExpanded()">&#9998; Edit &amp; rerun</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone 4: Results -->
+  <div class="zone results-zone" id="results-zone" style="display:none">
+    <div class="summary-bar" id="summary-bar" hidden></div>
+    <div class="result-cards" id="results-body"></div>
+  </div>
+</div>
+
+<script>
+const WS_PORT = 19847;
+const LOKI_WAIT_MS = 15000;
+const GRAFANA_BASE = 'http://localhost:3000';
+let ws = null;
+let state = null;
+let _pluginSeen = false;
+let _wsOk = false;
+let _lokiPhaseStart = null;
+let _expandedRows = new Set();
+let _lastStepName = null;
+let _lastPhase = null;
+let _filterDebounce = null;
+let _preflightConfirm = false;
+let _setupCollapsed = false;
+
+// ── Microinteraction helpers ─────────────────────────────────────────
+function logUI(elementId, eventType, message) {
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: elementId, event_type: eventType, message: message });
+  if (typeof Sentry !== 'undefined') {
+    Sentry.addBreadcrumb({ category: 'ui.' + eventType, message: message, data: { element_id: elementId }, level: 'info' });
+  }
+}
+
+function flashEl(el, cls, ms) {
+  if (!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+  setTimeout(function() { el.classList.remove(cls); }, ms || 500);
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ── Test metadata ────────────────────────────────────────────────────
+const TEST_META = {
+  T0:     { name: 'Ground Truth Capture',    desc: 'Seek to 3 incidents at 1x speed, capture ground-truth frame/driver/lap data', event: 'sdk_capture_ground_truth_incident', pass: '\u2265 3 events with frame/driver/lap', depends: null },
+  T1:     { name: 'Speed Sweep Detection',   desc: 'Replay at 1x/4x/8x/16x \u2014 detect incidents via session-flag rising edges', event: 'sdk_capture_speed_sample', pass: '\u2265 4 speed samples (one per speed)', depends: null },
+  T2:     { name: 'Variable Inventory',      desc: 'Snapshot all available iRacing SDK telemetry variables and their types', event: 'sdk_capture_variable_inventory', pass: 'variable_count > 0', depends: null },
+  T3:     { name: 'Player Data Snapshot',    desc: 'Capture the player\u2019s own car data (position, lap, fuel, times)', event: 'sdk_capture_player_snapshot', pass: 'driver_name non-empty', depends: null },
+  T4:     { name: 'Driver Roster',           desc: 'Read the full driver roster from session YAML (name, car #, iRating)', event: 'sdk_capture_driver_roster', pass: 'driver_count > 0', depends: null },
+  T5:     { name: 'Camera Switch',           desc: 'Switch camera to a different driver and verify CamCarIdx updates', event: 'sdk_capture_camera_switch_driver', pass: 'cam_group_num present', depends: null },
+  T5b:    { name: 'Camera View Cycle',       desc: 'Cycle through all camera groups and log each view', event: 'sdk_capture_camera_view_sample', pass: 'camera_group_name present', depends: null },
+  T6:     { name: 'Session Results',         desc: 'Read session results (positions, laps, incidents) from completed replay', event: 'sdk_capture_session_results', pass: '\u2265 1 event', depends: null },
+  T7:     { name: 'Incident Re-Seek',        desc: 'Re-seek to T0 ground-truth frames and verify frame numbers match', event: 'sdk_capture_incident_reseek', pass: '\u2265 3 events, \u2265 1 with frame_match=true', depends: 'T0' },
+  T8:      { name: 'FF Sweep',               desc: 'Trigger fast-forward incident sweep and verify index events are built', event: 'sdk_capture_ff_sweep_result', pass: 'gt_cars_in_index \u2265 1', depends: null },
+  T_INDEX: { name: 'Player Incident Index',  desc: 'NextIncident scan of all player-car incidents in the replay; builds a complete index', event: 'sdk_player_incident_index', pass: 'player_incidents_found \u2265 1', depends: null },
+  T_DISC:  { name: 'Data Point Discovery',   desc: 'Sweep all Tier 1+2 SDK variables at 4 replay positions for availability map', event: 'sdk_capture_data_discovery', pass: '\u2265 4 events (one per position)', depends: null },
+  T_60Hz: { name: '60 Hz Telemetry Dump',    desc: 'Record 17 telemetry channels at 60 Hz to JSONL (feature-flagged)', event: 'sdk_capture_60hz_summary', pass: 'ticks_recorded > 0', depends: 'SIMSTEWARD_60HZ_TEST_CAPTURE=1' },
+};
+
+const TEST_SUBSTEPS = {
+  T0:     [{ step: 'T0_Rewind', label: 'Rewind' }, { step: 'T0_FrameZero', label: 'Frame zero' }, { step: 'T0_ScanCooldown', label: 'Scan incidents' }, { step: 'T0_SeekCapture', label: 'Seek' }, { step: 'T0_CaptureSettle', label: 'Capture' }],
+  T1:     [{ step: 'T1_Rewind', label: 'Rewind' }, { step: 'T1_FrameZero', label: 'Frame zero' }, { step: 'T1_Sweep', label: 'Speed sweep' }],
+  T2:     [{ step: 'T2', label: 'Capture variables' }],
+  T3:     [{ step: 'T3', label: 'Capture player' }],
+  T4:     [{ step: 'T4', label: 'Read roster' }],
+  T5:     [{ step: 'T5_Switch', label: 'Switch camera' }, { step: 'T5_Settle', label: 'Verify' }],
+  T5b:    [{ step: 'T5b_Seek', label: 'Seek' }, { step: 'T5b_Cycle', label: 'Cycle cameras' }, { step: 'T5b_Settle', label: 'Confirm' }],
+  T6:     [{ step: 'T6', label: 'Read results' }],
+  T7:     [{ step: 'T7_Rewind', label: 'Rewind' }, { step: 'T7_FrameZero', label: 'Frame zero' }, { step: 'T7_Cooldown', label: 'Re-seek' }],
+  T8:     [{ step: 'T8_Trigger', label: 'Trigger sweep' }, { step: 'T8_Poll', label: 'Poll' }],
+  T_INDEX: [{ step: 'TINDEX_Rewind', label: 'Rewind' }, { step: 'TINDEX_FrameZero', label: 'Frame zero' }, { step: 'TINDEX_ScanCooldown', label: 'Scan incidents' }, { step: 'TINDEX_Emit', label: 'Emit index' }],
+  T_DISC: [{ step: 'TDISC_Seek', label: 'Seek' }, { step: 'TDISC_Settle', label: 'Settle' }, { step: 'TDISC_Capture', label: 'Capture' }],
+  T_60Hz: [{ step: '_60hz_record', label: 'Recording' }],
+};
+
+function getActiveTestFromStep(stepName) {
+  if (!stepName) return null;
+  if (stepName.startsWith('TDISC')) return 'T_DISC';
+  if (stepName.startsWith('TINDEX')) return 'T_INDEX';
+  if (stepName.startsWith('T5b')) return 'T5b';
+  var m = stepName.match(/^(T\d+)/);
+  return m ? m[1] : null;
+}
+
+function getTentativeStatus(r) {
+  if (!r || r.status !== 'emitted') return null;
+  var kv = (r.kpiValue || '').trim();
+  var num = parseFloat(kv);
+  switch (r.testId) {
+    case 'T0':   return (!isNaN(num) && num >= 3) ? 'tentative-pass' : 'tentative-fail';
+    case 'T1':   return (kv && !kv.startsWith('0')) ? 'tentative-pass' : 'tentative-fail';
+    case 'T2':   return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T3':   return kv ? 'tentative-pass' : 'tentative-fail';
+    case 'T4':   return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T5':   return (kv === 'true') ? 'tentative-pass' : 'tentative-fail';
+    case 'T5b':  return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T6':   return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    case 'T7':   return (kv && !kv.startsWith('0')) ? 'tentative-pass' : 'tentative-fail';
+    case 'T8':     return (!isNaN(num) && num >= 1) ? 'tentative-pass' : 'tentative-fail';
+    case 'T_INDEX': return (!isNaN(num) && num >= 1) ? 'tentative-pass' : 'tentative-fail';
+    case 'T_DISC': return (!isNaN(num) && num >= 4) ? 'tentative-pass' : 'tentative-fail';
+    case 'T_60Hz': return (!isNaN(num) && num > 0) ? 'tentative-pass' : 'tentative-fail';
+    default:     return null;
+  }
+}
+
+function buildSubstepsHtml(testId, currentStepName, testStatus) {
+  var subs = TEST_SUBSTEPS[testId];
+  if (!subs || subs.length <= 1) return '';
+  var activeTest = getActiveTestFromStep(currentStepName);
+  var isThisTestActive = activeTest === testId;
+  var currentIdx = isThisTestActive ? subs.findIndex(s => s.step === currentStepName) : -1;
+  var html = '<div class="substeps">';
+  subs.forEach(function(s, i) {
+    var cls = 'substep';
+    var icon = '\u25CB';
+    if (testStatus === 'pass') { cls += ' done'; icon = '\u2713'; }
+    else if (testStatus === 'fail') { cls += ' fail'; icon = '\u2717'; }
+    else if (testStatus === 'skip') { icon = '\u2298'; }
+    else if (isThisTestActive) {
+      if (i < currentIdx) { cls += ' done'; icon = '\u2713'; }
+      else if (i === currentIdx) { cls += ' active'; icon = ''; }
+    }
+    html += '<span class="' + cls + '">';
+    if (cls.includes('active')) html += '<span class="substep-dot"></span>';
+    else html += icon + ' ';
+    html += esc(s.label) + '</span>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// ── Test groups & selection ──────────────────────────────────────────
+const TEST_GROUPS = [
+  { id: 'incident', label: 'Incident Capture',     tests: ['T0', 'T1', 'T_INDEX'] },
+  { id: 'sdk',      label: 'SDK Data Capture',      tests: ['T2', 'T3', 'T4'] },
+  { id: 'camera',   label: 'Camera Control',        tests: ['T5', 'T5b'] },
+  { id: 'session',  label: 'Session & Validation',  tests: ['T6', 'T7', 'T8'] },
+  { id: 'disc',     label: 'Data Discovery',        tests: ['T_DISC'] },
+  { id: '60hz',     label: 'High-Rate Capture',     tests: ['T_60Hz'] },
+];
+const ALL_TEST_IDS = TEST_GROUPS.flatMap(g => g.tests);
+let selectedTests = new Set(ALL_TEST_IDS);
+
+// ── Filter bar ───────────────────────────────────────────────────────
+function buildFilterBar() {
+  const bar = document.getElementById('filter-bar');
+  bar.innerHTML = '';
+  TEST_GROUPS.forEach(g => {
+    const chip = document.createElement('button');
+    chip.className = 'filter-chip active';
+    chip.textContent = g.label;
+    chip.id = 'fchip-' + g.id;
+    chip.onclick = () => {
+      const cardsEl = document.getElementById('cards-' + g.id);
+      if (cardsEl) {
+        cardsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const hdr = document.getElementById('grp-hdr-' + g.id);
+        if (hdr) flashEl(hdr, 'flash', 600);
+      }
+      logUI('fchip-' + g.id, 'click', 'Filter chip: ' + g.label);
+    };
+    bar.appendChild(chip);
+  });
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Filter tests\u2026';
+  input.className = 'filter-input';
+  input.id = 'filter-input';
+  input.addEventListener('input', () => {
+    filterTestCards(input.value);
+    clearBtn.style.display = input.value ? 'inline' : 'none';
+    clearTimeout(_filterDebounce);
+    _filterDebounce = setTimeout(() => {
+      if (input.value.trim()) logUI('filter-input', 'input', 'Filter: ' + input.value.trim());
+    }, 600);
+  });
+  bar.appendChild(input);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'filter-clear';
+  clearBtn.textContent = '\u00D7';
+  clearBtn.title = 'Clear filter';
+  clearBtn.style.display = 'none';
+  clearBtn.onclick = () => {
+    input.value = '';
+    filterTestCards('');
+    clearBtn.style.display = 'none';
+    logUI('filter-clear', 'click', 'Clear filter');
+  };
+  bar.appendChild(clearBtn);
+
+  const countSpan = document.createElement('span');
+  countSpan.className = 'filter-count';
+  countSpan.id = 'filter-match-count';
+  bar.appendChild(countSpan);
+}
+
+function filterTestCards(query) {
+  const q = query.toLowerCase().trim();
+  let visible = 0;
+  ALL_TEST_IDS.forEach(id => {
+    const card = document.getElementById('tcard-' + id);
+    if (!card) return;
+    if (!q) { card.classList.remove('filtered-out'); visible++; return; }
+    const meta = TEST_META[id] || {};
+    const text = (id + ' ' + (meta.name || '') + ' ' + (meta.desc || '') + ' ' + (meta.event || '') + ' ' + (meta.depends || '')).toLowerCase();
+    const match = text.includes(q);
+    card.classList.toggle('filtered-out', !match);
+    if (match) visible++;
+  });
+  const countEl = document.getElementById('filter-match-count');
+  if (countEl) countEl.textContent = q ? visible + '/' + ALL_TEST_IDS.length + ' shown' : '';
+}
+
+// ── Badge helpers ─────────────────────────────────────────────────────
+const GROUP_BADGE_CLASS = { incident: 'bg-incident', sdk: 'bg-sdk', camera: 'bg-camera', session: 'bg-session', disc: 'bg-disc', '60hz': 'bg-60hz' };
+const GROUP_BADGE_LABEL = { incident: 'Incident', sdk: 'SDK', camera: 'Camera', session: 'Session', disc: 'Discovery', '60hz': 'High-Rate' };
+function _testGroupId(testId) { for (const g of TEST_GROUPS) { if (g.tests.includes(testId)) return g.id; } return null; }
+
+function buildTestSelect() {
+  const el = document.getElementById('test-select');
+  el.innerHTML = '';
+  TEST_GROUPS.forEach(g => {
+    const section = document.createElement('div');
+    const hdr = document.createElement('div');
+    hdr.className = 'test-group-hdr';
+    hdr.id = 'grp-hdr-' + g.id;
+    const groupCb = document.createElement('input');
+    groupCb.type = 'checkbox'; groupCb.checked = true; groupCb.id = 'grp-' + g.id;
+    groupCb.addEventListener('click', (e) => e.stopPropagation());
+    groupCb.addEventListener('change', () => {
+      g.tests.forEach(t => {
+        selectedTests[groupCb.checked ? 'add' : 'delete'](t);
+        const cb = document.getElementById('cb-' + t);
+        if (cb) { cb.checked = groupCb.checked; cb.disabled = false; }
+      });
+      enforceT0T7();
+      flashEl(hdr, 'flash', 400);
+      logUI('grp-' + g.id, 'change', 'Group ' + g.label + ' ' + (groupCb.checked ? 'selected' : 'deselected'));
+    });
+    hdr.appendChild(groupCb);
+    const chevron = document.createElement('span');
+    chevron.className = 'test-group-chevron';
+    chevron.textContent = '\u25BE';
+    hdr.appendChild(chevron);
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'test-group-name';
+    nameSpan.textContent = g.label;
+    hdr.appendChild(nameSpan);
+    const countSpan = document.createElement('span');
+    countSpan.className = 'test-group-count';
+    countSpan.textContent = g.tests.length + (g.tests.length === 1 ? ' test' : ' tests');
+    hdr.appendChild(countSpan);
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'test-group-status';
+    statusSpan.id = 'grp-status-' + g.id;
+    hdr.appendChild(statusSpan);
+    section.appendChild(hdr);
+
+    const cards = document.createElement('div');
+    cards.className = 'test-cards';
+    cards.id = 'cards-' + g.id;
+
+    hdr.addEventListener('click', () => {
+      const wasCollapsed = cards.classList.contains('collapsed');
+      cards.classList.toggle('collapsed');
+      chevron.classList.toggle('collapsed');
+      logUI('grp-hdr-' + g.id, 'click', 'Group ' + g.label + ' ' + (wasCollapsed ? 'expanded' : 'collapsed'));
+    });
+
+    g.tests.forEach(t => {
+      const meta = TEST_META[t] || { name: t, desc: '', event: '', pass: '', depends: null };
+      const substeps = TEST_SUBSTEPS[t] || [];
+      const gid = _testGroupId(t);
+      const card = document.createElement('div');
+      card.className = 'test-card';
+      card.id = 'tcard-' + t;
+
+      const top = document.createElement('div');
+      top.className = 'test-card-top';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = true; cb.id = 'cb-' + t;
+      cb.addEventListener('click', (e) => e.stopPropagation());
+      cb.addEventListener('change', () => {
+        selectedTests[cb.checked ? 'add' : 'delete'](t);
+        updateGroupState(g);
+        enforceT0T7();
+        flashEl(card, 'toggled', 350);
+        logUI('cb-' + t, 'change', 'Test ' + t + ' ' + (cb.checked ? 'selected' : 'deselected'));
+      });
+      top.appendChild(cb);
+
+      const body = document.createElement('div');
+      body.className = 'test-card-body';
+      body.innerHTML = '<span class="test-id">' + esc(t) + '</span><span class="test-name">' + esc(meta.name) + '</span>';
+      const badges = document.createElement('span');
+      badges.className = 'test-card-badges';
+      if (gid) badges.innerHTML += '<span class="test-badge ' + GROUP_BADGE_CLASS[gid] + '">' + esc(GROUP_BADGE_LABEL[gid]) + '</span>';
+      if (meta.depends && meta.depends.startsWith('SIMSTEWARD')) {
+        badges.innerHTML += '<span class="test-badge bg-flag">\u{1F512} Env Flag</span>';
+      } else if (meta.depends) {
+        badges.innerHTML += '<span class="test-badge bg-depends">\u2192 ' + esc(meta.depends) + '</span>';
+      }
+      body.appendChild(badges);
+      top.appendChild(body);
+
+      const right = document.createElement('div');
+      right.className = 'test-card-right';
+      const pillWrap = document.createElement('div');
+      pillWrap.className = 'test-card-pill';
+      pillWrap.id = 'sel-pill-' + t;
+      right.appendChild(pillWrap);
+      const chev = document.createElement('span');
+      chev.className = 'test-card-chevron';
+      chev.textContent = '\u25BE';
+      right.appendChild(chev);
+      top.appendChild(right);
+
+      top.addEventListener('click', () => {
+        const wasExpanded = card.classList.contains('expanded');
+        card.classList.toggle('expanded');
+        detail.classList.toggle('open');
+        logUI('tcard-' + t, 'click', 'Test ' + t + ' ' + (wasExpanded ? 'collapsed' : 'expanded'));
+      });
+      card.appendChild(top);
+
+      const detail = document.createElement('div');
+      detail.className = 'test-card-detail';
+      let detailHTML = '';
+      detailHTML += '<div class="test-detail-row"><span class="test-detail-label">Description</span><span class="test-detail-val">' + esc(meta.desc) + '</span></div>';
+      detailHTML += '<div class="test-detail-row"><span class="test-detail-label">Signal</span><span class="test-detail-val"><code class="mono">' + esc(meta.event) + '</code></span></div>';
+      detailHTML += '<div class="test-detail-row"><span class="test-detail-label">Pass criteria</span><span class="test-detail-val">' + esc(meta.pass) + '</span></div>';
+      if (meta.depends) {
+        const depLabel = meta.depends.startsWith('SIMSTEWARD') ? '\u{1F512} ' + esc(meta.depends) : '\u2192 Requires test ' + esc(meta.depends);
+        detailHTML += '<div class="test-detail-row"><span class="test-detail-label">Depends on</span><span class="test-detail-val">' + depLabel + '</span></div>';
+      }
+      if (substeps.length > 1) {
+        detailHTML += '<div class="test-detail-row"><span class="test-detail-label">Sub-steps</span><span class="test-detail-val"><span class="test-detail-substeps">';
+        substeps.forEach((s, i) => {
+          detailHTML += '<span class="test-detail-substep"><span class="substep-num">' + (i + 1) + '</span>' + esc(s.label) + '</span>';
+        });
+        detailHTML += '</span></span></div>';
+      }
+      detail.innerHTML = detailHTML;
+      card.appendChild(detail);
+      cards.appendChild(card);
+    });
+    section.appendChild(cards);
+    el.appendChild(section);
+  });
+}
+
+function updateGroupState(g) {
+  const gcb = document.getElementById('grp-' + g.id);
+  if (!gcb) return;
+  const checked = g.tests.filter(t => selectedTests.has(t)).length;
+  gcb.checked = checked === g.tests.length;
+  gcb.indeterminate = checked > 0 && checked < g.tests.length;
+}
+
+function enforceT0T7() {
+  const t7cb = document.getElementById('cb-T7');
+  if (!t7cb) return;
+  if (!selectedTests.has('T0')) {
+    selectedTests.delete('T7');
+    t7cb.checked = false;
+    t7cb.disabled = true;
+  } else {
+    t7cb.disabled = false;
+  }
+  updateGroupState(TEST_GROUPS[3]);
+}
+
+function updateSelectionPills(results, currentStepName) {
+  if (!results || !results.length) return;
+  var activeTest = getActiveTestFromStep(currentStepName);
+  results.forEach(r => {
+    const el = document.getElementById('sel-pill-' + r.testId);
+    if (!el) return;
+    var isRunning = activeTest === r.testId && r.status === 'pending';
+    var tentative = getTentativeStatus(r);
+    var display = isRunning ? 'running' : (tentative || r.status);
+    if (display !== 'pending') el.innerHTML = '<span class="pill ' + display + '">' + display.replace('tentative-', '\u2248 ') + '</span>';
+    else el.innerHTML = '';
+  });
+  TEST_GROUPS.forEach(g => {
+    const statusEl = document.getElementById('grp-status-' + g.id);
+    if (!statusEl) return;
+    const groupResults = results.filter(r => g.tests.includes(r.testId));
+    if (!groupResults.length) { statusEl.textContent = ''; return; }
+    const pass = groupResults.filter(r => r.status === 'pass').length;
+    const fail = groupResults.filter(r => r.status === 'fail').length;
+    const parts = [];
+    if (pass) parts.push('<span style="color:var(--green)">' + pass + ' pass</span>');
+    if (fail) parts.push('<span style="color:var(--red)">' + fail + ' fail</span>');
+    statusEl.innerHTML = parts.join(' / ');
+  });
+}
+
+// ── Precondition mini-tests ──────────────────────────────────────────
+const PC_TESTS = [
+  { id: 'PC_WS',        name: 'WebSocket connected',     level: 1 },
+  { id: 'PC_PLUGIN',    name: 'Plugin responding',        level: 1 },
+  { id: 'PC_SIMHUB',    name: 'SimHub HTTP server',       level: 1 },
+  { id: 'PC_GRAFANA',   name: 'Grafana/Loki configured',  level: 1 },
+  { id: 'PC_IRACING',   name: 'iRacing connected',        level: 1 },
+  { id: 'PC_REPLAY',    name: 'Replay mode active',       level: 1 },
+  { id: 'PC_SESSIONS',  name: 'Session map',              level: 1 },
+  { id: 'PC_CHECKERED', name: 'Session completed',        level: 2 },
+  { id: 'PC_RESULTS',   name: 'Results populated',        level: 2 },
+  { id: 'PC_SCOPE',     name: 'Full replay (race)',       level: 2 },
+  { id: 'PC_LOKI_RT',        name: 'Loki roundtrip',           level: 3 },
+  { id: 'PC_PLAYER_INC',    name: 'Player has incidents',     level: 2 },
+  { id: 'PC_CTRL_PAUSE',    name: 'Pause control',            level: 4 },
+  { id: 'PC_CTRL_SEEK',     name: 'Seek-to-start control',    level: 4 },
+  { id: 'PC_CTRL_INCIDENT', name: 'Next-incident control',    level: 4 },
+  { id: 'PC_CTRL_FF',       name: 'Fast-forward control',     level: 4 },
+  { id: 'PC_CTRL_SEEK_FRAME', name: 'Seek-to-frame control',  level: 4 },
+];
+let _replayScope = 'full';
+
+function buildPreconditionRows() {
+  const el = document.getElementById('pc-tests');
+  el.innerHTML = '';
+  PC_TESTS.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'pc-row';
+    row.id = 'pc-row-' + t.id;
+    row.innerHTML =
+      '<div class="pc-icon pending" id="pc-icon-' + t.id + '">&mdash;</div>' +
+      '<span class="pc-name">' + esc(t.name) + '</span>' +
+      '<span class="pc-level">L' + t.level + '</span>' +
+      '<span class="pc-detail" id="pc-detail-' + t.id + '"></span>';
+    el.appendChild(row);
+  });
+}
+
+function updatePreconditionCard(pf) {
+  if (!pf) return;
+  const tests = pf.miniTests || [];
+  const testMap = {};
+  tests.forEach(t => { testMap[t.id] = t; });
+
+  PC_TESTS.forEach(meta => {
+    const t = testMap[meta.id];
+    const icon = document.getElementById('pc-icon-' + meta.id);
+    const detail = document.getElementById('pc-detail-' + meta.id);
+    const row = document.getElementById('pc-row-' + meta.id);
+    if (!icon) return;
+    const status = t ? t.status : 'pending';
+    icon.className = 'pc-icon ' + status;
+    row.className = 'pc-row' + (status !== 'pending' ? ' ' + status : '');
+    if (status === 'running') icon.innerHTML = '<span class="pc-spinner"></span>';
+    else if (status === 'pass') icon.textContent = '\u2713';
+    else if (status === 'fail') icon.textContent = '\u2717';
+    else icon.textContent = '\u2014';
+    if (detail) detail.textContent = t ? (t.detail || '') : '';
+  });
+
+  var pfBar = document.getElementById('preflight-progress');
+  if (pfBar) {
+    var total = tests.length || 1;
+    var done = tests.filter(function(t) { return t.status === 'pass' || t.status === 'skip'; }).length;
+    var failed = tests.some(function(t) { return t.status === 'fail'; });
+    var pct = Math.round((done / total) * 100);
+    if (failed) {
+      var failedCount = tests.filter(function(t) { return t.status === 'fail'; }).length;
+      pct = Math.round(((done + failedCount) / total) * 100);
+      pfBar.style.width = pct + '%';
+      pfBar.style.background = 'var(--red)';
+    } else if (pf.phase === 'complete' && !failed) {
+      pfBar.style.width = '100%';
+      pfBar.style.background = 'var(--green)';
+    } else {
+      pfBar.style.width = pct + '%';
+      pfBar.style.background = 'var(--accent)';
+    }
+  }
+
+  document.getElementById('lbl-preflight-id').textContent =
+    pf.correlationId ? pf.correlationId.slice(0, 8) + '\u2026' : '\u2014';
+  document.getElementById('lbl-preflight-level').textContent = pf.level || 0;
+  updateScopeBadge(pf.replayScope === 'partial' ? 'partial' : 'full');
+
+  const btn = document.getElementById('btn-preflight');
+  if (pf.allPassed && pf.level >= 4) {
+    btn.textContent = 'All passed \u2713';
+    btn.disabled = true;
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'var(--green)';
+  } else if (pf.phase === 'running') {
+    btn.textContent = 'Checking\u2026';
+    btn.disabled = true;
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  } else if (pf.level >= 1 && pf.level < 4) {
+    btn.textContent = 'Deepen check (L' + (pf.level + 1) + ')';
+    btn.disabled = false;
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  } else {
+    btn.textContent = 'Check conditions';
+    btn.disabled = false;
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+}
+
+function updateScopeBadge(scope) {
+  if (scope) _replayScope = scope;
+  document.getElementById('badge-scope-full').classList.toggle('active', scope === 'full');
+  document.getElementById('badge-scope-partial').classList.toggle('active', scope === 'partial');
+}
+
+function runPreflight() {
+  var diag = state && state.diagnostics || {};
+  if (!diag.irsdkConnected) {
+    var btn = document.getElementById('btn-preflight');
+    btn.textContent = '\u26A0 iRacing not connected';
+    btn.style.color = 'var(--red)';
+    btn.style.borderColor = 'var(--red)';
+    setTimeout(function() { btn.textContent = 'Check conditions'; btn.style.color = ''; btn.style.borderColor = ''; }, 3000);
+    return;
+  }
+  var btn = document.getElementById('btn-preflight');
+  btn.textContent = 'Checking\u2026';
+  btn.disabled = true;
+  var rows = document.querySelectorAll('.pc-row');
+  rows.forEach(function(row) {
+    row.classList.add('running');
+    var icon = row.querySelector('.pc-icon');
+    if (icon) { icon.className = 'pc-icon running'; icon.textContent = '\u25CB'; }
+  });
+  send({ action: 'data_capture_suite', arg: 'preflight' });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-preflight', event_type: 'click', message: 'Run preflight check' });
+}
+
+function resetPreflight() {
+  _preflightConfirm = false;
+  var btn = document.getElementById('btn-start');
+  btn.classList.remove('primary', 'override-active');
+  btn.classList.add('warn');
+  btn.textContent = '\u25B6 Run Selected Tests';
+  send({ action: 'data_capture_suite', arg: 'preflight_reset' });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-preflight-reset', event_type: 'click', message: 'Reset preflight' });
+  buildPreconditionRows();
+  var pfBar = document.getElementById('preflight-progress');
+  if (pfBar) { pfBar.style.width = '0%'; pfBar.style.background = 'var(--accent)'; }
+  var idEl = document.getElementById('lbl-preflight-id');
+  if (idEl) idEl.textContent = '\u2014';
+  var lvlEl = document.getElementById('lbl-preflight-level');
+  if (lvlEl) lvlEl.textContent = '0';
+  var btn2 = document.getElementById('btn-preflight');
+  btn2.textContent = 'Check conditions';
+  btn2.disabled = false;
+  btn2.style.color = '';
+  btn2.style.borderColor = '';
+  var resetBtn = document.getElementById('btn-preflight-reset');
+  if (resetBtn) { resetBtn.style.borderColor = 'var(--accent)'; setTimeout(function() { resetBtn.style.borderColor = ''; }, 400); }
+}
+
+// ── Setup zone collapse / expand ────────────────────────────────────
+function setSetupCollapsed(collapsed) {
+  _setupCollapsed = collapsed;
+  var summary = document.getElementById('setup-summary');
+  var content = document.getElementById('setup-content');
+  var hint = summary ? summary.querySelector('.setup-expand-hint') : null;
+  if (collapsed) {
+    if (summary) summary.style.display = 'flex';
+    if (content) content.style.display = 'none';
+    if (hint) hint.textContent = '\u25BE expand';
+  } else {
+    if (summary) summary.style.display = 'none';
+    if (content) content.style.display = '';
+  }
+}
+
+function toggleSetup() {
+  setSetupCollapsed(!_setupCollapsed);
+  var hint = document.querySelector('#setup-summary .setup-expand-hint');
+  if (hint) hint.textContent = _setupCollapsed ? '\u25BE expand' : '\u25B4 collapse';
+  logUI('setup-summary', 'click', _setupCollapsed ? 'Setup collapsed' : 'Setup expanded');
+}
+
+function showSetupExpanded() {
+  setSetupCollapsed(false);
+  logUI('btn-rerun', 'click', 'Show setup for rerun');
+}
+
+function updateSetupSummaryText(pf) {
+  var el = document.getElementById('setup-summary-text');
+  if (!el) return;
+  var pfOk = pf && pf.allPassed;
+  var pfIcon = pfOk ? '\u2713' : '\u26A0';
+  var pfColor = pfOk ? 'var(--green)' : 'var(--yellow)';
+  var count = selectedTests.size;
+  var scope = _replayScope === 'full' ? 'Full scope' : 'Partial scope';
+  el.innerHTML =
+    '<span style="color:' + pfColor + '">' + pfIcon + ' ' + (pfOk ? 'Conditions OK' : 'Conditions partial') + '</span>' +
+    ' &nbsp;&middot;&nbsp; ' + count + ' test' + (count !== 1 ? 's' : '') + ' selected' +
+    ' &nbsp;&middot;&nbsp; ' + scope;
+}
+
+// ── Run zone state ───────────────────────────────────────────────────
+function updateRunZone(phase, hardReady, preflightPassed, suite, results) {
+  const idle    = !phase || phase === 'idle';
+  const running = phase === 'running';
+  const waiting = phase === 'awaitingloki';
+  const done    = phase === 'complete' || phase === 'cancelled';
+
+  const elIdle     = document.getElementById('run-idle');
+  const elActive   = document.getElementById('run-active');
+  const elComplete = document.getElementById('run-complete');
+
+  if (elIdle)     elIdle.style.display     = (idle || done) ? 'flex'  : 'none';
+  if (elActive)   elActive.style.display   = (running || waiting) ? 'flex'  : 'none';
+  if (elComplete) elComplete.style.display = done ? 'block' : 'none';
+
+  // Setup zone collapses when a run is active or done
+  if (running || waiting || done) {
+    if (!_setupCollapsed) setSetupCollapsed(true);
+    updateSetupSummaryText(suite && state ? state.preflight : null);
+  }
+
+  // btn-start in idle zone
+  var btnStart = document.getElementById('btn-start');
+  if (btnStart) {
+    btnStart.disabled = !hardReady || !preflightPassed || running || waiting;
+    if (preflightPassed) {
+      btnStart.classList.remove('warn');
+      btnStart.classList.add('primary');
+      if (!running && !waiting) btnStart.textContent = '\u25B6 Run Selected Tests';
+    } else {
+      btnStart.classList.remove('primary');
+      btnStart.classList.add('warn');
+      btnStart.textContent = hardReady ? '\u25B6 Run Pre-test Conditions First' : '\u25B6 Run Selected Tests';
+    }
+  }
+
+  // btn-cancel in idle zone (always disabled when not running)
+  var btnCancel = document.getElementById('btn-cancel');
+  if (btnCancel) btnCancel.disabled = true;
+
+  // btn-verify in idle zone (enabled when done)
+  var btnVerify = document.getElementById('btn-verify');
+  if (btnVerify) btnVerify.disabled = idle || running;
+
+  // Active zone updates
+  if (running || waiting) {
+    var phaseEl = document.getElementById('lbl-phase');
+    if (phaseEl) {
+      phaseEl.textContent = waiting ? 'awaiting Loki\u2026' : phase;
+      phaseEl.className = 'running-label run-phase-label';
+    }
+    // Loki countdown in step label
+    if (waiting) {
+      if (!_lokiPhaseStart) _lokiPhaseStart = Date.now();
+      var remaining = Math.max(0, Math.ceil((LOKI_WAIT_MS - (Date.now() - _lokiPhaseStart)) / 1000));
+      var stepEl = document.getElementById('lbl-step');
+      if (stepEl) stepEl.textContent = 'Loki ingestion wait\u2026 ' + remaining + 's';
+    } else {
+      _lokiPhaseStart = null;
+      var stepEl2 = document.getElementById('lbl-step');
+      if (stepEl2) stepEl2.textContent = (suite && suite.currentStepName) || '\u2014';
+    }
+    var cancelActive = document.getElementById('btn-cancel-active');
+    if (cancelActive) cancelActive.disabled = false;
+    var verifyActive = document.getElementById('btn-verify-active');
+    if (verifyActive) verifyActive.disabled = running;
+  }
+
+  // Elapsed + run ID (visible in active zone)
+  if (suite) {
+    var elEl = document.getElementById('lbl-elapsed');
+    if (elEl) elEl.textContent = suite.elapsedMs > 0 ? (suite.elapsedMs / 1000).toFixed(1) + 's' : '\u2014';
+    var ridEl = document.getElementById('lbl-runid');
+    if (ridEl) ridEl.textContent = suite.testRunId ? suite.testRunId.slice(0, 8) + '\u2026' : '\u2014';
+    var pct = suite.totalSteps > 0 ? Math.min(100, Math.round((suite.currentStep / suite.totalSteps) * 100)) : 0;
+    var pb = document.getElementById('progress-bar');
+    if (pb) pb.style.width = (done ? 100 : pct) + '%';
+  }
+
+  // Complete banner
+  if (done && results && results.length) {
+    updateCompleteBanner(results, suite);
+  }
+
+  // Results zone: show once a run has started
+  var resultsZone = document.getElementById('results-zone');
+  if (resultsZone) {
+    var hasAnything = results && results.length > 0;
+    resultsZone.style.display = hasAnything ? 'block' : 'none';
+  }
+}
+
+function updateCompleteBanner(results, suite) {
+  var banner = document.getElementById('run-complete-banner');
+  var scoreEl = document.getElementById('run-complete-score');
+  var detailsEl = document.getElementById('run-complete-details');
+  var gBtn = document.getElementById('btn-grafana');
+  if (!banner || !scoreEl || !detailsEl) return;
+
+  var pass  = results.filter(r => r.status === 'pass').length;
+  var fail  = results.filter(r => r.status === 'fail').length;
+  var skip  = results.filter(r => r.status === 'skip').length;
+  var total = results.filter(r => r.status !== 'skip').length;
+
+  banner.className = 'run-complete-banner' +
+    (fail > 0 ? ' has-fail' : (pass === total && total > 0 ? ' all-pass' : ' partial'));
+
+  var scoreColor = fail > 0 ? 'var(--red)' : (pass === total && total > 0 ? 'var(--green)' : 'var(--yellow)');
+  scoreEl.innerHTML = '<span style="color:' + scoreColor + '">' + pass + '/' + total + ' passed</span>';
+
+  var parts = [];
+  if (skip > 0) parts.push(skip + ' skipped');
+  if (suite && suite.elapsedMs > 0) parts.push((suite.elapsedMs / 1000).toFixed(1) + 's');
+  if (suite && suite.testRunId) parts.push('<span class="mono" style="color:var(--muted)">' + suite.testRunId.slice(0, 8) + '\u2026</span>');
+  detailsEl.innerHTML = parts.join(' &nbsp;&middot;&nbsp; ');
+
+  if (gBtn) {
+    var suiteGrafanaUrl = suite && (suite.grafanaExploreUrl || buildGrafanaUrl(suite.testRunId));
+    if (suiteGrafanaUrl && suite && suite.testRunId) {
+      gBtn.href = suiteGrafanaUrl;
+      gBtn.style.display = '';
+    } else {
+      gBtn.style.display = 'none';
+    }
+  }
+}
+
+buildPreconditionRows();
+buildFilterBar();
+buildTestSelect();
+
+// ── WebSocket ────────────────────────────────────────────────────────
+function connect() {
+  var wasConnected = _wsOk;
+  ws = new WebSocket('ws://127.0.0.1:' + WS_PORT);
+  ws.addEventListener('open', () => {
+    _wsOk = true;
+    setPill(true);
+    if (wasConnected === false) {
+      flashEl(document.getElementById('ws-pill'), 'reconnected', 800);
+    }
+    logUI('ws-pill', 'state_change', 'WebSocket connected');
+    if (typeof Sentry !== 'undefined') {
+      Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket connected', level: 'info' });
+      Sentry.setTag('ws_connected', 'true');
+    }
+  });
+  ws.addEventListener('close', () => {
+    _wsOk = false;
+    _pluginSeen = false;
+    setPill(false);
+    if (typeof Sentry !== 'undefined') {
+      Sentry.addBreadcrumb({ category: 'ws', message: 'WebSocket disconnected', level: 'warning' });
+      Sentry.setTag('ws_connected', 'false');
+    }
+    setTimeout(connect, 2000);
+  });
+  ws.addEventListener('message', ev => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'state') { _pluginSeen = true; handleState(msg); }
+    } catch (e) { if (typeof Sentry !== 'undefined') Sentry.captureException(e); }
+  });
+}
+
+function setPill(ok) {
+  const p = document.getElementById('ws-pill');
+  p.textContent = ok ? 'WS connected' : 'WS disconnected';
+  p.className = 'ws-pill ' + (ok ? 'ok' : 'bad');
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify(obj));
+}
+
+function sendAction(verb) {
+  if (verb === 'cancel') _lokiPhaseStart = null;
+  send({ action: 'data_capture_suite', arg: verb });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-' + verb, event_type: 'click', message: 'Data capture suite: ' + verb });
+}
+
+function resetDashboardForNewRun() {
+  _lokiPhaseStart = null;
+  _lastStepName = null;
+  _lastPhase = null;
+  _expandedRows.clear();
+  var stepEl = document.getElementById('lbl-step');
+  if (stepEl) stepEl.textContent = '\u2014';
+  var elEl = document.getElementById('lbl-elapsed');
+  if (elEl) elEl.textContent = '0.0s';
+  var ridEl = document.getElementById('lbl-runid');
+  if (ridEl) ridEl.textContent = '\u2014';
+  var pb = document.getElementById('progress-bar');
+  if (pb) pb.style.width = '0%';
+  var sb = document.getElementById('summary-bar');
+  if (sb) sb.hidden = true;
+  renderIdleResults();
+}
+
+function sendStart() {
+  const pf = state && state.preflight;
+  const preflightPassed = pf && pf.phase === 'complete' && pf.allPassed;
+  if (!preflightPassed) return; // plugin enforces this; button should already be disabled
+  resetDashboardForNewRun();
+  const skip = ALL_TEST_IDS.filter(id => !selectedTests.has(id));
+  const arg = skip.length ? 'start:' + skip.join(',') : 'start';
+  send({ action: 'data_capture_suite', arg });
+  send({ action: 'log', event: 'dashboard_ui_event', element_id: 'btn-start', event_type: 'click', message: 'Data capture suite: ' + arg });
+}
+
+// ── Grafana deep link builder ────────────────────────────────────────
+function buildGrafanaUrl(runId, eventName) {
+  if (!runId) return '';
+  var logql = '{app="sim-steward"} |json |test_run_id="' + runId + '"';
+  if (eventName) logql += ' |event="' + eventName + '"';
+  var left = JSON.stringify({
+    datasource: 'loki_local',
+    queries: [{ refId: 'A', expr: logql, queryType: 'range' }],
+    range: { from: 'now-1h', to: 'now' }
+  });
+  return GRAFANA_BASE + '/explore?orgId=1&left=' + encodeURIComponent(left);
+}
+
+// ── State handling ───────────────────────────────────────────────────
+function handleState(msg) {
+  state = msg;
+  const suite  = msg.dataCaptureSuite;
+  const diag   = msg.diagnostics || {};
+  const replay = msg.pluginMode === 'Replay';
+
+  // Version
+  var verEl = document.getElementById('lbl-version');
+  if (verEl && msg.pluginVersion) verEl.textContent = 'v' + msg.pluginVersion;
+  if (msg.pluginVersion && typeof Sentry !== 'undefined') Sentry.setTag('plugin_version', msg.pluginVersion);
+
+  // Signals (Zone 1)
+  setSig('sig-ws', _wsOk);
+  setSig('sig-plugin', _pluginSeen);
+  setSig('sig-simhub', diag.simHubHttpListening);
+  setSig('sig-grafana', diag.grafanaConfigured);
+  setSig('sig-replay', replay);
+
+  // Scope badge
+  updateScopeBadge(replay ? (diag.replaySessionCompleted ? 'full' : 'partial') : null);
+
+  // Preflight / Precondition card (Zone 2)
+  const pf = msg.preflight;
+  updatePreconditionCard(pf);
+  if (pf && pf.phase === 'complete') {
+    setSig('sig-grafana', pf.grafanaOk);
+    setSig('sig-simhub', pf.simHubOk);
+  }
+
+  const preflightPassed = pf && pf.allPassed;
+  const hardReady = _wsOk && _pluginSeen && !!diag.irsdkConnected && replay;
+
+  // Guard banner
+  const guard = document.getElementById('guard-banner');
+  if (!diag.irsdkConnected || !replay) {
+    guard.hidden = false;
+    guard.textContent = !diag.irsdkConnected
+      ? '\u26A0 iRacing not connected. Load a race replay to use this suite.'
+      : '\u26A0 Not in Replay mode. Open a race replay in iRacing.';
+  } else {
+    guard.hidden = true;
+  }
+
+  const phase = suite ? (suite.phase || 'idle') : 'idle';
+  const results = suite ? (suite.testResults || []) : [];
+  const stepName = suite ? (suite.currentStepName || null) : null;
+  const stepChanged = stepName !== _lastStepName || phase !== (_lastPhase || 'idle');
+  _lastStepName = stepName;
+  _lastPhase = phase;
+
+  updateRunZone(phase, hardReady, preflightPassed, suite, results);
+
+  if (!suite) return;
+
+  renderSummary(results);
+  if (stepChanged) renderResults(results, suite.testRunId, (phase === 'running') ? stepName : null, suite.selectedIncidents);
+  updateSelectionPills(results, stepName);
+}
+
+function setSig(id, ok) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'sig-dot' + (ok ? ' ok' : '');
+}
+
+// ── Summary bar ──────────────────────────────────────────────────────
+function renderSummary(results) {
+  const bar = document.getElementById('summary-bar');
+  if (!results.length) { bar.hidden = true; return; }
+  bar.hidden = false;
+  const counts = { pass: 0, fail: 0, skip: 0, found: 0, emitted: 0, pending: 0, tpass: 0, tfail: 0 };
+  results.forEach(r => {
+    var t = getTentativeStatus(r);
+    if (t === 'tentative-pass') counts.tpass++;
+    else if (t === 'tentative-fail') counts.tfail++;
+    else if (counts[r.status] !== undefined) counts[r.status]++;
+  });
+  bar.innerHTML =
+    '<span class="s-pass">\u2713 ' + counts.pass + ' pass</span>' +
+    '<span class="s-fail">\u2717 ' + counts.fail + ' fail</span>' +
+    (counts.tpass ? '<span style="color:rgba(14,242,114,0.55)">\u2248 ' + counts.tpass + ' tentative</span>' : '') +
+    (counts.tfail ? '<span style="color:rgba(255,95,95,0.55)">\u2248 ' + counts.tfail + ' tentative fail</span>' : '') +
+    '<span class="s-skip">\u2298 ' + counts.skip + ' skip</span>' +
+    '<span class="s-found">\u25CF ' + counts.found + ' found</span>' +
+    '<span class="s-emitted">\u25CF ' + counts.emitted + ' emitted</span>' +
+    '<span class="s-pending">\u25CB ' + counts.pending + ' pending</span>';
+}
+
+// ── Idle result cards ────────────────────────────────────────────────
+function renderIdleResults(currentStepName) {
+  const container = document.getElementById('results-body');
+  container.innerHTML = '';
+  const activeTest = getActiveTestFromStep(currentStepName);
+  ALL_TEST_IDS.forEach(id => {
+    const meta = TEST_META[id] || { name: id, desc: '', event: '', pass: '', depends: null };
+    const isRunning = activeTest === id;
+    const pillStatus = isRunning ? 'running' : 'pending';
+    const card = document.createElement('div');
+    card.className = 'result-card status-' + pillStatus;
+    const main = document.createElement('div');
+    main.className = 'result-main';
+    main.onclick = () => toggleDetail(id);
+    main.innerHTML =
+      '<div class="result-status"><span class="pill ' + pillStatus + '">' + pillStatus + '</span></div>' +
+      '<div class="result-body">' +
+        '<div class="result-header">' +
+          '<span class="result-id">' + esc(id) + '</span>' +
+          '<span class="result-name">' + esc(meta.name) + '</span>' +
+        '</div>' +
+        '<div class="result-desc">' + esc(meta.desc) + '</div>' +
+        '<div class="result-meta">' +
+          '<span>Event: <strong class="mono">' + esc(meta.event) + '</strong></span>' +
+          '<span>Pass: <strong>' + esc(meta.pass) + '</strong></span>' +
+          (meta.depends ? '<span>Depends: <strong>' + esc(meta.depends) + '</strong></span>' : '') +
+        '</div>' +
+        buildSubstepsHtml(id, currentStepName, 'pending') +
+      '</div>';
+    card.appendChild(main);
+    const detail = document.createElement('div');
+    detail.className = 'result-detail';
+    detail.id = 'detail-' + id;
+    if (_expandedRows.has(id)) detail.classList.add('open');
+    detail.innerHTML =
+      '<div><strong>Loki event:</strong> <span class="mono">' + esc(meta.event) + '</span></div>' +
+      '<div><strong>Pass criteria:</strong> ' + esc(meta.pass) + '</div>' +
+      (meta.depends ? '<div><strong>Dependency:</strong> ' + esc(meta.depends) + '</div>' : '<div><strong>Dependency:</strong> none</div>');
+    card.appendChild(detail);
+    container.appendChild(card);
+  });
+}
+
+// ── Result cards (active run) ────────────────────────────────────────
+function renderResults(results, runId, currentStepName, selectedIncidents) {
+  const container = document.getElementById('results-body');
+  if (!results.length) { renderIdleResults(currentStepName); return; }
+  container.innerHTML = '';
+  const activeTest = getActiveTestFromStep(currentStepName);
+
+  results.forEach(r => {
+    const meta = TEST_META[r.testId] || { name: r.name, desc: '', event: '', pass: '', depends: null };
+    const grafanaUrl = r.grafanaEventUrl || buildGrafanaUrl(runId, r.eventName);
+    const isRunning = activeTest === r.testId && r.status === 'pending';
+    const tentative = getTentativeStatus(r);
+    const displayStatus = isRunning ? 'running' : (tentative || r.status);
+
+    const card = document.createElement('div');
+    card.className = 'result-card status-' + displayStatus;
+
+    const main = document.createElement('div');
+    main.className = 'result-main';
+    main.onclick = () => toggleDetail(r.testId);
+    main.innerHTML =
+      '<div class="result-status"><span class="pill ' + displayStatus + '" title="' + statusLegend(displayStatus) + '">' + displayStatus.replace('tentative-', '\u2248 ') + '</span></div>' +
+      '<div class="result-body">' +
+        '<div class="result-header">' +
+          '<span class="result-id">' + esc(r.testId) + '</span>' +
+          '<span class="result-name">' + esc(meta.name) + '</span>' +
+        '</div>' +
+        '<div class="result-desc">' + esc(meta.desc) + '</div>' +
+        ((r.cameraContext || r.driverContext) ? '<div class="result-context">' +
+          (r.cameraContext ? '<span class="ctx-chip ctx-cam" title="Expected camera context">\uD83D\uDCF7 ' + esc(r.cameraContext) + '</span>' : '') +
+          (r.driverContext ? '<span class="ctx-chip ctx-driver" title="Expected driver context">\uD83C\uDFAF ' + esc(r.driverContext) + '</span>' : '') +
+        '</div>' : '') +
+        (r.error ? '<div class="result-error">\u2717 ' + esc(r.error) + '</div>' : '') +
+        '<div class="result-meta">' +
+          '<span>Event: <strong class="mono">' + esc(meta.event || r.eventName || '') + '</strong></span>' +
+          '<span>Pass: <strong>' + esc(meta.pass || '') + '</strong></span>' +
+          (r.lokiCount > 0 ? '<span>Loki: <strong>' + r.lokiCount + ' lines</strong></span>' : '') +
+          (r.kpiLabel ? '<span>' + esc(r.kpiLabel) + ': <strong>' + esc(r.kpiValue) + '</strong></span>' : '') +
+          (meta.depends ? '<span>Depends: <strong>' + esc(meta.depends) + '</strong></span>' : '') +
+        '</div>' +
+        buildSubstepsHtml(r.testId, currentStepName, displayStatus) +
+      '</div>' +
+      '<div class="result-actions">' +
+        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="logUI(\'explore-' + esc(r.testId) + '\',\'click\',\'Open Grafana for ' + esc(r.testId) + '\');event.stopPropagation()" title="Open in Grafana Explore">Explore</a>' : '') +
+      '</div>';
+    card.appendChild(main);
+
+    const detail = document.createElement('div');
+    detail.className = 'result-detail';
+    detail.id = 'detail-' + r.testId;
+    if (_expandedRows.has(r.testId)) detail.classList.add('open');
+    const logql = runId ? '{app="sim-steward"} |json |test_run_id="' + runId + '" |event="' + (r.eventName || '') + '"' : '';
+    var detailInner =
+      '<div><strong>Event name:</strong> <span class="mono">' + esc(r.eventName || meta.event || '') + '</span></div>' +
+      '<div><strong>Pass criteria:</strong> ' + esc(meta.pass || '') + '</div>' +
+      (meta.depends ? '<div><strong>Dependency:</strong> ' + esc(meta.depends) + '</div>' : '') +
+      (r.kpiLabel ? '<div><strong>KPI:</strong> ' + esc(r.kpiLabel) + ' = ' + esc(r.kpiValue || '\u2014') + '</div>' : '') +
+      '<div><strong>Loki lines:</strong> ' + r.lokiCount + '</div>' +
+      (r.error ? '<div style="color:var(--red)"><strong>Error:</strong> ' + esc(r.error) + '</div>' : '') +
+      '<div class="mono">' + esc(logql) + '</div>' +
+      '<div style="margin-top:6px;display:flex;gap:8px;align-items:center">' +
+        '<button class="btn sm" id="copy-btn-' + esc(r.testId) + '" onclick="copyLogQL(this,' + JSON.stringify(logql).replace(/</g, '\\u003c') + ',\'' + esc(r.testId) + '\');event.stopPropagation()">Copy LogQL</button>' +
+        (grafanaUrl ? '<a href="' + esc(grafanaUrl) + '" target="_blank" rel="noopener" class="btn sm" onclick="logUI(\'explore-' + esc(r.testId) + '\',\'click\',\'Open Grafana for ' + esc(r.testId) + '\');event.stopPropagation()">Open in Grafana</a>' : '') +
+      '</div>';
+
+    // Ground truth incidents embedded in T0 detail
+    if (r.testId === 'T0' && selectedIncidents && selectedIncidents.length) {
+      detailInner += buildGroundTruthHtml(selectedIncidents);
+    }
+
+    detail.innerHTML = detailInner;
+    card.appendChild(detail);
+    container.appendChild(card);
+  });
+}
+
+function buildGroundTruthHtml(incidents) {
+  if (!incidents || !incidents.length) return '';
+  var html = '<div class="gt-section"><div class="gt-section-label">Ground Truth Incidents (selected test cases)</div><div class="gt-incidents-row">';
+  incidents.forEach(inc => {
+    html += '<div class="incident-card" onclick="seekToIncident(' + inc.frame + ',' + inc.index + ');event.stopPropagation()">' +
+      '<span class="ic-idx">' + String.fromCodePoint(0x2460 + inc.index) + '</span>' +
+      '<span>Lap ' + inc.lap + ' \u2014 #' + esc(inc.carNumber) + ' ' + esc(inc.driverName) + '</span>' +
+      '<span class="mono">(frame ' + inc.frame + ')</span>' +
+      '<span class="ic-reason">' + esc(inc.reason) + '</span>' +
+      '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function seekToIncident(frame, index) {
+  send({ action: 'seek_to_incident', arg: String(frame) });
+  logUI('incident-' + index, 'click', 'Seek to incident ' + index + ' frame ' + frame);
+}
+
+function statusLegend(status) {
+  const map = {
+    'pending': 'Test has not started yet',
+    'running': 'Test is currently executing',
+    'emitted': 'Log emitted to Loki, awaiting ingestion',
+    'tentative-pass': 'Plugin data suggests pass, awaiting Loki confirmation',
+    'tentative-fail': 'Plugin data suggests failure, awaiting Loki confirmation',
+    'found': 'Log entry found in Loki, content not yet validated',
+    'pass': 'Found in Loki and content matches expected values',
+    'fail': 'Not found in Loki, or content does not match expected values',
+    'skip': 'Test was skipped (deselected or dependency not met)',
+  };
+  return map[status] || status;
+}
+
+function toggleDetail(testId) {
+  const el = document.getElementById('detail-' + testId);
+  if (!el) return;
+  if (_expandedRows.has(testId)) {
+    _expandedRows.delete(testId);
+    el.classList.remove('open');
+    logUI('detail-' + testId, 'click', 'Result ' + testId + ' collapsed');
+  } else {
+    _expandedRows.add(testId);
+    el.classList.add('open');
+    var card = el.closest('.result-card');
+    if (card) flashEl(card, 'just-expanded', 600);
+    logUI('detail-' + testId, 'click', 'Result ' + testId + ' expanded');
+  }
+}
+
+function copyLogQL(btn, logql, testId) {
+  navigator.clipboard.writeText(logql);
+  var existing = btn.parentNode.querySelector('.copy-toast');
+  if (existing) existing.remove();
+  var toast = document.createElement('span');
+  toast.className = 'copy-toast';
+  toast.textContent = 'Copied!';
+  btn.parentNode.insertBefore(toast, btn.nextSibling);
+  setTimeout(function() { toast.remove(); }, 1200);
+  logUI('copy-logql-' + testId, 'click', 'Copied LogQL for ' + testId);
+}
+
+renderIdleResults();
+connect();
+</script>
+</body>
+</html>

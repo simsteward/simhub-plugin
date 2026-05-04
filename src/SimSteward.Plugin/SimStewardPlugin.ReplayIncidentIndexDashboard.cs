@@ -28,7 +28,6 @@ namespace SimSteward.Plugin
             {
                 case ReplayIndexBuildPhase.SeekingStart: return "seeking_start";
                 case ReplayIndexBuildPhase.FastForwarding: return "fast_forward";
-                case ReplayIndexBuildPhase.CameraValidating: return "camera_validating";
                 default: return "idle";
             }
         }

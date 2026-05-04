@@ -1,0 +1,13 @@
+[     761ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/claude-token-cost?from=now-30d&to=now&orgId=1:0
+[    1585ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q103_1:0
+[    1641ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q102:0
+[    1713ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q104_1:0
+[    1809ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q105:0
+[    1820ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q106:0
+[    1831ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q107:0
+[   31071ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q113_1:0
+[   31105ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q112_1:0
+[   31114ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q111:0
+[   31177ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q115:0
+[   31177ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q114:0
+[   31192ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q116:0

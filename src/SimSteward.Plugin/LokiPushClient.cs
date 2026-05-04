@@ -11,8 +11,8 @@ namespace SimSteward.Plugin
 {
     /// <summary>
     /// Lightweight fire-and-forget Loki push client used by <see cref="PluginLogger"/>.
-    /// Replaces Alloy file-tailing for the simsteward stream.
     /// Only active when SIMSTEWARD_LOKI_URL is set; silently no-ops otherwise.
+    /// Supports Grafana Cloud Loki via Basic auth: set SIMSTEWARD_LOKI_USER + SIMSTEWARD_LOKI_TOKEN.
     /// </summary>
     public static class LokiPushClient
     {
@@ -24,24 +24,30 @@ namespace SimSteward.Plugin
         /// <summary>
         /// Pushes a batch of log entries to Loki, grouped by stream labels.
         /// Fire-and-forget — never throws. Returns immediately.
+        /// <paramref name="basicAuthUser"/> and <paramref name="basicAuthToken"/> are optional;
+        /// when both are non-empty, a Basic auth header is added (required for Grafana Cloud Loki).
         /// </summary>
-        public static void Push(string lokiUrl, string appLabel, string envLabel, IEnumerable<LogEntry> entries)
+        public static void Push(
+            string lokiUrl,
+            string appLabel,
+            string envLabel,
+            IEnumerable<LogEntry> entries,
+            string basicAuthUser = null,
+            string basicAuthToken = null)
         {
             if (string.IsNullOrEmpty(lokiUrl)) return;
             var list = entries?.ToList();
             if (list == null || list.Count == 0) return;
 
-            // Capture for the async task — do not capture locals that may change
-            Task.Run(() => PushInternalAsync(lokiUrl, appLabel, envLabel, list));
+            Task.Run(() => PushInternalAsync(lokiUrl, appLabel, envLabel, list, basicAuthUser, basicAuthToken));
         }
 
         private static async Task PushInternalAsync(
-            string lokiUrl, string appLabel, string envLabel, List<LogEntry> entries)
+            string lokiUrl, string appLabel, string envLabel, List<LogEntry> entries,
+            string basicAuthUser, string basicAuthToken)
         {
             try
             {
-                // Group entries by their label combination to minimise stream count per push.
-                // Labels match what Alloy previously extracted: level, component, event, domain.
                 var groups = entries
                     .GroupBy(e => (
                         level:     e.Level     ?? "INFO",
@@ -68,7 +74,6 @@ namespace SimSteward.Plugin
                     var values = new JArray();
                     foreach (var entry in g)
                     {
-                        // Loki timestamp in nanoseconds
                         long tsNs;
                         if (!string.IsNullOrEmpty(entry.Timestamp) &&
                             DateTimeOffset.TryParse(entry.Timestamp, out var dto))
@@ -89,9 +94,17 @@ namespace SimSteward.Plugin
                 var body = new JObject { ["streams"] = streams }.ToString(Formatting.None);
                 var url = lokiUrl.TrimEnd('/') + "/loki/api/v1/push";
 
-                using (var content = new StringContent(body, Encoding.UTF8, "application/json"))
+                using (var req = new HttpRequestMessage(HttpMethod.Post, url))
                 {
-                    await _client.PostAsync(url, content).ConfigureAwait(false);
+                    req.Content = new StringContent(body, Encoding.UTF8, "application/json");
+
+                    if (!string.IsNullOrEmpty(basicAuthUser) && !string.IsNullOrEmpty(basicAuthToken))
+                    {
+                        var creds = Convert.ToBase64String(Encoding.UTF8.GetBytes(basicAuthUser + ":" + basicAuthToken));
+                        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", creds);
+                    }
+
+                    await _client.SendAsync(req).ConfigureAwait(false);
                 }
             }
             catch

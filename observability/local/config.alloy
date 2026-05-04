@@ -1,9 +1,0 @@
-// RETIRED — Alloy is no longer part of the observability stack.
-//
-// The SimHub plugin (PluginLogger.cs) now pushes plugin-structured.jsonl entries directly
-// to Loki via LokiPushClient at flush time (~500ms batches), replacing this file-tail pipeline.
-//
-// Claude Code token metrics are pushed directly from ~/.claude/hooks/loki-log.js at session-end.
-//
-// This file is kept for reference only. Remove the alloy service from docker-compose.yml
-// before starting the stack.

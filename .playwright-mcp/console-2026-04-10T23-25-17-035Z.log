@@ -1,0 +1,8 @@
+[     299ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/simsteward-log-sentinel/simsteward-e28094-log-sentinel-v3?orgId=1&from=now-6h&to=now&refresh=30s:0
+[ 2101060ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q238_1:0
+[ 2101259ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q239_1:0
+[ 2131035ms] [ERROR] runRequest.catchError {type: cancelled, cancelled: true, data: null, status: -1, statusText: Request was aborted} @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[ 2131840ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/datasources/uid/loki_local/resources/label/env/values?start=1775844018033000000&end=1775865618033000000&query=%7Bapp%3D%22sim-steward%22%7D:0
+[ 2131843ms] [ERROR] {status: 500, statusText: Internal Server Error, data: Object, config: Object, traceId: undefined} @ http://localhost:3000/public/build/9430.7b7e47433c913d48d652.js:0
+[ 2401098ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q258_1:0
+[ 2401110ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q259_1:0

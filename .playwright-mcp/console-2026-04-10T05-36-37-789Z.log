@@ -1,0 +1,223 @@
+[     288ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/claude-token-cost/claude-code-e28094-token-and-cost-intelligence?from=now-7d&to=now&orgId=1&viewPanel=502:0
+[29687413ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Connection closed before receiving a handshake response @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29687413ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_8:0
+[29687416ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:3000/api/annotations?from=1775224276464&to=1775829076464&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29687416ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29687417ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29689787ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_7:0
+[29690022ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_6:0
+[29691134ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29692119ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_5:0
+[29692356ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_4:0
+[29694238ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29694486ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_3:0
+[29694718ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_2:0
+[29696852ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1089_1:0
+[29697708ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29705571ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29711003ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224306470&to=1775829106470&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29711004ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29711004ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_8:0
+[29711286ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29713255ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_7:0
+[29713365ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_6:0
+[29715615ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_5:0
+[29715708ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_4:0
+[29717973ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_3:0
+[29718066ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_2:0
+[29720328ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1090_1:0
+[29720406ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/user/auth-tokens/rotate:0
+[29720406ms] [ERROR] TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at d.rotateToken (http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:335:13271)
+    at http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:335:13071
+    at Nt.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1154:483)
+    at Ze.invokeTask (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1105:7517)
+    at ve.runTask (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1105:2583)
+    at invokeTask (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1105:8664)
+    at xn.useG.invoke (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1105:8556)
+    at vt.args.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1154:175) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:334
+[29721767ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29740282ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29741028ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224336472&to=1775829136472&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29741028ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29741028ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_8:0
+[29741307ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29743244ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_7:0
+[29743371ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_6:0
+[29745614ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_5:0
+[29745722ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_4:0
+[29747943ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_3:0
+[29748053ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_2:0
+[29748582ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29750287ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1091_1:0
+[29752139ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29757466ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29771035ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224366477&to=1775829166477&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29771035ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29771035ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_8:0
+[29771316ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29773252ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_7:0
+[29773392ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_6:0
+[29774748ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29775618ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_5:0
+[29775757ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_4:0
+[29777984ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_3:0
+[29778111ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_2:0
+[29780348ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1092_1:0
+[29793818ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29801055ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224396489&to=1775829196489&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29801055ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29801070ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_8:0
+[29801289ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29803287ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_7:0
+[29803427ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_6:0
+[29805652ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_5:0
+[29805792ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_4:0
+[29808008ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_3:0
+[29808149ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_2:0
+[29810352ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1093_1:0
+[29815072ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29819801ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29831048ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224426504&to=1775829226504&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29831049ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29831064ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_8:0
+[29831316ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29833256ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_7:0
+[29833397ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_6:0
+[29835613ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_5:0
+[29835753ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_4:0
+[29837953ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_3:0
+[29838077ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_2:0
+[29839937ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29840296ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1094_1:0
+[29853809ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29861035ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224456514&to=1775829256514&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29861035ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29861036ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_8:0
+[29861301ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29863293ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_7:0
+[29863371ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_6:0
+[29865645ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_5:0
+[29865723ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_4:0
+[29867975ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_3:0
+[29868054ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_2:0
+[29869053ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29870320ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1095_1:0
+[29891091ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224486514&to=1775829286514&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29891091ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29891092ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_8:0
+[29891339ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29893291ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_7:0
+[29893369ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29893446ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_6:0
+[29895657ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_5:0
+[29895797ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_4:0
+[29898000ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_3:0
+[29898157ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_2:0
+[29900342ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1096_1:0
+[29918173ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29921081ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/annotations?from=1775224516530&to=1775829316530&limit=100&matchAny=false&dashboardUID=claude-token-cost:0
+[29921082ms] [ERROR] runRequest.catchError TypeError: Failed to fetch
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1118:3537
+    at Y.de.<computed> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1111:3682)
+    at h._subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:51946)
+    at h._trySubscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39139)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:39062
+    at u (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:1500)
+    at h.subscribe (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:38978)
+    at m (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74561)
+    at http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1023:74936
+    at E.<anonymous> (http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1025:3763) @ http://localhost:3000/public/build/3729.ffff83737929c19134ef.js:3091
+[29921082ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_8:0
+[29921332ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/img/icons/unicons/sync-slash.svg:0
+[29922300ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_7:0
+[29922303ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_6:0
+[29922306ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_5:0
+[29922309ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_4:0
+[29922313ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_3:0
+[29922317ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_2:0
+[29922322ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q1097_1:0
+[29926512ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: HTTP Authentication failed; no valid credentials available @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312
+[29937190ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: HTTP Authentication failed; no valid credentials available @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312

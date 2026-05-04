@@ -7,10 +7,22 @@
 // DATA ARCHITECTURE:
 //   app="claude-dev-logging"   — ALL hook events: tool calls, lifecycle, agents, user prompts,
 //                                intermediate token snapshots (component="tokens", stop hook)
-//   app="claude-token-metrics" — ONE entry per completed session: token totals, cost_usd, effort
+//   app="claude-token-metrics" — ONE entry per completed TURN (stop hook), with is_final=false.
+//                                cost_usd is the turn's incremental cost. sum_over_time gives session total.
 //                                Join key: session_id (present in both streams)
 //   On-disk: logs/claude-session-metrics.jsonl — local backup only (not ingested by Alloy).
 //            Includes session_duration_ms + compaction_count for local debugging.
+//
+// NEW SIGNALS (session_type, plan_mode_entries, tool_time_ms):
+//   session_type — extracted from session-start payload hp.type ("startup"|"resume"|"compact").
+//                  Emitted as a Loki stream label on the session-start event, and as a JSON field
+//                  on all subsequent lifecycle events for that session.
+//   plan_mode_entries — count of EnterPlanMode tool calls in the session. Included in session-end.
+//   tool_time_ms — per-turn total wall-clock time spent in tool calls (sum of post-tool-use
+//                  duration_ms values for all tools fired since the last stop hook). Added to the
+//                  claude-token-metrics push so dashboards can correlate tool overhead vs token cost.
+//                  Also emits a companion claude_turn_tool_timing event (component="tool-timing")
+//                  to claude-dev-logging with per-tool breakdown: {toolName: {total_ms, calls}}.
 
 const http = require('http');
 const https = require('https');
@@ -19,6 +31,7 @@ const path = require('path');
 const os = require('os');
 
 const hookType = process.argv[2] || 'unknown';
+const hookSource = (process.argv.find(a => a.startsWith('--source=')) || '--source=unknown').slice(9);
 
 // --- Timing state directory ---
 const TIMING_DIR = path.join(os.tmpdir(), 'claude-hook-timing');
@@ -68,7 +81,12 @@ function loadEnv() {
 }
 loadEnv();
 
-const lokiUrl = (process.env.SIMSTEWARD_LOKI_URL || 'http://localhost:3100').replace(/\/+$/, '');
+const rawLokiUrl = (process.env.SIMSTEWARD_LOKI_URL || '').replace(/\/+$/, '');
+if (!rawLokiUrl || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(rawLokiUrl)) {
+  // Cloud-only: no local fallback. Exit silently if SIMSTEWARD_LOKI_URL is unset or points at localhost.
+  process.exit(0);
+}
+const lokiUrl = rawLokiUrl;
 const envLabel = process.env.SIMSTEWARD_LOG_ENV || 'local';
 const machine = process.env.COMPUTERNAME || os.hostname() || 'unknown';
 
@@ -136,9 +154,13 @@ function cleanStaleFiles() {
       const fp = path.join(TIMING_DIR, f);
       try {
         const age = now - fs.statSync(fp).mtimeMs;
-        // Token tracking files live for the whole session (24h max)
+        // Session-scoped files live for the whole session (24h max)
         // Retry markers expire quickly; everything else at STALE_MS
-        const threshold = (f.startsWith('token-offset-') || f.startsWith('token-totals-'))
+        const threshold = (
+          f.startsWith('token-offset-') || f.startsWith('token-totals-') ||
+          f.startsWith('session-type-') || f.startsWith('plan-count-') ||
+          f.startsWith('turn-tool-timing-')
+        )
           ? 24 * 60 * 60 * 1000
           : f.startsWith('retry-') ? RETRY_WINDOW_MS : STALE_MS;
         if (age > threshold) fs.unlinkSync(fp);
@@ -197,6 +219,12 @@ function classifyError(toolResponse) {
   } catch { return 'unknown'; }
 }
 
+// --- Plan type configuration ---
+// Set CLAUDE_PLAN_TYPE env var to match your subscription: 'pro' ($20), 'max' ($100), 'ultra' ($200).
+// Defaults to 'max'. Used for ROI/savings context in Grafana dashboards.
+const PLAN_TYPE = process.env.CLAUDE_PLAN_TYPE || 'max'; // 'pro' | 'max' | 'ultra'
+const PLAN_MONTHLY_COST = { pro: 20, max: 100, ultra: 200 }[PLAN_TYPE] ?? 100;
+
 // --- Model pricing (per 1M tokens) ---
 const MODEL_PRICING = {
   'claude-opus-4':   { input: 15,   output: 75,   cacheWrite: 18.75, cacheRead: 1.50 },
@@ -236,7 +264,7 @@ function extractTokensIncremental(transcriptPath, sessionId) {
     const prev = readTimingFile(offsetKey, false) || { offset: 0 };
     const accum = readTimingFile(totalsKey, false) || {
       input: 0, output: 0, cacheCreate: 0, cacheRead: 0,
-      turns: 0, tools: 0, model: undefined,
+      turns: 0, tools: 0, model: undefined, thinking: false,
     };
 
     const stat = fs.statSync(transcriptPath);
@@ -279,6 +307,7 @@ function extractTokensIncremental(transcriptPath, sessionId) {
       } catch {}
     }
 
+    if (!accum.thinking && /"type"\s*:\s*"thinking"/.test(chunk)) accum.thinking = true;
     writeTimingFile(offsetKey, { offset: stat.size });
     writeTimingFile(totalsKey, accum);
 
@@ -307,12 +336,16 @@ function formatTokenResult(accum) {
     assistant_turns:             accum.turns,
     tool_use_count:              accum.tools,
     model:                       accum.model || undefined,
+    thinking:                    accum.thinking || false,
   };
 }
 
 function cleanupTokenFiles(sessionId) {
   try { fs.unlinkSync(path.join(TIMING_DIR, 'token-offset-' + sessionId + '.json')); } catch {}
   try { fs.unlinkSync(path.join(TIMING_DIR, 'token-totals-' + sessionId + '.json')); } catch {}
+  try { fs.unlinkSync(path.join(TIMING_DIR, 'session-type-' + sessionId + '.json')); } catch {}
+  try { fs.unlinkSync(path.join(TIMING_DIR, 'plan-count-' + sessionId + '.json')); } catch {}
+  try { fs.unlinkSync(path.join(TIMING_DIR, 'turn-tool-timing-' + sessionId + '.json')); } catch {}
 }
 
 // --- Full session token extraction (session-end only) ---
@@ -383,8 +416,9 @@ function extractSessionTokens(transcriptPath) {
 }
 
 // --- Push token usage to Loki ---
-// isFinal=false → claude-dev-logging (component=tokens), intermediate snapshot, no cost/effort
-// isFinal=true  → claude-token-metrics, one per session, includes cost_usd + labeled by effort
+// isFinal=true  → claude-token-metrics (legacy backfill path only)
+// isFinal=false → claude-dev-logging component=tokens (legacy backfill path only)
+// Normal path: per-turn stop hook pushes directly to claude-token-metrics
 function pushTokenUsage(sessionId, project, tokenData, isFinal) {
   if (isFinal) {
     const logLine = scrubSecrets(JSON.stringify({
@@ -429,6 +463,7 @@ function buildEnrichedLogLine(hp, hType, enrichments, base) {
   return JSON.stringify({
     event: 'claude_hook',
     hook_type: hType,
+    hook_source: hookSource,
     tool_name: base.toolName || undefined,
     service: base.service || undefined,
     project: base.project || undefined,
@@ -475,6 +510,8 @@ function writeSessionMetricsSidecar(hp, sessionId, project, sessionEnrichments, 
       timestamp: new Date().toISOString(),
       session_duration_ms: sessionEnrichments.session_duration_ms,
       compaction_count: sessionEnrichments.compaction_count,
+      session_type: sessionEnrichments.session_type,
+      plan_mode_entries: sessionEnrichments.plan_mode_entries,
       ...(tokenData || {}),
     });
     fs.appendFileSync(path.join(metricsDir, 'claude-session-metrics.jsonl'), scrubSecrets(line) + '\n');
@@ -517,6 +554,13 @@ process.stdin.on('end', () => {
     writeTimingFile(toolUseId, { start: Date.now(), tool_name: toolName });
     Object.assign(enrichments, detectRetry(toolName, hp.tool_input, toolUseId));
     Object.assign(enrichments, computePayloadSizes(hp.tool_input, null));
+
+    // Track plan mode entries per session
+    if (toolName === 'EnterPlanMode') {
+      const planData = readTimingFile('plan-count-' + sessionId, false) || { count: 0 };
+      writeTimingFile('plan-count-' + sessionId, { count: planData.count + 1 });
+      enrichments.plan_mode_entry = true;
+    }
   }
 
   else if (hookType === 'post-tool-use') {
@@ -524,6 +568,15 @@ process.stdin.on('end', () => {
     if (timing) enrichments.duration_ms = Date.now() - timing.start;
     Object.assign(enrichments, computePayloadSizes(hp.tool_input, hp.tool_response));
     writeTimingFile('last-complete-' + sessionId, { timestamp: Date.now() });
+    // Accumulate per-turn tool timing for stop-hook correlation with tokens
+    if (enrichments.duration_ms !== undefined && toolName) {
+      const turnTimingKey = 'turn-tool-timing-' + sessionId;
+      const existing = readTimingFile(turnTimingKey, false) || {};
+      if (!existing[toolName]) existing[toolName] = { total_ms: 0, calls: 0 };
+      existing[toolName].total_ms += enrichments.duration_ms;
+      existing[toolName].calls++;
+      writeTimingFile(turnTimingKey, existing);
+    }
   }
 
   else if (hookType === 'post-tool-use-failure') {
@@ -532,6 +585,15 @@ process.stdin.on('end', () => {
     Object.assign(enrichments, computePayloadSizes(hp.tool_input, hp.tool_response));
     enrichments.error_type = classifyError(hp.tool_response);
     writeTimingFile('last-complete-' + sessionId, { timestamp: Date.now() });
+    // Accumulate failed calls too — they still consume time
+    if (enrichments.duration_ms !== undefined && toolName) {
+      const turnTimingKey = 'turn-tool-timing-' + sessionId;
+      const existing = readTimingFile(turnTimingKey, false) || {};
+      if (!existing[toolName]) existing[toolName] = { total_ms: 0, calls: 0 };
+      existing[toolName].total_ms += enrichments.duration_ms;
+      existing[toolName].calls++;
+      writeTimingFile(turnTimingKey, existing);
+    }
   }
 
   else if (hookType === 'subagent-start') {
@@ -559,8 +621,13 @@ process.stdin.on('end', () => {
 
   else if (hookType === 'session-start') {
     cleanStaleFiles();
+    const sessionType = hp.type || 'unknown';
     writeTimingFile('session-' + sessionId, { start: Date.now() });
     writeTimingFile('compactions-' + sessionId, { count: 0 });
+    writeTimingFile('session-type-' + sessionId, { session_type: sessionType });
+    enrichments.session_type = sessionType;
+    enrichments.plan_type = PLAN_TYPE;
+    enrichments.plan_monthly_cost_usd = PLAN_MONTHLY_COST;
   }
 
   else if (hookType === 'session-end') {
@@ -568,6 +635,11 @@ process.stdin.on('end', () => {
     if (sessionData) enrichments.session_duration_ms = Date.now() - sessionData.start;
     const compData = readTimingFile('compactions-' + sessionId);
     if (compData) enrichments.compaction_count = compData.count;
+    // Retrieve session_type and plan_mode_entries for the final log entry
+    const sessionTypeData = readTimingFile('session-type-' + sessionId, false);
+    if (sessionTypeData) enrichments.session_type = sessionTypeData.session_type;
+    const planData = readTimingFile('plan-count-' + sessionId, false);
+    if (planData) enrichments.plan_mode_entries = planData.count;
   }
 
   else if (hookType === 'user-prompt-submit') {
@@ -582,12 +654,22 @@ process.stdin.on('end', () => {
     enrichments.compaction_count = newCount;
   }
 
+  // Attach session_type to all lifecycle events (read from timing file, don't delete)
+  if (['stop', 'pre-compact', 'session-end', 'pre-tool-use', 'post-tool-use',
+       'subagent-start', 'subagent-stop'].includes(hookType) && !enrichments.session_type) {
+    const stData = readTimingFile('session-type-' + sessionId, false);
+    if (stData) enrichments.session_type = stData.session_type;
+  }
+
   // --- Main push to claude-dev-logging (all hook types) ---
-  const stream = { app: 'claude-dev-logging', env: envLabel, component, level };
+  // Add session_type as a Loki stream label on session-start for efficient filtering
+  const stream = hookType === 'session-start' && enrichments.session_type
+    ? { app: 'claude-dev-logging', env: envLabel, component, level, session_type: enrichments.session_type }
+    : { app: 'claude-dev-logging', env: envLabel, component, level };
   const logLine = scrubSecrets(buildEnrichedLogLine(hp, hookType, enrichments, base));
   pushToLoki(stream, logLine);
 
-  // --- Stop hook: per-turn token delta → claude-dev-logging component=tokens ---
+  // --- Stop hook: per-turn token delta → claude-dev-logging + claude-token-metrics ---
   // Fires after every Claude response. Pushes this turn's token burn + running total.
   if (hookType === 'stop' && hp.transcript_path) {
     const result = extractTokensIncremental(hp.transcript_path, sessionId);
@@ -617,15 +699,102 @@ process.stdin.on('end', () => {
           assistant_turns:             result.total.assistant_turns,
         }))
       );
+
+      // Read and reset per-turn tool timing accumulator (written by post-tool-use)
+      const turnTimingKey = 'turn-tool-timing-' + sessionId;
+      const turnToolTiming = readTimingFile(turnTimingKey); // reads + deletes → resets per turn
+      const totalToolTimeMs = turnToolTiming
+        ? Object.values(turnToolTiming).reduce((s, t) => s + t.total_ms, 0)
+        : 0;
+      const totalToolCallsTurn = turnToolTiming
+        ? Object.values(turnToolTiming).reduce((s, t) => s + t.calls, 0)
+        : 0;
+
+      // Emit per-turn tool timing breakdown to claude-dev-logging
+      if (turnToolTiming && totalToolCallsTurn > 0) {
+        pushToLoki(
+          { app: 'claude-dev-logging', env: envLabel, component: 'tool-timing', level: 'INFO' },
+          scrubSecrets(JSON.stringify({
+            event:              'claude_turn_tool_timing',
+            session_id:         sessionId,
+            project,
+            machine,
+            env:                envLabel,
+            tool_time_ms_total: totalToolTimeMs,
+            tool_call_count:    totalToolCallsTurn,
+            breakdown:          turnToolTiming,
+          }))
+        );
+      }
+
+      // Push per-turn delta to claude-token-metrics so dashboards update in real-time.
+      // Each stop event pushes this turn's incremental cost/tokens; sum_over_time accumulates
+      // correctly. The session-end hook no longer pushes to claude-token-metrics to avoid
+      // double-counting (sidecar file remains the authoritative off-Loki record).
+      if (result.turn && (result.turn.input_tokens > 0 || result.turn.output_tokens > 0
+          || result.turn.cache_creation_tokens > 0 || result.turn.cache_read_tokens > 0)) {
+        // Read effort from settings.json (same fallback used by full session extraction)
+        const EFFORT_MAP_STOP = { low: 'low', medium: 'med', med: 'med', high: 'high', max: 'max' };
+        let stopEffort = 'med';
+        try {
+          const settings = JSON.parse(fs.readFileSync(
+            path.join(os.homedir(), '.claude', 'settings.json'), 'utf8'));
+          const mapped = EFFORT_MAP_STOP[(settings.effortLevel || '').toLowerCase()];
+          if (mapped) stopEffort = mapped;
+        } catch {}
+        const sessionTypeForTurn = enrichments.session_type || 'unknown';
+        const turnCostUsd = computeCostUsd({
+          model:                       result.total.model,
+          total_input_tokens:          result.turn.input_tokens,
+          total_output_tokens:         result.turn.output_tokens,
+          total_cache_creation_tokens: result.turn.cache_creation_tokens,
+          total_cache_read_tokens:     result.turn.cache_read_tokens,
+        });
+        pushToLoki(
+          {
+            app: 'claude-token-metrics',
+            env: envLabel,
+            model: result.total.model || 'unknown',
+            project: project || 'unknown',
+            effort: stopEffort,
+          },
+          scrubSecrets(JSON.stringify({
+            event:                       'claude_turn_metrics',
+            session_id:                  sessionId,
+            project,
+            machine,
+            env:                         envLabel,
+            is_final:                    false,
+            timestamp:                   new Date().toISOString(),
+            model:                       result.total.model || undefined,
+            effort:                      stopEffort,
+            session_type:                sessionTypeForTurn,
+            thinking:                    result.total.thinking,
+            cost_usd:                    turnCostUsd,
+            plan_type:                   PLAN_TYPE,
+            plan_monthly_cost_usd:       PLAN_MONTHLY_COST,
+            pricing_model:               'api-retail',
+            total_input_tokens:          result.turn.input_tokens,
+            total_output_tokens:         result.turn.output_tokens,
+            total_cache_creation_tokens: result.turn.cache_creation_tokens,
+            total_cache_read_tokens:     result.turn.cache_read_tokens,
+            total_tokens:                result.turn.total_tokens,
+            assistant_turns:             result.turn.assistant_turns,
+            tool_use_count:              result.turn.tool_use_count,
+            tool_time_ms:                totalToolTimeMs || undefined,
+          }))
+        );
+      }
     }
   }
 
-  // --- Session-end: full token summary → claude-token-metrics + on-disk sidecar ---
+  // --- Session-end: full token summary → on-disk sidecar (no Loki push — per-turn stop
+  //     events have already pushed incremental deltas to claude-token-metrics, so a final
+  //     push here would double-count when dashboards run sum_over_time(cost_usd)). ---
   if (hookType === 'session-end' && hp.transcript_path) {
     const tokenData = extractSessionTokens(hp.transcript_path);
     if (tokenData) {
       tokenData.cost_usd = computeCostUsd(tokenData);
-      pushTokenUsage(sessionId, project, tokenData, true);
       writeSessionMetricsSidecar(hp, sessionId, project, enrichments, tokenData);
     } else {
       pushToLoki(

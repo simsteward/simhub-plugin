@@ -1,0 +1,37 @@
+<h2>What is a "Session" in this system?</h2>
+<p class="subtitle">Everything else — correlation, timelines, T1/T2 handoff — depends on this answer. Pick the model that best matches how you think about a user's "unit of work".</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Feature Invocation</h3>
+      <p>A session is one user action (button click, shortcut) and all the underlying log events it triggered — WebSocket calls, plugin responses, errors. Duration: milliseconds to a few seconds.</p>
+      <p style="margin-top:8px;font-size:0.85em;opacity:0.7">Best for: debugging "why did this click fail?" or tracing one feature end-to-end.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>iRacing Race Session</h3>
+      <p>A session maps to an iRacing subsession_id — everything that happened from session_start to session_end. Duration: minutes to hours.</p>
+      <p style="margin-top:8px;font-size:0.85em;opacity:0.7">Best for: "what happened during this race?" — incidents, actions, errors across the full session.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Claude Code Session</h3>
+      <p>A session maps to one Claude Code conversation (session_id from the hook). Contains all tool calls, token usage, lifecycle events for that AI work session.</p>
+      <p style="margin-top:8px;font-size:0.85em;opacity:0.7">Best for: "what did the AI assistant do this session?" — cost, tools used, errors, agent behavior.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>All of the above — nested hierarchy</h3>
+      <p>Sessions are hierarchical: a <strong>Work Session</strong> (user sitting down) contains one or more <strong>iRacing Sessions</strong>, each containing many <strong>Feature Invocations</strong>. Claude sessions run in parallel and are linked by time.</p>
+      <p style="margin-top:8px;font-size:0.85em;opacity:0.7">Most powerful for correlation, but more complex to build. This is the full "story" model.</p>
+    </div>
+  </div>
+</div>

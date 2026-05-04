@@ -27,5 +27,13 @@
     "security-guidance@claude-plugins-official": true,
     "sentry@claude-plugins-official": true,
     "code-review@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse":       [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js pre-tool-use"}]}],
+    "PostToolUse":      [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js post-tool-use"}]}],
+    "SessionStart":     [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js session-start"}]}],
+    "SessionEnd":       [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js session-end"}]}],
+    "Stop":             [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js stop"}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js user-prompt-submit"}]}]
   }
 }

@@ -62,7 +62,6 @@ namespace SimSteward.Plugin
         private volatile bool _simHubHttpListening;
         private volatile string _dashboardPingStatus = "—";
         private DateTime _lastDashboardPingUtc = DateTime.MinValue;
-        private DateTime _lastAgentHttpDebugUtc = DateTime.MinValue;
         private int _dataUpdateTick;
         private SystemMetricsSampler _resourceSampler;
         private DateTime _nextResourceSampleUtc = DateTime.MaxValue;
@@ -77,8 +76,10 @@ namespace SimSteward.Plugin
         private string _lokiBaseUrl = "";
         private string _grafanaBaseUrl = "";
         private int _replayFrameNumEnd;
-        /// <summary>Replay length (telemetry <c>ReplayFrameNumEnd</c>); 0 if unknown.</summary>
+        /// <summary>Replay length (telemetry <c>ReplayFrameNumEnd</c>); 0 if unknown. Unreliable — session-relative on some builds.</summary>
         private int _replayFrameTotal;
+        /// <summary>Running maximum of <c>ReplayFrameNum</c> seen this session — reliable proxy for end-of-replay frame.</summary>
+        private int _replayFrameMax;
         private string _currentSessionId = "";
         private string _currentSessionSeq = "";
         /// <summary>Latest iRacing session context for structured logs (WebSocket thread reads; DataUpdate writes).</summary>
@@ -114,9 +115,7 @@ namespace SimSteward.Plugin
                 drivers = BuildDriverList(),
                 cameraGroups = GetCameraGroupNames(),
                 diagnostics = snapshot.Diagnostics,
-                replayIncidentIndex = snapshot.ReplayIncidentIndex,
-                dataCaptureSuite = snapshot.DataCaptureSuite,
-                preflight = snapshot.Preflight
+                replayIncidentIndex = snapshot.ReplayIncidentIndex
             };
             return JsonConvert.SerializeObject(state);
         }
@@ -214,6 +213,8 @@ namespace SimSteward.Plugin
                 _bridge?.Broadcast(JsonConvert.SerializeObject(msg), "logEvents");
             }
             catch { }
+
+            try { if (ex != null) SentrySdk.CaptureException(ex); } catch { }
         }
 
         private void WriteBroadcastError(string context, Exception ex)
@@ -273,9 +274,7 @@ namespace SimSteward.Plugin
                 ReplaySessionNum = replaySessionNum,
                 ReplaySessionName = replaySessionName,
                 Diagnostics = BuildDiagnostics(clientCount),
-                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot(),
-                DataCaptureSuite = BuildDataCaptureSuiteSnapshot(),
-                Preflight = _preflightSnapshot
+                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot()
             };
         }
 
@@ -379,57 +378,34 @@ namespace SimSteward.Plugin
             return false;
         }
 
-        private PreflightSessionInfo[] ReadSessionListFromYaml()
+        private string GetSessionTypeFromYaml()
         {
             try
             {
                 var sessionInfo = _irsdk?.Data?.SessionInfo;
-                if (!(sessionInfo?.SessionInfo?.Sessions is IList list) || list.Count == 0)
-                    return null;
-
-                var result = new List<PreflightSessionInfo>();
+                if (!(sessionInfo?.SessionInfo?.Sessions is IList list)) return "";
                 foreach (var o in list)
                 {
                     if (o == null) continue;
-                    var t = o.GetType();
-                    var numProp    = t.GetProperty("SessionNum");
-                    var nameProp   = t.GetProperty("SessionName");
-                    var typeProp   = t.GetProperty("SessionType");
-                    var officialProp = t.GetProperty("ResultsOfficial");
-
-                    int num = 0;
-                    if (numProp?.GetValue(o) is int n) num = n;
-                    else int.TryParse(numProp?.GetValue(o)?.ToString(), out num);
-
-                    bool official = false;
-                    var offVal = officialProp?.GetValue(o);
-                    if (offVal is int oi) official = oi >= 1;
-                    else if (int.TryParse(offVal?.ToString(), out int op)) official = op >= 1;
-
-                    result.Add(new PreflightSessionInfo
-                    {
-                        SessionNum  = num,
-                        SessionName = nameProp?.GetValue(o)?.ToString() ?? "",
-                        SessionType = typeProp?.GetValue(o)?.ToString() ?? "",
-                        ResultsOfficial = official,
-                    });
+                    var typeProp = o.GetType().GetProperty("SessionType");
+                    var sessionType = typeProp?.GetValue(o)?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(sessionType)) return sessionType;
                 }
-                return result.Count > 0 ? result.ToArray() : null;
             }
-            catch
-            {
-                return null;
-            }
+            catch { }
+            return "";
         }
 
         private object[] BuildDriverList()
         {
             try
             {
-                var drivers = _irsdk?.Data?.SessionInfo?.DriverInfo?.Drivers as IList;
+                var driverInfo = _irsdk?.Data?.SessionInfo?.DriverInfo;
+                var drivers = driverInfo?.Drivers as IList;
                 if (drivers == null)
                     return Array.Empty<object>();
-                var playerIdx = SafeGetInt("PlayerCarIdx");
+                // DriverInfo.DriverCarIdx (session YAML) is the authoritative player-car signal.
+                var playerIdx = driverInfo != null ? driverInfo.DriverCarIdx : SafeGetInt("PlayerCarIdx");
                 var list = new System.Collections.Generic.List<object>();
                 foreach (var d in drivers)
                 {
@@ -902,51 +878,6 @@ namespace SimSteward.Plugin
                 }
             }
 
-            if (string.Equals(action, "data_capture_suite", StringComparison.OrdinalIgnoreCase))
-            {
-                var raw      = (arg ?? "").Trim();
-                var colonIdx = raw.IndexOf(':');
-                var verb     = (colonIdx >= 0 ? raw.Substring(0, colonIdx) : raw).ToLowerInvariant();
-                var skipParam = colonIdx >= 0 ? raw.Substring(colonIdx + 1) : "";
-                var skipIds   = string.IsNullOrEmpty(skipParam)
-                    ? Array.Empty<string>()
-                    : skipParam.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                switch (verb)
-                {
-                    case "start":
-                        TryStartDataCaptureSuite(skipIds);
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "preflight":
-                        _preflightRequested = true;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "preflight_scope":
-                        _preflightReplayScope = string.Equals(skipParam, "partial", StringComparison.OrdinalIgnoreCase) ? "partial" : "full";
-                        _preflightSnapshot.ReplayScope = _preflightReplayScope;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "preflight_reset":
-                        _preflightLevel = 0;
-                        _preflightCorrelationId = null;
-                        _preflightSnapshot = new PreflightSnapshot();
-                        _preflightStep = PreflightStep.Idle;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "cancel":
-                        _suiteCancelRequested = true;
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    case "verify":
-                        _suiteEmitCompleteUtc = DateTime.MinValue; // force re-verify on next tick
-                        LogActionResult(action, arg, correlationId, true, "");
-                        return (true, "ok", null);
-                    default:
-                        LogActionResult(action, arg, correlationId, false, "bad_arg");
-                        return (false, null, "bad_arg");
-                }
-            }
-
             if (string.Equals(action, "replay_incident_index_seek", StringComparison.OrdinalIgnoreCase))
             {
                 return DispatchReplayIncidentIndexSeek(arg, correlationId);
@@ -1039,21 +970,6 @@ namespace SimSteward.Plugin
                 return;
             _lastDashboardPingUtc = now;
 
-            // #region agent log
-            if ((now - _lastAgentHttpDebugUtc).TotalSeconds >= DashboardPingIntervalSec)
-            {
-                _lastAgentHttpDebugUtc = now;
-                var ep8888 = listeners.Where(e => e.Port == 8888).Select(e => e.Address.ToString() + ":" + e.Port).ToArray();
-                WriteAgentHttpDebug("H1,H2,H4", "simhub_http_listeners_8888", new Dictionary<string, object>
-                {
-                    ["count"] = ep8888.Length,
-                    ["endpoints"] = string.Join(";", ep8888),
-                    ["simHubHttpListening"] = _simHubHttpListening,
-                    ["hint_localhost_ipv6"] = "If browser uses localhost and refuses, try http://127.0.0.1:8888/... (H2)"
-                });
-            }
-            // #endregion
-
             Task.Run(() =>
             {
                 const string pingUrl = "http://127.0.0.1:8888/Web/sim-steward-dash/index.html";
@@ -1067,59 +983,15 @@ namespace SimSteward.Plugin
                     _dashboardPingStatus = response.IsSuccessStatusCode
                         ? $"OK ({(int)response.StatusCode})"
                         : $"HTTP {(int)response.StatusCode}";
-                    // #region agent log
-                    WriteAgentHttpDebug("H3", "dashboard_ping_ok", new Dictionary<string, object>
-                    {
-                        ["url"] = pingUrl,
-                        ["statusCode"] = (int)response.StatusCode,
-                        ["success"] = response.IsSuccessStatusCode
-                    });
-                    // #endregion
                 }
                 catch (Exception ex)
                 {
                     SentrySdk.CaptureException(ex);
                     _dashboardPingStatus = "Error: " + ex.Message;
-                    // #region agent log
-                    WriteAgentHttpDebug("H1,H3,H5", "dashboard_ping_error", new Dictionary<string, object>
-                    {
-                        ["url"] = pingUrl,
-                        ["error"] = ex.GetType().Name,
-                        ["message"] = ex.Message
-                    });
-                    // #endregion
                 }
             });
         }
 
-        // #region agent log
-        private void WriteAgentHttpDebug(string hypothesisId, string message, Dictionary<string, object> data)
-        {
-            try
-            {
-                var baseDir = !string.IsNullOrEmpty(_pluginDataPath)
-                    ? _pluginDataPath
-                    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SimHubWpf", "PluginsData", "SimSteward");
-                Directory.CreateDirectory(baseDir);
-                var envPath = Environment.GetEnvironmentVariable("SIMSTEWARD_DEBUG_LOG_PATH");
-                var path = !string.IsNullOrWhiteSpace(envPath) ? envPath.Trim() : Path.Combine(baseDir, "debug-959be8.log");
-                var payload = new Dictionary<string, object>
-                {
-                    ["sessionId"] = "959be8",
-                    ["hypothesisId"] = hypothesisId,
-                    ["location"] = "SimStewardPlugin.cs:RefreshDependencyChecks",
-                    ["message"] = message,
-                    ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    ["data"] = data
-                };
-                File.AppendAllText(path, JsonConvert.SerializeObject(payload) + "\n", Encoding.UTF8);
-            }
-            catch
-            {
-                // ignore
-            }
-        }
-        // #endregion
 #endif
 
 #if SIMHUB_SDK
@@ -1148,10 +1020,12 @@ namespace SimSteward.Plugin
                 _sentryDisposable = SentrySdk.Init(o =>
                 {
                     o.Dsn = sentryDsn;
-                    o.Environment = "local";
+                    o.Environment = Environment.GetEnvironmentVariable("SIMSTEWARD_LOG_ENV") ?? "local";
                     o.Release = PluginVersionInfo.Display;
                     o.TracesSampleRate = 1.0;
                     o.IsGlobalModeEnabled = true;
+                    o.AutoSessionTracking = false;
+                    o.MaxBreadcrumbs = 100;
                     o.SetBeforeSend((sentryEvent, hint) =>
                     {
                         sentryEvent.SetTag("plugin_mode", _pluginMode ?? "Unknown");
@@ -1175,7 +1049,6 @@ namespace SimSteward.Plugin
             SentrySdk.AddBreadcrumb("Plugin started", "lifecycle");
 
             pluginManager.AddProperty("SimSteward.PluginMode", GetType(), "Unknown");
-            pluginManager.AddProperty("SimSteward.IncidentCount", GetType(), 0);
             pluginManager.AddProperty("SimSteward.ClientCount", GetType(), 0);
 
             var wsPort = DefaultPort;
@@ -1259,7 +1132,6 @@ namespace SimSteward.Plugin
                     _replayIncidentIndexPrereqLogKey = "";
                     _logger?.Structured("INFO", "simhub-plugin", "iracing_disconnected", "iRacing disconnected.", null, "lifecycle", null);
                 };
-                _irsdk.OnSessionInfo += OnIrsdkSessionInfo;
                 _irsdk.OnTelemetryData += OnIrsdkTelemetryDataForReplayIndex;
                 _irsdk.Start();
                 _logger.Structured("INFO", "simhub-plugin", "irsdk_started", "iRacing SDK started.", null, "lifecycle", null);
@@ -1305,6 +1177,8 @@ namespace SimSteward.Plugin
 
         public void DataUpdate(PluginManager pluginManager, ref GameData data)
         {
+            try
+            {
             _dataUpdateTick++;
             if (_dataUpdateTick % DependencyCheckIntervalTicks == 0)
                 RefreshDependencyChecks();
@@ -1349,6 +1223,7 @@ namespace SimSteward.Plugin
 
                 _replayFrameNumEnd = SafeGetInt("ReplayFrameNum");
                 _replayFrameTotal = SafeGetInt("ReplayFrameNumEnd");
+                if (_replayFrameNumEnd > _replayFrameMax) _replayFrameMax = _replayFrameNumEnd;
                 int subId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
                 int parentId = 0;
                 try
@@ -1394,6 +1269,7 @@ namespace SimSteward.Plugin
                 _pluginMode = "Unknown";
                 _replayFrameNumEnd = 0;
                 _replayFrameTotal = 0;
+                _replayFrameMax = 0;
                 _currentSessionId = "";
                 _currentSessionSeq = "";
                 _logCtxSubsession = SessionLogging.NotInSession;
@@ -1406,7 +1282,6 @@ namespace SimSteward.Plugin
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
-            pluginManager.SetPropertyValue("SimSteward.IncidentCount", GetType(), _yamlIncidentCount);
             pluginManager.SetPropertyValue("SimSteward.ClientCount", GetType(), clientCount);
 
             if (_bridge == null) return;
@@ -1419,12 +1294,19 @@ namespace SimSteward.Plugin
             }
 
             var now = DateTime.UtcNow;
+
             if ((now - _lastBroadcastAt).TotalMilliseconds < BroadcastThrottleMs)
                 return;
             _lastBroadcastAt = now;
 
             var snapshot = BuildPluginSnapshot();
             _bridge.BroadcastState(BuildStateJson(snapshot));
+            }
+            catch (Exception ex)
+            {
+                try { SentrySdk.CaptureException(ex); } catch { }
+                try { _logger?.Error("DataUpdate top-level exception", ex); } catch { }
+            }
         }
 
         private int SafeGetInt(string name)
@@ -1468,6 +1350,7 @@ namespace SimSteward.Plugin
         {
             _logger?.Structured("INFO", "simhub-plugin", "plugin_stopped", "SimSteward plugin End.", null, "lifecycle", null);
 
+            try { SentrySdk.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult(); } catch { }
             try { _sentryDisposable?.Dispose(); } catch { }
             _sentryDisposable = null;
 
@@ -1495,7 +1378,6 @@ namespace SimSteward.Plugin
                 try
                 {
                     _irsdk.OnTelemetryData -= OnIrsdkTelemetryDataForReplayIndex;
-                    _irsdk.OnSessionInfo -= OnIrsdkSessionInfo;
                     _irsdk.Stop();
                 }
                 catch (Exception ex)
