@@ -87,6 +87,11 @@ if (!rawLokiUrl || /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(rawLokiUrl)) {
   process.exit(0);
 }
 const lokiUrl = rawLokiUrl;
+const lokiUser = process.env.SIMSTEWARD_LOKI_USER || '';
+const lokiToken = process.env.SIMSTEWARD_LOKI_TOKEN || '';
+const lokiAuth = (lokiUser && lokiToken)
+  ? 'Basic ' + Buffer.from(lokiUser + ':' + lokiToken).toString('base64')
+  : undefined;
 const envLabel = process.env.SIMSTEWARD_LOG_ENV || 'local';
 const machine = process.env.COMPUTERNAME || os.hostname() || 'unknown';
 
@@ -485,7 +490,7 @@ function pushToLoki(stream, logLine) {
 
   const req = mod.request(parsed, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...(lokiAuth ? { Authorization: lokiAuth } : {}) },
     timeout: 4000,
   }, res => { res.resume(); });
 
