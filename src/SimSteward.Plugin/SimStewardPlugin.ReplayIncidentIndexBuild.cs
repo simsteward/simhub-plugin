@@ -322,6 +322,53 @@ namespace SimSteward.Plugin
             }
         }
 
+        /// <summary>
+        /// Test rig sweep-progress broadcast. ~1 Hz cadence; bridges the silence while the live
+        /// aggregator is paused for the duration of the FF index build.
+        /// </summary>
+        private void BroadcastReplaySweepProgressIfDueLocked(int replayFrame, double replaySessionTimeSec)
+        {
+            if (_bridge == null || _bridge.ClientCount <= 0) return;
+            var nowUtc = DateTime.UtcNow;
+            if ((nowUtc - _lastSweepProgressTickAt).TotalMilliseconds < 1000)
+                return;
+            _lastSweepProgressTickAt = nowUtc;
+
+            int frameEnd = _replayIndexReplayFrameNumEndSnapshot > 0
+                ? _replayIndexReplayFrameNumEndSnapshot
+                : SafeGetInt("ReplayFrameNumEnd");
+            double pct = frameEnd > 0 ? (100.0 * replayFrame / frameEnd) : 0.0;
+            if (pct < 0) pct = 0;
+            if (pct > 100) pct = 100;
+
+            long elapsedMs = _replayIndexFfWallClock?.ElapsedMilliseconds ?? 0;
+            long estRemainingMs = 0;
+            if (pct > 0.5 && elapsedMs > 0)
+                estRemainingMs = (long)(elapsedMs * (100.0 - pct) / pct);
+
+            int telemetrySpeed = SafeGetInt("ReplayPlaySpeed");
+            var payload = new ReplaySweepProgressPayload
+            {
+                Ts = nowUtc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                Frame = replayFrame,
+                FrameEnd = frameEnd,
+                SamplesSoFar = _replayIndexIncidentSamples.Count,
+                EstCompletionPct = Math.Round(pct, 2),
+                EstRemainingMs = estRemainingMs,
+                TelemetryPlaySpeed = telemetrySpeed,
+                PlaySpeedRequested = ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed
+            };
+            try
+            {
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+                _bridge.Broadcast(json, "replaySweepProgressTick");
+            }
+            catch (Exception ex)
+            {
+                WriteBroadcastError("BroadcastReplaySweepProgressIfDueLocked", ex);
+            }
+        }
+
         private void ProcessFastForwardingLocked()
         {
             _replayIndexFfTelemetrySampleCount++;
@@ -369,6 +416,9 @@ namespace SimSteward.Plugin
                     _replayIndexIncidentSamples.AddRange(tick);
                     LogReplayIncidentIndexDetectionsLocked(tick, replaySessionTimeSec);
                 }
+
+                // Test rig (docs/RULES-TestRig-Contract.md): ~1 Hz sweep progress broadcast.
+                BroadcastReplaySweepProgressIfDueLocked(replayFrame, replaySessionTimeSec);
 
                 // Cap at 90,000 samples (~24h of simulated race time at 32x) as failsafe.
                 if (_replayIndexFfTelemetrySampleCount <= 90000)

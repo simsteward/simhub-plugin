@@ -72,9 +72,10 @@ namespace SimSteward.Plugin.Tests
         }
 
         [Fact]
-        public void DefaultFastForwardPlaySpeed_Is32()
+        public void DefaultFastForwardPlaySpeed_Is16()
         {
-            Assert.Equal(32, ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed);
+            // Test rig (docs/RULES-TestRig-Contract.md): clamped to iRacing's documented max of 16×.
+            Assert.Equal(16, ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed);
         }
 
         [Fact]

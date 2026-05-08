@@ -118,6 +118,36 @@ namespace SimSteward.Plugin
             public string DetectionSource;
             public int ReplayFrame;
         }
+
+        // ── Test rig: replay-control state (docs/RULES-TestRig-Contract.md) ──
+        /// <summary>Last applied magnitude for replay playback (unsigned). Default 1×.</summary>
+        private int _lastReplaySpeedMagnitude = 1;
+        /// <summary>Last applied direction (<c>"forward"</c> or <c>"reverse"</c>). Default forward.</summary>
+        private string _lastReplayDirection = "forward";
+        /// <summary>True when the last <c>replay_set_speed</c> was &lt;1 (slow-mo / divisor mode).</summary>
+        private bool _lastReplaySlowMotion;
+
+        // ── Test rig: live replay aggregator (separate from FF sweep's detector) ──
+        private readonly ReplayIncidentIndexDetector _liveDetector = new ReplayIncidentIndexDetector();
+        private readonly ReplayIncidentLiveAggregator _liveAggregator = new ReplayIncidentLiveAggregator();
+        private bool _liveDetectorBaselineReady;
+        private int _liveLastReplayFrame = -1;
+        private DateTime _lastReplayTickAt = DateTime.MinValue;
+        private DateTime _lastSweepProgressTickAt = DateTime.MinValue;
+
+        // ── Test rig: misfire stamps (set on jump_next/prev, evaluated 750ms later) ──
+        private DateTime _lastJumpRequestedAt = DateTime.MinValue;
+        private string _lastJumpDirection;
+        private int _lastJumpExpectedFrame;
+        private int _lastJumpExpectedSessionTimeMs;
+        private string _lastJumpExpectedFingerprint;
+        private bool _lastJumpEvaluated = true;
+        private bool _lastJumpMisfire;
+        private int _lastJumpLandedFrame;
+        private int _lastJumpLandedSessionTimeMs;
+        private int _lastJumpDeltaMs;
+        private string _lastJumpNearestFingerprint;
+        private DateTime _lastJumpEvaluatedAt = DateTime.MinValue;
 #endif
 
 #if SIMHUB_SDK
@@ -679,55 +709,232 @@ namespace SimSteward.Plugin
                 }
             }
 
-            if (string.Equals(action, "replay_speed", StringComparison.OrdinalIgnoreCase))
+            // ── Test rig (docs/RULES-TestRig-Contract.md): replay control surface ──
+            if (string.Equals(action, "replay_play", StringComparison.OrdinalIgnoreCase))
             {
-                if (!double.TryParse((arg ?? "").Trim(),
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out var speed))
-                {
-                    const string err = "bad_arg";
-                    LogActionResult(action, arg, correlationId, false, err);
-                    return (false, null, err);
-                }
-
                 if (_irsdk == null || !_irsdk.IsConnected)
                 {
-                    const string err = "not_connected";
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                try
+                {
+                    int magnitude = _lastReplaySpeedMagnitude > 0 ? _lastReplaySpeedMagnitude : 1;
+                    int signedSpeed = string.Equals(_lastReplayDirection, "reverse", StringComparison.OrdinalIgnoreCase)
+                        ? -magnitude : magnitude;
+                    _irsdk.ReplaySetPlaySpeed(signedSpeed, _lastReplaySlowMotion);
+                    var sup = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["speed"] = magnitude,
+                        ["direction"] = _lastReplayDirection,
+                        ["slow_motion"] = _lastReplaySlowMotion
+                    };
+                    LogActionResult(action, arg, correlationId, true, "", sup);
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    var err = ex.Message ?? "replay_play_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
                 }
+            }
 
+            if (string.Equals(action, "replay_pause", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
                 try
                 {
-                    int multiplier;
-                    bool slowMotion;
-                    if (speed == 0.0)
-                    {
-                        multiplier = 0; slowMotion = false;
-                    }
-                    else if (speed > 0.0 && speed < 1.0)
-                    {
-                        multiplier = (int)Math.Round(1.0 / speed);
-                        slowMotion = true;
-                    }
-                    else if (speed >= 1.0)
-                    {
-                        multiplier = (int)speed; slowMotion = false;
-                    }
-                    else
-                    {
-                        // negative: rewind at magnitude (e.g. -4 → 4x reverse)
-                        multiplier = (int)Math.Abs(speed); slowMotion = false;
-                    }
-                    _irsdk.ReplaySetPlaySpeed(multiplier, slowMotion);
+                    _irsdk.ReplaySetPlaySpeed(0, false);
                     LogActionResult(action, arg, correlationId, true, "");
                     return (true, "ok", null);
                 }
                 catch (Exception ex)
                 {
                     SentrySdk.CaptureException(ex);
-                    var err = ex.Message ?? "replay_speed_failed";
+                    var err = ex.Message ?? "replay_pause_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_set_speed", StringComparison.OrdinalIgnoreCase))
+            {
+                var parsed = ReplayControlActions.ParseSetSpeed(arg);
+                if (!parsed.Ok)
+                {
+                    LogActionResult(action, arg, correlationId, false, parsed.Error);
+                    return (false, null, parsed.Error);
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                try
+                {
+                    _lastReplaySpeedMagnitude = parsed.Magnitude;
+                    _lastReplaySlowMotion = parsed.SlowMotion;
+                    int signed = string.Equals(_lastReplayDirection, "reverse", StringComparison.OrdinalIgnoreCase)
+                        ? -parsed.Magnitude : parsed.Magnitude;
+                    _irsdk.ReplaySetPlaySpeed(signed, parsed.SlowMotion);
+                    var sup = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["speed"] = parsed.Magnitude,
+                        ["slow_motion"] = parsed.SlowMotion,
+                        ["direction"] = _lastReplayDirection
+                    };
+                    LogActionResult(action, arg, correlationId, true, "", sup);
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    var err = ex.Message ?? "replay_set_speed_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_set_direction", StringComparison.OrdinalIgnoreCase))
+            {
+                var parsed = ReplayControlActions.ParseSetDirection(arg);
+                if (!parsed.Ok)
+                {
+                    LogActionResult(action, arg, correlationId, false, parsed.Error);
+                    return (false, null, parsed.Error);
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                if (_lastReplaySpeedMagnitude <= 0)
+                {
+                    LogActionResult(action, arg, correlationId, false, "no_prior_speed");
+                    return (false, null, "no_prior_speed");
+                }
+                try
+                {
+                    _lastReplayDirection = parsed.Direction;
+                    int signed = string.Equals(parsed.Direction, "reverse", StringComparison.OrdinalIgnoreCase)
+                        ? -_lastReplaySpeedMagnitude : _lastReplaySpeedMagnitude;
+                    _irsdk.ReplaySetPlaySpeed(signed, _lastReplaySlowMotion);
+                    var sup = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["speed"] = _lastReplaySpeedMagnitude,
+                        ["direction"] = _lastReplayDirection,
+                        ["slow_motion"] = _lastReplaySlowMotion
+                    };
+                    LogActionResult(action, arg, correlationId, true, "", sup);
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    var err = ex.Message ?? "replay_set_direction_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_seek_frame", StringComparison.OrdinalIgnoreCase))
+            {
+                var parsed = ReplayControlActions.ParseSeekFrame(arg);
+                if (!parsed.Ok)
+                {
+                    LogActionResult(action, arg, correlationId, false, parsed.Error);
+                    return (false, null, parsed.Error);
+                }
+                if (IsSeekThrottled())
+                {
+                    LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                    return (false, null, "seek_throttled");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                try
+                {
+                    MarkSeekIssued();
+                    _irsdk.ReplaySetPlayPosition(IRacingSdkEnum.RpyPosMode.Begin, parsed.Frame);
+                    var sup = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["frame"] = parsed.Frame
+                    };
+                    LogActionResult(action, arg, correlationId, true, "", sup);
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    var err = ex.Message ?? "replay_seek_frame_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            if (string.Equals(action, "replay_jump_next_incident", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "replay_jump_prev_incident", StringComparison.OrdinalIgnoreCase))
+            {
+                bool isNext = string.Equals(action, "replay_jump_next_incident", StringComparison.OrdinalIgnoreCase);
+                var rows = _replayIndexDashboardCachedRoot?.Incidents;
+                if (rows == null || rows.Count == 0)
+                {
+                    LogActionResult(action, arg, correlationId, false, "index_unavailable");
+                    return (false, null, "index_unavailable");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                if (IsSeekThrottled())
+                {
+                    LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                    return (false, null, "seek_throttled");
+                }
+                int currentFrame = SafeGetInt("ReplayFrameNum");
+                var picked = isNext
+                    ? ReplayControlActions.ResolveNextIncident(rows, currentFrame)
+                    : ReplayControlActions.ResolvePrevIncident(rows, currentFrame);
+                if (!picked.Ok)
+                {
+                    LogActionResult(action, arg, correlationId, false, picked.Error);
+                    return (false, null, picked.Error);
+                }
+                try
+                {
+                    MarkSeekIssued();
+                    int sessionNum = SafeGetInt("SessionNum");
+                    _irsdk.ReplaySearchSessionTime(sessionNum, picked.Row.SessionTimeMs);
+                    // Stamp expected jump for misfire evaluator (DataUpdate evaluates ~750 ms later).
+                    _lastJumpRequestedAt = DateTime.UtcNow;
+                    _lastJumpDirection = isNext ? "next" : "prev";
+                    _lastJumpExpectedFrame = picked.Row.ReplayFrame;
+                    _lastJumpExpectedSessionTimeMs = picked.Row.SessionTimeMs;
+                    _lastJumpExpectedFingerprint = picked.Row.Fingerprint;
+                    _lastJumpEvaluated = false;
+                    var sup = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["expected_frame"] = picked.Row.ReplayFrame,
+                        ["expected_session_time_ms"] = picked.Row.SessionTimeMs,
+                        ["expected_fingerprint"] = picked.Row.Fingerprint ?? ""
+                    };
+                    LogActionResult(action, arg, correlationId, true, "", sup);
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    var err = ex.Message ?? "replay_jump_failed";
                     LogActionResult(action, arg, correlationId, false, err);
                     return (false, null, err);
                 }
@@ -1545,6 +1752,8 @@ namespace SimSteward.Plugin
 
                 if (_autoWalkActive) ProcessAutoWalkTick();
                 ProcessCaptureQueueTick();
+                ProcessLiveReplayAggregatorTick();
+                ProcessJumpMisfireEvaluatorTick();
 
                 if (++_captureManifestFlushTickCounter >= CaptureManifestFlushIntervalTicks)
                 {
@@ -1568,6 +1777,11 @@ namespace SimSteward.Plugin
                 _logCtxLap = SessionLogging.LapUnknown;
                 _logCtxSessionYamlFingerprint = "";
                 _lastSessionInfoUpdateForYamlFingerprint = -1;
+                // Test rig: tear down live aggregator state when iRacing disconnects.
+                _liveDetectorBaselineReady = false;
+                _liveLastReplayFrame = -1;
+                _liveAggregator.Reset();
+                _lastJumpEvaluated = true;
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);
@@ -1775,6 +1989,246 @@ namespace SimSteward.Plugin
                 _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, row.CarIdx, 0, 0);
             }
             catch (Exception ex) { SentrySdk.CaptureException(ex); }
+        }
+
+        /// <summary>
+        /// Test rig (docs/RULES-TestRig-Contract.md): per-tick live replay aggregator + 250ms broadcast.
+        /// Skipped during FF index build to avoid colliding with that detector's baseline.
+        /// </summary>
+        private void ProcessLiveReplayAggregatorTick()
+        {
+            try
+            {
+                if (_irsdk == null || !_irsdk.IsConnected) return;
+                if (_replayIndexBuildPhase != ReplayIndexBuildPhase.Idle) return;
+                if (!string.Equals(_pluginMode, "Replay", StringComparison.OrdinalIgnoreCase)) return;
+
+                int replayFrame = SafeGetInt("ReplayFrameNum");
+
+                // Reset on backward seek (user scrubbed back) or first run after reconnect.
+                bool needReset = !_liveDetectorBaselineReady || (_liveLastReplayFrame >= 0 && replayFrame < _liveLastReplayFrame);
+                if (needReset)
+                {
+                    SafeGetIntPerCar("CarIdxSessionFlags", _replayIndexScratchCarIdxSessionFlags);
+                    SafeGetIntPerCar("CarIdxTrackSurface", _replayIndexScratchCarIdxTrackSurface);
+                    int playerInc0 = 0;
+                    try { playerInc0 = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
+                    int playerCarIdx0 = SafeGetInt("PlayerCarIdx");
+                    _liveDetector.Reset(
+                        _replayIndexScratchCarIdxSessionFlags,
+                        playerInc0,
+                        playerCarIdx0,
+                        _replayIndexScratchCarIdxTrackSurface);
+                    _liveAggregator.Reset();
+                    _liveDetectorBaselineReady = true;
+                    _liveLastReplayFrame = replayFrame;
+                    return;
+                }
+
+                _liveLastReplayFrame = replayFrame;
+
+                double rst = 0;
+                try { rst = _irsdk.Data.GetDouble("ReplaySessionTime"); }
+                catch { try { rst = _irsdk.Data.GetDouble("SessionTime"); } catch { } }
+
+                SafeGetIntPerCar("CarIdxSessionFlags", _replayIndexScratchCarIdxSessionFlags);
+                SafeGetIntPerCar("CarIdxTrackSurface", _replayIndexScratchCarIdxTrackSurface);
+                SafeGetIntPerCar("CarIdxLap", _replayIndexScratchCarIdxLap);
+                int playerIncidents = 0;
+                try { playerIncidents = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
+                int playerCarIdx = SafeGetInt("PlayerCarIdx");
+
+                var samples = _liveDetector.Process(
+                    rst,
+                    _replayIndexScratchCarIdxSessionFlags,
+                    playerIncidents,
+                    playerCarIdx,
+                    replayFrame,
+                    _replayIndexScratchCarIdxTrackSurface,
+                    _replayIndexScratchCarIdxLap);
+                for (int i = 0; i < samples.Count; i++)
+                    _liveAggregator.Apply(samples[i]);
+
+                // Throttle the broadcast to ReplayControlActions.LiveTickCadenceMs.
+                var nowUtc = DateTime.UtcNow;
+                if ((nowUtc - _lastReplayTickAt).TotalMilliseconds < ReplayControlActions.LiveTickCadenceMs)
+                    return;
+                _lastReplayTickAt = nowUtc;
+
+                if (_bridge == null || _bridge.ClientCount <= 0) return;
+                BroadcastReplayStateTick(replayFrame, rst, nowUtc);
+            }
+            catch (Exception ex)
+            {
+                try { SentrySdk.CaptureException(ex); } catch { }
+            }
+        }
+
+        private void BroadcastReplayStateTick(int replayFrame, double sessionTime, DateTime nowUtc)
+        {
+            // YAML side: use cached parse if available; pass null when in-progress so the dashboard renders "—".
+            System.Collections.Generic.IReadOnlyDictionary<int, int> yamlByCarIdx = null;
+            try
+            {
+                string yaml = _irsdk.Data?.SessionInfoYaml;
+                int sn = SafeGetInt("SessionNum");
+                if (!string.IsNullOrEmpty(yaml) &&
+                    ReplayIncidentIndexResultsYaml.TryParseOfficialIncidentsByCarIdx(yaml, sn,
+                        out System.Collections.Generic.Dictionary<int, int> map, out _, out _))
+                {
+                    yamlByCarIdx = map;
+                }
+            }
+            catch { }
+
+            var driverList = BuildDriverIdentityList();
+            var aggregates = _liveAggregator.BuildAggregates(yamlByCarIdx);
+            var driverRows = _liveAggregator.BuildDriverRows(driverList, yamlByCarIdx);
+
+            int playSpeed = SafeGetInt("ReplayPlaySpeed");
+            bool paused = playSpeed == 0;
+            int magnitude = Math.Abs(playSpeed);
+            string direction = playSpeed < 0 ? "reverse" : "forward";
+
+            var payload = new ReplayStateTickPayload
+            {
+                Ts = nowUtc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                Frame = replayFrame,
+                FrameEnd = SafeGetInt("ReplayFrameNumEnd"),
+                SessionTime = Math.Round(sessionTime, 3),
+                Paused = paused,
+                Speed = magnitude > 0 ? magnitude : _lastReplaySpeedMagnitude,
+                Direction = direction,
+                SlowMotion = _lastReplaySlowMotion,
+                Aggregates = aggregates,
+                Drivers = driverRows,
+                Misfire = BuildMisfirePayload(nowUtc)
+            };
+            try
+            {
+                string json = JsonConvert.SerializeObject(payload);
+                _bridge.Broadcast(json, "replayStateTick");
+            }
+            catch (Exception ex)
+            {
+                WriteBroadcastError("BroadcastReplayStateTick", ex);
+            }
+        }
+
+        private System.Collections.Generic.List<DriverIdentity> BuildDriverIdentityList()
+        {
+            var list = new System.Collections.Generic.List<DriverIdentity>();
+            try
+            {
+                if (!(_irsdk?.Data?.SessionInfo?.DriverInfo?.Drivers is System.Collections.IList drivers))
+                    return list;
+                foreach (var d in drivers)
+                {
+                    if (d == null) continue;
+                    var t = d.GetType();
+                    var carIdxObj = t.GetProperty("CarIdx")?.GetValue(d);
+                    int carIdx = carIdxObj is int ci ? ci : Convert.ToInt32(carIdxObj ?? -1);
+                    if (carIdx < 0) continue;
+                    string name = t.GetProperty("UserName")?.GetValue(d)?.ToString() ?? "";
+                    string custId = t.GetProperty("UserID")?.GetValue(d)?.ToString()
+                                    ?? t.GetProperty("CustID")?.GetValue(d)?.ToString()
+                                    ?? "";
+                    list.Add(new DriverIdentity(carIdx, name, custId));
+                }
+            }
+            catch { }
+            return list;
+        }
+
+        private ReplayStateLastJump BuildMisfirePayload(DateTime nowUtc)
+        {
+            // Show the misfire payload for MisfireVisibilityMs after evaluation, then revert to the all-null skeleton.
+            if (!_lastJumpEvaluated || _lastJumpEvaluatedAt == DateTime.MinValue)
+                return new ReplayStateLastJump();
+            if ((nowUtc - _lastJumpEvaluatedAt).TotalMilliseconds > ReplayControlActions.MisfireVisibilityMs)
+                return new ReplayStateLastJump();
+            return new ReplayStateLastJump
+            {
+                Active = _lastJumpMisfire,
+                Direction = _lastJumpDirection,
+                ExpectedFrame = _lastJumpExpectedFrame,
+                LandedFrame = _lastJumpLandedFrame,
+                DeltaFrames = _lastJumpLandedFrame - _lastJumpExpectedFrame,
+                DeltaMs = _lastJumpDeltaMs,
+                ExpectedFingerprint = _lastJumpExpectedFingerprint,
+                NearestFingerprint = _lastJumpNearestFingerprint
+            };
+        }
+
+        /// <summary>
+        /// Test rig misfire evaluator. Runs once per <c>replay_jump_*_incident</c>, ~750 ms after the SDK
+        /// seek call (gives iRacing time to settle), provided the seek throttle is also clear.
+        /// </summary>
+        private void ProcessJumpMisfireEvaluatorTick()
+        {
+            try
+            {
+                if (_lastJumpEvaluated) return;
+                if (_lastJumpRequestedAt == DateTime.MinValue) return;
+                if ((DateTime.UtcNow - _lastJumpRequestedAt).TotalMilliseconds < ReplayControlActions.MisfireSettleMs)
+                    return;
+                if (IsSeekThrottled()) return;
+                if (_irsdk == null || !_irsdk.IsConnected) return;
+
+                int landedFrame = SafeGetInt("ReplayFrameNum");
+                double rst = 0;
+                try { rst = _irsdk.Data.GetDouble("ReplaySessionTime"); }
+                catch { try { rst = _irsdk.Data.GetDouble("SessionTime"); } catch { } }
+                int landedSessionTimeMs = ReplayIncidentIndexDetection.ToSessionTimeMs(rst);
+
+                var rows = _replayIndexDashboardCachedRoot?.Incidents;
+                var result = ReplayControlActions.EvaluateMisfire(
+                    rows, landedFrame, landedSessionTimeMs, _lastJumpExpectedFingerprint);
+
+                _lastJumpEvaluated = true;
+                _lastJumpEvaluatedAt = DateTime.UtcNow;
+                _lastJumpMisfire = result.Misfire;
+                _lastJumpLandedFrame = landedFrame;
+                _lastJumpLandedSessionTimeMs = landedSessionTimeMs;
+                _lastJumpDeltaMs = result.DeltaMs == int.MaxValue ? -1 : result.DeltaMs;
+                _lastJumpNearestFingerprint = result.NearestFingerprint;
+
+                int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+                string indexPath = subSessionId > 0
+                    ? ReplayIncidentIndexOutputPaths.GetFilePathForSubSession(subSessionId)
+                    : "";
+
+                var fields = ReplayControlActions.BuildMisfireLogFields(
+                    _lastJumpDirection,
+                    _lastJumpExpectedFrame,
+                    _lastJumpExpectedSessionTimeMs,
+                    _lastJumpExpectedFingerprint,
+                    result,
+                    indexPath);
+                MergeSessionAndRoutingFields(fields);
+                string level = result.Misfire ? "WARN" : "DEBUG";
+                _logger?.Structured(level, "simhub-plugin", "replay_jump_misfire",
+                    result.Misfire ? "Replay jump misfire detected." : "Replay jump landed on expected incident.",
+                    fields, SessionLogging.DomainAction, null);
+
+                try
+                {
+                    SentrySdk.AddBreadcrumb(
+                        message: "replay_jump_misfire",
+                        category: "action",
+                        level: result.Misfire ? BreadcrumbLevel.Warning : BreadcrumbLevel.Info,
+                        data: new System.Collections.Generic.Dictionary<string, string>
+                        {
+                            ["direction"] = _lastJumpDirection ?? "",
+                            ["delta_ms"] = _lastJumpDeltaMs.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        });
+                }
+                catch { }
+            }
+            catch (Exception ex)
+            {
+                try { SentrySdk.CaptureException(ex); } catch { }
+            }
         }
 #endif
 

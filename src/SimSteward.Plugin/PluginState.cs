@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Newtonsoft.Json;
 
 namespace SimSteward.Plugin
@@ -160,5 +161,169 @@ namespace SimSteward.Plugin
 
         [JsonProperty("autoWalkActive")]
         public bool AutoWalkActive { get; set; }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Test rig — replay_state_tick / replay_sweep_progress_tick wire payloads
+    // (docs/RULES-TestRig-Contract.md). Field names use snake_case to match the
+    // existing dashboard contract for these channels.
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Root payload for <c>replay_state_tick</c> (250 ms cadence).</summary>
+    public sealed class ReplayStateTickPayload
+    {
+        [JsonProperty("type")]
+        public string Type { get; set; } = "replay_state_tick";
+
+        [JsonProperty("ts")]
+        public string Ts { get; set; } = "";
+
+        [JsonProperty("frame")]
+        public int Frame { get; set; }
+
+        [JsonProperty("frame_end")]
+        public int FrameEnd { get; set; }
+
+        [JsonProperty("session_time")]
+        public double SessionTime { get; set; }
+
+        [JsonProperty("paused")]
+        public bool Paused { get; set; }
+
+        [JsonProperty("speed")]
+        public int Speed { get; set; }
+
+        [JsonProperty("direction")]
+        public string Direction { get; set; } = "forward";
+
+        [JsonProperty("slow_motion")]
+        public bool SlowMotion { get; set; }
+
+        [JsonProperty("aggregates")]
+        public ReplayStateAggregates Aggregates { get; set; } = new ReplayStateAggregates();
+
+        [JsonProperty("drivers")]
+        public List<ReplayStateDriverRow> Drivers { get; set; } = new List<ReplayStateDriverRow>();
+
+        [JsonProperty("misfire")]
+        public ReplayStateLastJump Misfire { get; set; } = new ReplayStateLastJump();
+    }
+
+    /// <summary>Wraps the two aggregate buckets (<c>ours</c> and <c>yaml</c>).</summary>
+    public sealed class ReplayStateAggregates
+    {
+        [JsonProperty("ours")]
+        public ReplayStateAggregateBucket Ours { get; set; } = new ReplayStateAggregateBucket();
+
+        [JsonProperty("yaml")]
+        public ReplayStateAggregateBucket Yaml { get; set; } = new ReplayStateAggregateBucket();
+    }
+
+    /// <summary>Counters bucket for <c>aggregates.ours</c> / <c>aggregates.yaml</c>.</summary>
+    /// <remarks>Every field is nullable so the YAML-in-progress rule can emit explicit nulls
+    /// (which the dashboard renders as "—" instead of misleading "0").</remarks>
+    public sealed class ReplayStateAggregateBucket
+    {
+        [JsonProperty("incidents")]
+        public int? Incidents { get; set; }
+
+        [JsonProperty("points")]
+        public int? Points { get; set; }
+
+        [JsonProperty("off_tracks")]
+        public int? OffTracks { get; set; }
+
+        [JsonProperty("car_contacts")]
+        public int? CarContacts { get; set; }
+    }
+
+    /// <summary>Per-driver row in the live aggregator table.</summary>
+    public sealed class ReplayStateDriverRow
+    {
+        [JsonProperty("pos")]
+        public int Pos { get; set; }
+
+        [JsonProperty("car_idx")]
+        public int CarIdx { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; } = "";
+
+        [JsonProperty("cust_id")]
+        public string CustId { get; set; } = "";
+
+        [JsonProperty("our_inc")]
+        public int OurInc { get; set; }
+
+        [JsonProperty("yaml_inc")]
+        public int? YamlInc { get; set; }
+
+        [JsonProperty("our_pts")]
+        public int OurPts { get; set; }
+
+        [JsonProperty("off_tracks")]
+        public int OffTracks { get; set; }
+
+        [JsonProperty("car_contacts")]
+        public int CarContacts { get; set; }
+    }
+
+    /// <summary>Misfire payload on <c>replay_state_tick.misfire</c>. All-null when inactive.</summary>
+    public sealed class ReplayStateLastJump
+    {
+        [JsonProperty("active")]
+        public bool Active { get; set; }
+
+        [JsonProperty("direction")]
+        public string Direction { get; set; }
+
+        [JsonProperty("expected_frame")]
+        public int? ExpectedFrame { get; set; }
+
+        [JsonProperty("landed_frame")]
+        public int? LandedFrame { get; set; }
+
+        [JsonProperty("delta_frames")]
+        public int? DeltaFrames { get; set; }
+
+        [JsonProperty("delta_ms")]
+        public int? DeltaMs { get; set; }
+
+        [JsonProperty("expected_fingerprint")]
+        public string ExpectedFingerprint { get; set; }
+
+        [JsonProperty("nearest_fingerprint")]
+        public string NearestFingerprint { get; set; }
+    }
+
+    /// <summary>Root payload for <c>replay_sweep_progress_tick</c> (~1 Hz during FF sweep).</summary>
+    public sealed class ReplaySweepProgressPayload
+    {
+        [JsonProperty("type")]
+        public string Type { get; set; } = "replay_sweep_progress_tick";
+
+        [JsonProperty("ts")]
+        public string Ts { get; set; } = "";
+
+        [JsonProperty("frame")]
+        public int Frame { get; set; }
+
+        [JsonProperty("frame_end")]
+        public int FrameEnd { get; set; }
+
+        [JsonProperty("samples_so_far")]
+        public int SamplesSoFar { get; set; }
+
+        [JsonProperty("est_completion_pct")]
+        public double EstCompletionPct { get; set; }
+
+        [JsonProperty("est_remaining_ms")]
+        public long EstRemainingMs { get; set; }
+
+        [JsonProperty("telemetry_play_speed")]
+        public int TelemetryPlaySpeed { get; set; }
+
+        [JsonProperty("play_speed_requested")]
+        public int PlaySpeedRequested { get; set; }
     }
 }
