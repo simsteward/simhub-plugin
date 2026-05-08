@@ -39,7 +39,7 @@ namespace SimSteward.Plugin
     /// </summary>
     public sealed class ReplayIncidentIndexSessionEntry
     {
-        [JsonProperty("session_num")]
+        [JsonProperty("sessionNum")]
         public int SessionNum { get; set; }
 
         [JsonProperty("name")]
@@ -48,7 +48,7 @@ namespace SimSteward.Plugin
         [JsonProperty("type")]
         public string Type { get; set; }
 
-        [JsonProperty("impact_class")]
+        [JsonProperty("impactClass")]
         public string ImpactClass { get; set; }
     }
 
@@ -75,7 +75,7 @@ namespace SimSteward.Plugin
         [JsonProperty("replayFrame")]
         public int ReplayFrame { get; set; }
 
-        [JsonProperty("session_num")]
+        [JsonProperty("sessionNum")]
         public int SessionNum { get; set; } = IncidentSample.SessionNumUnknown;
     }
 
