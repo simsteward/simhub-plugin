@@ -2038,6 +2038,7 @@ namespace SimSteward.Plugin
                 try { playerIncidents = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
                 int playerCarIdx = SafeGetInt("PlayerCarIdx");
 
+                int sessionNumLive = SafeGetInt("SessionNum");
                 var samples = _liveDetector.Process(
                     rst,
                     _replayIndexScratchCarIdxSessionFlags,
@@ -2045,7 +2046,8 @@ namespace SimSteward.Plugin
                     playerCarIdx,
                     replayFrame,
                     _replayIndexScratchCarIdxTrackSurface,
-                    _replayIndexScratchCarIdxLap);
+                    _replayIndexScratchCarIdxLap,
+                    sessionNumLive);
                 for (int i = 0; i < samples.Count; i++)
                     _liveAggregator.Apply(samples[i]);
 

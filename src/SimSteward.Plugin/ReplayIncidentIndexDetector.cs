@@ -73,7 +73,8 @@ namespace SimSteward.Plugin
             int playerCarIdx,
             int replayFrame,
             int[] trackSurface = null,
-            int[] carIdxLap = null)
+            int[] carIdxLap = null,
+            int sessionNum = IncidentSample.SessionNumUnknown)
         {
             ValidateLength(nameof(flags), flags, ReplayIncidentIndexBuild.CarSlotCount);
 
@@ -94,7 +95,8 @@ namespace SimSteward.Plugin
                         ReplayIncidentIndexDetection.SourceRepairFlag,
                         null,
                         replayFrame,
-                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown));
+                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
+                        sessionNum));
                 }
 
                 if (ReplayIncidentIndexDetection.IsRisingEdge(prev, curr, ReplayIncidentIndexDetection.FurledSessionFlag)
@@ -106,7 +108,8 @@ namespace SimSteward.Plugin
                         ReplayIncidentIndexDetection.SourceFurledFlag,
                         null,
                         replayFrame,
-                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown));
+                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
+                        sessionNum));
                 }
 
                 _prevFlags[i] = curr;
@@ -126,7 +129,8 @@ namespace SimSteward.Plugin
                             ReplayIncidentIndexDetection.SourceTrackSurface,
                             null,
                             replayFrame,
-                            carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown));
+                            carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
+                            sessionNum));
                     }
                     _prevTrackSurface[i] = currSurf;
                 }
@@ -145,7 +149,8 @@ namespace SimSteward.Plugin
                         ReplayIncidentIndexDetection.SourcePlayerIncidentCount,
                         points,
                         replayFrame,
-                        carIdxLap != null && playerCarIdx < carIdxLap.Length ? carIdxLap[playerCarIdx] : SessionLogging.LapUnknown));
+                        carIdxLap != null && playerCarIdx < carIdxLap.Length ? carIdxLap[playerCarIdx] : SessionLogging.LapUnknown,
+                        sessionNum));
                 }
 
                 _prevPlayerIncidents = playerIncidents;

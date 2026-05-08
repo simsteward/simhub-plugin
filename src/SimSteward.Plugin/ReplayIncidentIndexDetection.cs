@@ -52,13 +52,17 @@ namespace SimSteward.Plugin
     /// <summary>One primary incident detection (TR-012–TR-016); fingerprint added in M4.</summary>
     public readonly struct IncidentSample
     {
+        /// <summary>Default sentinel for unknown session number (e.g. live ticks before SessionNum is read).</summary>
+        public const int SessionNumUnknown = -1;
+
         public IncidentSample(
             int carIdx,
             int sessionTimeMs,
             string detectionSource,
             int? incidentPoints,
             int replayFrame,
-            int lap = SessionLogging.LapUnknown)
+            int lap = SessionLogging.LapUnknown,
+            int sessionNum = SessionNumUnknown)
         {
             CarIdx = carIdx;
             SessionTimeMs = sessionTimeMs;
@@ -66,6 +70,7 @@ namespace SimSteward.Plugin
             IncidentPoints = incidentPoints;
             ReplayFrame = replayFrame;
             Lap = lap;
+            SessionNum = sessionNum;
         }
 
         public int CarIdx { get; }
@@ -74,5 +79,6 @@ namespace SimSteward.Plugin
         public int? IncidentPoints { get; }
         public int ReplayFrame { get; }
         public int Lap { get; }
+        public int SessionNum { get; }
     }
 }

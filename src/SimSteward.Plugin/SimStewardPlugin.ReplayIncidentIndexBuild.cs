@@ -1,5 +1,6 @@
 #if SIMHUB_SDK
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using IRSDKSharper;
@@ -403,6 +404,7 @@ namespace SimSteward.Plugin
 
                 int playerCarIdx = SafeGetInt("PlayerCarIdx");
                 int replayFrame = SafeGetInt("ReplayFrameNum");
+                int sessionNum = SafeGetInt("SessionNum");
                 var tick = _replayIndexDetector.Process(
                     replaySessionTimeSec,
                     _replayIndexScratchCarIdxSessionFlags,
@@ -410,7 +412,8 @@ namespace SimSteward.Plugin
                     playerCarIdx,
                     replayFrame,
                     _replayIndexScratchCarIdxTrackSurface,
-                    _replayIndexScratchCarIdxLap);
+                    _replayIndexScratchCarIdxLap,
+                    sessionNum);
                 if (tick.Count > 0)
                 {
                     _replayIndexIncidentSamples.AddRange(tick);
@@ -533,6 +536,7 @@ namespace SimSteward.Plugin
                     _replayIndexIncidentSamples,
                     _replayIndexLastValidationBlock,
                     path);
+                root.Sessions = BuildReplayIndexSessionsLocked();
                 string json = ReplayIncidentIndexDocumentBuilder.Serialize(root);
                 ReplayIncidentIndexOutputPaths.WriteJsonAtomic(path, json);
                 ReplayIncidentIndexDashboardNotifyIndexWritten(subSessionId, root);
@@ -614,6 +618,79 @@ namespace SimSteward.Plugin
 
             LogActionResult("replay_incident_index_build", arg, correlationId, true, "");
             return (true, "ok", null);
+        }
+
+        /// <summary>
+        /// Mirror <c>SessionInfo.Sessions[]</c> into the on-disk lookup block, classifying
+        /// each session via <see cref="SessionTypeImpactClass"/>. Unknown <c>SessionType</c>
+        /// strings emit a structured WARN (fail-safe = "free") and the entry is still written.
+        /// </summary>
+        private IReadOnlyList<ReplayIncidentIndexSessionEntry> BuildReplayIndexSessionsLocked()
+        {
+            var entries = new List<ReplayIncidentIndexSessionEntry>();
+            try
+            {
+                var sessionInfo = _irsdk?.Data?.SessionInfo;
+                if (!(sessionInfo?.SessionInfo?.Sessions is IList list)) return entries;
+
+                int subSessionId = sessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+
+                foreach (var o in list)
+                {
+                    if (o == null) continue;
+                    var t = o.GetType();
+                    var snProp = t.GetProperty("SessionNum");
+                    var nameProp = t.GetProperty("SessionName");
+                    var typeProp = t.GetProperty("SessionType");
+
+                    int sn = -1;
+                    var snVal = snProp?.GetValue(o);
+                    if (snVal is int i) sn = i;
+                    else if (snVal != null) int.TryParse(snVal.ToString(), out sn);
+
+                    string name = nameProp?.GetValue(o)?.ToString() ?? "";
+                    string type = typeProp?.GetValue(o)?.ToString() ?? "";
+
+                    if (!SessionTypeImpactClass.IsKnown(type))
+                    {
+                        try
+                        {
+                            var wf = new Dictionary<string, object>
+                            {
+                                ["session_type"] = type,
+                                ["session_num"] = sn,
+                                ["sub_session_id"] = subSessionId
+                            };
+                            MergeSessionAndRoutingFields(wf);
+                            _logger.Structured(
+                                "WARN",
+                                "simhub-plugin",
+                                "session_type_unrecognized",
+                                "Unrecognized SessionType '" + type + "' for session " + sn + " — classifying as 'free' (fail-safe).",
+                                wf,
+                                "iracing",
+                                null);
+                        }
+                        catch
+                        {
+                            // logging must not abort sessions[] build
+                        }
+                    }
+
+                    entries.Add(new ReplayIncidentIndexSessionEntry
+                    {
+                        SessionNum = sn,
+                        Name = name,
+                        Type = type,
+                        ImpactClass = SessionTypeImpactClass.Classify(type)
+                    });
+                }
+            }
+            catch
+            {
+                // never abort index finalize on yaml reflection error
+            }
+            return entries;
         }
 
         /// <summary>Read one int per car slot into <paramref name="buffer"/>, defaulting to 0 on any error.</summary>
