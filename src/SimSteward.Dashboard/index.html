@@ -504,6 +504,7 @@ Sentry.init({
       <span class="diag-item"><span class="d-dot" id="d-simhub"></span>SimHub</span>
     </div>
     <a href="replay-incident-index.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Replay incident index (TR-031–TR-038)">Replay index →</a>
+    <a href="test-rig.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Test rig (Phase 2)">Test rig →</a>
 <span class="ws-badge disconnected" id="ws-badge">WS ○</span>
   </header>
 
@@ -528,9 +529,9 @@ Sentry.init({
         </div>
         <div class="btn-row">
           <button type="button" class="btn" title="Jump to start" onclick="ra('replay_jump','start','replay-jump-start')">⏮</button>
-          <button type="button" class="btn" title="Rewind 4×"    onclick="ra('replay_speed','-4','replay-rewind')">⏪</button>
+          <button type="button" class="btn" title="Rewind 4×"    onclick="rewind4x()">⏪</button>
           <button type="button" class="btn" id="replay-play-pause-btn" title="Pause replay" onclick="toggleReplayPlayPause()">⏸</button>
-          <button type="button" class="btn" title="Forward 4×"   onclick="ra('replay_speed','4','replay-forward')">⏩</button>
+          <button type="button" class="btn" title="Forward 4×"   onclick="forward4x()">⏩</button>
           <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end','replay-jump-end')">⏭</button>
         </div>
         <div class="btn-row">
@@ -1582,10 +1583,10 @@ function updatePlayPauseBtn() {
 function toggleReplayPlayPause() {
   if (replayPaused) {
     replayPaused = false;
-    ra('replay_speed', lastReplaySpeed, 'replay-play-pause');
+    ra('replay_play', '', 'replay-play-pause');
   } else {
     replayPaused = true;
-    ra('replay_speed', '0', 'replay-play-pause');
+    ra('replay_pause', '', 'replay-play-pause');
   }
   updatePlayPauseBtn();
 }
@@ -1596,7 +1597,23 @@ function setSpeed(el) {
   lastReplaySpeed = el.dataset.s || '1';
   replayPaused = false;
   updatePlayPauseBtn();
-  ra('replay_speed', el.dataset.s);
+  ra('replay_set_speed', el.dataset.s);
+}
+
+function rewind4x() {
+  ra('replay_set_speed', '4', 'replay-rewind');
+  ra('replay_set_direction', 'reverse', 'replay-rewind');
+  lastReplaySpeed = '4';
+  replayPaused = false;
+  updatePlayPauseBtn();
+}
+
+function forward4x() {
+  ra('replay_set_speed', '4', 'replay-forward');
+  ra('replay_set_direction', 'forward', 'replay-forward');
+  lastReplaySpeed = '4';
+  replayPaused = false;
+  updatePlayPauseBtn();
 }
 function seekInc(frame) {
   sendDashboardUiEvent({

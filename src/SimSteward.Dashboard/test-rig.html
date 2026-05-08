@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Sim Steward — Test rig</title>
+<style>
+:root {
+  --bg: #080808; --bg2: #0e0e0e; --surface: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.08);
+  --accent: #1f9cff; --green: #0ef272; --red: #ff5f5f; --yellow: #ffc840; --cyan: #0dd8ff;
+  --text: #f0f0f0; --muted: rgba(240,240,240,0.45);
+  --r: 10px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; background: var(--bg); color: var(--text); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 12px 14px 28px; display: flex; flex-direction: column; gap: 10px; }
+.topnav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.78rem; }
+.topnav a { color: var(--accent); text-decoration: none; }
+.topnav a:hover { text-decoration: underline; }
+.ws-pill { margin-left: auto; font-size: 0.68rem; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); }
+.ws-pill.ok { color: var(--green); border-color: rgba(14,242,114,0.35); }
+.ws-pill.bad { color: var(--red); border-color: rgba(255,95,95,0.35); }
+.banner { padding: 10px 14px; border-radius: var(--r); border: 1px solid var(--border);
+  background: rgba(255,200,64,0.06); font-size: 0.82rem; line-height: 1.4; display: flex; gap: 10px; align-items: center; }
+.banner.err { border-color: rgba(255,95,95,0.4); background: rgba(255,95,95,0.07); }
+.banner .x { margin-left: auto; cursor: pointer; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); font-size: 0.78rem; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; }
+.panel-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.row:last-child { margin-bottom: 0; }
+.btn { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.04);
+  color: var(--text); font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
+.btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
+.btn.active { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.18); }
+.spill { padding: 6px 12px; border: 1px solid var(--border); border-radius: 99px; background: rgba(255,255,255,0.03); color: var(--text); font-size: 0.74rem; cursor: pointer; }
+.spill.active { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.14); }
+.spill:disabled { opacity: 0.45; cursor: not-allowed; }
+.mode-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--border); font-size: 0.72rem; }
+.mode-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.mode-pill.replay { border-color: rgba(31,156,255,0.45); color: var(--accent); }
+.mode-pill.replay .dot { background: var(--accent); }
+.mode-pill.waiting { color: var(--muted); }
+.frame-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(0,0,0,0.3); color: var(--text); font-family: "Courier New", monospace; font-size: 0.78rem; width: 110px; }
+.meta { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+.meta strong { color: var(--text); font-weight: 600; }
+.mono { font-family: "Courier New", monospace; font-size: 0.72rem; }
+.counters { display: grid; grid-template-columns: 80px repeat(4, 1fr); gap: 6px; font-size: 0.78rem; }
+.counters .lbl { color: var(--muted); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 6px; align-self: center; }
+.counters .cell { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 2px; }
+.counters .cell .ck { color: var(--muted); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.counters .cell .cv { font-family: "Courier New", monospace; font-size: 0.95rem; }
+.counters .cell.delta-pos .cv { color: var(--green); }
+.counters .cell.delta-neg .cv { color: var(--red); }
+.table-wrap { overflow: auto; max-height: min(560px, 60vh); border: 1px solid var(--border); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { position: sticky; top: 0; background: #121212; cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; }
+th:hover { color: var(--text); }
+th.sort-asc::after { content: ' ▲'; color: var(--accent); }
+th.sort-desc::after { content: ' ▼'; color: var(--accent); }
+tr:hover td { background: rgba(255,255,255,0.02); }
+tr.row-delta td { background: rgba(255,200,64,0.06); }
+tr.row-delta:hover td { background: rgba(255,200,64,0.10); }
+.sweep-overlay { padding: 14px 16px; border: 1px solid rgba(255,200,64,0.4); background: rgba(255,200,64,0.06); border-radius: var(--r); font-size: 0.82rem; }
+.sweep-overlay strong { color: var(--yellow); }
+.sweep-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); margin-top: 8px; overflow: hidden; }
+.sweep-bar > div { height: 100%; background: var(--yellow); transition: width 0.3s ease; }
+.toast { position: fixed; bottom: 16px; right: 16px; max-width: 400px; padding: 10px 14px;
+  background: rgba(18,18,22,0.97); border: 1px solid var(--border); border-radius: 8px; font-size: 0.78rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 50; }
+.toast.show { opacity: 1; }
+[hidden] { display: none !important; }
+</style>
+<script src="https://browser.sentry-cdn.com/9.27.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>
+<script>
+Sentry.init({
+  dsn: 'https://46ad94b35a51979ba4223eeffe38f5c8@o4511097126780928.ingest.us.sentry.io/4511103122210816',
+  environment: 'local',
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [Sentry.replayIntegration()],
+  initialScope: { tags: { dashboard: 'test-rig', page: 'test-rig' } },
+});
+</script>
+</head>
+<body>
+<div class="wrap">
+  <nav class="topnav">
+    <a href="index.html">← Sim Steward dashboard</a>
+    <a href="replay-incident-index.html">Replay index →</a>
+    <span style="color:var(--muted)">Test rig (Phase 2)</span>
+    <span class="ws-pill bad" id="ws-pill">WS …</span>
+  </nav>
+
+  <div class="banner err" id="tr-misfire-banner" hidden>
+    <span><strong>Jump misfire.</strong>
+      <span id="tr-misfire-detail">—</span></span>
+    <button type="button" class="x" id="tr-misfire-dismiss" onclick="dismissMisfire()">✕</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Replay state</div>
+    <div class="row">
+      <span class="mode-pill waiting" id="tr-state-pill"><span class="dot"></span><span id="tr-state-text">Waiting…</span></span>
+      <span class="meta mono" id="tr-state-meta">frame —/— · t=— · — × · forward</span>
+    </div>
+    <div class="row">
+      <button type="button" class="btn primary" id="tr-play-pause" onclick="onPlayPause()" disabled>▶ Play</button>
+      <button type="button" class="btn" id="tr-jump-start" onclick="onJump('start')" disabled title="Jump to start of replay">⏮ Start</button>
+      <button type="button" class="btn" id="tr-prev-incident" onclick="onJumpIncident('prev')" disabled title="Jump to previous incident">⟵ Prev incident</button>
+      <button type="button" class="btn" id="tr-next-incident" onclick="onJumpIncident('next')" disabled title="Jump to next incident">Next incident ⟶</button>
+      <button type="button" class="btn" id="tr-jump-end" onclick="onJump('end')" disabled title="Jump to end of replay">⏭ End</button>
+      <button type="button" class="btn" id="tr-direction-toggle" onclick="onDirectionToggle()" disabled title="Toggle replay direction">⇄ Reverse</button>
+    </div>
+    <div class="row">
+      <span class="meta" style="margin-right:4px">Speed:</span>
+      <button type="button" class="spill" id="tr-speed-1"  onclick="onSetSpeed(1)"  disabled>1×</button>
+      <button type="button" class="spill" id="tr-speed-2"  onclick="onSetSpeed(2)"  disabled>2×</button>
+      <button type="button" class="spill" id="tr-speed-4"  onclick="onSetSpeed(4)"  disabled>4×</button>
+      <button type="button" class="spill" id="tr-speed-8"  onclick="onSetSpeed(8)"  disabled>8×</button>
+      <button type="button" class="spill" id="tr-speed-16" onclick="onSetSpeed(16)" disabled>16×</button>
+    </div>
+    <div class="row">
+      <span class="meta" style="margin-right:4px">Seek frame:</span>
+      <input type="number" class="frame-input" id="tr-seek-frame-input" placeholder="frame #" min="0" step="1"/>
+      <button type="button" class="btn primary" id="tr-seek-frame-go" onclick="onSeekFrame()" disabled>Go</button>
+    </div>
+  </div>
+
+  <div class="panel" id="tr-sweep-panel" hidden>
+    <div class="panel-title">Index build (fast-forward sweep)</div>
+    <div class="sweep-overlay">
+      <div>Building index… <strong id="tr-sweep-frame">frame —/—</strong> · <span id="tr-sweep-samples">— samples</span> · <span id="tr-sweep-eta">ETA —</span></div>
+      <div class="sweep-bar"><div id="tr-sweep-bar-fill" style="width:0%"></div></div>
+      <div class="meta" style="margin-top:6px" id="tr-sweep-speed">play_speed —</div>
+    </div>
+  </div>
+
+  <div class="panel" id="tr-counters-panel">
+    <div class="panel-title">Aggregates (ours vs YAML)</div>
+    <div class="counters" id="tr-counters">
+      <div class="lbl"></div>
+      <div class="cell"><span class="ck">Total inc</span><span class="cv" id="tr-cnt-ours-inc">—</span></div>
+      <div class="cell"><span class="ck">Total pts</span><span class="cv" id="tr-cnt-ours-pts">—</span></div>
+      <div class="cell"><span class="ck">Off-tracks</span><span class="cv" id="tr-cnt-ours-off">—</span></div>
+      <div class="cell"><span class="ck">Car contacts</span><span class="cv" id="tr-cnt-ours-cnt">—</span></div>
+
+      <div class="lbl">Ours</div>
+      <div class="cell"><span class="ck">total inc</span><span class="cv" id="tr-cnt-ours-inc-lbl">—</span></div>
+      <div class="cell"><span class="ck">total pts</span><span class="cv" id="tr-cnt-ours-pts-lbl">—</span></div>
+      <div class="cell"><span class="ck">off</span><span class="cv" id="tr-cnt-ours-off-lbl">—</span></div>
+      <div class="cell"><span class="ck">cnt</span><span class="cv" id="tr-cnt-ours-cnt-lbl">—</span></div>
+
+      <div class="lbl">YAML</div>
+      <div class="cell"><span class="ck">total inc</span><span class="cv" id="tr-cnt-yaml-inc">—</span></div>
+      <div class="cell"><span class="ck">total pts</span><span class="cv" id="tr-cnt-yaml-pts">—</span></div>
+      <div class="cell"><span class="ck">off</span><span class="cv" id="tr-cnt-yaml-off">—</span></div>
+      <div class="cell"><span class="ck">cnt</span><span class="cv" id="tr-cnt-yaml-cnt">—</span></div>
+
+      <div class="lbl">Δ</div>
+      <div class="cell" id="tr-cnt-d-inc-cell"><span class="ck">total inc</span><span class="cv" id="tr-cnt-d-inc">—</span></div>
+      <div class="cell" id="tr-cnt-d-pts-cell"><span class="ck">total pts</span><span class="cv" id="tr-cnt-d-pts">—</span></div>
+      <div class="cell" id="tr-cnt-d-off-cell"><span class="ck">off</span><span class="cv" id="tr-cnt-d-off">—</span></div>
+      <div class="cell" id="tr-cnt-d-cnt-cell"><span class="ck">cnt</span><span class="cv" id="tr-cnt-d-cnt">—</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Per-driver</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr id="tr-thead-row">
+            <th data-k="pos"          id="tr-table-sort-pos">Pos</th>
+            <th data-k="name"         id="tr-table-sort-name">Driver</th>
+            <th data-k="cust_id"      id="tr-table-sort-cust_id">CustID</th>
+            <th data-k="our_inc"      id="tr-table-sort-our_inc">Our#</th>
+            <th data-k="yaml_inc"     id="tr-table-sort-yaml_inc">YAML#</th>
+            <th data-k="our_pts"      id="tr-table-sort-our_pts">Pts</th>
+            <th data-k="off_tracks"   id="tr-table-sort-off_tracks">Off</th>
+            <th data-k="car_contacts" id="tr-table-sort-car_contacts">Cnt</th>
+            <th data-k="delta"        id="tr-table-sort-delta">Δ</th>
+          </tr>
+        </thead>
+        <tbody id="tr-tbody"></tbody>
+      </table>
+    </div>
+    <p class="meta" id="tr-empty-hint" style="margin-top:8px">No replay tick received yet. Load a replay; ticks arrive every 250 ms while in Replay mode (and not during a fast-forward sweep).</p>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const WS_PORT = 19847;
+function wsUrl() {
+  const h = window.location.hostname || 'localhost';
+  const p = new URLSearchParams(window.location.search);
+  const tok = p.get('token') || p.get('wsToken');
+  if (tok) return 'ws://' + h + ':' + WS_PORT + '/?token=' + encodeURIComponent(tok);
+  return 'ws://' + h + ':' + WS_PORT;
+}
+
+let ws = null;
+let wsBackoffMs = 500;
+let lastTick = null;
+let lastSweep = null;
+let isSweeping = false;
+let lastSeekAt = 0;
+let lastJumpAt = 0;
+let sortKey = 'pos';
+let sortDir = 1;
+const rowCache = new Map(); // cust_id -> { tr, cells: { pos, name, cust_id, our_inc, yaml_inc, our_pts, off_tracks, car_contacts, delta } }
+
+function connectWs() {
+  const pill = document.getElementById('ws-pill');
+  try {
+    pill.textContent = 'WS …';
+    pill.className = 'ws-pill bad';
+    ws = new WebSocket(wsUrl());
+    ws.onopen = () => {
+      pill.textContent = 'WS connected';
+      pill.className = 'ws-pill ok';
+      wsBackoffMs = 500;
+      setControlsEnabled(true);
+    };
+    ws.onclose = () => {
+      ws = null;
+      pill.textContent = 'WS reconnecting…';
+      pill.className = 'ws-pill bad';
+      setControlsEnabled(false);
+      const wait = Math.min(wsBackoffMs, 5000);
+      wsBackoffMs = Math.min(wsBackoffMs * 2, 5000);
+      setTimeout(connectWs, wait);
+    };
+    ws.onerror = () => {};
+    ws.onmessage = (e) => {
+      try { onMsg(JSON.parse(e.data)); }
+      catch (err) { if (typeof Sentry !== 'undefined') Sentry.captureException(err); }
+    };
+  } catch (err) {
+    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
+    setTimeout(connectWs, 3000);
+  }
+}
+
+function send(action, arg) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    toast('WebSocket not connected.');
+    return false;
+  }
+  ws.send(JSON.stringify({ action, arg: arg ?? '' }));
+  return true;
+}
+
+function logUi(elementId, message, eventType) {
+  send('log', JSON.stringify({
+    event: 'dashboard_ui_event',
+    element_id: elementId,
+    event_type: eventType || 'click',
+    message: message,
+    domain: 'ui'
+  }));
+}
+
+function onMsg(m) {
+  if (!m || !m.type) return;
+  try {
+    if (m.type === 'replay_state_tick') applyTick(m);
+    else if (m.type === 'replay_sweep_progress_tick') applySweepTick(m);
+    else if (m.type === 'actionResult') onActionResult(m);
+  } catch (err) {
+    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
+  }
+}
+
+// ── Tick handler ─────────────────────────────────────────
+function applyTick(m) {
+  // Sweep ended → hide overlay, show counters
+  if (isSweeping) {
+    isSweeping = false;
+    document.getElementById('tr-sweep-panel').hidden = true;
+    document.getElementById('tr-counters-panel').hidden = false;
+  }
+  lastTick = m;
+  renderStatePill(m);
+  renderCounters(m.aggregates || {});
+  renderTable(m.drivers || []);
+  renderMisfire(m.misfire || null);
+  document.getElementById('tr-empty-hint').hidden = (m.drivers && m.drivers.length > 0);
+}
+
+function renderStatePill(m) {
+  const pill = document.getElementById('tr-state-pill');
+  const text = document.getElementById('tr-state-text');
+  const meta = document.getElementById('tr-state-meta');
+  const playPause = document.getElementById('tr-play-pause');
+  const dirBtn = document.getElementById('tr-direction-toggle');
+  pill.className = 'mode-pill replay';
+  text.textContent = m.paused ? 'Paused' : 'Playing';
+  const fr = m.frame != null ? m.frame : '—';
+  const fe = m.frame_end != null ? m.frame_end : '—';
+  const t = m.session_time != null ? m.session_time.toFixed(1) : '—';
+  const sp = m.speed != null ? m.speed : '—';
+  const dir = m.direction || 'forward';
+  const slow = m.slow_motion ? ' (slow)' : '';
+  const newMeta = 'frame ' + fr + '/' + fe + ' · t=' + t + 's · ' + sp + '×' + slow + ' · ' + dir;
+  if (meta.textContent !== newMeta) meta.textContent = newMeta;
+  // Play/Pause button
+  const ppLabel = m.paused ? '▶ Play' : '⏸ Pause';
+  if (playPause.textContent !== ppLabel) playPause.textContent = ppLabel;
+  playPause.title = m.paused ? 'Resume replay' : 'Pause replay';
+  playPause.dataset.paused = m.paused ? '1' : '0';
+  // Direction toggle label
+  const dirLabel = dir === 'reverse' ? '⇄ Forward' : '⇄ Reverse';
+  if (dirBtn.textContent !== dirLabel) dirBtn.textContent = dirLabel;
+  dirBtn.dataset.dir = dir;
+  // Speed pill active state
+  document.querySelectorAll('.spill[id^="tr-speed-"]').forEach((b) => {
+    const id = b.id;
+    const want = id === 'tr-speed-' + sp;
+    b.classList.toggle('active', want);
+  });
+}
+
+function renderCounters(agg) {
+  const ours = agg.ours || {};
+  const yaml = agg.yaml || null; // null when YAML in-progress
+  setCellNum('tr-cnt-ours-inc', ours.incidents);
+  setCellNum('tr-cnt-ours-pts', ours.points);
+  setCellNum('tr-cnt-ours-off', ours.off_tracks);
+  setCellNum('tr-cnt-ours-cnt', ours.car_contacts);
+  setCellNum('tr-cnt-ours-inc-lbl', ours.incidents);
+  setCellNum('tr-cnt-ours-pts-lbl', ours.points);
+  setCellNum('tr-cnt-ours-off-lbl', ours.off_tracks);
+  setCellNum('tr-cnt-ours-cnt-lbl', ours.car_contacts);
+  if (!yaml) {
+    ['tr-cnt-yaml-inc','tr-cnt-yaml-pts','tr-cnt-yaml-off','tr-cnt-yaml-cnt',
+     'tr-cnt-d-inc','tr-cnt-d-pts','tr-cnt-d-off','tr-cnt-d-cnt'].forEach(id => setText(id, '—'));
+    ['tr-cnt-d-inc-cell','tr-cnt-d-pts-cell','tr-cnt-d-off-cell','tr-cnt-d-cnt-cell'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('delta-pos','delta-neg');
+    });
+    return;
+  }
+  setCellNum('tr-cnt-yaml-inc', yaml.incidents);
+  setCellNum('tr-cnt-yaml-pts', yaml.points);
+  setCellNum('tr-cnt-yaml-off', yaml.off_tracks);
+  setCellNum('tr-cnt-yaml-cnt', yaml.car_contacts);
+  setDelta('tr-cnt-d-inc', 'tr-cnt-d-inc-cell', ours.incidents, yaml.incidents);
+  setDelta('tr-cnt-d-pts', 'tr-cnt-d-pts-cell', ours.points, yaml.points);
+  setDelta('tr-cnt-d-off', 'tr-cnt-d-off-cell', ours.off_tracks, yaml.off_tracks);
+  setDelta('tr-cnt-d-cnt', 'tr-cnt-d-cnt-cell', ours.car_contacts, yaml.car_contacts);
+}
+
+function setCellNum(id, val) {
+  const txt = (val == null) ? '—' : String(val);
+  setText(id, txt);
+}
+function setText(id, txt) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== txt) el.textContent = txt;
+}
+function setDelta(textId, cellId, ours, yaml) {
+  const cell = document.getElementById(cellId);
+  if (ours == null || yaml == null) {
+    setText(textId, '—');
+    cell.classList.remove('delta-pos','delta-neg');
+    return;
+  }
+  const d = ours - yaml;
+  const sign = d > 0 ? '+' : '';
+  setText(textId, sign + d);
+  cell.classList.toggle('delta-pos', d > 0);
+  cell.classList.toggle('delta-neg', d < 0);
+}
+
+// ── Per-driver table ─────────────────────────────────────
+function renderTable(drivers) {
+  const tbody = document.getElementById('tr-tbody');
+  // Drop rows for drivers no longer present
+  const seen = new Set();
+  for (const d of drivers) seen.add(String(d.cust_id));
+  for (const [cid, entry] of Array.from(rowCache.entries())) {
+    if (!seen.has(cid)) {
+      entry.tr.remove();
+      rowCache.delete(cid);
+    }
+  }
+  // Ensure rows exist for every driver
+  for (const d of drivers) {
+    const cid = String(d.cust_id);
+    if (!rowCache.has(cid)) {
+      rowCache.set(cid, buildRow(cid));
+      tbody.appendChild(rowCache.get(cid).tr);
+    }
+  }
+  // Sort
+  const sorted = drivers.slice().sort(compareDrivers);
+  // Reorder DOM via appendChild (no new node creation)
+  for (const d of sorted) {
+    const entry = rowCache.get(String(d.cust_id));
+    if (entry) tbody.appendChild(entry.tr);
+  }
+  // Update cell text via diff
+  for (const d of sorted) {
+    const entry = rowCache.get(String(d.cust_id));
+    if (!entry) continue;
+    const c = entry.cells;
+    setCellText(c.pos, valOrDash(d.pos));
+    setCellText(c.name, d.name || '—');
+    setCellText(c.cust_id, d.cust_id != null ? String(d.cust_id) : '—');
+    setCellText(c.our_inc, valOrDash(d.our_inc));
+    setCellText(c.yaml_inc, d.yaml_inc == null ? '—' : String(d.yaml_inc));
+    setCellText(c.our_pts, valOrDash(d.our_pts));
+    setCellText(c.off_tracks, valOrDash(d.off_tracks));
+    setCellText(c.car_contacts, valOrDash(d.car_contacts));
+    let deltaTxt = '—';
+    let deltaVal = null;
+    if (d.yaml_inc != null && d.our_inc != null) {
+      deltaVal = d.our_inc - d.yaml_inc;
+      deltaTxt = (deltaVal > 0 ? '+' : '') + deltaVal;
+    }
+    setCellText(c.delta, deltaTxt);
+    const isDelta = (deltaVal != null && deltaVal !== 0);
+    if (entry.tr.classList.contains('row-delta') !== isDelta) {
+      entry.tr.classList.toggle('row-delta', isDelta);
+    }
+  }
+  updateSortIndicators();
+}
+
+function buildRow(cid) {
+  const tr = document.createElement('tr');
+  tr.dataset.cid = cid;
+  const cells = {};
+  ['pos','name','cust_id','our_inc','yaml_inc','our_pts','off_tracks','car_contacts','delta'].forEach((k) => {
+    const td = document.createElement('td');
+    if (k === 'cust_id') td.className = 'mono';
+    if (k === 'our_inc' || k === 'yaml_inc' || k === 'our_pts' || k === 'off_tracks' || k === 'car_contacts' || k === 'delta' || k === 'pos') td.style.fontFamily = '"Courier New", monospace';
+    td.textContent = '—';
+    tr.appendChild(td);
+    cells[k] = td;
+  });
+  return { tr, cells };
+}
+
+function setCellText(td, txt) {
+  if (td.textContent !== txt) td.textContent = txt;
+}
+function valOrDash(v) { return v == null ? '—' : String(v); }
+
+function compareDrivers(a, b) {
+  const k = sortKey;
+  let av, bv;
+  if (k === 'delta') {
+    av = (a.yaml_inc == null || a.our_inc == null) ? null : (a.our_inc - a.yaml_inc);
+    bv = (b.yaml_inc == null || b.our_inc == null) ? null : (b.our_inc - b.yaml_inc);
+  } else {
+    av = a[k]; bv = b[k];
+  }
+  if (av == null && bv == null) return 0;
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
+  return String(av).localeCompare(String(bv)) * sortDir;
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll('th[data-k]').forEach((th) => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.getAttribute('data-k') === sortKey) {
+      th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    }
+  });
+}
+
+// ── Misfire banner ───────────────────────────────────────
+function renderMisfire(mf) {
+  const banner = document.getElementById('tr-misfire-banner');
+  if (!mf || !mf.active) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  const detail = document.getElementById('tr-misfire-detail');
+  const dir = mf.direction || '?';
+  const exp = mf.expected_frame != null ? mf.expected_frame : '—';
+  const lan = mf.landed_frame != null ? mf.landed_frame : '—';
+  const dF = mf.delta_frames != null ? mf.delta_frames : '—';
+  const dMs = mf.delta_ms != null ? mf.delta_ms : '—';
+  detail.textContent = 'dir=' + dir + ' · expected frame ' + exp + ', landed ' + lan + ' (Δ ' + dF + ' frames / ' + dMs + ' ms)';
+}
+
+function dismissMisfire() {
+  logUi('tr-misfire-dismiss', 'Dismiss misfire banner', 'ui_interaction');
+  document.getElementById('tr-misfire-banner').hidden = true;
+}
+
+// ── Sweep tick handler ───────────────────────────────────
+function applySweepTick(m) {
+  isSweeping = true;
+  lastSweep = m;
+  document.getElementById('tr-sweep-panel').hidden = false;
+  document.getElementById('tr-counters-panel').hidden = true;
+  const fr = m.frame != null ? m.frame : '—';
+  const fe = m.frame_end != null ? m.frame_end : '—';
+  setText('tr-sweep-frame', 'frame ' + fr + '/' + fe);
+  setText('tr-sweep-samples', (m.samples_so_far != null ? m.samples_so_far : '—') + ' samples');
+  const eta = m.est_remaining_ms;
+  setText('tr-sweep-eta', eta == null ? 'ETA —' : ('ETA ' + Math.round(eta / 1000) + 's'));
+  const pct = m.est_completion_pct != null ? Math.max(0, Math.min(100, m.est_completion_pct)) : 0;
+  document.getElementById('tr-sweep-bar-fill').style.width = pct + '%';
+  setText('tr-sweep-speed', 'play_speed ' + (m.telemetry_play_speed != null ? m.telemetry_play_speed : '—') + ' (requested ' + (m.play_speed_requested != null ? m.play_speed_requested : '—') + ')');
+}
+
+// ── Actions ──────────────────────────────────────────────
+function onPlayPause() {
+  const btn = document.getElementById('tr-play-pause');
+  const paused = btn.dataset.paused === '1';
+  if (paused) {
+    logUi('tr-play-pause', 'Play replay');
+    send('replay_play', '');
+  } else {
+    logUi('tr-play-pause', 'Pause replay');
+    send('replay_pause', '');
+  }
+}
+
+function onSetSpeed(n) {
+  const id = 'tr-speed-' + n;
+  logUi(id, 'Set replay speed ' + n + '×');
+  send('replay_set_speed', String(n));
+}
+
+function onDirectionToggle() {
+  const btn = document.getElementById('tr-direction-toggle');
+  const cur = btn.dataset.dir || 'forward';
+  const next = cur === 'forward' ? 'reverse' : 'forward';
+  logUi('tr-direction-toggle', 'Set direction ' + next);
+  send('replay_set_direction', next);
+}
+
+function onSeekFrame() {
+  if (Date.now() - lastSeekAt < 800) { toast('Seek cooldown — wait a moment.'); return; }
+  const input = document.getElementById('tr-seek-frame-input');
+  const v = parseInt(input.value, 10);
+  if (!isFinite(v) || v < 0) { toast('Enter a frame number ≥ 0.'); return; }
+  lastSeekAt = Date.now();
+  logUi('tr-seek-frame-go', 'Seek to frame ' + v);
+  send('replay_seek_frame', String(v));
+}
+
+function onJump(which) {
+  if (Date.now() - lastSeekAt < 800) { toast('Seek cooldown.'); return; }
+  lastSeekAt = Date.now();
+  const id = which === 'start' ? 'tr-jump-start' : 'tr-jump-end';
+  logUi(id, 'Jump to ' + which);
+  send('replay_jump', which);
+}
+
+function onJumpIncident(dir) {
+  if (Date.now() - lastJumpAt < 800) { toast('Jump cooldown.'); return; }
+  lastJumpAt = Date.now();
+  const id = dir === 'next' ? 'tr-next-incident' : 'tr-prev-incident';
+  logUi(id, dir === 'next' ? 'Jump to next incident' : 'Jump to previous incident');
+  send(dir === 'next' ? 'replay_jump_next_incident' : 'replay_jump_prev_incident', '');
+}
+
+function onActionResult(m) {
+  if (m && m.success) return;
+  const err = (m && m.error) || '';
+  const map = {
+    not_connected: 'Not connected to iRacing.',
+    not_replay_mode: 'Not in replay mode.',
+    bad_arg: 'Bad request argument.',
+    seek_throttled: 'Seek throttled — try again in a moment.',
+    index_unavailable: 'Replay incident index not built yet.',
+    at_start: 'Already at first incident.',
+    at_end: 'Already at last incident.',
+    no_prior_speed: 'No prior speed recorded — set a speed first.',
+  };
+  toast(map[err] || err || 'Action failed');
+}
+
+// ── Disabled states ──────────────────────────────────────
+function setControlsEnabled(connected) {
+  const ids = [
+    'tr-play-pause','tr-jump-start','tr-jump-end','tr-prev-incident','tr-next-incident',
+    'tr-direction-toggle','tr-seek-frame-go',
+    'tr-speed-1','tr-speed-2','tr-speed-4','tr-speed-8','tr-speed-16'
+  ];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !connected;
+  });
+}
+
+// ── Toast ────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._id);
+  toast._id = setTimeout(() => t.classList.remove('show'), 3800);
+}
+
+// ── Sort headers ─────────────────────────────────────────
+document.querySelectorAll('th[data-k]').forEach((th) => {
+  th.addEventListener('click', () => {
+    const k = th.getAttribute('data-k');
+    logUi('tr-table-sort-' + k, 'Sort by ' + k, 'ui_interaction');
+    if (sortKey === k) sortDir = -sortDir;
+    else { sortKey = k; sortDir = 1; }
+    if (lastTick) renderTable(lastTick.drivers || []);
+    else updateSortIndicators();
+  });
+});
+
+connectWs();
+</script>
+</body>
+</html>
