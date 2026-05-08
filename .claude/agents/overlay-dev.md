@@ -64,6 +64,12 @@ UI-only (no WS action): `event_type:'ui_interaction'`.
 `src/SimSteward.Dashboard/index.html` · `src/SimSteward.Dashboard/replay-incident-index.html` · new `*.html` under same dir.
 Do not touch `src/SimSteward.Plugin/`.
 
+## Deployment (you do NOT run it — leave the repo green for the user)
+- `deploy.ps1` (repo root) auto-copies every `*.html` (and `README.txt`) from `src/SimSteward.Dashboard/` → SimHub `Web/sim-steward-dash/`. New HTML files are picked up automatically — no manifest update.
+- After deploy, the user refreshes the browser tab (or SimHub overlay window) to load the new HTML.
+- **Gate before user runs it:** valid HTML/JS (file opens cleanly), `tests/WebSocketConnectTest.ps1` still passes, no console errors when the page loads against a live plugin. Sentry init must match `replay-incident-index.html` (CDN script + `Sentry.init({...})` + `page=<name>` tag).
+- The agent leaves the repo deployable. The user runs `pwsh deploy.ps1` — never the agent.
+
 ## ContextStream
 - Find existing element IDs/patterns: `mcp__contextstream__search(mode="keyword", query="btn-next-incident")`
 - Past UI decisions: `mcp__contextstream__memory(action="decisions", query="dashboard")`

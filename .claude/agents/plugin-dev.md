@@ -50,6 +50,13 @@ Fallbacks: `SessionLogging.NotInSession` (strings) · `SessionLogging.LapUnknown
 - `Init()` for `AttachDelegate`/`AddAction` only
 - Fleck only, bind `0.0.0.0:19847`. No `HttpListener`.
 
+## Deployment (you do NOT run it — leave the repo green for the user)
+- `deploy.ps1` (repo root) is the only deploy path. Copies plugin DLLs → SimHub plugins folder; every `*.html` + `README.txt` from `src/SimSteward.Dashboard/` → SimHub `Web/sim-steward-dash/`. Pushes a `local-deployment` Loki event tagged `app=sim-steward, env={local|production}`.
+- **Gate before user runs it:** `dotnet test src/SimSteward.Plugin.Tests/` 0 fails AND `tests/*.ps1` (`ReplayWorkflowTest.ps1`, `WebSocketConnectTest.ps1`, `DeployLokiEventsTest.ps1`) pass AND `dotnet build` 0 errors / 0 new warnings.
+- **Retry-once-then-stop:** after 2 build/test fails, stop and report. Do NOT keep iterating.
+- The agent leaves the repo deployable. The user runs `pwsh deploy.ps1` — never the agent (SimHub must be closed; user controls that).
+- Mention deploy in the commit message only when the work meaningfully changes deploy behavior (new file copied, new env var read, manifest changed).
+
 ## ContextStream
 - Search: `mcp__contextstream__search(mode="keyword", query="MergeSessionAndRoutingFields")` — before reading files
 - Past decisions: `mcp__contextstream__memory(action="decisions", query="...")`
