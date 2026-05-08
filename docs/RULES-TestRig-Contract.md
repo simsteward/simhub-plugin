@@ -180,7 +180,7 @@ LoadReplayByPath -Path <string>
 ### `LoadReplay -SubSessionId N`
 
 1. Glob `C:\Users\winth\OneDrive\Documents\iRacing\replay\*.rpy`.
-2. Regex match each filename: `subses(\d{7,9})\b` (case-insensitive).
+2. Regex match each filename: `subses(\d{7,9})(?:\D|$)` (case-insensitive). The trailing `(?:\D|$)` rejects 10+ digit runs and matches cleanly before `.`/`_`/`-`/end-of-string. **Do not use `\b`** — `\b` does not fire between a digit and `_` because `_` is a word-char.
 3. Prefer exact `subses{id}.rpy`; fall back to embedded match.
 4. If 0 matches → `replay_load_failed` with `error: "not_found_locally"`.
 5. `Start-Process <path>` — Windows file association handles Steam handoff + iRacing UI launch.
