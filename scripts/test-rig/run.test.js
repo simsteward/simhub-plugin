@@ -15,6 +15,9 @@ const {
   evaluateAssertions,
   indexFilePath,
   SCENARIOS,
+  aggregateByImpactClass,
+  validateSmokeIndex,
+  buildSmokeReport,
 } = require('./run.js');
 
 // ── parseArgs ───────────────────────────────────────────────────────────────
@@ -50,7 +53,8 @@ test('parseArgs: rejects unknown flag', () => {
     /unknown_arg:--bogus/);
 });
 
-test('parseArgs: accepts all three scenarios', () => {
+test('parseArgs: accepts all four scenarios (incl. smoke)', () => {
+  assert.ok(SCENARIOS.includes('smoke'), 'smoke is registered');
   for (const s of SCENARIOS) {
     const r = parseArgs(['--subsession', '99999999', '--scenario', s]);
     assert.equal(r.scenario, s);
@@ -150,4 +154,112 @@ test('indexFilePath: falls back when LOCALAPPDATA missing', () => {
     if (orig === undefined) delete process.env.LOCALAPPDATA;
     else process.env.LOCALAPPDATA = orig;
   }
+});
+
+// ── smoke fixtures + helpers ────────────────────────────────────────────────
+
+const VALID_SMOKE_INDEX = {
+  sessions: [
+    { sessionNum: 0, name: 'PRACTICE', type: 'Open Practice', impactClass: 'free' },
+    { sessionNum: 1, name: 'QUALIFY',  type: 'Lone Qualify',  impactClass: 'partial' },
+    { sessionNum: 2, name: 'RACE',     type: 'Race',          impactClass: 'full' },
+  ],
+  incidents: [
+    { sessionNum: 0, fingerprint: 'a' },
+    { sessionNum: 0, fingerprint: 'b' },
+    { sessionNum: 1, fingerprint: 'c' },
+    { sessionNum: 2, fingerprint: 'd' },
+    { sessionNum: 2, fingerprint: 'e' },
+    { sessionNum: 2, fingerprint: 'f' },
+  ],
+};
+
+test('aggregateByImpactClass: sums incidents per session impactClass', () => {
+  const t = aggregateByImpactClass(VALID_SMOKE_INDEX.incidents, VALID_SMOKE_INDEX.sessions);
+  assert.deepEqual(t, { incidents: 6, free: 2, partial: 1, full: 3 });
+});
+
+test('aggregateByImpactClass: returns zeros on empty inputs', () => {
+  assert.deepEqual(
+    aggregateByImpactClass([], []),
+    { incidents: 0, free: 0, partial: 0, full: 0 },
+  );
+  assert.deepEqual(
+    aggregateByImpactClass(undefined, undefined),
+    { incidents: 0, free: 0, partial: 0, full: 0 },
+  );
+});
+
+test('validateSmokeIndex: passes on a valid index', () => {
+  const r = validateSmokeIndex(VALID_SMOKE_INDEX);
+  assert.equal(r.passed, true, `failures: ${JSON.stringify(r.failures)}`);
+  assert.deepEqual(r.failures, []);
+});
+
+test('validateSmokeIndex: flags missing sessions array', () => {
+  const r = validateSmokeIndex({ incidents: [] });
+  assert.equal(r.passed, false);
+  assert.ok(r.failures.includes('sessions_array_missing'));
+});
+
+test('validateSmokeIndex: flags empty sessions array', () => {
+  const r = validateSmokeIndex({ sessions: [], incidents: [] });
+  assert.equal(r.passed, false);
+  assert.ok(r.failures.includes('sessions_array_empty'));
+});
+
+test('validateSmokeIndex: flags missing incidents array', () => {
+  const r = validateSmokeIndex({
+    sessions: [{ sessionNum: 0, name: 'P', type: 'Practice', impactClass: 'free' }],
+  });
+  assert.equal(r.passed, false);
+  assert.ok(r.failures.includes('incidents_array_missing'));
+});
+
+test('validateSmokeIndex: flags invalid impactClass', () => {
+  const r = validateSmokeIndex({
+    sessions: [{ sessionNum: 0, impactClass: 'bogus' }],
+    incidents: [],
+  });
+  assert.equal(r.passed, false);
+  assert.ok(r.failures.some(f => f.startsWith('session_invalid_impact_class')),
+    `failures: ${JSON.stringify(r.failures)}`);
+});
+
+test('validateSmokeIndex: flags orphan incident sessionNum', () => {
+  const r = validateSmokeIndex({
+    sessions: [{ sessionNum: 0, impactClass: 'free' }],
+    incidents: [{ sessionNum: 0 }, { sessionNum: 99 }],
+  });
+  assert.equal(r.passed, false);
+  assert.ok(r.failures.some(f => f === 'incident_orphan_sessionNum:99'),
+    `failures: ${JSON.stringify(r.failures)}`);
+});
+
+test('buildSmokeReport: shape matches spec on valid input', () => {
+  const r = buildSmokeReport(VALID_SMOKE_INDEX, 304211, 85355778);
+  assert.equal(r.passed, true, `failures: ${JSON.stringify(r.failures)}`);
+  assert.equal(r.sub_session_id, 85355778);
+  assert.equal(r.duration_ms, 304211);
+  assert.deepEqual(r.totals, { incidents: 6, free: 2, partial: 1, full: 3 });
+  assert.equal(r.sessions.length, 3);
+  assert.deepEqual(r.sessions[0], {
+    sessionNum: 0, name: 'PRACTICE', type: 'Open Practice', impactClass: 'free', incidents: 2,
+  });
+  assert.deepEqual(r.sessions[2], {
+    sessionNum: 2, name: 'RACE', type: 'Race', impactClass: 'full', incidents: 3,
+  });
+  assert.deepEqual(r.failures, []);
+});
+
+test('buildSmokeReport: passed=false populates failures[]', () => {
+  const r = buildSmokeReport(
+    { sessions: [{ sessionNum: 0, impactClass: 'bogus' }], incidents: [{ sessionNum: 99 }] },
+    1234,
+    7777,
+  );
+  assert.equal(r.passed, false);
+  assert.ok(r.failures.length >= 2, `expected multiple failures, got: ${JSON.stringify(r.failures)}`);
+  assert.equal(r.sub_session_id, 7777);
+  assert.equal(r.duration_ms, 1234);
 });

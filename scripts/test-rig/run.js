@@ -6,7 +6,7 @@
 // Plan:      .claude/plans/zany-kindling-marble.md (Phase 6)
 //
 // Usage:
-//   node scripts/test-rig/run.js --subsession <id> --scenario <sweep|live-counters|jump-test>
+//   node scripts/test-rig/run.js --subsession <id> --scenario <sweep|live-counters|jump-test|smoke>
 //                                [--include-steam] [--teardown]
 //                                [--ws ws://localhost:19847]
 //                                [--reset-timeout-ms 600000]
@@ -36,6 +36,7 @@ const DEFAULT_SCENARIO_TIMEOUT_MS = {
   sweep:           20 * 60 * 1000,                          // 20 min
   'live-counters':  35 * 1000,                              // 30s play + 5s settle
   'jump-test':      45 * 1000,                              // 10 jumps × 2s + buffer
+  smoke:           20 * 60 * 1000,                          // 20 min — sweep is the long pole
 };
 const ANCHOR_TIMEOUT_MS           = 30 * 1000;
 const TICK_PROGRESS_INTERVAL_MS   = 5 * 1000;
@@ -60,7 +61,9 @@ function indexFilePath(subSessionId) {
 //  CLI parsing  (exported for unit tests)
 // ────────────────────────────────────────────────────────────────────────────
 
-const SCENARIOS = ['sweep', 'live-counters', 'jump-test'];
+const SCENARIOS = ['sweep', 'live-counters', 'jump-test', 'smoke'];
+
+const VALID_IMPACT_CLASSES = ['free', 'partial', 'full'];
 
 function parseArgs(argv) {
   const args = {
@@ -131,6 +134,7 @@ function printUsage() {
     '  sweep           Trigger replay_incident_index_build; wait for index JSON file.',
     '  live-counters   Play 30s @ 1×, capture every replay_state_tick.',
     '  jump-test       Fire 10 replay_jump_next_incident actions; record misfires.',
+    '  smoke           Rig health: WS liveness + sweep + per-impact-class breakdown.',
     '',
     'Artifacts:',
     '  logs/test-rig/<UTC ISO>/{run.json,events.jsonl,index.json,console.log}',
@@ -392,6 +396,7 @@ const scenarios = {
   sweep:          runSweepScenario,
   'live-counters': runLiveCountersScenario,
   'jump-test':    runJumpTestScenario,
+  smoke:          runSmokeScenario,
 };
 
 async function runSweepScenario({ ws, args, artifacts }) {
@@ -572,6 +577,242 @@ async function runJumpTestScenario({ ws, artifacts }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+//  Smoke scenario helpers (pure — exported for unit tests)
+// ────────────────────────────────────────────────────────────────────────────
+
+// Pull the case-tolerant array of incidents/sessions out of the index JSON.
+function _smokeIncidents(indexJson) {
+  if (!indexJson || typeof indexJson !== 'object') return [];
+  if (Array.isArray(indexJson.incidents)) return indexJson.incidents;
+  if (Array.isArray(indexJson.Incidents)) return indexJson.Incidents;
+  return [];
+}
+function _smokeSessions(indexJson) {
+  if (!indexJson || typeof indexJson !== 'object') return null;
+  if (Array.isArray(indexJson.sessions)) return indexJson.sessions;
+  if (Array.isArray(indexJson.Sessions)) return indexJson.Sessions;
+  return null;
+}
+function _sessionNum(o) {
+  if (!o || typeof o !== 'object') return undefined;
+  return o.sessionNum ?? o.SessionNum;
+}
+function _impactClass(o) {
+  if (!o || typeof o !== 'object') return undefined;
+  return o.impactClass ?? o.ImpactClass;
+}
+
+function aggregateByImpactClass(incidents, sessions) {
+  const incidentList = Array.isArray(incidents) ? incidents : [];
+  const sessionList  = Array.isArray(sessions)  ? sessions  : [];
+
+  // Look up sessionNum → impactClass.
+  const sessionImpactBySessionNum = new Map();
+  for (const s of sessionList) {
+    const n = _sessionNum(s);
+    if (n === undefined || n === null) continue;
+    sessionImpactBySessionNum.set(n, _impactClass(s));
+  }
+
+  const totals = { incidents: incidentList.length, free: 0, partial: 0, full: 0 };
+  for (const inc of incidentList) {
+    const n = _sessionNum(inc);
+    const cls = sessionImpactBySessionNum.get(n);
+    if (cls === 'free' || cls === 'partial' || cls === 'full') {
+      totals[cls]++;
+    }
+  }
+  return totals;
+}
+
+function validateSmokeIndex(indexJson) {
+  const failures = [];
+  if (!indexJson || typeof indexJson !== 'object') {
+    return { passed: false, failures: ['index_json_not_an_object'] };
+  }
+
+  const sessions = _smokeSessions(indexJson);
+  if (sessions === null) {
+    failures.push('sessions_array_missing');
+  } else if (sessions.length < 1) {
+    failures.push('sessions_array_empty');
+  }
+
+  const incidents = _smokeIncidents(indexJson);
+  if (!Array.isArray(indexJson.incidents) && !Array.isArray(indexJson.Incidents)) {
+    failures.push('incidents_array_missing');
+  }
+
+  // Validate impactClass values on each session.
+  if (Array.isArray(sessions)) {
+    for (const s of sessions) {
+      const cls = _impactClass(s);
+      if (!VALID_IMPACT_CLASSES.includes(cls)) {
+        failures.push(`session_invalid_impact_class:sessionNum=${_sessionNum(s)} impactClass=${cls === undefined ? '<missing>' : cls}`);
+      }
+    }
+  }
+
+  // Every incident.sessionNum must match some sessions[].sessionNum (no orphans).
+  if (Array.isArray(sessions) && (Array.isArray(indexJson.incidents) || Array.isArray(indexJson.Incidents))) {
+    const sessionNums = new Set(sessions.map(_sessionNum).filter(n => n !== undefined && n !== null));
+    for (const inc of incidents) {
+      const n = _sessionNum(inc);
+      if (n === undefined || n === null) {
+        failures.push('incident_missing_sessionNum');
+        continue;
+      }
+      if (!sessionNums.has(n)) {
+        failures.push(`incident_orphan_sessionNum:${n}`);
+      }
+    }
+  }
+
+  return { passed: failures.length === 0, failures };
+}
+
+function buildSmokeReport(indexJson, durationMs, subSessionId) {
+  const { passed, failures } = validateSmokeIndex(indexJson);
+  const incidents = _smokeIncidents(indexJson);
+  const sessions  = _smokeSessions(indexJson) || [];
+
+  const totals = aggregateByImpactClass(incidents, sessions);
+
+  // Per-session breakdown — count incidents whose sessionNum matches.
+  const perSession = sessions.map(s => {
+    const n = _sessionNum(s);
+    const count = incidents.reduce((acc, inc) => acc + (_sessionNum(inc) === n ? 1 : 0), 0);
+    return {
+      sessionNum:  n,
+      name:        s.name        ?? s.Name        ?? null,
+      type:        s.type        ?? s.Type        ?? null,
+      impactClass: _impactClass(s) ?? null,
+      incidents:   count,
+    };
+  });
+
+  return {
+    passed,
+    sub_session_id: subSessionId,
+    duration_ms:    durationMs,
+    totals,
+    sessions:       perSession,
+    failures,
+  };
+}
+
+async function runSmokeScenario({ ws, args, artifacts }) {
+  const startedTs = Date.now();
+  const indexPath = indexFilePath(args.subsession);
+  log(`[smoke] expecting index file at ${indexPath}`, artifacts);
+
+  // 1. Confirm liveness — pause + wait for one tick.
+  ws.send({ action: 'replay_pause', arg: '' });
+  let liveness;
+  try {
+    liveness = await ws.waitFor(
+      m => m.type === 'replay_state_tick',
+      { timeoutMs: ANCHOR_TIMEOUT_MS, label: 'smoke_liveness_tick' }
+    );
+    log(`[smoke] liveness ok — frame=${liveness.frame} paused=${liveness.paused}`, artifacts);
+  } catch (err) {
+    const report = buildSmokeReport({}, Date.now() - startedTs, args.subsession);
+    report.passed = false;
+    report.failures = [`liveness_tick_timeout:${err.message}`, ...(report.failures || [])];
+    await artifacts.writeJson('smoke.json', report);
+    return {
+      assertions: [
+        { name: 'ws_liveness',     passed: false, details: { error: err.message } },
+        { name: 'index_file_exists', passed: false, details: { skipped: true } },
+      ],
+      summary: report,
+    };
+  }
+
+  // 2. Pre-clean index file so we know the sweep produced it fresh.
+  try { await fsp.unlink(indexPath); log('[smoke] removed pre-existing index', artifacts); } catch {}
+
+  // 3. Trigger sweep.
+  ws.send({ action: 'replay_incident_index_build', arg: '' });
+  log('[smoke] dispatched replay_incident_index_build; polling for index file…', artifacts);
+
+  // 4. Poll for the file.
+  const deadline = Date.now() + args.scenarioTimeoutMs;
+  let indexExists = false;
+  while (Date.now() < deadline) {
+    try { await fsp.access(indexPath); indexExists = true; break; } catch {}
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  if (!indexExists) {
+    const report = buildSmokeReport({}, Date.now() - startedTs, args.subsession);
+    report.passed = false;
+    report.failures = [`index_file_missing_after_${args.scenarioTimeoutMs}ms:${indexPath}`, ...(report.failures || [])];
+    await artifacts.writeJson('smoke.json', report);
+    return {
+      assertions: [
+        { name: 'ws_liveness',       passed: true,  details: { frame: liveness.frame } },
+        { name: 'index_file_exists', passed: false, details: { path: indexPath, timeout_ms: args.scenarioTimeoutMs } },
+      ],
+      summary: report,
+    };
+  }
+
+  // 5. Read + parse.
+  let indexJson = null;
+  let parseError = null;
+  try {
+    const text = await fsp.readFile(indexPath, 'utf8');
+    indexJson = JSON.parse(text);
+    await artifacts.writeJson('index.json', indexJson);
+  } catch (err) {
+    parseError = err;
+  }
+
+  if (parseError) {
+    const report = buildSmokeReport({}, Date.now() - startedTs, args.subsession);
+    report.passed = false;
+    report.failures = [`index_file_unparsable:${parseError.message}`, ...(report.failures || [])];
+    await artifacts.writeJson('smoke.json', report);
+    return {
+      assertions: [
+        { name: 'ws_liveness',         passed: true,  details: { frame: liveness.frame } },
+        { name: 'index_file_exists',   passed: true,  details: { path: indexPath } },
+        { name: 'index_file_parsable', passed: false, details: { error: parseError.message } },
+      ],
+      summary: report,
+    };
+  }
+
+  // 6. Build smoke report (validates + aggregates).
+  const report = buildSmokeReport(indexJson, Date.now() - startedTs, args.subsession);
+  await artifacts.writeJson('smoke.json', report);
+  log(`[smoke] passed=${report.passed} totals=${JSON.stringify(report.totals)} `
+    + `sessions=${report.sessions.length} failures=${report.failures.length}`, artifacts);
+
+  // Each failure becomes its own assertion entry so they show up in run.json + Loki push.
+  const v = validateSmokeIndex(indexJson);
+  const assertions = [
+    { name: 'ws_liveness',                passed: true, details: { frame: liveness.frame } },
+    { name: 'index_file_exists',          passed: true, details: { path: indexPath } },
+    { name: 'index_file_parsable',        passed: true, details: { incident_rows: _smokeIncidents(indexJson).length } },
+    { name: 'sessions_present',           passed: !v.failures.includes('sessions_array_missing') && !v.failures.includes('sessions_array_empty'),
+      details: { count: (_smokeSessions(indexJson) || []).length } },
+    { name: 'incidents_array_present',    passed: !v.failures.includes('incidents_array_missing'),
+      details: { count: _smokeIncidents(indexJson).length } },
+    { name: 'all_impact_classes_valid',   passed: !v.failures.some(f => f.startsWith('session_invalid_impact_class')),
+      details: {} },
+    { name: 'no_orphan_incident_sessions', passed: !v.failures.some(f => f.startsWith('incident_orphan_sessionNum') || f === 'incident_missing_sessionNum'),
+      details: {} },
+  ];
+
+  return {
+    assertions,
+    summary: report,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 //  Assertion evaluator (exported for tests)
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -718,6 +959,11 @@ module.exports = {
   evaluateAssertions,
   indexFilePath,
   SCENARIOS,
+  // smoke helpers (pure — used by run.test.js)
+  aggregateByImpactClass,
+  validateSmokeIndex,
+  buildSmokeReport,
+  VALID_IMPACT_CLASSES,
   // for completeness — exposed for ad-hoc reuse
   pushLoki,
 };
