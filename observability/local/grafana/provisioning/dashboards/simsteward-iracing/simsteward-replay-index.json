@@ -1,0 +1,785 @@
+{
+  "uid": "simsteward-replay-index",
+  "title": "SimSteward — Replay Incident Index",
+  "description": "Tracks replay incident index build runs: performance, detection quality, validation results, and record window activity.",
+  "tags": ["simsteward", "iracing", "replay"],
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Index Build Summary",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "displayName": "Total Index Builds",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d4aa", "value": null },
+              { "color": "#ffd166", "value": 10 },
+              { "color": "#c77dff", "value": 50 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_fast_forward_complete\" [$__range]))",
+          "legendFormat": "Builds",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Index Builds",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "displayName": "Avg Build Time",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d4aa", "value": null },
+              { "color": "#ffd166", "value": 30000 },
+              { "color": "#f72585", "value": 120000 }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_fast_forward_complete\" | json index_build_time_ms=\"fields.index_build_time_ms\" | unwrap index_build_time_ms [$__range]))",
+          "legendFormat": "Avg Build Time",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Build Time",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 1,
+          "displayName": "Camera Seek Match %",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#f72585", "value": null },
+              { "color": "#ffd166", "value": 70 },
+              { "color": "#00d4aa", "value": 90 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "avg(avg_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_validation_summary\" | json camera_seek_match_percent=\"fields.camera_seek_match_percent\" | unwrap camera_seek_match_percent [$__range]))",
+          "legendFormat": "Camera Seek Match %",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Camera Seek Match %",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "displayName": "Total Discrepancies",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d4aa", "value": null },
+              { "color": "#ffd166", "value": 1 },
+              { "color": "#f72585", "value": 5 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(sum_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_validation_summary\" | json discrepancy_count=\"fields.discrepancy_count\" | unwrap discrepancy_count [$__range]))",
+          "legendFormat": "Discrepancies",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Discrepancies",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 101,
+      "title": "Build Performance",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#c77dff", "mode": "fixed" },
+          "custom": {
+            "barMaxWidth": 40,
+            "drawStyle": "bars",
+            "fillOpacity": 75,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "decimals": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 16, "x": 0, "y": 7 },
+      "id": 10,
+      "interval": "1h",
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "max_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_fast_forward_complete\" | json index_build_time_ms=\"fields.index_build_time_ms\" | unwrap index_build_time_ms [$__interval])",
+          "legendFormat": "Build Time (ms)",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Index Build Time per Run (ms)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#00d4aa", "mode": "fixed" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 7 },
+      "id": 11,
+      "interval": "1h",
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "max_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_fast_forward_complete\" | json detected_incident_samples=\"fields.detected_incident_samples\" | unwrap detected_incident_samples [$__interval])",
+          "legendFormat": "Incidents Detected",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Incidents Detected per Build",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 105,
+      "title": "Detection Breakdown",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "repair_flag" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#F7768E", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "furled_flag" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#FF9E64", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "player_incident_count" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#7AA2F7", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "track_surface" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#BB9AF7", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "id": 50,
+      "options": {
+        "barWidth": 0.97,
+        "fillOpacity": 80,
+        "groupWidth": 0.7,
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "stacking": "normal",
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "xTickLabelRotation": 0
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum by (detection_source) (count_over_time({app=\"sim-steward\", component=\"simhub-plugin\"} | json detection_source=\"fields.detection_source\" | __error__=\"\" | event=\"replay_incident_index_detection\" [$__interval]))",
+          "legendFormat": "{{detection_source}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Detections by Source",
+      "type": "barchart"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "id": 51,
+      "options": {
+        "barWidth": 0.97,
+        "fillOpacity": 80,
+        "groupWidth": 0.7,
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "orientation": "horizontal",
+        "stacking": "none",
+        "tooltip": { "mode": "single", "sort": "desc" },
+        "xField": "car_idx",
+        "xTickLabelRotation": 0
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum by (car_idx) (count_over_time({app=\"sim-steward\", component=\"simhub-plugin\"} | json car_idx=\"fields.car_idx\" | __error__=\"\" | event=\"replay_incident_index_detection\" [$__range]))",
+          "legendFormat": "{{car_idx}}",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Incident Count by Car Idx",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 106,
+      "title": "Fast-Forward Speed Stability",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#7AA2F7", "mode": "fixed" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true,
+            "thresholdStyle": { "mode": "line" }
+          },
+          "decimals": 2,
+          "noValue": "No ff_progress data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "#9ECE6A", "value": 3.75 }
+            ]
+          },
+          "unit": "hertz"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "id": 60,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "max_over_time({app=\"sim-steward\", component=\"simhub-plugin\"} | json effective_hz=\"fields.effective_sample_hz_vs_session_time\" | __error__=\"\" | event=\"replay_index_ff_progress\" | unwrap effective_hz [$__interval])",
+          "legendFormat": "Sample Hz",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Effective Sample Hz (target: 3.75)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "lost" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#F7768E", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "confirmed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#9ECE6A", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "id": 61,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(count_over_time({app=\"sim-steward\", component=\"simhub-plugin\"} | json | __error__=\"\" | event=\"replay_index_ff_speed_lost\" [$__interval]))",
+          "legendFormat": "lost",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(count_over_time({app=\"sim-steward\", component=\"simhub-plugin\"} | json | __error__=\"\" | event=\"replay_index_ff_speed_confirmed\" [$__interval]))",
+          "legendFormat": "confirmed",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "title": "Speed Events (Lost vs Confirmed)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 102,
+      "title": "Validation Quality",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#00d4aa", "mode": "fixed" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "lineWidth": 2,
+            "spanNulls": true
+          },
+          "decimals": 1,
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 35 },
+      "id": 20,
+      "interval": "1h",
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "max_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_validation_summary\" | json camera_seek_match_percent=\"fields.camera_seek_match_percent\" | unwrap camera_seek_match_percent [$__interval])",
+          "legendFormat": "Camera Seek Match %",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Camera Seek Match % Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#f72585", "mode": "fixed" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "spanNulls": false
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 35 },
+      "id": 21,
+      "interval": "1h",
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "max_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_validation_summary\" | json discrepancy_count=\"fields.discrepancy_count\" | unwrap discrepancy_count [$__interval])",
+          "legendFormat": "Discrepancies",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Discrepancy Count per Build",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
+      "id": 103,
+      "title": "Record Window Activity & Errors",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#c77dff", "mode": "fixed" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "spanNulls": false
+          },
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 45 },
+      "id": 30,
+      "interval": "1h",
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(sum_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_record_window\" | json telemetry_ticks=\"fields.telemetry_ticks\" | unwrap telemetry_ticks [$__interval]))",
+          "legendFormat": "Telemetry Ticks",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Telemetry Ticks per Record Window",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "displayName": "Build Errors",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d4aa", "value": null },
+              { "color": "#ffd166", "value": 1 },
+              { "color": "#f72585", "value": 3 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 45 },
+      "id": 31,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_build_error\" [$__range]))",
+          "legendFormat": "Build Errors",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Build Errors",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "displayName": "Build Cancellations",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d4aa", "value": null },
+              { "color": "#ffd166", "value": 1 },
+              { "color": "#f72585", "value": 5 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 45 },
+      "id": 32,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(count_over_time({app=\"sim-steward\"} | json | __error__=\"\" | event=\"replay_incident_index_build_cancelled\" [$__range]))",
+          "legendFormat": "Cancellations",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Build Cancellations",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "displayName": "Fast Repair Deltas",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d4aa", "value": null },
+              { "color": "#ffd166", "value": 1 },
+              { "color": "#f72585", "value": 10 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 49 },
+      "id": 33,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(sum_over_time({app=\"sim-steward\"} | json v=\"fields.fast_repair_delta_events\" | __error__=\"\" | event=\"replay_incident_index_fast_forward_complete\" | unwrap v [$__range]))",
+          "legendFormat": "Fast Repair Deltas",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Fast Repair Delta Events",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "displayName": "Speed Lost Count",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00d4aa", "value": null },
+              { "color": "#ffd166", "value": 1 },
+              { "color": "#f72585", "value": 5 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 49 },
+      "id": 34,
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "sum(count_over_time({app=\"sim-steward\", component=\"simhub-plugin\"} | json | __error__=\"\" | event=\"replay_index_ff_speed_lost\" [$__range]))",
+          "legendFormat": "Speed Lost",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Speed Lost Count",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
+      "id": 104,
+      "title": "Build Events Log",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 54 },
+      "id": 40,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "expr": "{app=\"sim-steward\"} | json | __error__=\"\" | event=~\"replay_incident_index_(fast_forward_complete|validation_summary|build_error|build_cancelled|started)\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Index Build Events Log",
+      "type": "logs"
+    }
+  ]
+}
