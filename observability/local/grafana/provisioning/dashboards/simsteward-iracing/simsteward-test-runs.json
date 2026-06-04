@@ -1,0 +1,452 @@
+{
+  "uid": "simsteward-test-runs",
+  "title": "SimSteward — Test Run Results",
+  "description": "Test rig run quality: assertion pass/fail, scenario duration, failure details.",
+  "tags": ["simsteward", "testing", "iracing"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "annotations": { "list": [] },
+  "editable": true,
+  "liveNow": false,
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+        "query": "label_values({app=\"sim-steward\",component=\"test-rig\"}, env)",
+        "current": { "text": "local", "value": "local" },
+        "includeAll": false,
+        "multi": false,
+        "refresh": 2,
+        "sort": 1,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Summary Stats",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+    {
+      "id": 1,
+      "title": "Last Run — Fail Count",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "instant",
+          "expr": "last_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_completed\" | unwrap fail_count [$__range])",
+          "legendFormat": "Fail Count"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#73BF69" },
+              { "value": 1, "color": "#F2495C" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Pass Rate %",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_assertion\" | passed=\"true\" [$__range])) / sum(count_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_assertion\" [$__range]))",
+          "legendFormat": "Pass Rate"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#F2495C" },
+              { "value": 0.9, "color": "#FF9830" },
+              { "value": 1, "color": "#73BF69" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Assertions Passed",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_assertion\" | passed=\"true\" [$__range]))",
+          "legendFormat": "Passed"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#808080" },
+              { "value": 1, "color": "#73BF69" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Last Run Duration",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "instant",
+          "expr": "last_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_completed\" | unwrap total_ms [$__range])",
+          "legendFormat": "Duration"
+        }
+      ],
+      "options": {
+        "colorMode": "background-gradient",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "#73BF69" },
+              { "value": 60000, "color": "#FF9830" },
+              { "value": 300000, "color": "#F2495C" }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Pass/Fail History",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 }
+    },
+    {
+      "id": 10,
+      "title": "Assertion Pass/Fail by Scenario Over Time",
+      "type": "barchart",
+      "gridPos": { "x": 0, "y": 7, "w": 24, "h": 9 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "range",
+          "expr": "sum by (scenario) (count_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_assertion\" | passed=\"true\" [$__interval]))",
+          "legendFormat": "{{scenario}} passed"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "range",
+          "expr": "sum by (scenario) (count_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_assertion\" | passed=\"false\" [$__interval]))",
+          "legendFormat": "{{scenario}} failed"
+        }
+      ],
+      "options": {
+        "barWidth": 0.6,
+        "stacking": "normal",
+        "groupWidth": 0.7,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "xField": "Time",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#F2495C" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Assertion Breakdown",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 1 }
+    },
+    {
+      "id": 20,
+      "title": "Total Assertions by Scenario (range)",
+      "type": "barchart",
+      "gridPos": { "x": 0, "y": 17, "w": 24, "h": 9 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "instant",
+          "expr": "sum by (scenario) (count_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_assertion\" | passed=\"true\" [$__range]))",
+          "legendFormat": "{{scenario}} — passed"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "instant",
+          "expr": "sum by (scenario) (count_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_assertion\" | passed=\"false\" [$__range]))",
+          "legendFormat": "{{scenario}} — failed"
+        }
+      ],
+      "options": {
+        "barWidth": 0.6,
+        "stacking": "normal",
+        "groupWidth": 0.7,
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "xField": "scenario",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byFrameRefID", "options": "A" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }]
+          },
+          {
+            "matcher": { "id": "byFrameRefID", "options": "B" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#F2495C" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "Performance",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 1 }
+    },
+    {
+      "id": 30,
+      "title": "Last Run Duration by Scenario",
+      "type": "barchart",
+      "gridPos": { "x": 0, "y": 27, "w": 12, "h": 9 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "instant",
+          "expr": "max by (scenario) (max_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_completed\" | unwrap total_ms [$__range]))",
+          "legendFormat": "{{scenario}}"
+        }
+      ],
+      "options": {
+        "barWidth": 0.6,
+        "stacking": "none",
+        "groupWidth": 0.7,
+        "fillOpacity": 80,
+        "gradientMode": "opacity",
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xField": "scenario",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 80, "lineWidth": 0 }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 31,
+      "title": "Scenario Duration Trend",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 27, "w": 12, "h": 9 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "range",
+          "expr": "max by (scenario) (max_over_time({app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_completed\" | unwrap total_ms [$__interval]))",
+          "legendFormat": "{{scenario}}"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "gradientMode": "opacity",
+            "spanNulls": true,
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 104,
+      "type": "row",
+      "title": "Failure Details",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 36, "w": 24, "h": 1 }
+    },
+    {
+      "id": 40,
+      "title": "Recent Failures",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 37, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "range",
+          "expr": "{app=\"sim-steward\",component=\"test-rig\",env=\"$env\"} | json | __error__=\"\" | event=\"test_rig_run_failed\"",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    },
+    {
+      "id": 41,
+      "title": "All Test Rig Logs",
+      "type": "logs",
+      "gridPos": { "x": 12, "y": 37, "w": 12, "h": 10 },
+      "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "grafanacloud-logs" },
+          "queryType": "range",
+          "expr": "{app=\"sim-steward\",component=\"test-rig\",env=\"$env\"}",
+          "legendFormat": ""
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    }
+  ]
+}
