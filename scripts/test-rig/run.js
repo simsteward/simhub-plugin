@@ -240,6 +240,7 @@ class WsClient {
     this.artifacts  = artifacts;
     this.ws         = null;
     this.lastTick   = null;     // last replay_state_tick observed
+    this.lastHello  = null;     // last session_hello observed
     this.handlers   = new Set();
   }
   connect({ timeoutMs = 15000 } = {}) {
@@ -281,6 +282,7 @@ class WsClient {
         try { parsed = JSON.parse(text); } catch { return; }
         this.artifacts?.appendEvent({ ts: new Date().toISOString(), dir: 'in', msg: parsed });
         if (parsed.type === 'replay_state_tick') this.lastTick = parsed;
+        if (parsed.type === 'session_hello') this.lastHello = parsed;
         for (const h of this.handlers) {
           try { h(parsed); } catch (err) { log(`[ws] handler error: ${err.message}`, this.artifacts); }
         }
@@ -826,6 +828,31 @@ async function main(argv) {
     phase = 'ws_connect';
     const ws = new WsClient(args.wsUrl, artifacts);
     await ws.connect({ timeoutMs: 30000 });
+
+    phase = 'session_hello';
+    const helloIsReady = m =>
+      m && m.type === 'session_hello' &&
+      Number.isFinite(m.sub_session_id) && m.sub_session_id > 0;
+    let helloSubId = null;
+    if (helloIsReady(ws.lastHello)) {
+      helloSubId = ws.lastHello.sub_session_id;
+    } else {
+      try {
+        const hello = await ws.waitFor(helloIsReady,
+          { timeoutMs: ANCHOR_TIMEOUT_MS, label: 'session_hello' });
+        helloSubId = hello.sub_session_id;
+      } catch { helloSubId = null; }
+    }
+
+    const resolved = resolveSubsession({ flagValue: args.subsession, helloValue: helloSubId });
+    if (!resolved.ok) {
+      const message = resolved.error === 'subsession_mismatch'
+        ? `subsession_mismatch: --subsession=${resolved.flag} but loaded replay=${resolved.loaded}`
+        : 'no_replay_loaded: open iRacing and load a replay first';
+      throw new Error(message);
+    }
+    args.subsession = resolved.subsession;
+    log(`[run] subsession=${args.subsession} (source=${resolved.source})`, artifacts);
 
     phase = 'anchor';
     await anchorAtStart(ws, artifacts);
