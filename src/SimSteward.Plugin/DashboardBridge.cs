@@ -15,12 +15,14 @@ namespace SimSteward.Plugin
         private readonly object _clientLock = new object();
         private readonly Func<string> _getStateForNewClient;
         private readonly Func<string> _getLogTailForNewClient;
+        private readonly Func<string> _getHelloForNewClient;
         private readonly Func<string, string, string, (bool success, string result, string error)> _dispatchAction;
         private readonly Action<string, string, string> _onLog;
         private readonly Action<string, string, Dictionary<string, object>> _onStructuredLog;
         private readonly PluginLogger _logger;
         private readonly Action<Exception, string> _onSendError;
         private readonly Action _onNoClients;
+        private readonly Action _onLastClientDisconnected;
         private string _authToken;
 
         public DashboardBridge(
@@ -31,16 +33,20 @@ namespace SimSteward.Plugin
             PluginLogger logger = null,
             Action<string, string, Dictionary<string, object>> onStructuredLog = null,
             Action<Exception, string> onSendError = null,
-            Action onNoClients = null)
+            Action onNoClients = null,
+            Action onLastClientDisconnected = null,
+            Func<string> getHelloForNewClient = null)
         {
             _getStateForNewClient = getStateForNewClient ?? (() => "{}");
             _getLogTailForNewClient = getLogTailForNewClient;
+            _getHelloForNewClient = getHelloForNewClient ?? (() => null);
             _dispatchAction = dispatchAction ?? ((_, __, ___) => (false, null, "missing_dispatch"));
             _onLog = onLog ?? ((_, __, ___) => { });
             _onStructuredLog = onStructuredLog;
             _logger = logger;
             _onSendError = onSendError;
             _onNoClients = onNoClients;
+            _onLastClientDisconnected = onLastClientDisconnected;
         }
 
         public void Start(string bindAddress, int port, string authToken)
@@ -87,6 +93,17 @@ namespace SimSteward.Plugin
                             SentrySdk.CaptureException(ex);
                             _logger?.Warn($"DashboardBridge: getLogTailForNewClient failed: {ex.Message}");
                         }
+                        try
+                        {
+                            var helloJson = _getHelloForNewClient?.Invoke();
+                            if (!string.IsNullOrEmpty(helloJson))
+                                socket.Send(helloJson);
+                        }
+                        catch (Exception ex)
+                        {
+                            SentrySdk.CaptureException(ex);
+                            _logger?.Warn($"DashboardBridge: getHelloForNewClient failed: {ex.Message}");
+                        }
                     };
 
                     socket.OnClose = () =>
@@ -100,6 +117,8 @@ namespace SimSteward.Plugin
                         var clientIp = socket.ConnectionInfo?.ClientIpAddress ?? "unknown";
                         _logger?.Structured("INFO", "bridge", "ws_client_disconnected", "client disconnected",
                             new Dictionary<string, object> { ["client_ip"] = clientIp, ["client_count"] = clientCount });
+                        if (clientCount == 0)
+                            _onLastClientDisconnected?.Invoke();
                     };
 
                     socket.OnMessage = msg => HandleMessage(socket, msg);
@@ -170,6 +189,21 @@ namespace SimSteward.Plugin
             }
             if (clientCount == 0)
                 _onNoClients?.Invoke();
+        }
+
+        public void BroadcastHello(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return;
+            List<IWebSocketConnection> snapshot;
+            lock (_clientLock)
+            {
+                snapshot = new List<IWebSocketConnection>(_clients);
+            }
+            foreach (var client in snapshot)
+            {
+                try { client.Send(json); }
+                catch (Exception ex) { _onSendError?.Invoke(ex, "hello"); }
+            }
         }
 
         private bool Authenticate(IWebSocketConnection socket)
