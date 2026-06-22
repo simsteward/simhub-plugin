@@ -11,10 +11,12 @@ namespace SimSteward.Plugin
     {
         private readonly int[] _prevFlags = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _prevTrackSurface = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _prevFastRepairs = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastRepairEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastFurledEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastPlayerEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastSurfaceEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly double[] _lastFastRepairEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
 
         private int _prevPlayerIncidents;
 
@@ -27,7 +29,7 @@ namespace SimSteward.Plugin
         /// <summary>
         /// TR-005/006/017 baseline: first <see cref="Process"/> compares against these arrays, not zeros.
         /// </summary>
-        public void Reset(int[] baselineFlags, int baselinePlayerIncidents, int playerCarIdx, int[] baselineTrackSurface = null)
+        public void Reset(int[] baselineFlags, int baselinePlayerIncidents, int playerCarIdx, int[] baselineTrackSurface = null, int[] baselineFastRepairs = null)
         {
             ValidateLength(nameof(baselineFlags), baselineFlags, ReplayIncidentIndexBuild.CarSlotCount);
             if (playerCarIdx < -1 || playerCarIdx >= ReplayIncidentIndexBuild.CarSlotCount)
@@ -41,12 +43,18 @@ namespace SimSteward.Plugin
             else
                 Array.Clear(_prevTrackSurface, 0, _prevTrackSurface.Length);
 
+            if (baselineFastRepairs != null && baselineFastRepairs.Length >= ReplayIncidentIndexBuild.CarSlotCount)
+                Array.Copy(baselineFastRepairs, 0, _prevFastRepairs, 0, ReplayIncidentIndexBuild.CarSlotCount);
+            else
+                Array.Clear(_prevFastRepairs, 0, _prevFastRepairs.Length);
+
             for (int i = 0; i < ReplayIncidentIndexBuild.CarSlotCount; i++)
             {
                 _lastRepairEmitSec[i]  = -1;
                 _lastFurledEmitSec[i]  = -1;
                 _lastPlayerEmitSec[i]  = -1;
                 _lastSurfaceEmitSec[i] = -1;
+                _lastFastRepairEmitSec[i] = -1;
             }
         }
 
@@ -76,7 +84,8 @@ namespace SimSteward.Plugin
             int[] carIdxLap = null,
             int sessionNum = IncidentSample.SessionNumUnknown,
             float[] carIdxLapDistPct = null,
-            int[] carIdxPosition = null)
+            int[] carIdxPosition = null,
+            int[] carIdxFastRepairsUsed = null)
         {
             ValidateLength(nameof(flags), flags, ReplayIncidentIndexBuild.CarSlotCount);
 
@@ -143,6 +152,28 @@ namespace SimSteward.Plugin
                             carPosition: carIdxPosition != null && i < carIdxPosition.Length && carIdxPosition[i] > 0 ? (int?)carIdxPosition[i] : null));
                     }
                     _prevTrackSurface[i] = currSurf;
+                }
+
+                // Fast repair: CarIdxFastRepairsUsed rising edge detection.
+                if (carIdxFastRepairsUsed != null && carIdxFastRepairsUsed.Length > i)
+                {
+                    int prevFR = _prevFastRepairs[i];
+                    int currFR = carIdxFastRepairsUsed[i];
+                    if (currFR > prevFR
+                        && TryTakePrimarySlot(_lastFastRepairEmitSec, i, replaySessionTimeSec))
+                    {
+                        results.Add(new IncidentSample(
+                            i,
+                            sessionTimeMs,
+                            ReplayIncidentIndexDetection.SourceFastRepair,
+                            null,
+                            replayFrame,
+                            carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
+                            sessionNum,
+                            lapDistPct: carIdxLapDistPct != null && i < carIdxLapDistPct.Length ? (float?)carIdxLapDistPct[i] : null,
+                            carPosition: carIdxPosition != null && i < carIdxPosition.Length && carIdxPosition[i] > 0 ? (int?)carIdxPosition[i] : null));
+                    }
+                    _prevFastRepairs[i] = currFR;
                 }
             }
 

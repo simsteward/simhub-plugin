@@ -22,6 +22,7 @@ namespace SimSteward.Plugin
         public const string SourceTrackSurface = "track_surface";
         /// <summary>Per-driver Incidents delta observed in SessionInfoYaml ResultsPositions[] between snapshots.</summary>
         public const string SourceYamlIncidentDelta = "yaml_incident_delta";
+        public const string SourceFastRepair = "fast_repair";
 
         /// <summary>iRacing SessionFlags bit: checkered flag shown.</summary>
         public const int CheckeredSessionFlag = 0x0001;

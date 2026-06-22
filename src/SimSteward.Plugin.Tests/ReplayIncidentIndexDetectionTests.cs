@@ -334,5 +334,39 @@ namespace SimSteward.Plugin.Tests
             Assert.Equal(0.72f, r[0].LapDistPct);
             Assert.Equal(5, r[0].CarPosition);
         }
+
+        [Fact]
+        public void Process_FastRepairIncrement_EmitsFastRepairRow()
+        {
+            var d = new ReplayIncidentIndexDetector();
+            var baseFlags = Zeros64();
+            var baseFastRepairs = Zeros64();
+            d.Reset(baseFlags, 0, 0, baselineFastRepairs: baseFastRepairs);
+
+            var flags = Zeros64();
+            var fastRepairs = Zeros64();
+            fastRepairs[4] = 1; // car 4 used one fast repair
+
+            var r = d.Process(15.0, flags, 0, 0, 200, carIdxFastRepairsUsed: fastRepairs);
+
+            Assert.Single(r);
+            Assert.Equal(4, r[0].CarIdx);
+            Assert.Equal("fast_repair", r[0].DetectionSource);
+        }
+
+        [Fact]
+        public void Process_FastRepairNoChange_EmitsNothing()
+        {
+            var d = new ReplayIncidentIndexDetector();
+            var baseFastRepairs = Zeros64();
+            baseFastRepairs[4] = 1;
+            d.Reset(Zeros64(), 0, 0, baselineFastRepairs: baseFastRepairs);
+
+            var fastRepairs = Zeros64();
+            fastRepairs[4] = 1; // same as baseline — no increment
+
+            var r = d.Process(15.0, Zeros64(), 0, 0, 200, carIdxFastRepairsUsed: fastRepairs);
+            Assert.Empty(r);
+        }
     }
 }
