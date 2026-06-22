@@ -518,7 +518,155 @@ All `CarIdx*` arrays are indexed 0-63 (max 64 cars). Index corresponds to `CarId
 
 ---
 
-## Appendix B: Permanently Removed Fields
+## Appendix B: Replay Control — Broadcast Commands & Known Bugs
+
+The iRacing SDK provides **fire-and-forget broadcast commands** to control the sim. These are NOT telemetry reads — they are outbound messages with no return value. State changes must be observed via telemetry polling.
+
+### B.1 Broadcast Message Types (BroadcastMessageTypes enum)
+
+| Value | Name | Parameters | Purpose |
+|---|---|---|---|
+| 0 | CamSwitchPos | carPosition, cameraGroup, cameraNumber | Switch camera by race position |
+| 1 | CamSwitchNum | carNumber, cameraGroup, cameraNumber | Switch camera by car number |
+| 2 | CamSetState | CameraState bitfield | Set camera state flags |
+| 3 | ReplaySetPlaySpeed | speed, slowMotion (bool) | Set replay playback speed |
+| 4 | ReplaySetPlayPosition | RpyPosMode, frameNumber | Seek to absolute frame |
+| 5 | ReplaySearch | RpySrchMode | Search replay for event |
+| 6 | ReplaySetState | RpyStateMode | Replay state control |
+| 7 | ReloadTextures | — | Reload car textures |
+| 8 | ChatCommand | — | Send chat command |
+| 9 | PitCommand | PitCommandMode, value | Configure pit stop |
+| 10 | TelemCommand | TelemCommandMode | Control telemetry recording |
+
+### B.2 Replay Search Modes (ReplaySearchModeTypes)
+
+| Value | Name | Behavior | SimSteward Usage |
+|---|---|---|---|
+| 0 | ToStart | Jump to frame 0 | ReplayIncidentIndexBuild — start of sweep |
+| 1 | ToEnd | Jump to last frame | ReplayIncidentIndexBuild — end-of-replay detection |
+| 2 | PreviousSession | Jump to start of previous session | `replay_session prev` action |
+| 3 | NextSession | Jump to start of next session | `replay_session next` action |
+| 4 | PreviousLap | Jump to start of previous lap | not yet used |
+| 5 | NextLap | Jump to start of next lap | not yet used |
+| 6 | PreviousFrame | Step back one frame | not yet used |
+| 7 | NextFrame | Step forward one frame | not yet used |
+| 8 | PreviousIncident | **Jump to previous incident** | `replay_jump_prev_incident` action |
+| 9 | NextIncident | **Jump to next incident** | `replay_jump_next_incident` action |
+
+### B.3 Replay Position Modes (ReplayPositionModeTypes)
+
+| Value | Name | Meaning |
+|---|---|---|
+| 0 | Begin | Frame number is absolute from start |
+| 1 | Current | Frame number is relative to current |
+| 2 | End | Frame number is relative to end |
+
+### B.4 Camera Switch Modes (CamSwitchModeTypes)
+
+| Value | Name | Meaning |
+|---|---|---|
+| -3 | FocusAtIncident | Focus camera at incident location |
+| -2 | FocusAtLeader | Focus camera at race leader |
+| -1 | FocusAtExciting | Focus camera at most exciting car |
+| 0 | FocusAtDriver | Focus at specific driver (default) |
+
+### B.5 Pit Command Modes (PitCommandModeTypes)
+
+| Value | Name | Meaning |
+|---|---|---|
+| 0 | Clear | Clear all pit requests |
+| 1 | WS | Windshield tearoff |
+| 2 | Fuel | Set fuel level (liters in var2) |
+| 3-6 | LF/RF/LR/RR | Change tire (pressure in kPa in var2) |
+| 7 | ClearTires | Clear tire change requests |
+| 8 | FastRepair | Request fast repair |
+| 9 | ClearWS | Clear windshield request |
+| 10 | ClearFR | Clear fast repair request |
+| 11 | ClearFuel | Clear fuel request |
+
+### B.6 CrewChief vs SimSteward: Replay Control Crosswalk
+
+| Control | CrewChief | SimSteward | iRacing SDK Call |
+|---|---|---|---|
+| Next incident seek | **Not used** (live-only tool) | Primary replay navigation | `BroadcastMessage(ReplaySearch, NextIncident)` |
+| Previous incident seek | Not used | Reverse navigation | `BroadcastMessage(ReplaySearch, PreviousIncident)` |
+| Set playback speed | Not used | 1×–16× fast-forward for sweep | `BroadcastMessage(ReplaySetPlaySpeed, speed, slowMo)` |
+| Seek to frame | Not used | Frame-accurate incident playback | `BroadcastMessage(ReplaySetPlayPosition, Begin, frame)` |
+| Seek to session time | Not used | Session-time-based seek | `BroadcastMessage(ReplaySearchSessionTime, sessionNum, timeMs)` |
+| Camera switch | Not used | Auto-follows incident car | `BroadcastMessage(CamSwitchPos, position, group, camera)` |
+| Pause replay | Not used | Required before NextIncident | `BroadcastMessage(ReplaySetPlaySpeed, 0, false)` |
+
+**Key insight:** CrewChief is a live race engineer — it reads telemetry but never sends replay commands. SimSteward is the only consumer of these broadcast APIs in this ecosystem.
+
+### B.7 Known Replay Bugs & Required Workarounds
+
+These are empirically discovered behaviors that differ from the SDK documentation. **Any code using replay broadcast commands must implement these workarounds.**
+
+#### BUG: NextIncident ignored when replay is playing
+
+**Symptom:** `ReplaySearch(NextIncident)` silently does nothing or seeks to a random frame when issued while replay speed > 0.
+
+**Required workaround:**
+1. Pause replay: `ReplaySetPlaySpeed(0, false)`
+2. Wait ~500ms (30 ticks at 60Hz) for pause to take effect
+3. Issue `ReplaySearch(NextIncident)`
+4. Wait ~2.5s cooldown before reading telemetry or issuing another seek
+
+**SimSteward constant:** `NextIncidentPauseSettleTicks = 30`
+
+#### BUG: NextIncident has ~2.5 second mandatory cooldown
+
+**Symptom:** Issuing `NextIncident` within 2.5 seconds of a previous seek produces unreliable results — the command may be silently dropped or land on the wrong incident.
+
+**Required workaround:** Wait at least 150 ticks (2.5s at 60Hz) between consecutive `ReplaySearch` calls.
+
+**SimSteward constant:** `NextIncidentCooldownTicks = 150`
+
+#### BUG: NextIncident silently fails ("stuck" calls)
+
+**Symptom:** Occasionally `NextIncident` appears to succeed (no error) but the replay frame doesn't change. This is more common near the end of the replay or when the current position is already past the last incident.
+
+**Required workaround:** Snapshot `ReplayFrameNum` before issuing the command. After the cooldown, check actual frame delta. If delta < 300 frames (normal 1× playback drift), treat as a stuck call. After 3 consecutive stuck calls, abort the seek loop.
+
+**SimSteward detection:** `frameDelta < 300` → `_suiteStuckNextIncidentCount++` → bail at ≥ 3
+
+#### BUG: Speed commands ignored when issued from SDK callback thread while paused
+
+**Symptom:** `ReplaySetPlaySpeed(N)` silently ignored when replay is paused, if the command originates from the SDK's telemetry callback thread.
+
+**Required workaround:** Resume at 1× first, then issue the target speed.
+
+#### BUG: ReplaySetPlayPosition lands in dead zone for multi-session replays
+
+**Symptom:** Seeking to `ReplayFrameNumEnd - 300` can land in a gap between sessions where `SessionState = 0` (Invalid), producing garbage telemetry.
+
+**Required workaround:** Use `ReplaySearch(ToEnd)` instead, which correctly lands at the actual session end. If `ToEnd` lands at frame 0 (another bug), fall back to position-based seek with a larger offset.
+
+#### BUG: ReplayFrameNumEnd shifts during scrubbing
+
+**Symptom:** `ReplayFrameNumEnd` reports different values depending on which session the replay is currently viewing. It is not a stable constant.
+
+**Required workaround:** Snapshot `ReplayFrameNumEnd` once at frame 0 (start of sweep) and use the snapshot for the entire operation. Never re-read mid-sweep.
+
+**SimSteward approach:** Uses running max of observed values as the authoritative frame count.
+
+#### BUG: CamCarIdx not immediately updated after NextIncident
+
+**Symptom:** After `ReplaySearch(NextIncident)`, `CamCarIdx` may take several frames to update to the incident car. Reading it immediately can return the previous car.
+
+**Required workaround:** Wait for the full cooldown period before reading `CamCarIdx`.
+
+#### BUG: PlayerCarMyIncidentCount jumps 0→N at replay start
+
+**Symptom:** At the very start of a replay sweep (< 1 second into playback), `PlayerCarMyIncidentCount` may jump from 0 to the player's total incident count as the field initializes. This appears as a massive incident delta.
+
+**Required workaround:** In the first 1 second of a sweep, reject deltas that are not standard incident values (1, 2, or 4). Treat non-standard deltas as baseline initialization, not real incidents.
+
+**SimSteward guard:** Baseline-reset logic in `ReplayIncidentIndexDetector`
+
+---
+
+## Appendix C: Permanently Removed Fields
 
 | Field | Reason | Alternative |
 |---|---|---|
@@ -531,7 +679,7 @@ All `CarIdx*` arrays are indexed 0-63 (max 64 cars). Index corresponds to `CarId
 
 ---
 
-## Appendix C: CrewChief File Index
+## Appendix D: CrewChief File Index
 
 | Domain | CrewChief File (relative to CrewChiefV4/CrewChiefV4/) | Key Responsibilities |
 |---|---|---|

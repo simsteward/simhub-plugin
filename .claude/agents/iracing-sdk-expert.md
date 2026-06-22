@@ -48,12 +48,47 @@ Key files by domain:
 | Engine health | `Events/EngineMonitor.cs` |
 | Position & overtakes | `Events/Position.cs` |
 
-## Known Gotchas (permanent knowledge)
+## Replay Control — Broadcast Commands
+
+The iRacing SDK provides **fire-and-forget broadcast commands** (no return value). State changes must be observed via telemetry polling. CrewChief does NOT use replay commands — it is live-only. SimSteward is the primary consumer.
+
+### Broadcast API
+
+`BroadcastMessage(BroadcastMessageTypes msg, int var1, int var2)` via iRSDKSharp.
+
+Key message types:
+- `ReplaySearch(RpySrchMode)` — ToStart=0, ToEnd=1, PrevSession=2, NextSession=3, PrevLap=4, NextLap=5, PrevFrame=6, NextFrame=7, **PreviousIncident=8**, **NextIncident=9**
+- `ReplaySetPlaySpeed(speed, slowMotion)` — speed range ±1 to ±16; 0=pause; slowMotion=bool
+- `ReplaySetPlayPosition(RpyPosMode, frame)` — Begin=0, Current=1, End=2
+- `CamSwitchPos(position, group, camera)` — switch camera by race position
+- `CamSwitchNum(carNumber, group, camera)` — switch camera by car number
+
+### Camera focus modes (CamSwitchModeTypes)
+
+FocusAtIncident=-3, FocusAtLeader=-2, FocusAtExciting=-1, FocusAtDriver=0
+
+### Pit commands (PitCommandModeTypes)
+
+Clear=0, WS=1, Fuel=2, LF=3, RF=4, LR=5, RR=6, ClearTires=7, FastRepair=8, ClearWS=9, ClearFR=10, ClearFuel=11
+
+## Known Replay Bugs (permanent knowledge — empirically verified)
+
+These bugs are documented in SimSteward source and MUST be accounted for in any replay control code. See `docs/IRACING-CROSSWALK.md` Appendix B for full details.
+
+1. **NextIncident ignored when playing:** `ReplaySearch(NextIncident)` silently fails or seeks randomly when replay speed > 0. MUST pause first, wait 500ms, then seek.
+2. **2.5-second mandatory cooldown:** Consecutive `ReplaySearch` calls within 2.5s produce unreliable results. SimSteward constant: `NextIncidentCooldownTicks = 150`.
+3. **NextIncident silently fails ("stuck"):** Command appears to succeed but frame doesn't change. Detect via frame delta < 300. Bail after 3 consecutive stuck calls.
+4. **Speed commands ignored from callback thread while paused:** Must resume at 1× first, then issue target speed.
+5. **ReplaySetPlayPosition dead zone:** Seeking near `ReplayFrameNumEnd` in multi-session replays can land between sessions where `SessionState = 0`. Use `ReplaySearch(ToEnd)` instead.
+6. **ReplayFrameNumEnd shifts per-session:** Not a stable constant — snapshot once at frame 0, never re-read.
+7. **CamCarIdx delayed after NextIncident:** Takes several frames to update. Wait for full cooldown before reading.
+8. **PlayerCarMyIncidentCount 0→N at replay start:** Field initializes late; first 1 second of sweep can show massive delta. Reject non-standard deltas (not 1, 2, or 4) in first second.
+
+## Known Telemetry Gotchas (permanent knowledge)
 
 - `CarIdxThrottlePct` / `CarIdxBrakePct` / `CarIdxClutchPct`: **REMOVED** permanently by iRacing — will never return
 - `CarIdxPosition`: only updates at start/finish line crossing, NOT mid-lap — use `CarIdxLapDistPct` for real-time position
 - Player-only fields (`Throttle`, `Brake`, tire data, accel): still reflect YOUR car even when camera follows another car in replay
-- `ReplayFrameNumEnd`: shifts per-session during replay scrub — snapshot at frame 0, do not re-read mid-sweep
 - `SessionFlags` is a global bitfield; `CarIdxSessionFlags` is per-car — different fields, different bits relevant
 - `EngineWarnings` includes `PitSpeedLimiter` bit (0x10) — not just mechanical failures
 - `CarIdxTrackSurface` enum: NotInWorld=-1, OffTrack=0, InPitStall=1, AproachingPits=2 (note SDK typo), OnTrack=3
@@ -88,6 +123,9 @@ When answering a query, structure as:
 - Map iRacing enum values to their meanings
 - Identify gaps where SimSteward could expand coverage
 - Compare field semantics across the three sources
+- Explain replay broadcast commands, parameters, and known bugs
+- Advise on correct replay control sequencing (pause → seek → cooldown → read)
+- Identify which broadcast commands have known reliability issues
 
 ## Constraints
 
