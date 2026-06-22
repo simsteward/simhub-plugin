@@ -312,5 +312,27 @@ namespace SimSteward.Plugin.Tests
             Assert.Equal(0.45f, s.LapDistPct);
             Assert.Equal(3, s.CarPosition);
         }
+
+        [Fact]
+        public void Process_RepairDetection_CapturesLapDistPctAndPosition()
+        {
+            var d = new ReplayIncidentIndexDetector();
+            d.Reset(Zeros64(), 0, 0);
+
+            var flags = Zeros64();
+            flags[3] = ReplayIncidentIndexDetection.RepairSessionFlag;
+
+            var lapDistPct = new float[64];
+            lapDistPct[3] = 0.72f;
+            var positions = Zeros64();
+            positions[3] = 5;
+
+            var r = d.Process(10.0, flags, 0, 0, 100,
+                carIdxLapDistPct: lapDistPct, carIdxPosition: positions);
+
+            Assert.Single(r);
+            Assert.Equal(0.72f, r[0].LapDistPct);
+            Assert.Equal(5, r[0].CarPosition);
+        }
     }
 }
