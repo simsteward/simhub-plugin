@@ -40,6 +40,8 @@ The iRacing `/data` REST API provides per-lap incident flags server-side, but re
 | `ReplaySessionTime` | Replay state | Current playback position in session seconds. Recorded at moment of detection. |
 | `CamCarIdx` | Replay camera | Car the camera switches to after `NextIncident` seek. Used for post-seek car identification. |
 
+> **Reference implementation:** For validated patterns on how these signals combine into a working incident detector, consult [CrewChief V4](https://github.com/mrbelowski/CrewChiefV4) — see [IRACING-DATA-AVAILABILITY.md § Appendix: CrewChief reference modules](IRACING-DATA-AVAILABILITY.md#appendix--crewchief-reference-modules) for the module map.
+
 ### 2.4 Observability (Grafana) & Data Finding Mission
 
 **CRITICAL:** We are currently on a **data finding mission** to understand how the SDK behaves during accelerated replay playback. Because we do not yet know the limits of the SDK or the precise behavior of specific variables (see §7 Open Questions), **verbose logging is highly desirable** during the initial implementation.
@@ -50,7 +52,7 @@ Index-build telemetry for operators and research SHOULD appear in Grafana via **
 
 ### 2.5 SimHub web dashboard
 
-Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plugin exposes data and commands through the **Fleck** WebSocket server and optional broadcast messages; static assets live under SimHub `Web/` per project conventions (see `.cursor/rules/SimHub.mdc`). Grafana remains optional; the new page is the primary local UX for the replay incident index when shipped inside SimSteward.
+Operator-facing UI runs in the **browser** (ES6+), not Dash Studio WPF. The plugin exposes data and commands through the **Fleck** WebSocket server and optional broadcast messages; static assets live under SimHub `Web/` per project conventions (see `CLAUDE.md`). Grafana remains optional; the new page is the primary local UX for the replay incident index when shipped inside SimSteward.
 
 ### 2.6 Data Capture Layer (Hybrid Approach Decision)
 
@@ -280,7 +282,7 @@ To maximise test value, use a replay that satisfies the following:
 
 ## 9. Implementation Milestones
 
-This implementation is broken down into the following milestones (tracked in ContextStream). **TR-041** applies to **every** milestone when marked complete (milestone summary in §9). Full criteria: §4.10.
+This implementation is broken down into the following milestones. **TR-041** applies to **every** milestone when marked complete (milestone summary in §9). Full criteria: §4.10.
 
 | Milestone | Requirements | Description | Status |
 |---|---|---|---|
@@ -342,7 +344,7 @@ Milestone **M2** is **Complete**; TR-004–TR-011, NFR-008, and TR-041 are imple
 
 | Item | Evidence |
 |------|----------|
-| **TR-041** | This subsection is the M2 milestone summary (scope, requirement mapping, evidence pointers). Milestone status synced in ContextStream when marked complete. |
+| **TR-041** | This subsection is the M2 milestone summary (scope, requirement mapping, evidence pointers). |
 | **TR-004** | `ReplaySearch(ToStart)` from `TryBeginReplayIncidentIndexBuildLocked`; `ReplayFrameNum` stabilized at 0 (`FrameZeroStableConsecutiveSamples` consecutive `OnTelemetryData` ticks); seek failure → `replay_incident_index_build_error` (`seek_start_timeout`). **Code:** `SimStewardPlugin.ReplayIncidentIndexBuild.cs` (`ProcessSeekingStartLocked`). |
 | **TR-005** | Baseline `CarIdxSessionFlags` for all **64** slots via `Data.GetInt("CarIdxSessionFlags", i)`; emitted on `replay_incident_index_baseline_ready` as `car_idx_session_flags` (full array). |
 | **TR-006** | `PlayerCarMyIncidentCount` at baseline as `player_car_my_incident_count_baseline` on `replay_incident_index_baseline_ready`. |

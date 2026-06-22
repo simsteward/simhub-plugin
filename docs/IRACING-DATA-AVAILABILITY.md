@@ -184,3 +184,28 @@ Entirely separate from the SDK. Accessed via HTTP against iRacing's servers usin
 ---
 
 *Last updated from research conducted March 2026. SDK variable availability subject to change with iRacing updates.*
+
+---
+
+## Appendix — CrewChief reference modules
+
+[CrewChief V4](https://github.com/mrbelowski/CrewChiefV4) is the canonical reference implementation for iRacing SDK property semantics and detection patterns. When designing a new detector or interpreting an SDK field, consult CrewChief **before** reverse-engineering from scratch.
+
+**Raw URL pattern for WebFetch:**
+
+```
+https://raw.githubusercontent.com/mrbelowski/CrewChiefV4/master/CrewChiefV4/<path>
+```
+
+**Starter module map** (paths relative to the `CrewChiefV4/` folder inside the repo):
+
+| SimSteward topic | CrewChief reference |
+|---|---|
+| iRacing telemetry → game state (the **backbone** — every detection is derived from raw SDK fields here) | `iRacing/iRacingGameStateMapper.cs` |
+| Flag state machine (yellow / checkered / blue / green rising-edge logic) | `Events/FlagsMonitor.cs` |
+| Spotter / proximity-based "car beside you" / contact precondition | `iRacing/iRacingSpotter.cs`, `Events/Spotter.cs` |
+| Damage / hit severity interpretation from telemetry | `Events/DamageReporting.cs` |
+
+**Growing the map.** When sim-expert discovers a useful CrewChief reference for a topic not yet listed (e.g., pit-stall classification, repair-flag semantics, off-track threshold tuning), add a row here. The map is a living index, not a fixed taxonomy.
+
+**Why this matters.** SimSteward has shipped wrong constants to production (e.g., `CarIdxTrackSurface` enum values) by inferring SDK behavior without checking CrewChief first. Treating CrewChief as the primary reference shortens every new detection design from "figure it out from first principles" to "diff against a known-good implementation."
