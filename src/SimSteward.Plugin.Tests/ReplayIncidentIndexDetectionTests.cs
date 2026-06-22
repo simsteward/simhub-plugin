@@ -398,5 +398,40 @@ namespace SimSteward.Plugin.Tests
             Assert.Equal(6, r[0].CarIdx);
             Assert.Equal("disqualify", r[0].DetectionSource);
         }
+
+        [Fact]
+        public void Process_OffTrackOntoRumbleStrip_Suppressed()
+        {
+            var d = new ReplayIncidentIndexDetector();
+            var baseSurface = new int[ReplayIncidentIndexBuild.CarSlotCount];
+            for (int i = 0; i < baseSurface.Length; i++) baseSurface[i] = ReplayIncidentIndexDetection.TrackSurfaceOnTrack;
+            d.Reset(Zeros64(), 0, 0, baselineTrackSurface: baseSurface);
+
+            var surface = (int[])baseSurface.Clone();
+            surface[2] = ReplayIncidentIndexDetection.TrackSurfaceOffTrack;
+            var material = new int[ReplayIncidentIndexBuild.CarSlotCount];
+            material[2] = 11; // Rumble1Material
+
+            var r = d.Process(10.0, Zeros64(), 0, 0, 100, trackSurface: surface, carIdxTrackSurfaceMaterial: material);
+            Assert.Empty(r); // rumble strip = not a real off-track
+        }
+
+        [Fact]
+        public void Process_OffTrackOntoGrass_NotSuppressed()
+        {
+            var d = new ReplayIncidentIndexDetector();
+            var baseSurface = new int[ReplayIncidentIndexBuild.CarSlotCount];
+            for (int i = 0; i < baseSurface.Length; i++) baseSurface[i] = ReplayIncidentIndexDetection.TrackSurfaceOnTrack;
+            d.Reset(Zeros64(), 0, 0, baselineTrackSurface: baseSurface);
+
+            var surface = (int[])baseSurface.Clone();
+            surface[2] = ReplayIncidentIndexDetection.TrackSurfaceOffTrack;
+            var material = new int[ReplayIncidentIndexBuild.CarSlotCount];
+            material[2] = 15; // Grass1Material
+
+            var r = d.Process(10.0, Zeros64(), 0, 0, 100, trackSurface: surface, carIdxTrackSurfaceMaterial: material);
+            Assert.Single(r);
+            Assert.Equal(ReplayIncidentIndexDetection.SourceTrackSurface, r[0].DetectionSource);
+        }
     }
 }

@@ -89,7 +89,8 @@ namespace SimSteward.Plugin
             int sessionNum = IncidentSample.SessionNumUnknown,
             float[] carIdxLapDistPct = null,
             int[] carIdxPosition = null,
-            int[] carIdxFastRepairsUsed = null)
+            int[] carIdxFastRepairsUsed = null,
+            int[] carIdxTrackSurfaceMaterial = null)
         {
             ValidateLength(nameof(flags), flags, ReplayIncidentIndexBuild.CarSlotCount);
 
@@ -166,16 +167,24 @@ namespace SimSteward.Plugin
                         && currSurf == ReplayIncidentIndexDetection.TrackSurfaceOffTrack
                         && TryTakePrimarySlot(_lastSurfaceEmitSec, i, replaySessionTimeSec))
                     {
-                        results.Add(new IncidentSample(
-                            i,
-                            sessionTimeMs,
-                            ReplayIncidentIndexDetection.SourceTrackSurface,
-                            null,
-                            replayFrame,
-                            carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
-                            sessionNum,
-                            lapDistPct: carIdxLapDistPct != null && i < carIdxLapDistPct.Length ? (float?)carIdxLapDistPct[i] : null,
-                            carPosition: carIdxPosition != null && i < carIdxPosition.Length && carIdxPosition[i] > 0 ? (int?)carIdxPosition[i] : null));
+                        // Suppress false positives when car lands on rumble strip (kerb)
+                        bool isRumble = carIdxTrackSurfaceMaterial != null
+                            && i < carIdxTrackSurfaceMaterial.Length
+                            && ReplayIncidentIndexDetection.IsRumbleStrip(carIdxTrackSurfaceMaterial[i]);
+
+                        if (!isRumble)
+                        {
+                            results.Add(new IncidentSample(
+                                i,
+                                sessionTimeMs,
+                                ReplayIncidentIndexDetection.SourceTrackSurface,
+                                null,
+                                replayFrame,
+                                carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
+                                sessionNum,
+                                lapDistPct: carIdxLapDistPct != null && i < carIdxLapDistPct.Length ? (float?)carIdxLapDistPct[i] : null,
+                                carPosition: carIdxPosition != null && i < carIdxPosition.Length && carIdxPosition[i] > 0 ? (int?)carIdxPosition[i] : null));
+                        }
                     }
                     _prevTrackSurface[i] = currSurf;
                 }

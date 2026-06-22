@@ -44,6 +44,14 @@ namespace SimSteward.Plugin
         /// <summary>iRacing CarIdxTrackSurface value: car not in world / loading (irsdk_NotInWorld = -1). Exclude from transitions.</summary>
         public const int TrackSurfaceNotInWorld = -1;
 
+        /// <summary>Rumble strip material range (11-14). Off-track transitions onto rumble strips are suppressed as false positives.</summary>
+        public const int Rumble1Material = 11;
+        /// <summary>Rumble strip material range (11-14). Off-track transitions onto rumble strips are suppressed as false positives.</summary>
+        public const int Rumble4Material = 14;
+
+        /// <summary>True when the material value indicates a rumble strip (kerb).</summary>
+        public static bool IsRumbleStrip(int material) => material >= Rumble1Material && material <= Rumble4Material;
+
         /// <summary>True when masked bits transition 0 → 1 between consecutive samples.</summary>
         public static bool IsRisingEdge(int prevRaw, int currRaw, int mask)
         {
