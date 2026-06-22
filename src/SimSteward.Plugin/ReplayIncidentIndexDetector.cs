@@ -14,6 +14,8 @@ namespace SimSteward.Plugin
         private readonly int[] _prevFastRepairs = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastRepairEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastFurledEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly double[] _lastBlackEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly double[] _lastDqEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastPlayerEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastSurfaceEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly double[] _lastFastRepairEmitSec = new double[ReplayIncidentIndexBuild.CarSlotCount];
@@ -52,6 +54,8 @@ namespace SimSteward.Plugin
             {
                 _lastRepairEmitSec[i]  = -1;
                 _lastFurledEmitSec[i]  = -1;
+                _lastBlackEmitSec[i]   = -1;
+                _lastDqEmitSec[i]      = -1;
                 _lastPlayerEmitSec[i]  = -1;
                 _lastSurfaceEmitSec[i] = -1;
                 _lastFastRepairEmitSec[i] = -1;
@@ -121,6 +125,28 @@ namespace SimSteward.Plugin
                         ReplayIncidentIndexDetection.SourceFurledFlag,
                         null,
                         replayFrame,
+                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
+                        sessionNum,
+                        lapDistPct: carIdxLapDistPct != null && i < carIdxLapDistPct.Length ? (float?)carIdxLapDistPct[i] : null,
+                        carPosition: carIdxPosition != null && i < carIdxPosition.Length && carIdxPosition[i] > 0 ? (int?)carIdxPosition[i] : null));
+                }
+
+                if (ReplayIncidentIndexDetection.IsRisingEdge(prev, curr, ReplayIncidentIndexDetection.BlackSessionFlag)
+                    && TryTakePrimarySlot(_lastBlackEmitSec, i, replaySessionTimeSec))
+                {
+                    results.Add(new IncidentSample(
+                        i, sessionTimeMs, ReplayIncidentIndexDetection.SourceBlackFlag, null, replayFrame,
+                        carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
+                        sessionNum,
+                        lapDistPct: carIdxLapDistPct != null && i < carIdxLapDistPct.Length ? (float?)carIdxLapDistPct[i] : null,
+                        carPosition: carIdxPosition != null && i < carIdxPosition.Length && carIdxPosition[i] > 0 ? (int?)carIdxPosition[i] : null));
+                }
+
+                if (ReplayIncidentIndexDetection.IsRisingEdge(prev, curr, ReplayIncidentIndexDetection.DisqualifySessionFlag)
+                    && TryTakePrimarySlot(_lastDqEmitSec, i, replaySessionTimeSec))
+                {
+                    results.Add(new IncidentSample(
+                        i, sessionTimeMs, ReplayIncidentIndexDetection.SourceDisqualify, null, replayFrame,
                         carIdxLap != null && i < carIdxLap.Length ? carIdxLap[i] : SessionLogging.LapUnknown,
                         sessionNum,
                         lapDistPct: carIdxLapDistPct != null && i < carIdxLapDistPct.Length ? (float?)carIdxLapDistPct[i] : null,

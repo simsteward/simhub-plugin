@@ -13,11 +13,19 @@ namespace SimSteward.Plugin
         /// <summary>Furled black flag (§2.3 / TR-013).</summary>
         public const int FurledSessionFlag = 0x80000;
 
+        /// <summary>Black flag (§2.3 / TR-014).</summary>
+        public const int BlackSessionFlag = 0x00010000;
+
+        /// <summary>Disqualification (§2.3 / TR-014).</summary>
+        public const int DisqualifySessionFlag = 0x00020000;
+
         /// <summary>TR-018 / milestone: minimum replay session time gap (seconds) between duplicate primary emissions for the same car and source.</summary>
         public const double PrimaryDebounceSessionTimeSec = 1.0;
 
         public const string SourceRepairFlag = "repair_flag";
         public const string SourceFurledFlag = "furled_flag";
+        public const string SourceBlackFlag = "black_flag";
+        public const string SourceDisqualify = "disqualify";
         public const string SourcePlayerIncidentCount = "player_incident_count";
         public const string SourceTrackSurface = "track_surface";
         /// <summary>Per-driver Incidents delta observed in SessionInfoYaml ResultsPositions[] between snapshots.</summary>

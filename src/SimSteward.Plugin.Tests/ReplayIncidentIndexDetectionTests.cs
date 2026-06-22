@@ -368,5 +368,35 @@ namespace SimSteward.Plugin.Tests
             var r = d.Process(15.0, Zeros64(), 0, 0, 200, carIdxFastRepairsUsed: fastRepairs);
             Assert.Empty(r);
         }
+
+        [Fact]
+        public void Process_BlackFlagRisingEdge_EmitsBlackFlagRow()
+        {
+            var d = new ReplayIncidentIndexDetector();
+            d.Reset(Zeros64(), 0, 0);
+
+            var flags = Zeros64();
+            flags[2] = 0x00010000; // Black flag bit
+            var r = d.Process(20.0, flags, 0, 0, 300);
+
+            Assert.Single(r);
+            Assert.Equal(2, r[0].CarIdx);
+            Assert.Equal("black_flag", r[0].DetectionSource);
+        }
+
+        [Fact]
+        public void Process_DisqualifyRisingEdge_EmitsDisqualifyRow()
+        {
+            var d = new ReplayIncidentIndexDetector();
+            d.Reset(Zeros64(), 0, 0);
+
+            var flags = Zeros64();
+            flags[6] = 0x00020000; // Disqualify bit
+            var r = d.Process(25.0, flags, 0, 0, 400);
+
+            Assert.Single(r);
+            Assert.Equal(6, r[0].CarIdx);
+            Assert.Equal("disqualify", r[0].DetectionSource);
+        }
     }
 }
