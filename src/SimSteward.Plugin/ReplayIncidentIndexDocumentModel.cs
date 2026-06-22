@@ -77,6 +77,12 @@ namespace SimSteward.Plugin
 
         [JsonProperty("sessionNum")]
         public int SessionNum { get; set; } = IncidentSample.SessionNumUnknown;
+
+        [JsonProperty("lapDistPct", NullValueHandling = NullValueHandling.Ignore)]
+        public float? LapDistPct { get; set; }
+
+        [JsonProperty("carPosition", NullValueHandling = NullValueHandling.Ignore)]
+        public int? CarPosition { get; set; }
     }
 
     public sealed class ReplayIncidentIndexValidationBlock
@@ -113,6 +119,22 @@ namespace SimSteward.Plugin
 
         [JsonProperty("yamlIncidents")]
         public int YamlIncidents { get; set; }
+
+        /// <summary>YamlIncidents - DetectedEventCount. Positive = under-detected; negative = over-detected.</summary>
+        [JsonProperty("gap")]
+        public int Gap { get; set; }
+
+        /// <summary>Driver UserName from SessionInfo.DriverInfo.Drivers[] when available; empty otherwise.</summary>
+        [JsonProperty("displayName")]
+        public string DisplayName { get; set; } = "";
+
+        /// <summary>iRacing CustID (UserID) for the driver in this slot at the time of the build.</summary>
+        [JsonProperty("uniqueUserId")]
+        public string UniqueUserId { get; set; } = "";
+
+        /// <summary>Per-detection-source hit counts for this car (e.g. {"yaml_incident_delta":2,"track_surface":1}).</summary>
+        [JsonProperty("sourcesHit")]
+        public Dictionary<string, int> SourcesHit { get; set; } = new Dictionary<string, int>();
     }
 
     /// <summary>Maps <see cref="IncidentSample"/> list to TR-020 rows with fingerprints; TR-021 sort.</summary>
@@ -152,7 +174,9 @@ namespace SimSteward.Plugin
                     IncidentPoints = s.IncidentPoints,
                     Lap = s.Lap,
                     ReplayFrame = s.ReplayFrame,
-                    SessionNum = s.SessionNum
+                    SessionNum = s.SessionNum,
+                    LapDistPct = s.LapDistPct,
+                    CarPosition = s.CarPosition
                 });
 
                 string key = s.CarIdx.ToString(System.Globalization.CultureInfo.InvariantCulture);

@@ -132,10 +132,84 @@ namespace SimSteward.Plugin.Tests
             var f = Zeros64();
             d.Reset(f, 0, 0);
 
-            var r = d.Process(0, f, 3, 1, 0);
+            // First sample establishes a non-zero baseline post-baseline-reset-window
+            // (the guard only fires when prev == 0 and time < 1s).
+            d.Process(2.0, f, 1, 1, 0);
+
+            // Subsequent non-standard delta (5) — not in {1,2,4} so points should be null.
+            var r = d.Process(5.0, f, 6, 1, 0);
             Assert.Single(r);
             Assert.Equal(1, r[0].CarIdx);
             Assert.Null(r[0].IncidentPoints);
+        }
+
+        [Fact]
+        public void Process_PlayerIncidentBaselineLate_NonStandardDeltaSuppressed()
+        {
+            // Reproduces the Phoenix t=150ms false positive: at race start, _prevPlayerIncidents=0
+            // (captured at frame 0 before iRacing populated the field); a sudden N-incident "jump"
+            // within the first second with a non-standard delta is a baseline-init artifact, not real.
+            var d = new ReplayIncidentIndexDetector();
+            var f = Zeros64();
+            d.Reset(f, 0, 0);
+
+            var r = d.Process(0.15, f, 5, 0, 9);
+            Assert.Empty(r);
+        }
+
+        [Fact]
+        public void Process_TrackSurface_OnTrackToOffTrack_EmitsRow()
+        {
+            // Authoritative iRacing irsdk_TrkLoc values: OnTrack=3, OffTrack=0.
+            var d = new ReplayIncidentIndexDetector();
+            var baseFlags = Zeros64();
+            var baseSurf = Zeros64();
+            for (int i = 0; i < baseSurf.Length; i++) baseSurf[i] = ReplayIncidentIndexDetection.TrackSurfaceOnTrack;
+            d.Reset(baseFlags, 0, 0, baseSurf);
+
+            var nextSurf = (int[])baseSurf.Clone();
+            nextSurf[12] = ReplayIncidentIndexDetection.TrackSurfaceOffTrack;
+            var r = d.Process(5.0, baseFlags, 0, 0, 200, nextSurf);
+
+            Assert.Single(r);
+            Assert.Equal(12, r[0].CarIdx);
+            Assert.Equal(ReplayIncidentIndexDetection.SourceTrackSurface, r[0].DetectionSource);
+        }
+
+        [Fact]
+        public void Process_TrackSurface_PitStallNotTreatedAsOffTrack()
+        {
+            // Defends against the earlier constant bug where TrackSurfaceOffTrack was wrongly set to 1
+            // (which is actually InPitStall). Going OnTrack → InPitStall is a normal pit entry,
+            // NOT an off-track incident and must not emit.
+            var d = new ReplayIncidentIndexDetector();
+            var baseFlags = Zeros64();
+            var baseSurf = Zeros64();
+            for (int i = 0; i < baseSurf.Length; i++) baseSurf[i] = ReplayIncidentIndexDetection.TrackSurfaceOnTrack;
+            d.Reset(baseFlags, 0, 0, baseSurf);
+
+            var nextSurf = (int[])baseSurf.Clone();
+            nextSurf[4] = 1; // irsdk_InPitStall
+            var r = d.Process(5.0, baseFlags, 0, 0, 200, nextSurf);
+
+            Assert.Empty(r);
+        }
+
+        [Fact]
+        public void Process_TrackSurface_NotInWorldDoesNotEmit()
+        {
+            // -1 (NotInWorld) can appear during replay seek; treat as quiet.
+            var d = new ReplayIncidentIndexDetector();
+            var baseFlags = Zeros64();
+            var baseSurf = Zeros64();
+            for (int i = 0; i < baseSurf.Length; i++) baseSurf[i] = ReplayIncidentIndexDetection.TrackSurfaceOnTrack;
+            d.Reset(baseFlags, 0, 0, baseSurf);
+
+            var nextSurf = (int[])baseSurf.Clone();
+            nextSurf[1] = ReplayIncidentIndexDetection.TrackSurfaceNotInWorld;
+            var r = d.Process(5.0, baseFlags, 0, 0, 200, nextSurf);
+
+            Assert.Empty(r);
         }
 
         [Fact]
@@ -220,6 +294,23 @@ namespace SimSteward.Plugin.Tests
             var d = new ReplayIncidentIndexDetector();
             var z = Zeros64();
             Assert.Throws<ArgumentOutOfRangeException>(() => d.Reset(z, 0, 64));
+        }
+
+        [Fact]
+        public void IncidentSample_NewContextFields_DefaultToNull()
+        {
+            var s = new IncidentSample(carIdx: 1, sessionTimeMs: 5000, detectionSource: "test", incidentPoints: null, replayFrame: 100);
+            Assert.Null(s.LapDistPct);
+            Assert.Null(s.CarPosition);
+        }
+
+        [Fact]
+        public void IncidentSample_NewContextFields_RoundTrip()
+        {
+            var s = new IncidentSample(carIdx: 1, sessionTimeMs: 5000, detectionSource: "test", incidentPoints: null, replayFrame: 100,
+                lapDistPct: 0.45f, carPosition: 3);
+            Assert.Equal(0.45f, s.LapDistPct);
+            Assert.Equal(3, s.CarPosition);
         }
     }
 }

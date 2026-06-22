@@ -1,0 +1,36 @@
+# OpenTelemetry Collector (contrib): OTLP in → Prometheus text format out for local Prometheus scrape.
+# See docs/observability-local.md § Metrics (canonical local path).
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: ""
+    const_labels:
+      cluster: local
+
+service:
+  extensions: [health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

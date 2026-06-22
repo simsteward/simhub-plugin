@@ -20,14 +20,20 @@ namespace SimSteward.Plugin
         public const string SourceFurledFlag = "furled_flag";
         public const string SourcePlayerIncidentCount = "player_incident_count";
         public const string SourceTrackSurface = "track_surface";
+        /// <summary>Per-driver Incidents delta observed in SessionInfoYaml ResultsPositions[] between snapshots.</summary>
+        public const string SourceYamlIncidentDelta = "yaml_incident_delta";
 
         /// <summary>iRacing SessionFlags bit: checkered flag shown.</summary>
         public const int CheckeredSessionFlag = 0x0001;
 
-        /// <summary>iRacing CarIdxTrackSurface value: car on the racing surface.</summary>
-        public const int TrackSurfaceOnTrack  = 4;
-        /// <summary>iRacing CarIdxTrackSurface value: car off the racing surface (excursion / incident).</summary>
-        public const int TrackSurfaceOffTrack = 1;
+        // iRacing irsdk_TrkLoc enum (from irsdk_defines.h):
+        //   NotInWorld = -1, OffTrack = 0, InPitStall = 1, ApproachingPits = 2, OnTrack = 3
+        /// <summary>iRacing CarIdxTrackSurface value: car on the racing surface (irsdk_OnTrack = 3).</summary>
+        public const int TrackSurfaceOnTrack  = 3;
+        /// <summary>iRacing CarIdxTrackSurface value: car off the racing surface (irsdk_OffTrack = 0).</summary>
+        public const int TrackSurfaceOffTrack = 0;
+        /// <summary>iRacing CarIdxTrackSurface value: car not in world / loading (irsdk_NotInWorld = -1). Exclude from transitions.</summary>
+        public const int TrackSurfaceNotInWorld = -1;
 
         /// <summary>True when masked bits transition 0 → 1 between consecutive samples.</summary>
         public static bool IsRisingEdge(int prevRaw, int currRaw, int mask)
@@ -62,7 +68,9 @@ namespace SimSteward.Plugin
             int? incidentPoints,
             int replayFrame,
             int lap = SessionLogging.LapUnknown,
-            int sessionNum = SessionNumUnknown)
+            int sessionNum = SessionNumUnknown,
+            float? lapDistPct = null,
+            int? carPosition = null)
         {
             CarIdx = carIdx;
             SessionTimeMs = sessionTimeMs;
@@ -71,6 +79,8 @@ namespace SimSteward.Plugin
             ReplayFrame = replayFrame;
             Lap = lap;
             SessionNum = sessionNum;
+            LapDistPct = lapDistPct;
+            CarPosition = carPosition;
         }
 
         public int CarIdx { get; }
@@ -80,5 +90,9 @@ namespace SimSteward.Plugin
         public int ReplayFrame { get; }
         public int Lap { get; }
         public int SessionNum { get; }
+        /// <summary>Track position 0.0-1.0 at detection time (from CarIdxLapDistPct).</summary>
+        public float? LapDistPct { get; }
+        /// <summary>Race position at detection time (from CarIdxPosition). 0 = not classified.</summary>
+        public int? CarPosition { get; }
     }
 }
