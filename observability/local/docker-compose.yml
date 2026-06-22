@@ -21,7 +21,8 @@ services:
     ports:
       - "3500:3500"
     env_file:
-      - .env.observability.local
+      - path: .env.observability.local
+        required: false
     environment:
       - LOKI_PUSH_TOKEN=${LOKI_PUSH_TOKEN:-}
     volumes:
@@ -60,3 +61,46 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Claude Code native OpenTelemetry ingest. Receives OTLP from Claude Code
+  # (.claude/settings.json → http://localhost:4317), exposes :8889 for the local
+  # prometheus scrape, and forwards metrics+logs to Grafana Cloud. Grafana Cloud creds
+  # are read from the repo .env; missing creds are non-fatal (local Prometheus still works).
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    env_file:
+      - path: ../../.env
+        required: false
+    ports:
+      - "4317:4317"   # OTLP gRPC (Claude Code → collector)
+      - "4318:4318"   # OTLP HTTP
+      - "13133:13133" # health_check
+    # NOTE: :8889 (Prometheus text endpoint) is intentionally NOT published to the host —
+    # SimHubWPF.exe already binds host :8889. The local `prometheus` service scrapes it
+    # over the compose network (otel-collector:8889); the Grafana Cloud path uses the OTLP
+    # gateway, not this port. So no host publish is needed and the SimHub clash is avoided.
+    expose:
+      - "8889"
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:13133"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Local Prometheus — scrapes the collector (:8889) so claude_code.* metrics are
+  # queryable offline via the provisioned "Prometheus Local" datasource (prometheus_local).
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    depends_on:
+      - otel-collector
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${GRAFANA_STORAGE_PATH:-S:/sim-steward-grafana-storage}/prometheus:/prometheus

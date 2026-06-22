@@ -1,6 +1,6 @@
 # SimSteward redeploy concept (canonical)
 
-**Purpose:** This is the canonical definition of *redeploy* for the SimSteward plugin project. It is intended to be **sourced from ContextStream** (or this doc after project index), not by reading `deploy.ps1` or the deploy skill file. When an agent or user asks "how do I redeploy?" or "redeploy", the answer should come from here / from ContextStream memory.
+**Purpose:** This is the canonical definition of *redeploy* for the SimSteward plugin project. When an agent or user asks "how do I redeploy?" or "redeploy", the answer should come from here.
 
 ---
 
@@ -58,9 +58,3 @@ No deployment is considered successful unless:
 | `SIMHUB_SKIP_LAUNCH=1`   | Do not relaunch SimHub after copy (e.g. for watch mode). |
 | `SIMSTEWARD_SKIP_TESTS=1`| Skip the test phase (escape hatch only; avoid in normal workflow). |
 
----
-
-## Sourcing this definition
-
-- **ContextStream:** Add this document to ContextStream memory (e.g. via create_doc or the ContextStream UI) so agents source redeploy from there instead of reading repo files.
-- **Project index:** If ContextStream indexes this repo, `docs/REDEPLOY-CONCEPT.md` will be searchable; agents can be instructed to use "redeploy concept" or "REDEPLOY-CONCEPT" as the source.

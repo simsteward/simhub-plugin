@@ -66,10 +66,10 @@ Four labels only. Do **not** put high-cardinality values (`session_id`, `car_num
 |-------|--------|-----------|
 | `app` | `claude-dev-logging` | Dev tooling namespace. |
 | `env` | `local` or `dev` | From `SIMSTEWARD_LOG_ENV`. |
-| `component` | `tool`, `mcp-contextstream`, `mcp-sentry`, `mcp-ollama`, `lifecycle`, `agent`, `user`, `other` | Subsystem. |
+| `component` | `tool`, `mcp-sentry`, `mcp-ollama`, `lifecycle`, `agent`, `user`, `other` | Subsystem. |
 | `level` | `INFO`, `WARN`, `ERROR` | Severity. |
 
-The hook logger (`~/.claude/hooks/loki-log.js`) buckets by hook type: tool hooks for non-MCP tools use `component=tool`; MCP tools use `component=mcp-<service>`; session/compact/stop use `lifecycle`; subagent/task use `agent`; prompt/notification/permission use `user`. MCP service is also in the JSON body `service` field: `{app="claude-dev-logging"} | json | service="contextstream"`.
+The hook logger (`~/.claude/hooks/loki-log.js`) buckets by hook type: tool hooks for non-MCP tools use `component=tool`; MCP tools use `component=mcp-<service>`; session/compact/stop use `lifecycle`; subagent/task use `agent`; prompt/notification/permission use `user`. MCP service is also in the JSON body `service` field.
 
 #### Enrichment fields (JSON body, not labels)
 
@@ -91,9 +91,28 @@ Derived from stdin + temp-file timestamp correlation (`$TMPDIR/claude-hook-timin
 
 Stale files (>5 min) are cleaned on each PreToolUse and SessionStart. Retry markers expire after 10 s.
 
-#### Session token sidecar
+#### Session summary push (no on-disk sidecar)
 
-On `SessionEnd`, the hook reads `transcript_path` (JSONL) and writes aggregated metrics to `{cwd}/logs/claude-session-metrics.jsonl` (tailed by Alloy). No conversation content — only: `total_input_tokens`, `total_output_tokens`, `total_cache_creation_tokens`, `total_cache_read_tokens`, `assistant_turns`, `tool_use_count`, `model`, `session_duration_ms`, `compaction_count`.
+On `SessionEnd`, the hook reads `transcript_path` (JSONL) and pushes a `claude_session_summary` event directly to `app="claude-dev-logging", component="lifecycle", level="INFO"`. No JSONL sidecar on disk; no Alloy tail. Body fields: `total_input_tokens`, `total_output_tokens`, `total_cache_creation_tokens`, `total_cache_read_tokens`, `assistant_turns`, `tool_use_count`, `model`, `session_duration_ms`, `compaction_count`, plus the cost breakdown (`cost_usd`, `input_cost_usd`, `output_cost_usd`, `cache_write_cost_usd`, `cache_read_cost_usd`, `cache_savings_usd`).
+
+## Claude Code native telemetry (OpenTelemetry — authoritative cost/tokens)
+
+The hook pipeline above parses the **parent** session transcript only. Subagents (Agent/Task tool) run as **separate** transcripts under `~/.claude/projects/<slug>/<sessionId>/subagents/agent-<id>.jsonl`, which the Stop hook never reads — so `claude-token-metrics` (Loki) **undercounts** subagent-heavy sessions (often badly: `/status` may report most usage came from subagents). The authoritative feed is **Claude Code's own OpenTelemetry**.
+
+**Pipeline:** `CLAUDE_CODE_ENABLE_TELEMETRY=1` (set in `.claude/settings.json` → `env`) → OTLP to the local **OTel collector** (`observability/local/otel-collector-config.yaml`, `:4317`) → Grafana Cloud OTLP gateway (metrics → Mimir, logs → Loki) and a local Prometheus (`:8889`) for offline checks. Creds: `SIMSTEWARD_OTLP_*` in `.env`.
+
+**Metrics (Mimir / `grafanacloud-prom`):**
+
+| Metric | Unit | Key labels |
+|--------|------|------------|
+| `claude_code.cost.usage` | USD | `model`, **`query_source`** (`main`/`subagent`/`auxiliary`), `env` |
+| `claude_code.token.usage` | tokens | `type` (`input`/`output`/`cacheRead`/`cacheCreation`), `model`, `query_source`, `env` |
+
+These counters are Claude Code's own accounting and **include subagents** via `query_source`, so summing them matches `/status` "Total cost" and "Usage by model." The "SimSteward — Claude Code" dashboard's top section queries them (PromQL uses `{__name__=~"claude_code_cost_usage.*"}` to tolerate exporter unit suffixes like `_USD_total`). **Logs** (`claude_code.api_request`, etc.) flow to Loki for per-request audit.
+
+**Historical backfill:** OTEL cannot replay history. `scripts/backfill-subagent-usage.js` reads existing subagent transcripts, computes cost with the same pricing as the hook (`scripts/hooks/loki-log.js` exports `computeCostBreakdown`), and pushes per-subagent `claude_turn_metrics` (with `is_subagent="true"`, `query_source="subagent"`) into `claude-token-metrics` so the legacy Loki history is corrected. Dry-run by default; `--push` to write. Subject to Loki's 14-day retention (older entries are reported as skipped).
+
+> **Not available via telemetry:** the **5-hour session %** and **weekly %** subscription limits shown in `/status` and `/usage` are rate-limit windows computed **client-side** by Claude Code. They are **not** exposed as OTEL metrics, hook fields, or any readable feed — so dashboards track cost/token *volume*, **not** plan-limit usage. The old "Monthly Spend % of $100" gauge (API-retail cost ÷ a dollar limit) was misleading for a subscription plan and has been removed.
 
 ## Event taxonomy
 

@@ -1,24 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "mcp__contextstream__context",
-      "mcp__contextstream__graph",
-      "mcp__contextstream__help",
-      "mcp__contextstream__init",
-      "mcp__contextstream__instruct",
-      "mcp__contextstream__integration",
-      "mcp__contextstream__media",
-      "mcp__contextstream__memory",
-      "mcp__contextstream__project",
-      "mcp__contextstream__ram",
-      "mcp__contextstream__reminder",
-      "mcp__contextstream__search",
-      "mcp__contextstream__session",
-      "mcp__contextstream__skill",
-      "mcp__contextstream__workspace",
       "WebSearch",
       "mcp__claude_ai_Sentry__*"
     ]
+  },
+  "env": {
+    "_comment": "Native Claude Code OpenTelemetry → local OTel collector (observability/local). The collector holds Grafana Cloud creds, so no secret lives here. claude_code.cost.usage / token.usage carry query_source=main|subagent|auxiliary, so subagent usage is counted (closes the dashboard undercount). Exporter failures are non-fatal when the collector is down.",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
+    "OTEL_METRIC_EXPORT_INTERVAL": "10000",
+    "OTEL_METRICS_INCLUDE_SESSION_ID": "true"
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
@@ -29,11 +24,17 @@
     "code-review@claude-plugins-official": true
   },
   "hooks": {
-    "PreToolUse":       [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js pre-tool-use"}]}],
-    "PostToolUse":      [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js post-tool-use"}]}],
-    "SessionStart":     [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js session-start"}]}],
-    "SessionEnd":       [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js session-end"}]}],
-    "Stop":             [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js stop"}]}],
-    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js user-prompt-submit"}]}]
+    "PreToolUse":         [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js pre-tool-use",          "timeout": 5}]}],
+    "PostToolUse":        [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js post-tool-use",         "timeout": 5}]}],
+    "PostToolUseFailure": [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js post-tool-use-failure", "timeout": 5}]}],
+    "SessionStart":       [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js session-start",         "timeout": 10}]}],
+    "SessionEnd":         [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js session-end",           "timeout": 15}]}],
+    "Stop":               [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js stop",                  "timeout": 15}]}],
+    "PreCompact":         [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js pre-compact",           "timeout": 5}]}],
+    "SubagentStart":      [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js subagent-start",        "timeout": 5}]}],
+    "SubagentStop":       [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js subagent-stop",         "timeout": 10}]}],
+    "Notification":       [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js notification",          "timeout": 5}]}],
+    "PermissionRequest":  [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js permission-request",    "timeout": 5}]}],
+    "UserPromptSubmit":   [{"hooks": [{"type": "command", "command": "node scripts/hooks/loki-log.js user-prompt-submit",    "timeout": 5}]}]
   }
 }

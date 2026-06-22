@@ -89,14 +89,26 @@ Sentry.init({
   <div class="banner err" id="guard-banner" hidden></div>
 
   <div class="panel">
-    <div class="panel-title">Build &amp; record</div>
+    <div class="panel-title">Build</div>
+    <div class="row" style="margin-bottom:6px">
+      <span style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);align-self:center">Mode</span>
+      <button type="button" class="btn record" id="btn-record" onclick="toggleRecord()">⏺ Record</button>
+      <span class="meta" id="record-path" style="margin-left:2px"></span>
+    </div>
+    <div style="height:1px;background:var(--border);margin-bottom:10px"></div>
     <div class="row">
       <button type="button" class="btn primary" id="btn-start" onclick="sendBuild('start')">Start index build</button>
-      <button type="button" class="btn danger" id="btn-cancel" onclick="sendBuild('cancel')">Cancel build</button>
-      <button type="button" class="btn record" id="btn-record" onclick="toggleRecord()">Record</button>
+      <button type="button" class="btn" id="btn-finalize" onclick="sendBuild('finalize')" disabled>Stop &amp; save</button>
+      <button type="button" class="btn danger" id="btn-cancel" onclick="sendBuild('cancel')" disabled>Cancel</button>
     </div>
-    <div class="meta" id="build-meta"></div>
-    <div class="meta" id="record-path" style="margin-top:6px"></div>
+    <div class="meta" id="build-meta">Waiting for iRacing connection…</div>
+    <div style="height:1px;background:var(--border);margin:10px 0"></div>
+    <div class="row" style="margin-bottom:0">
+      <input type="file" id="file-index-input" accept=".json,application/json" hidden onchange="onFileInputChange(event)" />
+      <button type="button" class="btn" id="btn-load-index" onclick="loadIndexFromFile()">Load from file…</button>
+      <button type="button" class="btn" id="btn-view-live" onclick="viewLive()" hidden>View live session</button>
+      <span class="meta" id="file-load-state" style="margin-left:2px"></span>
+    </div>
   </div>
 
   <div class="panel" id="navigate-panel">
@@ -109,7 +121,10 @@ Sentry.init({
     <div class="row">
       <button type="button" class="btn" id="btn-walk-start" onclick="walkStart()" disabled>▶ Auto-walk</button>
       <button type="button" class="btn danger" id="btn-walk-stop" onclick="walkStop()" disabled>■ Stop walk</button>
-      <button type="button" class="btn" id="btn-capture-all" onclick="captureAll()" disabled style="white-space:nowrap">Capture all mine</button>
+    </div>
+    <div style="height:1px;background:var(--border);margin:6px 0 10px"></div>
+    <div class="row">
+      <button type="button" class="btn primary" id="btn-capture-all" onclick="captureAll()" disabled style="white-space:nowrap">Capture all mine</button>
     </div>
   </div>
 
@@ -152,10 +167,38 @@ function wsUrl() {
 }
 let ws = null;
 let lastIdx = null;
+let lastDiagnostics = null;
 let lastSessionNum = 0;
 let sortKey = 'sessionTimeMs';
 let sortDir = 1;
 let lastSeekAt = 0;
+
+// File-load view state — when set, summary/table render from this object instead of the live state.
+let loadedFileIdx = null;
+let viewSource = 'live'; // 'live' | 'file'
+const MAX_INDEX_FILE_BYTES = 5 * 1024 * 1024;
+
+function logUiInteraction(elementId, message) {
+  try {
+    send('log', JSON.stringify({event:'dashboard_ui_event', element_id:elementId, event_type:'ui_interaction', message:String(message||''), domain:'ui'}));
+  } catch { /* WS may be down — UI must still work */ }
+}
+function logUiClick(elementId, message) {
+  try {
+    send('log', JSON.stringify({event:'dashboard_ui_event', element_id:elementId, event_type:'click', message:String(message||''), domain:'ui'}));
+  } catch { /* WS may be down */ }
+}
+
+function currentDisplayIndex(rii) {
+  if (viewSource === 'file' && loadedFileIdx) return loadedFileIdx;
+  return rii && rii.index;
+}
+function fileViewSubMatches(rii) {
+  if (!(viewSource === 'file' && loadedFileIdx)) return true;
+  const fileSub = loadedFileIdx.subSessionId;
+  const liveSub = rii ? rii.subSessionId : null;
+  return fileSub != null && liveSub != null && String(fileSub) === String(liveSub);
+}
 
 function connectWs() {
   const pill = document.getElementById('ws-pill');
@@ -196,6 +239,7 @@ function onMsg(m) {
 function onState(m) {
   const rii = m.replayIncidentIndex;
   lastSessionNum = m.replaySessionNum != null ? m.replaySessionNum : 0;
+  lastDiagnostics = m.diagnostics || null;
   if (!rii) return;
   lastIdx = rii;
   renderGuard(rii, m.diagnostics);
@@ -203,6 +247,7 @@ function onState(m) {
   renderSummary(rii);
   renderTable(rii);
   updateNavigatePanel(rii, m.diagnostics);
+  refreshFileViewUi();
   document.getElementById('btn-record').classList.toggle('on', !!rii.recordMode);
   const rp = rii.recordSamplePath || '';
   document.getElementById('record-path').textContent = rp ? ('Record file: ' + rp) : '';
@@ -229,25 +274,35 @@ function renderGuard(rii, diag) {
 function renderBuild(rii) {
   const phase = rii.phase || 'idle';
   const busy = phase !== 'idle';
+  const hasIndex = !busy && rii.incidentCount != null && rii.incidentCount >= 0 && rii.index != null;
   document.getElementById('btn-start').disabled = busy;
+  document.getElementById('btn-finalize').disabled = phase !== 'fast_forward';
   document.getElementById('btn-cancel').disabled = !busy;
-  const elapsed = rii.buildElapsedMs != null ? rii.buildElapsedMs : 0;
-  const rst = rii.replaySessionTime != null ? rii.replaySessionTime.toFixed(2) : '—';
-  const fr = rii.replayFrameNum != null ? rii.replayFrameNum : 0;
   const fe = rii.replayFrameEnd != null ? rii.replayFrameEnd : 0;
-  const prog = fe > 0 ? Math.round(100 * fr / fe) + '%' : '—';
-  document.getElementById('build-meta').innerHTML =
-    '<strong>Phase:</strong> ' + phase +
-    ' &nbsp;|&nbsp; <strong>Elapsed:</strong> ' + elapsed + ' ms' +
-    ' &nbsp;|&nbsp; <strong>ReplaySessionTime:</strong> ' + rst + ' s' +
-    ' &nbsp;|&nbsp; <strong>Frame:</strong> ' + fr + ' / ' + fe + ' (' + prog + ')' +
-    ' &nbsp;|&nbsp; <strong>SubSession:</strong> ' + (rii.subSessionId || 0) +
-    ' &nbsp;|&nbsp; <strong>SessionNum:</strong> ' + (rii.sessionNum != null ? rii.sessionNum : '—');
+  const el = document.getElementById('build-meta');
+  if (phase === 'idle') {
+    if (hasIndex) {
+      el.innerHTML = '<strong>Complete</strong> &nbsp;|&nbsp; <strong>' + rii.incidentCount + ' incident' + (rii.incidentCount !== 1 ? 's' : '') + ' found</strong>';
+    } else {
+      const estSec = fe > 0 ? Math.round(fe / (60 * 16)) : null;
+      const estStr = estSec != null ? ' — est. ~' + estSec + 's at 16×' : '';
+      el.innerHTML = '<strong>Ready</strong>' + (fe > 0 ? ' &nbsp;|&nbsp; <strong>Frames:</strong> ' + fe + estStr : ' — waiting for replay data');
+    }
+  } else {
+    const elapsed = rii.buildElapsedMs != null ? rii.buildElapsedMs : 0;
+    const rst = rii.replaySessionTime != null ? rii.replaySessionTime.toFixed(2) : '—';
+    const fr = rii.replayFrameNum != null ? rii.replayFrameNum : 0;
+    const prog = fe > 0 ? Math.round(100 * fr / fe) + '%' : '—';
+    el.innerHTML =
+      '<strong>Phase:</strong> ' + phase +
+      ' &nbsp;|&nbsp; <strong>Elapsed:</strong> ' + elapsed + ' ms' +
+      ' &nbsp;|&nbsp; <strong>Frame:</strong> ' + fr + ' / ' + fe + ' (' + prog + ')';
+  }
 }
 
 function renderSummary(rii) {
   const g = document.getElementById('summary-grid');
-  const ix = rii.index;
+  const ix = currentDisplayIndex(rii);
   if (!ix) {
     g.innerHTML = '<div style="grid-column:1/-1;color:var(--muted)">No completed index for this context (build in progress or none yet).</div>';
     return;
@@ -276,10 +331,15 @@ function fpShort(fp) {
 function renderTable(rii) {
   const tb = document.getElementById('tbody');
   const empty = document.getElementById('empty-hint');
-  const rows = (rii.index && rii.index.incidents) ? rii.index.incidents.slice() : [];
+  const ix = currentDisplayIndex(rii);
+  const rows = (ix && ix.incidents) ? ix.incidents.slice() : [];
+  const rowsActive = fileViewSubMatches(rii);
   if (!rows.length) {
     tb.innerHTML = '';
     empty.hidden = false;
+    empty.textContent = (viewSource === 'file')
+      ? 'Loaded file contains no incidents.'
+      : 'No index loaded for this subsession. Run a build or open a replay with an existing JSON index.';
     return;
   }
   empty.hidden = true;
@@ -292,6 +352,7 @@ function renderTable(rii) {
     if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * sortDir;
     return String(av).localeCompare(String(bv)) * sortDir;
   });
+  const disAttr = rowsActive ? '' : ' disabled title="Loaded file is for a different subsession — Seek/Capture disabled"';
   tb.innerHTML = rows.map((r) => {
     const pts = r.incidentPoints == null ? 'null' : String(r.incidentPoints);
     const arg = JSON.stringify({ sessionTimeMs: r.sessionTimeMs, sessionNum: lastSessionNum, carIdx: r.carIdx });
@@ -304,10 +365,10 @@ function renderTable(rii) {
       '<td>' + pts + '</td>' +
       '<td style="white-space:nowrap">' +
       '<button type="button" class="btn primary" style="padding:4px 8px;font-size:0.65rem;white-space:nowrap" data-seek="' +
-      encodeURIComponent(arg) + '" onclick="window._riiSeek(this)">Seek</button>' +
+      encodeURIComponent(arg) + '" onclick="window._riiSeek(this)"' + disAttr + '>Seek</button>' +
       ' <button type="button" class="btn" style="padding:4px 8px;font-size:0.65rem;white-space:nowrap" data-cap="' +
       encodeURIComponent(JSON.stringify({frame:r.replayFrame??-1,camera:'',car:r.carIdx,fingerprint:r.fingerprint||'',sessionTimeMs:r.sessionTimeMs??-1,carIdx:r.carIdx,lap:r.lap??-1,incidentPoints:r.incidentPoints??0,detectionSource:r.detectionSource||''})) +
-      '" onclick="window._riiCapture(this)">Capture</button>' +
+      '" onclick="window._riiCapture(this)"' + disAttr + '>Capture</button>' +
       '</td></tr>';
   }).join('');
 }
@@ -342,14 +403,21 @@ function toggleRecord() {
 }
 
 function onActionResult(m) {
-  if (m.success) return;
+  if (m.success) {
+    if (m.action === 'replay_incident_index_build') {
+      const labels = { start: 'Build started', cancel: 'Build cancelled', finalize: 'Build finalizing…' };
+      toast(labels[m.arg] || 'OK');
+    }
+    return;
+  }
   const err = m.error || '';
   const map = {
     not_connected: 'Not connected to iRacing.',
-    not_replay_mode: 'Not in replay mode.',
+    not_replay_mode: 'Not in replay mode — load a replay first.',
     build_in_progress: 'Index build already running.',
     bad_arg: 'Bad request.',
     no_subsession: 'No subsession id — load a replay session.',
+    not_fast_forwarding: 'No active build to finalize.',
   };
   toast(map[err] || err || 'Action failed');
 }
@@ -392,13 +460,127 @@ function updateNavigatePanel(rii, diag) {
   const count = rii && rii.incidentCount != null ? rii.incidentCount : 0;
   const walking = rii && rii.autoWalkActive;
 
-  document.getElementById('btn-prev-incident').disabled = !hasIndex;
-  document.getElementById('btn-next-incident').disabled = !hasIndex;
-  document.getElementById('btn-walk-start').disabled = !hasIndex || walking;
+  // Nav buttons rely on the plugin's cursor (live state), so they only make sense in live view
+  // OR when a loaded file's subsession matches the current iRacing replay.
+  const navOk = fileViewSubMatches(rii);
+
+  document.getElementById('btn-prev-incident').disabled = !hasIndex || !navOk;
+  document.getElementById('btn-next-incident').disabled = !hasIndex || !navOk;
+  document.getElementById('btn-walk-start').disabled = !hasIndex || walking || !navOk;
   document.getElementById('btn-walk-stop').disabled = !walking;
-  document.getElementById('btn-capture-all').disabled = !connected;
-  document.getElementById('cursor-display').textContent =
-    count > 0 && cursor >= 0 ? '#' + (cursor + 1) + ' of ' + count : (count > 0 ? '— of ' + count : '—');
+  document.getElementById('btn-capture-all').disabled = !connected || !navOk;
+
+  // When viewing a matching file, show the file's incident count instead of the plugin's count.
+  if (viewSource === 'file' && loadedFileIdx && navOk) {
+    const fileCount = (loadedFileIdx.incidents || []).length;
+    document.getElementById('cursor-display').textContent =
+      fileCount > 0 ? '— of ' + fileCount + ' (file)' : '—';
+  } else {
+    document.getElementById('cursor-display').textContent =
+      count > 0 && cursor >= 0 ? '#' + (cursor + 1) + ' of ' + count : (count > 0 ? '— of ' + count : '—');
+  }
+}
+
+function loadIndexFromFile() {
+  logUiClick('btn-load-index', 'Open file picker for index JSON');
+  const input = document.getElementById('file-index-input');
+  input.value = ''; // ensure re-selecting same file fires change
+  input.click();
+}
+
+function onFileInputChange(evt) {
+  const f = evt.target.files && evt.target.files[0];
+  if (!f) {
+    logUiInteraction('file-index-load-cancelled', 'No file selected');
+    return;
+  }
+  if (f.size > MAX_INDEX_FILE_BYTES) {
+    logUiInteraction('file-index-load-failed', 'File too large: ' + f.size + ' bytes (max ' + MAX_INDEX_FILE_BYTES + ')');
+    toast('File too large (max 5 MB).');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = () => {
+    logUiInteraction('file-index-load-failed', 'FileReader error: ' + ((reader.error && reader.error.message) || 'unknown'));
+    toast('Could not read file.');
+  };
+  reader.onload = () => {
+    let parsed;
+    try { parsed = JSON.parse(reader.result); }
+    catch (e) {
+      const msg = (e && e.message) || 'parse error';
+      logUiInteraction('file-index-load-failed', 'JSON parse error: ' + msg);
+      toast('Invalid JSON: ' + msg);
+      return;
+    }
+    const err = validateIndexShape(parsed);
+    if (err) {
+      logUiInteraction('file-index-load-failed', 'Validation failed: ' + err);
+      toast('Index validation failed: ' + err);
+      return;
+    }
+    loadedFileIdx = parsed;
+    viewSource = 'file';
+    const cnt = (parsed.incidents || []).length;
+    logUiInteraction('file-index-loaded',
+      'Loaded file=' + (f.name || '?') + ' subSessionId=' + parsed.subSessionId + ' incidents=' + cnt);
+    toast('Loaded ' + cnt + ' incident' + (cnt !== 1 ? 's' : '') + ' from ' + f.name);
+    refreshFileViewUi();
+    if (lastIdx) {
+      renderSummary(lastIdx);
+      renderTable(lastIdx);
+      updateNavigatePanel(lastIdx, lastDiagnostics);
+    } else {
+      // No live state yet — still render summary/table from file
+      const synthetic = { index: null, incidentCount: cnt };
+      renderSummary(synthetic);
+      renderTable(synthetic);
+    }
+  };
+  reader.readAsText(f);
+}
+
+function validateIndexShape(o) {
+  if (!o || typeof o !== 'object') return 'not an object';
+  if (o.subSessionId == null || o.subSessionId === '') return 'missing subSessionId';
+  if (!Array.isArray(o.incidents)) return 'missing or invalid incidents array';
+  for (let i = 0; i < o.incidents.length; i++) {
+    const r = o.incidents[i];
+    if (!r || typeof r !== 'object') return 'incidents[' + i + '] not an object';
+    if (typeof r.carIdx !== 'number') return 'incidents[' + i + '].carIdx not numeric';
+    if (typeof r.sessionTimeMs !== 'number') return 'incidents[' + i + '].sessionTimeMs not numeric';
+  }
+  return null;
+}
+
+function viewLive() {
+  logUiClick('btn-view-live', 'Return to live session view');
+  loadedFileIdx = null;
+  viewSource = 'live';
+  refreshFileViewUi();
+  if (lastIdx) {
+    renderSummary(lastIdx);
+    renderTable(lastIdx);
+    updateNavigatePanel(lastIdx, lastDiagnostics);
+  }
+}
+
+function refreshFileViewUi() {
+  const btnLive = document.getElementById('btn-view-live');
+  const state = document.getElementById('file-load-state');
+  if (viewSource === 'file' && loadedFileIdx) {
+    btnLive.hidden = false;
+    const fileSub = loadedFileIdx.subSessionId;
+    const liveSub = lastIdx ? lastIdx.subSessionId : null;
+    const match = liveSub != null && String(liveSub) === String(fileSub);
+    const color = match ? 'var(--green)' : 'var(--yellow)';
+    state.innerHTML = '<strong style="color:' + color + '">Viewing file:</strong> subSessionId=' + fileSub +
+      (match ? ' <span style="color:var(--muted)">(matches current)</span>'
+             : ' <span style="color:var(--muted)">(≠ current ' + (liveSub != null ? liveSub : '—') + ' — Seek disabled)</span>');
+  } else {
+    btnLive.hidden = true;
+    state.textContent = '';
+  }
 }
 
 document.querySelectorAll('th[data-k]').forEach((th) => {

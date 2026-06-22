@@ -6,10 +6,13 @@
   "scripts": {
     "env:run": "dotenv -e .env --",
     "loki:query": "dotenv -e .env -- node scripts/query-loki-once.mjs",
+    "dash:deploy": "dotenv -e .env -- node scripts/deploy-dashboard.mjs",
     "secrets:lint": "secretlint \"**/*\"",
     "secrets:gitleaks": "pwsh -NoProfile -File scripts/run-gitleaks-docker.ps1",
-    "contextstream:ingest": "pwsh -NoProfile -File scripts/contextstream-ingest.ps1",
-    "contextstream:ingest:force": "pwsh -NoProfile -File scripts/contextstream-ingest.ps1 -Force"
+    "obs:up": "dotenv -e .env -- docker compose -f observability/local/docker-compose.yml up -d",
+    "obs:down": "docker compose -f observability/local/docker-compose.yml down",
+    "obs:wipe": "docker compose -f observability/local/docker-compose.yml down -v",
+    "obs:ps": "docker compose -f observability/local/docker-compose.yml ps"
   },
   "devDependencies": {
     "@secretlint/secretlint-rule-preset-recommend": "^11.4.0",

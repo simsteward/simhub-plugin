@@ -1,9 +1,23 @@
-# OpenTelemetry Collector (contrib): OTLP in → Prometheus text format out for local Prometheus scrape.
-# See docs/observability-local.md § Metrics (canonical local path).
+# OpenTelemetry Collector (contrib): OTLP in → (1) local Prometheus scrape for offline
+# verification, (2) Grafana Cloud OTLP gateway for production metrics + logs.
+#
+# Primary purpose: ingest Claude Code native telemetry (CLAUDE_CODE_ENABLE_TELEMETRY=1,
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 — see .claude/settings.json). Those
+# claude_code.cost.usage / claude_code.token.usage counters carry query_source=
+# main|subagent|auxiliary, so subagent usage is counted — this is the authoritative feed
+# that matches `/status` and closes the dashboard undercount.
+#
+# Grafana Cloud creds come from the repo .env (injected via docker-compose env_file), so no
+# secret lives in this file. With creds unset the collector still starts; GC exports just
+# 401 harmlessly and the local Prometheus path keeps working.
 
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+  basicauth/grafanacloud:
+    client_auth:
+      username: ${env:SIMSTEWARD_OTLP_USER:-unset}
+      password: ${env:SIMSTEWARD_OTLP_TOKEN:-unset}
 
 receivers:
   otlp:
@@ -19,18 +33,39 @@ processors:
     check_interval: 1s
     limit_mib: 512
     spike_limit_mib: 128
+  attributes/env:
+    # Stamp env=local|production as a DATAPOINT attribute (→ Prometheus/Mimir label, not a
+    # resource attribute Grafana Cloud might drop) so dashboards can filter the $env variable.
+    actions:
+      - key: env
+        value: ${env:SIMSTEWARD_LOG_ENV:-local}
+        action: upsert
 
 exporters:
+  # (1) Local Prometheus text endpoint — scraped by the local prometheus service (:8889).
   prometheus:
     endpoint: 0.0.0.0:8889
     namespace: ""
+    resource_to_telemetry_conversion:
+      enabled: true
     const_labels:
       cluster: local
 
+  # (2) Grafana Cloud OTLP gateway — one endpoint + creds for BOTH metrics and logs.
+  #     Metrics → Mimir, logs (claude_code.api_request events) → Loki.
+  otlphttp/grafanacloud:
+    endpoint: ${env:SIMSTEWARD_OTLP_ENDPOINT:-https://otlp-gateway-prod-us-east-0.grafana.net/otlp}
+    auth:
+      authenticator: basicauth/grafanacloud
+
 service:
-  extensions: [health_check]
+  extensions: [health_check, basicauth/grafanacloud]
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [prometheus]
+      processors: [memory_limiter, attributes/env, batch]
+      exporters: [prometheus, otlphttp/grafanacloud]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/env, batch]
+      exporters: [otlphttp/grafanacloud]

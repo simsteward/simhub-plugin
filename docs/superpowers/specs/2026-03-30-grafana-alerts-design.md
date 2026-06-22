@@ -1,6 +1,6 @@
 # Grafana Alerts Design — Log Sentinel Layer 0
 **Date:** 2026-03-30
-**Status:** Approved
+**Status:** Superseded — Sentinel was deleted (commit 9aa258e, 2026-04). The "39 rules / 7 domains / Domain 6" framework described below no longer applies. Current alert model: rules managed individually in Grafana Cloud, queries filter by `env` Loki stream label. See `docs/GRAFANA-LOGGING.md`.
 
 ---
 

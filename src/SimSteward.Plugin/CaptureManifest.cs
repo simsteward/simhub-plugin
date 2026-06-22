@@ -20,6 +20,10 @@ namespace SimSteward.Plugin
         [JsonProperty("lap")] public int Lap { get; set; } = -1;
         [JsonProperty("incidentPoints")] public int IncidentPoints { get; set; }
         [JsonProperty("detectionSource")] public string DetectionSource { get; set; }
+        /// <summary>Replay frame number at the captured incident (as passed by the dashboard / index row).</summary>
+        [JsonProperty("replayFrame")] public int ReplayFrame { get; set; } = -1;
+        /// <summary>Frame the plugin actually seeked to (incident frame minus pre-roll), for reproducibility.</summary>
+        [JsonProperty("seekFrame")] public int SeekFrame { get; set; } = -1;
         [JsonProperty("clips")] public List<CaptureClipEntry> Clips { get; set; } = new List<CaptureClipEntry>();
         [JsonProperty("pushedToQueue")] public bool PushedToQueue { get; set; }
         [JsonProperty("capturedAt")] public string CapturedAt { get; set; }

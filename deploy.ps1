@@ -198,6 +198,75 @@ if ($sdkMissing) {
     }
 }
 
+# ── Sentry helpers (defined early so post-build block can use them) ──────────
+$sentryOrg = 'sim-steward'
+$sentryProjects = @('simhub-plugin', 'web-dashboards')
+$sentryAuthToken = if (-not [string]::IsNullOrWhiteSpace($env:SENTRY_AUTH_TOKEN)) { $env:SENTRY_AUTH_TOKEN }
+                   elseif (-not [string]::IsNullOrWhiteSpace($env:SENTRY_ELEVATED_API_KEY)) { $env:SENTRY_ELEVATED_API_KEY }
+                   else { $null }
+
+function Parse-SentryDsn {
+    param([string]$Dsn)
+    if ($Dsn -match '^https://([^@]+)@([^/]+)/(\d+)$') {
+        return @{ PublicKey = $Matches[1]; IngestDomain = $Matches[2]; ProjectId = $Matches[3] }
+    }
+    return $null
+}
+
+$script:sentryDsn = Parse-SentryDsn $env:SIMSTEWARD_SENTRY_DSN
+
+function Push-SentryApi {
+    param([string]$Path, [hashtable]$Body)
+    if ([string]::IsNullOrWhiteSpace($sentryAuthToken) -or [string]::IsNullOrWhiteSpace($sentryRelease)) { return }
+    try {
+        $url = "https://sentry.io/api/0/organizations/$sentryOrg/$Path"
+        $json = $Body | ConvertTo-Json -Compress -Depth 5
+        $headers = @{ Authorization = "Bearer $sentryAuthToken"; 'Content-Type' = 'application/json' }
+        Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Warning "Sentry API ($Path): $($_.Exception.Message)"
+    }
+}
+
+function Push-SentryCheckIn {
+    param([string]$MonitorSlug, [string]$Status, [string]$CheckInId)
+    if (-not $script:sentryDsn) { return $null }
+    try {
+        $baseUrl = "https://$($script:sentryDsn.IngestDomain)/api/$($script:sentryDsn.ProjectId)/cron/$MonitorSlug/$($script:sentryDsn.PublicKey)/"
+        $headers = @{ 'Content-Type' = 'application/json' }
+        if ([string]::IsNullOrWhiteSpace($CheckInId)) {
+            $body = @{
+                status         = $Status
+                monitor_config = @{
+                    schedule        = @{ type = 'interval'; value = 1; unit = 'day' }
+                    checkin_margin  = 5
+                    max_runtime     = 10
+                    timezone        = 'UTC'
+                }
+            }
+            $json = $body | ConvertTo-Json -Compress -Depth 5
+            $resp = Invoke-RestMethod -Uri $baseUrl -Method Post -Headers $headers -Body $json -ErrorAction Stop
+            $newId = $resp.id
+            Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in started: $MonitorSlug" @{
+                monitor_slug = $MonitorSlug; status = $Status; checkin_id = $newId
+            }
+            return $newId
+        } else {
+            $url = "${baseUrl}?check_in_id=$CheckInId"
+            $body = @{ status = $Status }
+            $json = $body | ConvertTo-Json -Compress -Depth 5
+            Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop | Out-Null
+            Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in completed: $MonitorSlug ($Status)" @{
+                monitor_slug = $MonitorSlug; status = $Status; checkin_id = $CheckInId
+            }
+            return $null
+        }
+    } catch {
+        Write-Warning "Sentry CheckIn ($MonitorSlug/$Status): $($_.Exception.Message)"
+        return $null
+    }
+}
+
 # ── Build ───────────────────────────────────────────────────────────────────
 Write-Host "Building..."
 Push-LokiEvent 'deploy_build_started' 'INFO' 'dotnet build started'
@@ -229,6 +298,45 @@ if (-not (Test-Path (Join-Path $outDir "SimSteward.Plugin.dll"))) {
 if (-not (Test-Path (Join-Path $outDir "SimSteward.Plugin.dll"))) {
     Push-LokiEvent 'deploy_failed' 'ERROR' 'Build output not found' @{ out_dir = $outDir }
     Write-Error "Build output not found. Expected SimSteward.Plugin.dll in bin\Plugin or bin\Plugin\net48"
+}
+
+# ── Sentry: create release + upload debug symbols (after build, before deploy) ─
+$builtDll      = Join-Path $outDir "SimSteward.Plugin.dll"
+$sentryRelease = Read-PluginDllProductVersion $builtDll
+
+if (-not [string]::IsNullOrWhiteSpace($sentryAuthToken) -and -not [string]::IsNullOrWhiteSpace($sentryRelease)) {
+    Write-Host "Registering Sentry release: $sentryRelease"
+    $fullSha = ''; try { $fullSha = (& git -C $PluginRoot rev-parse HEAD 2>$null); if ($LASTEXITCODE -ne 0) { $fullSha = '' } } catch {}
+
+    Push-SentryApi "releases/" @{
+        version  = $sentryRelease
+        projects = $sentryProjects
+        ref      = $fullSha
+    }
+    Push-LokiEvent 'deploy_sentry_release_created' 'INFO' "Sentry release created: $sentryRelease" @{
+        sentry_release = $sentryRelease
+        git_sha        = $fullSha
+    }
+
+    $sentryCli = "C:\Users\winth\.sentry\bin\sentry.exe"
+    if (Test-Path $sentryCli) {
+        Write-Host "Uploading debug symbols to Sentry..."
+        try {
+            & $sentryCli debug-files upload --org $sentryOrg --project 'simhub-plugin' `
+                --auth-token $sentryAuthToken $outDir
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Debug symbols uploaded."
+                Push-LokiEvent 'deploy_sentry_dif_upload' 'INFO' 'PDB symbols uploaded to Sentry' @{
+                    sentry_release = $sentryRelease
+                    pdb_dir        = $outDir
+                }
+            } else { Write-Warning "Sentry DIF upload exited $LASTEXITCODE (non-fatal)." }
+        } catch { Write-Warning "Sentry DIF upload failed (non-fatal): $($_.Exception.Message)" }
+    } else { Write-Warning "sentry CLI not found at $sentryCli — skipping DIF upload." }
+} elseif ([string]::IsNullOrWhiteSpace($sentryAuthToken)) {
+    Write-Host "Skipping Sentry release creation (SENTRY_AUTH_TOKEN not set)."
+} else {
+    Write-Warning "Skipping Sentry release creation (auth token set but version unavailable; release='$sentryRelease')."
 }
 
 # ── Run unit tests (if test projects exist) ─────────────────────────────────
@@ -443,124 +551,20 @@ if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) 
 }
 Write-Host ""
 
-# ── Sentry release + deploy tracking ────────────────────────────────────────
-$sentryOrg = 'sim-steward'
-$sentryProjects = @('simhub-plugin', 'web-dashboards')
-$sentryAuthToken = if (-not [string]::IsNullOrWhiteSpace($env:SENTRY_AUTH_TOKEN)) { $env:SENTRY_AUTH_TOKEN }
-                   elseif (-not [string]::IsNullOrWhiteSpace($env:SENTRY_ELEVATED_API_KEY)) { $env:SENTRY_ELEVATED_API_KEY }
-                   else { $null }
-$sentryRelease = if (-not [string]::IsNullOrWhiteSpace($script:SimStewardPluginVersionDeployed)) { $script:SimStewardPluginVersionDeployed } else { $null }
-
-function Parse-SentryDsn {
-    param([string]$Dsn)
-    # https://<public_key>@<ingest_domain>/<project_id>
-    if ($Dsn -match '^https://([^@]+)@([^/]+)/(\d+)$') {
-        return @{
-            PublicKey     = $Matches[1]
-            IngestDomain  = $Matches[2]
-            ProjectId     = $Matches[3]
-        }
-    }
-    return $null
-}
-
-$script:sentryDsn = Parse-SentryDsn $env:SIMSTEWARD_SENTRY_DSN
-
-function Push-SentryApi {
-    param([string]$Path, [hashtable]$Body)
-    if ([string]::IsNullOrWhiteSpace($sentryAuthToken) -or [string]::IsNullOrWhiteSpace($sentryRelease)) { return }
-    try {
-        $url = "https://sentry.io/api/0/organizations/$sentryOrg/$Path"
-        $json = $Body | ConvertTo-Json -Compress -Depth 5
-        $headers = @{ Authorization = "Bearer $sentryAuthToken"; 'Content-Type' = 'application/json' }
-        Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop | Out-Null
-    } catch {
-        # Non-fatal: deploy must not fail because Sentry API is down
-        Write-Warning "Sentry API ($Path): $($_.Exception.Message)"
-    }
-}
-
-function Push-SentryCheckIn {
-    param([string]$MonitorSlug, [string]$Status, [string]$CheckInId)
-    if (-not $script:sentryDsn) { return $null }
-    try {
-        $baseUrl = "https://$($script:sentryDsn.IngestDomain)/api/$($script:sentryDsn.ProjectId)/cron/$MonitorSlug/$($script:sentryDsn.PublicKey)/"
-        $headers = @{ 'Content-Type' = 'application/json' }
-        if ([string]::IsNullOrWhiteSpace($CheckInId)) {
-            # Initial check-in: POST with monitor_config for upsert/auto-creation
-            $body = @{
-                status         = $Status
-                monitor_config = @{
-                    schedule        = @{ type = 'interval'; value = 1; unit = 'day' }
-                    checkin_margin  = 5
-                    max_runtime     = 10
-                    timezone        = 'UTC'
-                }
-            }
-            $json = $body | ConvertTo-Json -Compress -Depth 5
-            $resp = Invoke-RestMethod -Uri $baseUrl -Method Post -Headers $headers -Body $json -ErrorAction Stop
-            $newId = $resp.id
-            Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in started: $MonitorSlug" @{
-                monitor_slug = $MonitorSlug
-                status       = $Status
-                checkin_id   = $newId
-            }
-            return $newId
-        } else {
-            # Completion check-in: POST with check_in_id to update existing
-            $url = "${baseUrl}?check_in_id=$CheckInId"
-            $body = @{ status = $Status }
-            $json = $body | ConvertTo-Json -Compress -Depth 5
-            Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -ErrorAction Stop | Out-Null
-            Push-LokiEvent 'deploy_sentry_checkin' 'INFO' "Sentry cron check-in completed: $MonitorSlug ($Status)" @{
-                monitor_slug = $MonitorSlug
-                status       = $Status
-                checkin_id   = $CheckInId
-            }
-            return $null
-        }
-    } catch {
-        # Non-fatal: deploy must not fail because Sentry API is down
-        Write-Warning "Sentry CheckIn ($MonitorSlug/$Status): $($_.Exception.Message)"
-        return $null
-    }
-}
-
+# ── Sentry: register deploys (release was created post-build above) ──────────
 if (-not [string]::IsNullOrWhiteSpace($sentryAuthToken) -and -not [string]::IsNullOrWhiteSpace($sentryRelease)) {
-    Write-Host "Registering Sentry release: $sentryRelease (3 projects)"
-
-    # Create release across all 3 projects with commits
-    $fullSha = ''
-    try { $fullSha = (& git -C $PluginRoot rev-parse HEAD 2>$null) } catch {}
-    Push-SentryApi "releases/" @{
-        version  = $sentryRelease
-        projects = $sentryProjects
-        ref      = $fullSha
-    }
-
-    # URL-encode release version for path segments ('+' in SemVer breaks URLs)
     $encodedRelease = [System.Uri]::EscapeDataString($sentryRelease)
 
-    # Deploy: simhub-plugin (C# DLLs)
-    Push-SentryApi "releases/$encodedRelease/deploys/" @{
-        environment = 'local'
-        name        = 'simhub-plugin'
-    }
+    Push-SentryApi "releases/$encodedRelease/deploys/" @{ environment = 'local'; name = 'simhub-plugin' }
+    Push-SentryApi "releases/$encodedRelease/deploys/" @{ environment = 'local'; name = 'web-dashboards' }
 
-    # Deploy: web-dashboards (all HTML/JS dashboards)
-    Push-SentryApi "releases/$encodedRelease/deploys/" @{
-        environment = 'local'
-        name        = 'web-dashboards'
-    }
-
-    Write-Host "Sentry release + 2 deploys registered (simhub-plugin, web-dashboards)."
-    Push-LokiEvent 'deploy_sentry_release' 'INFO' "Sentry release registered: $sentryRelease" @{
+    Write-Host "Sentry deploys registered (simhub-plugin, web-dashboards)."
+    Push-LokiEvent 'deploy_sentry_deploys' 'INFO' "Sentry deploys registered: $sentryRelease" @{
         sentry_release  = $sentryRelease
-        sentry_org      = $sentryOrg
         sentry_projects = ($sentryProjects -join ',')
     }
 } elseif ([string]::IsNullOrWhiteSpace($sentryAuthToken)) {
-    Write-Host "Skipping Sentry release tracking (SENTRY_AUTH_TOKEN not set)."
+    Write-Host "Skipping Sentry deploy tracking (SENTRY_AUTH_TOKEN not set)."
 }
 
 # ── 5. Re-launch SimHub ─────────────────────────────────────────────────────

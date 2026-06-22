@@ -93,6 +93,11 @@ namespace SimSteward.Plugin
         /// <summary>SHA-256 prefix of <c>SessionInfoYaml</c> when available; merged into structured logs via <see cref="MergeSessionAndRoutingFields"/>.</summary>
         private volatile string _logCtxSessionYamlFingerprint = "";
 
+        /// <summary>Total frames in the replay file (snapshot taken at frame 0). Non-zero only while a replay index build is active; cleared on completion/cancel.</summary>
+        private volatile int _logCtxReplayTotalFrames;
+        /// <summary>Number of sessions in the replay (from SessionInfo.Sessions[]). Non-zero only while a replay index build is active.</summary>
+        private volatile int _logCtxReplaySessionCount;
+
         private int _lastSessionInfoUpdateForYamlFingerprint = -1;
         private DateTime _lastSeekIssuedUtc = DateTime.MinValue;
         private int _incidentCursor = -1;
@@ -1170,6 +1175,8 @@ namespace SimSteward.Plugin
                             Lap = parsed.lap ?? SessionLogging.LapUnknown,
                             IncidentPoints = parsed.incidentPoints ?? 0,
                             DetectionSource = parsed.detectionSource ?? "manual",
+                            ReplayFrame = parsed.frame,
+                            SeekFrame = seekFrame,
                             PushedToQueue = false,
                             CapturedAt = nowStr,
                             Clips = new System.Collections.Generic.List<CaptureClipEntry>
@@ -1188,7 +1195,9 @@ namespace SimSteward.Plugin
                         ["lap"] = parsed.lap ?? SessionLogging.LapUnknown,
                         ["incident_points"] = parsed.incidentPoints ?? 0,
                         ["detection_source"] = parsed.detectionSource ?? "manual",
-                        ["camera_view"] = cameraView
+                        ["camera_view"] = cameraView,
+                        ["replay_frame"] = parsed.frame,
+                        ["seek_frame"] = seekFrame
                     };
                     MergeSessionAndRoutingFields(captureFields);
                     _logger?.Structured("INFO", "CaptureManifest", "incident_committed",
@@ -1427,6 +1436,13 @@ namespace SimSteward.Plugin
             var fp = _logCtxSessionYamlFingerprint;
             if (!string.IsNullOrEmpty(fp))
                 fields["session_yaml_fingerprint_sha256_16"] = fp;
+            int totalFrames = _logCtxReplayTotalFrames;
+            if (totalFrames > 0)
+            {
+                fields["replay_total_frames"] = totalFrames;
+                int sc = _logCtxReplaySessionCount;
+                if (sc > 0) fields["replay_session_count"] = sc;
+            }
             SessionLogging.AppendRoutingAndDestination(fields);
         }
 
@@ -1511,7 +1527,7 @@ namespace SimSteward.Plugin
                     o.Release = PluginVersionInfo.Display;
                     o.TracesSampleRate = 1.0;
                     o.IsGlobalModeEnabled = true;
-                    o.AutoSessionTracking = false;
+                    o.AutoSessionTracking = true;
                     o.MaxBreadcrumbs = 100;
                     o.SetBeforeSend((sentryEvent, hint) =>
                     {
@@ -1575,6 +1591,11 @@ namespace SimSteward.Plugin
                     }
                     WriteBroadcastError("Broadcast skipped: 0 clients", null);
                     _broadcastNoClientsPending = true;
+                },
+                onLastClientDisconnected: () =>
+                {
+                    _replayIndexCancelRequested = true;
+                    _replayIndexRecordModeEnabled = false;
                 });
 
             try
@@ -1945,6 +1966,7 @@ namespace SimSteward.Plugin
                     Lap = task.Lap,
                     IncidentPoints = task.IncidentPoints,
                     DetectionSource = task.DetectionSource,
+                    ReplayFrame = task.ReplayFrame,
                     PushedToQueue = false,
                     CapturedAt = now,
                     Clips = new System.Collections.Generic.List<CaptureClipEntry>()
@@ -1959,6 +1981,7 @@ namespace SimSteward.Plugin
                     ["lap"] = task.Lap,
                     ["incident_points"] = task.IncidentPoints,
                     ["detection_source"] = task.DetectionSource,
+                    ["replay_frame"] = task.ReplayFrame,
                     ["queue_remaining"] = _captureQueue.Count
                 };
                 MergeSessionAndRoutingFields(captureFields);

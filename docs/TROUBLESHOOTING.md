@@ -107,7 +107,6 @@ If you run a replay and incidents are not captured or signaled:
 | Mode always "Unknown" | iRacing running and shared memory enabled |
 | No logs in Grafana / Loki | Section 8: SIMSTEWARD_LOKI_URL, local stack, auth, data source |
 | Log stream empty when clicking buttons | Section 4b: connection, broadcast-errors.log, browser console |
-| ContextStream 401 / index missing | Section 9: `.env` key, verify-key, ingest in interactive terminal |
 
 ---
 
@@ -159,27 +158,6 @@ For the full pipeline (collector, ports, Grafana datasource URL), see **docs/obs
 2. **No `simsteward_*` metrics** — OTLP is disabled unless **`OTEL_EXPORTER_OTLP_ENDPOINT`** or **`SIMSTEWARD_OTLP_ENDPOINT`** is set **before** SimHub starts (SimHub does not load `.env` automatically). Use **`scripts/run-simhub-local-observability.ps1`** or set env in the user/session environment.
 3. **`connection refused` to port 4317** — OpenTelemetry Collector is not up or ports are not mapped; restart compose from the repo root.
 4. **Wrong protocol** — gRPC defaults for **`http://127.0.0.1:4317`**. For HTTP/protobuf on **4318**, set **`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`** and point the endpoint at **4318**.
-
----
-
-## 10. ContextStream MCP (index / search / 401)
-
-**Default workflow:** Keep the repo in sync with ContextStream using the **ContextStream MCP** **`project` tool** — `project(action="index")` or `project(action="ingest_local", path="<repo>")` — then log the run with `session(action="capture", event_type="operation", …)` per **docs/CONTEXTSTREAM-UPLOAD-PLAN.md**. Do **not** use ad-hoc HTTP/API scripts for routine sync. The CLI steps below are **troubleshooting only** when MCP or env is misconfigured.
-
-- **401 on ingest or `verify-key`** — The ContextStream API key must be in `.env` (`CONTEXTSTREAM_API_KEY`, etc.) and loaded for CLI commands. From the repo root:  
-  `npx -y envmcp --env-file .env cmd /c "%LocalAppData%\ContextStream\contextstream-mcp.exe verify-key"`  
-  If that fails, rotate the key in the ContextStream account and update `.env` (do not commit real secrets).
-- **`ingest` fails with "not a terminal"`** — From repo root (with `.env`): `powershell -ExecutionPolicy Bypass -File scripts/contextstream-ingest.ps1` (spawns `cmd` so the CLI sees a console). Or run `contextstream-mcp.exe ingest --path <repo>` manually in Windows Terminal / `cmd`. The MCP server uses the same key via Cursor env.
-- **Search says index freshness `missing`** — After a successful ingest from step above, keyword search still works; semantic/index metadata syncs once ingestion completes.
-
-### ContextStream KB links
-
-| Spec | Doc ID |
-|------|--------|
-| Observability — Local Stack | `25ed8579-c142-4040-b9a2-87b14523475f` |
-| Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
-| Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
-| Sim Steward — Data Routing (OTel / Loki / Prometheus) | `cbae1c33-c778-4e9a-9a8d-6b3e3c8c368b` |
 
 ---
 

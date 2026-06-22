@@ -164,7 +164,7 @@ Five ratios appear across multiple dashboards. Every panel showing one of these 
 The following are explicitly excluded from this spec:
 
 - Visual redesign / layout changes to any dashboard (separate spec)
-- Grafana alert rule changes (separate review per Grafana Alert Covenant)
+- Grafana alert rule changes (review impacted rules individually in Grafana Cloud)
 - Adding new log fields to the plugin or hook — all work uses fields that already exist in `claude-token-metrics`
 - Sentinel pricing / cost tracking — Ollama is not billed
 

@@ -88,6 +88,8 @@ All Loki entries carry the `env` stream label set from `SIMSTEWARD_LOG_ENV` (`lo
 Streams in active use:
 - `app="sim-steward"` — C# plugin, dashboard, deploy markers (see `docs/GRAFANA-LOGGING.md` for the event taxonomy)
 - `app="claude-dev-logging"` — Claude Code hook telemetry (`scripts/hooks/loki-log.js`)
-- `app="claude-token-metrics"` — per-turn cost metrics (one entry per Claude response)
+- `app="claude-token-metrics"` — per-turn cost metrics, **main session only** (one entry per Claude response). Undercounts subagents — see below.
+
+**Authoritative Claude Code cost/tokens = native OpenTelemetry, not the Loki hook stream.** The hook parses only the parent transcript; subagents run as separate transcripts and are missed. `CLAUDE_CODE_ENABLE_TELEMETRY=1` (`.claude/settings.json` → `env`) ships `claude_code.cost.usage` / `claude_code.token.usage` (Prometheus/Mimir, `grafanacloud-prom`) with a `query_source` label so subagent usage is counted and totals match `/status`. The OTel collector is in `observability/local`. The **5h-session / weekly subscription limit %** from `/status` is **not** exposed by any feed — dashboards track cost/volume, not plan limits. Backfill historical subagents with `scripts/backfill-subagent-usage.js`. Full detail: `docs/GRAFANA-LOGGING.md` → *Claude Code native telemetry*.
 
 There is no global alert covenant or fixed alert-domain framework. Alert rules are managed individually in Grafana Cloud — review the specific rule(s) impacted by a change rather than referencing a domain table.

@@ -1,11 +1,11 @@
 {
   "uid": "simsteward-claude-code",
   "title": "SimSteward — Claude Code",
-  "description": "Claude Code session cost, token usage, tool health, and session audit",
+  "description": "Claude Code usage. TOP section = Loki hook pipeline (main sessions live + backfilled subagents via scripts/backfill-subagent-usage.js). NOTE: OTEL PromQL panels (grafanacloud-prom) will replace these once SIMSTEWARD_OTLP_TOKEN is provisioned at grafana.com → Access Policies (metrics:write + logs:write). BOTTOM = legacy tool health + session audit. Subscription 5h/weekly limit % is NOT available via telemetry — see the Spend Context note.",
   "refresh": "30s",
   "schemaVersion": 38,
-  "version": 2,
-  "tags": ["claude", "sim-steward", "cost"],
+  "version": 4,
+  "tags": ["claude", "sim-steward", "cost", "otel"],
   "timezone": "browser",
   "time": {"from": "now-24h", "to": "now"},
   "templating": {
@@ -31,198 +31,208 @@
   },
   "panels": [
     {
-      "type": "row", "title": "Cost Summary",
+      "type": "row", "title": "All Sources — cost & tokens incl. backfilled subagents (Loki · OTEL PromQL once OTLP creds provisioned)",
       "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
       "collapsed": false, "panels": []
     },
     {
-      "type": "stat", "title": "Total Cost",
+      "type": "stat", "title": "Total Cost (all sources)",
+      "description": "Sum of cost_usd across main sessions (live hook) + subagents (backfilled). Will switch to OTEL PromQL once SIMSTEWARD_OTLP_TOKEN provisioned.",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
       "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
-      "fieldConfig": {
-        "defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7AA2F7", "mode": "fixed"}, "noValue": "$0.00"},
-        "overrides": []
-      },
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7AA2F7", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Total Cost", "queryType": "range", "refId": "A"}]
+    },
+    {
+      "type": "stat", "title": "Total Tokens (all sources)",
+      "description": "Total tokens across main sessions + backfilled subagents from hook pipeline.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 1, "color": {"fixedColor": "#BB9AF7", "mode": "fixed"}, "noValue": "0"}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_tokens [$__range]))", "legendFormat": "Total Tokens", "queryType": "range", "refId": "A"}]
+    },
+    {
+      "type": "stat", "title": "Subagent Share of Cost",
+      "description": "Fraction of total cost from backfilled subagents. The metric the old dashboard was blind to.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 1, "min": 0, "max": 1, "color": {"mode": "thresholds"}, "noValue": "0%", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 0.4}, {"color": "#7AA2F7", "value": 0.7}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__range])) / sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Subagent %", "queryType": "range", "refId": "A"}]
+    },
+    {
+      "type": "stat", "title": "Subagent Cost (backfilled)",
+      "description": "Absolute cost from backfilled subagent transcripts — previously invisible to all dashboards.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7DCFFF", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__range]))", "legendFormat": "Subagent Cost", "queryType": "range", "refId": "A"}]
+    },
+    {
+      "type": "timeseries", "title": "Cost by Source (main vs subagent)",
+      "description": "Daily cost split: subagent (backfilled) vs main session (live). Gap before backfill = main only.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__interval]))", "legendFormat": "subagent", "queryType": "range", "refId": "A"},
+        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent!=\"true\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__interval]))", "legendFormat": "main", "queryType": "range", "refId": "B"}
+      ]
+    },
+    {
+      "type": "piechart", "title": "Cost Share by Model",
+      "description": "Cost breakdown by model — haiku/sonnet/opus from both main sessions and backfilled subagents.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}, "tooltip": {"mode": "single"}},
+      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "{{model}}", "queryType": "range", "refId": "A"}]
+    },
+    {
+      "type": "timeseries", "title": "Tokens by Type",
+      "description": "Token breakdown: input, output, cache_read, cache_write — across main sessions and backfilled subagents.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_input_tokens [$__interval]))", "legendFormat": "input", "queryType": "range", "refId": "A"},
+        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_output_tokens [$__interval]))", "legendFormat": "output", "queryType": "range", "refId": "B"},
+        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_read_tokens [$__interval]))", "legendFormat": "cache_read", "queryType": "range", "refId": "C"},
+        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_creation_tokens [$__interval]))", "legendFormat": "cache_write", "queryType": "range", "refId": "D"}
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Cost by Model",
+      "description": "Cost over time broken down by model — includes backfilled subagent models (haiku-4-5, opus-4-6/4-7) that were previously invisible.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__interval]))", "legendFormat": "{{model}}", "queryType": "range", "refId": "A"}]
+    },
+    {
+      "type": "row", "title": "Spend Context — API-equivalent (NOT subscription plan-limit)",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 21},
+      "collapsed": false, "panels": []
+    },
+    {
+      "type": "stat", "title": "API-equivalent Spend (selected range)",
+      "description": "Retail API-price equivalent of usage in the selected range. A volume/cost proxy — NOT your subscription plan-limit usage.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 22},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7AA2F7", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Spend", "queryType": "range", "refId": "A"}]
+    },
+    {
+      "type": "text", "title": "Why there is no plan-limit gauge",
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 22},
+      "options": {"mode": "markdown", "content": "**This dashboard tracks cost & token *volume*, not subscription limits.**\n\nThe 5-hour session % and weekly % shown in `/status` and `/usage` are **subscription rate-limit windows computed client-side** by Claude Code. They are **not exposed** via OpenTelemetry metrics, hook payloads, or any feed this stack can read.\n\nThe old *\"Monthly Spend % of $100\"* gauge divided API-retail cost by a dollar limit that does not apply to a subscription plan — it was removed. The stat at left is the API-equivalent spend (a useful volume proxy), nothing more.\n\nSee `docs/GRAFANA-LOGGING.md` → *Claude Code native telemetry*."}
+    },
+    {
+      "type": "row", "title": "Legacy — Hook Pipeline (Loki) · main-session live + backfilled subagents",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28},
+      "collapsed": false, "panels": []
+    },
+    {
+      "type": "stat", "title": "Total Cost (hook pipeline — cross-check)",
+      "description": "Per-turn cost_usd from the Loki hook pipeline (main session live; subagents only after running scripts/backfill-subagent-usage.js). Cross-check against the authoritative metric above.",
+      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 29},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#565f89", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Total Cost", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Cache Savings",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
-      "fieldConfig": {
-        "defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#9ECE6A", "mode": "fixed"}, "noValue": "$0.00"},
-        "overrides": []
-      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 29},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#9ECE6A", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cache_savings_usd [$__range]))", "legendFormat": "Cache Savings", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Cache Hit Rate",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
-      "fieldConfig": {
-        "defaults": {"unit": "percentunit", "decimals": 1, "color": {"mode": "thresholds"}, "noValue": "0%", "thresholds": {"mode": "absolute", "steps": [{"color": "#F7768E", "value": null}, {"color": "#E0AF68", "value": 0.3}, {"color": "#9ECE6A", "value": 0.6}]}},
-        "overrides": []
-      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 29},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 1, "color": {"mode": "thresholds"}, "noValue": "0%", "thresholds": {"mode": "absolute", "steps": [{"color": "#F7768E", "value": null}, {"color": "#E0AF68", "value": 0.3}, {"color": "#9ECE6A", "value": 0.6}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_read_tokens [$__range])) / (sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_input_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_read_tokens [$__range])) + sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_creation_tokens [$__range])))", "legendFormat": "Cache Hit Rate", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Tool Errors",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
-      "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 1}, {"color": "#F7768E", "value": 5}]}},
-        "overrides": []
-      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 29},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 1}, {"color": "#F7768E", "value": 5}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(count_over_time({app=\"claude-dev-logging\", env=~\"$env\", level=\"ERROR\"} [$__range]))", "legendFormat": "Tool Errors", "queryType": "range", "refId": "A"}]
     },
     {
-      "type": "row", "title": "Monthly Limit Tracker",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5},
-      "collapsed": false, "panels": []
-    },
-    {
-      "type": "stat", "title": "Monthly Spend % of $100 Limit (set range to now-30d)",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 6},
-      "fieldConfig": {
-        "defaults": {"unit": "percentunit", "decimals": 1, "min": 0, "max": 1, "displayName": "30-Day Spend", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 0.6}, {"color": "#F7768E", "value": 0.85}]}},
-        "overrides": []
-      },
-      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range])) / 100", "legendFormat": "Monthly Spend %", "queryType": "range", "refId": "A"}]
-    },
-    {
-      "type": "row", "title": "Cost Trend",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14},
-      "collapsed": false, "panels": []
-    },
-    {
-      "type": "timeseries", "title": "Cost per Turn — Breakdown",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 15},
-      "fieldConfig": {
-        "defaults": {"unit": "currencyUSD", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}},
-        "overrides": [
-          {"matcher": {"id": "byName", "options": "Output Cost"}, "properties": [{"id": "color", "value": {"fixedColor": "#F7768E", "mode": "fixed"}}]},
-          {"matcher": {"id": "byName", "options": "Input Cost"}, "properties": [{"id": "color", "value": {"fixedColor": "#7AA2F7", "mode": "fixed"}}]},
-          {"matcher": {"id": "byName", "options": "Cache Write Cost"}, "properties": [{"id": "color", "value": {"fixedColor": "#E0AF68", "mode": "fixed"}}]},
-          {"matcher": {"id": "byName", "options": "Cache Read Cost"}, "properties": [{"id": "color", "value": {"fixedColor": "#9ECE6A", "mode": "fixed"}}]}
-        ]
-      },
-      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap output_cost_usd [$__interval]))", "legendFormat": "Output Cost", "queryType": "range", "refId": "A"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap input_cost_usd [$__interval]))", "legendFormat": "Input Cost", "queryType": "range", "refId": "B"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cache_write_cost_usd [$__interval]))", "legendFormat": "Cache Write Cost", "queryType": "range", "refId": "C"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cache_read_cost_usd [$__interval]))", "legendFormat": "Cache Read Cost", "queryType": "range", "refId": "D"}
-      ]
-    },
-    {
-      "type": "row", "title": "Token Volume",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23},
-      "collapsed": false, "panels": []
-    },
-    {
-      "type": "timeseries", "title": "Token Volume per Turn",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
-      "fieldConfig": {
-        "defaults": {"unit": "short", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}},
-        "overrides": [
-          {"matcher": {"id": "byName", "options": "Output Tokens"}, "properties": [{"id": "color", "value": {"fixedColor": "#FF9E64", "mode": "fixed"}}]},
-          {"matcher": {"id": "byName", "options": "Input Tokens"}, "properties": [{"id": "color", "value": {"fixedColor": "#7AA2F7", "mode": "fixed"}}]},
-          {"matcher": {"id": "byName", "options": "Cache Write Tokens"}, "properties": [{"id": "color", "value": {"fixedColor": "#E0AF68", "mode": "fixed"}}]},
-          {"matcher": {"id": "byName", "options": "Cache Read Tokens"}, "properties": [{"id": "color", "value": {"fixedColor": "#9ECE6A", "mode": "fixed"}}]}
-        ]
-      },
-      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_output_tokens [$__interval]))", "legendFormat": "Output Tokens", "queryType": "range", "refId": "A"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_input_tokens [$__interval]))", "legendFormat": "Input Tokens", "queryType": "range", "refId": "B"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_creation_tokens [$__interval]))", "legendFormat": "Cache Write Tokens", "queryType": "range", "refId": "C"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_read_tokens [$__interval]))", "legendFormat": "Cache Read Tokens", "queryType": "range", "refId": "D"}
-      ]
-    },
-    {
-      "type": "row", "title": "Tool Health",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 32},
+      "type": "row", "title": "Tool Health (Hook Pipeline)",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 33},
       "collapsed": false, "panels": []
     },
     {
       "type": "bargauge", "title": "Slowest Tools — Avg Duration (ms)",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 10, "w": 16, "x": 0, "y": 33},
-      "fieldConfig": {
-        "defaults": {"unit": "ms", "color": {"mode": "continuous-BlYlRd"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 5000}, {"color": "#F7768E", "value": 30000}]}},
-        "overrides": []
-      },
+      "gridPos": {"h": 10, "w": 16, "x": 0, "y": 34},
+      "fieldConfig": {"defaults": {"unit": "ms", "color": {"mode": "continuous-BlYlRd"}, "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 5000}, {"color": "#F7768E", "value": 30000}]}}, "overrides": []},
       "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["mean"], "fields": "", "values": false}, "text": {}, "tooltip": {"mode": "single"}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "avg by (tool_name) (avg_over_time({app=\"claude-dev-logging\", env=~\"$env\"} | json | __error__=\"\" | hook_type=\"post-tool-use\" | duration_ms > 0 | unwrap duration_ms [$__range]))", "legendFormat": "{{tool_name}}", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Tool Errors (Range)",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 33},
-      "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#F7768E", "value": 1}]}},
-        "overrides": []
-      },
+      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 34},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#F7768E", "value": 1}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(count_over_time({app=\"claude-dev-logging\", env=~\"$env\", level=\"ERROR\"} [$__range]))", "legendFormat": "Errors", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Retries",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 33},
-      "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 5}, {"color": "#F7768E", "value": 20}]}},
-        "overrides": []
-      },
+      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 34},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"mode": "thresholds"}, "noValue": "0", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 5}, {"color": "#F7768E", "value": 20}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(count_over_time({app=\"claude-dev-logging\", env=~\"$env\", component=\"tool\"} | json | __error__=\"\" | is_retry=\"true\" [$__range]))", "legendFormat": "Retries", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Avg Tool Time / Turn (ms)",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 38},
-      "fieldConfig": {
-        "defaults": {"unit": "ms", "decimals": 0, "color": {"fixedColor": "#7DCFFF", "mode": "fixed"}, "noValue": "0"},
-        "overrides": []
-      },
+      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 39},
+      "fieldConfig": {"defaults": {"unit": "ms", "decimals": 0, "color": {"fixedColor": "#7DCFFF", "mode": "fixed"}, "noValue": "0"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "avg(avg_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | tool_time_ms > 0 | unwrap tool_time_ms [$__range]))", "legendFormat": "Avg Tool Time", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Total Tool Calls",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 38},
-      "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 0, "color": {"fixedColor": "#BB9AF7", "mode": "fixed"}, "noValue": "0"},
-        "overrides": []
-      },
+      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 39},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "color": {"fixedColor": "#BB9AF7", "mode": "fixed"}, "noValue": "0"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(count_over_time({app=\"claude-dev-logging\", env=~\"$env\", component=\"tool\"} | json | __error__=\"\" | hook_type=\"post-tool-use\" [$__range]))", "legendFormat": "Tool Calls", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "row", "title": "Session Audit",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 43},
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 44},
       "collapsed": false, "panels": []
     },
     {
       "type": "logs", "title": "Session Summaries",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 44},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 45},
       "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "{app=\"claude-dev-logging\", env=~\"$env\", component=\"lifecycle\"} | json | __error__=\"\" | event=\"claude_session_summary\"", "legendFormat": "", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "logs", "title": "Raw Logs — claude-dev-logging",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 54},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 55},
       "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
       "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "{app=\"claude-dev-logging\", env=~\"$env\"}", "legendFormat": "", "queryType": "range", "refId": "A"}]
     }

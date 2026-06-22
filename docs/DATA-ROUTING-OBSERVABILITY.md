@@ -142,16 +142,3 @@ These stay **events or throttled snapshots** in structured logs — **not** a mi
 - **docs/IRACING-DATA-AVAILABILITY.md** — when/where data exists (telemetry vs YAML vs REST).
 - Grafana: [Loki label best practices](https://grafana.com/docs/loki/latest/get-started/labels/bp-labels/), [Prometheus cardinality](https://grafana.com/docs/grafana-cloud/send-data/metrics/metricsCardinality/).
 
----
-
-## ContextStream KB links
-
-| Spec | Doc ID |
-|------|--------|
-| iRacing Observability Strategy | `c54019c3-4e79-461a-a9b6-eb533a2c5e44` |
-| Observability — Scaling | `99bd9e71-2b08-4eea-b2d4-f7bb22b38af0` |
-| Grafana Loki (summary) | `58a20aaf-bdde-4318-88f7-1ec8ec44377b` |
-| iRacing Telemetry — SDK Variable Reference | `42ab06d4-9ed3-43a1-996c-bd0250ecdf6e` |
-| iRacing Data Availability Reference | TBD after ContextStream `project(ingest_local)` — update this row with doc ID from index |
-| Architecture & Data Structures | `c453dd83-dfd9-4002-b8a2-2e0c8a4d032c` |
-| Troubleshooting | `88274879-cd2d-4d86-9766-c86b88f95cfe` |

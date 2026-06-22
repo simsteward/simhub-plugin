@@ -1,5 +1,5 @@
 # Post-deploy test: verify all deploy events reached Loki with expected values
-# Requires: local Loki running on localhost:3100, deploy.ps1 just completed
+# Requires: deploy.ps1 just completed (pushes to Grafana Cloud Loki or local Loki)
 # Run: .\tests\DeployLokiEventsTest.ps1
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +13,35 @@ if (Test-Path $loadDotenv) {
 
 $lokiUrl = $env:SIMSTEWARD_LOKI_URL
 if ([string]::IsNullOrWhiteSpace($lokiUrl)) { $lokiUrl = "http://localhost:3100" }
-Write-Host "Loki: $lokiUrl"
+
+# Grafana Cloud read strategy: the Loki write token is write-only (access policy scope: logs:write).
+# Reads are routed through the Grafana datasource proxy using a service account token that has
+# Viewer+ permissions on the Grafana org.  This avoids needing a separate logs:read access policy.
+#
+# Required env vars (already in .env):
+#   CURSOR_ELEVATED_GRAFANA_TOKEN  — service account token with Viewer role
+#   SIMSTEWARD_GRAFANA_BASE_URL    — https://simsteward.grafana.net
+#   SIMSTEWARD_LOKI_DATASOURCE_UID — grafanacloud-logs
+#
+# Falls back to direct Basic auth for a local Loki stack.
+$grafanaBaseUrl    = $env:SIMSTEWARD_GRAFANA_BASE_URL
+$lokiDatasourceUid = $env:SIMSTEWARD_LOKI_DATASOURCE_UID
+$grafanaToken      = $env:CURSOR_ELEVATED_GRAFANA_TOKEN
+
+$useGrafanaProxy = (
+    $lokiUrl -match 'grafana\.net' -and
+    -not [string]::IsNullOrWhiteSpace($grafanaBaseUrl) -and
+    -not [string]::IsNullOrWhiteSpace($lokiDatasourceUid) -and
+    -not [string]::IsNullOrWhiteSpace($grafanaToken)
+)
+
+if ($useGrafanaProxy) {
+    $queryBase = "$($grafanaBaseUrl.TrimEnd('/'))/api/datasources/proxy/uid/$lokiDatasourceUid/loki/api/v1/query_range"
+    Write-Host "Loki query: Grafana proxy ($grafanaBaseUrl, uid=$lokiDatasourceUid)"
+} else {
+    $queryBase = "$($lokiUrl.TrimEnd('/'))/loki/api/v1/query_range"
+    Write-Host "Loki query: direct ($lokiUrl)"
+}
 
 $passed = 0
 $failed = 0
@@ -23,18 +51,23 @@ function Query-LokiEvent {
     $startNs = ([DateTimeOffset]::UtcNow.AddMinutes(-$LookbackMinutes).ToUnixTimeMilliseconds()) * 1000000
     $endNs   = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) * 1000000
     $query   = '{component="local-deployment"} |= "' + $EventName + '"'
-    $base    = "$($lokiUrl.TrimEnd('/'))/loki/api/v1/query_range"
 
     # Build URL with query string manually to avoid PowerShell encoding issues
-    $qs = "query=$([Uri]::EscapeDataString($query))&start=$startNs&end=$endNs&limit=10&direction=BACKWARD"
-    $uri = "$base`?$qs"
+    $qs  = "query=$([Uri]::EscapeDataString($query))&start=$startNs&end=$endNs&limit=10&direction=BACKWARD"
+    $uri = "${script:queryBase}?$qs"
 
     $headers = @{}
-    $lokiUser = $env:SIMSTEWARD_LOKI_USER
-    $lokiPass = $env:SIMSTEWARD_LOKI_TOKEN
-    if (-not [string]::IsNullOrWhiteSpace($lokiUser) -and -not [string]::IsNullOrWhiteSpace($lokiPass) -and $lokiUrl -match 'grafana\.net') {
-        $pair = [Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $lokiUser.Trim(), $lokiPass.Trim()))
-        $headers['Authorization'] = 'Basic ' + [Convert]::ToBase64String($pair)
+    if ($script:useGrafanaProxy) {
+        # Grafana datasource proxy — Bearer token (service account with Viewer role)
+        $headers['Authorization'] = 'Bearer ' + $script:grafanaToken.Trim()
+    } else {
+        # Direct local Loki — no auth needed (or Basic if env vars present)
+        $lokiUser = $env:SIMSTEWARD_LOKI_USER
+        $lokiPass = $env:SIMSTEWARD_LOKI_TOKEN
+        if (-not [string]::IsNullOrWhiteSpace($lokiUser) -and -not [string]::IsNullOrWhiteSpace($lokiPass)) {
+            $pair = [Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $lokiUser.Trim(), $lokiPass.Trim()))
+            $headers['Authorization'] = 'Basic ' + [Convert]::ToBase64String($pair)
+        }
     }
 
     try {

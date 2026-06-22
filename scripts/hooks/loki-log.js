@@ -1,7 +1,7 @@
 // Claude Code hook -> Loki push
 // Self-contained: loads .env, reads stdin, pushes to Loki. No shell wrapper needed.
 // Enrichments: tool duration, payload sizes, retry detection, error classification,
-//              agent topology, session lifecycle, token sidecar.
+//              agent topology, session lifecycle, per-turn cost breakdown.
 // Usage: node loki-log.js <hook-type>
 //
 // DATA ARCHITECTURE:
@@ -10,8 +10,9 @@
 //   app="claude-token-metrics" — ONE entry per completed TURN (stop hook), with is_final=false.
 //                                cost_usd is the turn's incremental cost. sum_over_time gives session total.
 //                                Join key: session_id (present in both streams)
-//   On-disk: logs/claude-session-metrics.jsonl — local backup only (not ingested by Alloy).
-//            Includes session_duration_ms + compaction_count for local debugging.
+//   claude_session_summary      — pushed to claude-dev-logging at session-end with full token totals
+//                                and session metadata. NOT pushed to claude-token-metrics (avoids
+//                                double-counting with per-turn sum_over_time queries).
 //
 // NEW SIGNALS (session_type, plan_mode_entries, tool_time_ms):
 //   session_type — extracted from session-start payload hp.type ("startup"|"resume"|"compact").
@@ -29,9 +30,15 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawn } = require('child_process');
 
 const hookType = process.argv[2] || 'unknown';
 const hookSource = (process.argv.find(a => a.startsWith('--source=')) || '--source=unknown').slice(9);
+
+// --- Hook-level wall-clock timing (written to hook-timing.log for profiling) ---
+const HOOK_TIMING_LOG = path.join(os.tmpdir(), 'claude-hook-timing', 'hook-timing.log');
+const HOOK_START_MS = Date.now();
+const HOOK_START_TS = new Date().toISOString();
 
 // --- Timing state directory ---
 const TIMING_DIR = path.join(os.tmpdir(), 'claude-hook-timing');
@@ -73,7 +80,11 @@ function loadEnv() {
         const key = trimmed.slice(0, eq).trim();
         let val = trimmed.slice(eq + 1).trim();
         val = val.replace(/^["']|["']$/g, '');
-        if (key && !(key in process.env)) process.env[key] = val;
+        if (key) {
+          // Always override SIMSTEWARD_* vars from .env so the file wins over
+          // stale inherited env (e.g. old localhost URL in a long-running shell).
+          if (key.startsWith('SIMSTEWARD_') || !(key in process.env)) process.env[key] = val;
+        }
       }
       break;
     } catch { /* file not found, try next */ }
@@ -97,16 +108,20 @@ const machine = process.env.COMPUTERNAME || os.hostname() || 'unknown';
 
 // --- MCP service detection ---
 const MCP_SERVICES = [
-  [/^mcp__contextstream__/, 'contextstream'],
-  [/^mcp__claude_ai_Sentry__/, 'sentry'],
+  [/^mcp__claude_ai_Sentry__/,    'sentry'],
   [/^mcp__plugin_sentry_sentry__/, 'sentry'],
-  [/^mcp__ollama__/, 'ollama'],
+  [/^mcp__ollama__/,              'ollama'],
+  [/^mcp__playwright__/,          'playwright'],
 ];
 
 function detectService(toolName) {
   if (!toolName) return undefined;
   const match = MCP_SERVICES.find(([re]) => re.test(toolName));
-  return match ? match[1] : undefined;
+  if (match) return match[1];
+  // Unknown MCP tool — extract the service segment so it's still queryable
+  // as component="mcp-<service>" rather than falling through to "tool".
+  const m = toolName.match(/^mcp__([^_]+(?:_[^_]+)*?)__/);
+  return m ? m[1].replace(/_/g, '-') : undefined;
 }
 
 function inferProject(cwd) {
@@ -231,30 +246,71 @@ const PLAN_TYPE = process.env.CLAUDE_PLAN_TYPE || 'max'; // 'pro' | 'max' | 'ult
 const PLAN_MONTHLY_COST = { pro: 20, max: 100, ultra: 200 }[PLAN_TYPE] ?? 100;
 
 // --- Model pricing (per 1M tokens) ---
-const MODEL_PRICING = {
+// Override by placing a JSON file at ~/.claude/model-pricing.json:
+// { "claude-opus-4": { "input": 15, "output": 75, "cacheWrite": 18.75, "cacheRead": 1.50 }, ... }
+function loadModelPricing() {
+  const candidates = [
+    path.join(os.homedir(), '.claude', 'model-pricing.json'),
+    path.join(process.cwd(), 'model-pricing.json'),
+  ];
+  for (const f of candidates) {
+    try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
+  }
+  return null;
+}
+
+const MODEL_PRICING = loadModelPricing() || {
   'claude-opus-4':   { input: 15,   output: 75,   cacheWrite: 18.75, cacheRead: 1.50 },
   'claude-sonnet-4': { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30 },
   'claude-haiku-4':  { input: 0.80, output: 4,    cacheWrite: 1.00,  cacheRead: 0.08 },
 };
 
 function getPricing(model) {
-  if (!model) return MODEL_PRICING['claude-opus-4'];
+  if (!model) return null;
+  if (MODEL_PRICING[model]) return MODEL_PRICING[model];
+  // Substring match — longest key wins so 'claude-opus-4-7' beats 'claude-opus-4'
   const m = model.toLowerCase();
-  if (m.includes('haiku'))  return MODEL_PRICING['claude-haiku-4'];
-  if (m.includes('sonnet')) return MODEL_PRICING['claude-sonnet-4'];
-  return MODEL_PRICING['claude-opus-4'];
+  const keys = Object.keys(MODEL_PRICING).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (m.includes(key.toLowerCase())) return MODEL_PRICING[key];
+  }
+  return null; // unknown model — caller must handle gracefully
 }
 
-function computeCostUsd(tokenData) {
+// Returns { cost_usd, input_cost_usd, output_cost_usd, cache_write_cost_usd,
+//           cache_read_cost_usd, cache_savings_usd } at 5-decimal precision.
+// cache_savings_usd = what cache_read tokens would have cost at full input price minus
+// what they actually cost — quantifies caching ROI for Grafana cache-efficiency panels.
+// Output tokens are 5× input on Sonnet and dominate session cost; isolating them lets
+// dashboards show the real cost driver instead of a single collapsed cost_usd number.
+function computeCostBreakdown(tokenData) {
   try {
     const p = getPricing(tokenData.model);
+    if (!p) return { pricing_known: false };
+
     const M = 1_000_000;
-    return Math.round(
-      ((tokenData.total_input_tokens          || 0) / M * p.input
-     + (tokenData.total_output_tokens         || 0) / M * p.output
-     + (tokenData.total_cache_creation_tokens || 0) / M * p.cacheWrite
-     + (tokenData.total_cache_read_tokens     || 0) / M * p.cacheRead) * 100000
-    ) / 100000; // 5 decimal precision
+    const round5 = n => Math.round(n * 100000) / 100000;
+
+    const inputTokens      = tokenData.total_input_tokens          || 0;
+    const outputTokens     = tokenData.total_output_tokens         || 0;
+    const cacheWriteTokens = tokenData.total_cache_creation_tokens || 0;
+    const cacheReadTokens  = tokenData.total_cache_read_tokens     || 0;
+
+    const inputCost      = (inputTokens      / M) * p.input;
+    const outputCost     = (outputTokens     / M) * p.output;
+    const cacheWriteCost = (cacheWriteTokens / M) * p.cacheWrite;
+    const cacheReadCost  = (cacheReadTokens  / M) * p.cacheRead;
+    const cacheSavings   = (cacheReadTokens  / M) * (p.input - p.cacheRead);
+
+    return {
+      pricing_known:        true,
+      cost_usd:             round5(inputCost + outputCost + cacheWriteCost + cacheReadCost),
+      input_cost_usd:       round5(inputCost),
+      output_cost_usd:      round5(outputCost),
+      cache_write_cost_usd: round5(cacheWriteCost),
+      cache_read_cost_usd:  round5(cacheReadCost),
+      cache_savings_usd:    round5(cacheSavings),
+    };
   } catch { return undefined; }
 }
 
@@ -286,7 +342,8 @@ function extractTokensIncremental(transcriptPath, sessionId) {
     const lines = chunk.split('\n').filter(Boolean);
 
     // Track this turn's delta separately from the running total
-    const delta = { input: 0, output: 0, cacheCreate: 0, cacheRead: 0, turns: 0, tools: 0 };
+    const delta = { input: 0, output: 0, cacheCreate: 0, cacheRead: 0, turns: 0, tools: 0, model: undefined, extraUsage: {} };
+    const KNOWN_USAGE_FIELDS = new Set(['input_tokens','output_tokens','cache_creation_input_tokens','cache_read_input_tokens']);
 
     for (const line of lines) {
       try {
@@ -303,7 +360,19 @@ function extractTokensIncremental(transcriptPath, sessionId) {
           accum.cacheCreate += u.cache_creation_input_tokens || 0;
           accum.cacheRead  += u.cache_read_input_tokens || 0;
           accum.turns++;
-          if (!accum.model && obj.message.model) accum.model = obj.message.model;
+          // Capture any future/unknown numeric usage fields (e.g. thinking_tokens)
+          for (const [k, v] of Object.entries(u)) {
+            if (!KNOWN_USAGE_FIELDS.has(k) && typeof v === 'number') {
+              delta.extraUsage[k] = (delta.extraUsage[k] || 0) + v;
+              if (!accum.extraUsage) accum.extraUsage = {};
+              accum.extraUsage[k] = (accum.extraUsage[k] || 0) + v;
+            }
+          }
+          // Track model per-turn (last model in this chunk wins) and session-first
+          if (obj.message.model) {
+            delta.model = obj.message.model;
+            if (!accum.model) accum.model = obj.message.model;
+          }
         }
         if (obj.type === 'tool_use' || (obj.type === 'progress' && obj.data && obj.data.type === 'tool_use')) {
           delta.tools++;
@@ -312,7 +381,8 @@ function extractTokensIncremental(transcriptPath, sessionId) {
       } catch {}
     }
 
-    if (!accum.thinking && /"type"\s*:\s*"thinking"/.test(chunk)) accum.thinking = true;
+    const turnHasThinking = /"type"\s*:\s*"thinking"/.test(chunk);
+    if (!accum.thinking && turnHasThinking) accum.thinking = true;
     writeTimingFile(offsetKey, { offset: stat.size });
     writeTimingFile(totalsKey, accum);
 
@@ -325,6 +395,10 @@ function extractTokensIncremental(transcriptPath, sessionId) {
         total_tokens:          delta.input + delta.output,
         assistant_turns:       delta.turns,
         tool_use_count:        delta.tools,
+        model:                 delta.model || undefined,
+        turn_number:           accum.turns,  // 1-indexed; includes this turn
+        has_thinking:          turnHasThinking,
+        ...(Object.keys(delta.extraUsage).length > 0 ? { extra_usage_fields: delta.extraUsage } : {}),
       },
       total: formatTokenResult(accum),
       chunk, // raw new bytes — reused by extractToolAttribution so we don't re-read
@@ -343,6 +417,7 @@ function formatTokenResult(accum) {
     tool_use_count:              accum.tools,
     model:                       accum.model || undefined,
     thinking:                    accum.thinking || false,
+    ...(accum.extraUsage && Object.keys(accum.extraUsage).length > 0 ? { extra_usage_fields: accum.extraUsage } : {}),
   };
 }
 
@@ -463,7 +538,10 @@ function extractSessionTokens(transcriptPath) {
     const text = fs.readFileSync(transcriptPath, 'utf8');
     const lines = text.split('\n').filter(Boolean);
     let totalInput = 0, totalOutput = 0, totalCacheCreate = 0, totalCacheRead = 0;
-    let assistantTurns = 0, toolUseCalls = 0, model;
+    let assistantTurns = 0, toolUseCalls = 0;
+    const modelsUsed = new Set();
+    const extraUsageTotals = {};
+    const KNOWN_USAGE_FIELDS = new Set(['input_tokens','output_tokens','cache_creation_input_tokens','cache_read_input_tokens']);
 
     for (const line of lines) {
       try {
@@ -475,7 +553,12 @@ function extractSessionTokens(transcriptPath) {
           totalCacheCreate += u.cache_creation_input_tokens || 0;
           totalCacheRead += u.cache_read_input_tokens || 0;
           assistantTurns++;
-          if (!model && obj.message.model) model = obj.message.model;
+          if (obj.message.model) modelsUsed.add(obj.message.model);
+          for (const [k, v] of Object.entries(u)) {
+            if (!KNOWN_USAGE_FIELDS.has(k) && typeof v === 'number') {
+              extraUsageTotals[k] = (extraUsageTotals[k] || 0) + v;
+            }
+          }
         }
         if (obj.type === 'tool_use' || (obj.type === 'progress' && obj.data && obj.data.type === 'tool_use')) {
           toolUseCalls++;
@@ -486,84 +569,44 @@ function extractSessionTokens(transcriptPath) {
     // Detect thinking (separate from effort — presence of thinking blocks in transcript)
     const thinking = /"type"\s*:\s*"thinking"/.test(text);
 
-    // Detect effort level: check transcript metadata first, fall back to settings.json
+    // Detect effort level: check transcript metadata first, fall back to settings.json.
+    // Unknown effort values pass through as-is rather than silently defaulting to 'high'.
     const EFFORT_MAP = { low: 'low', medium: 'med', med: 'med', high: 'high', max: 'max' };
-    let effort = 'high'; // Claude Code default
+    let effort;
     for (const line of lines) {
       try {
         const obj = JSON.parse(line);
         if (obj.effort) {
-          const mapped = EFFORT_MAP[obj.effort.toLowerCase()];
-          if (mapped) { effort = mapped; break; }
+          effort = EFFORT_MAP[obj.effort.toLowerCase()] || obj.effort;
+          break;
         }
       } catch {}
     }
-    if (effort === 'high') {
-      // Fall back to settings.json effortLevel
+    if (!effort) {
       try {
         const settings = JSON.parse(fs.readFileSync(
           path.join(os.homedir(), '.claude', 'settings.json'), 'utf8'));
-        const mapped = EFFORT_MAP[(settings.effortLevel || '').toLowerCase()];
-        if (mapped) effort = mapped;
-      } catch {}
+        const raw = (settings.effortLevel || '').toLowerCase();
+        effort = EFFORT_MAP[raw] || settings.effortLevel || 'high';
+      } catch { effort = 'high'; }
     }
 
+    const modelsList = [...modelsUsed];
     return {
-      total_input_tokens: totalInput,
-      total_output_tokens: totalOutput,
+      total_input_tokens:          totalInput,
+      total_output_tokens:         totalOutput,
       total_cache_creation_tokens: totalCacheCreate,
-      total_cache_read_tokens: totalCacheRead,
-      total_tokens: totalInput + totalOutput,
-      assistant_turns: assistantTurns,
-      tool_use_count: toolUseCalls,
-      model: model || undefined,
+      total_cache_read_tokens:     totalCacheRead,
+      total_tokens:                totalInput + totalOutput,
+      assistant_turns:             assistantTurns,
+      tool_use_count:              toolUseCalls,
+      model:                       modelsList.length === 1 ? modelsList[0] : undefined,
+      models_used:                 modelsList.length > 0 ? modelsList : undefined,
       effort,
       thinking,
+      ...(Object.keys(extraUsageTotals).length > 0 ? { extra_usage_fields: extraUsageTotals } : {}),
     };
   } catch { return null; }
-}
-
-// --- Push token usage to Loki ---
-// isFinal=true  → claude-token-metrics (legacy backfill path only)
-// isFinal=false → claude-dev-logging component=tokens (legacy backfill path only)
-// Normal path: per-turn stop hook pushes directly to claude-token-metrics
-function pushTokenUsage(sessionId, project, tokenData, isFinal) {
-  if (isFinal) {
-    const logLine = scrubSecrets(JSON.stringify({
-      event: 'claude_session_token_summary',
-      session_id: sessionId,
-      project,
-      machine,
-      env: envLabel,
-      is_final: true,
-      timestamp: new Date().toISOString(),
-      ...tokenData,
-    }));
-    pushToLoki(
-      {
-        app: 'claude-token-metrics',
-        env: envLabel,
-        model: tokenData.model || 'unknown',
-        project: project || 'unknown',
-        effort: tokenData.effort || 'standard',
-      },
-      logLine
-    );
-  } else {
-    const logLine = scrubSecrets(JSON.stringify({
-      event: 'claude_token_usage',
-      session_id: sessionId,
-      project,
-      machine,
-      env: envLabel,
-      is_final: false,
-      ...tokenData,
-    }));
-    pushToLoki(
-      { app: 'claude-dev-logging', env: envLabel, component: 'tokens', level: 'INFO' },
-      logLine
-    );
-  }
 }
 
 // --- Build enriched log line ---
@@ -584,49 +627,20 @@ function buildEnrichedLogLine(hp, hType, enrichments, base) {
   });
 }
 
-// --- Push to Loki ---
-function pushToLoki(stream, logLine) {
-  const ts = String(Date.now()) + '000000';
-  const body = JSON.stringify({ streams: [{ stream, values: [[ts, logLine]] }] });
-  const parsed = new URL(lokiUrl + '/loki/api/v1/push');
-  const mod = parsed.protocol === 'https:' ? https : http;
-
-  const req = mod.request(parsed, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...(lokiAuth ? { Authorization: lokiAuth } : {}) },
-    timeout: 4000,
-  }, res => { res.resume(); });
-
-  req.on('error', () => {});
-  req.on('timeout', () => req.destroy());
-  req.write(body);
-  req.end();
+// --- Push queue (flushed once via detached worker at end of hook) ---
+// Accumulates all Loki pushes for this hook invocation. Dispatched in a single
+// detached child process so the hook exits without waiting for network I/O.
+const pushQueue = [];
+function queuePush(stream, logLine) {
+  pushQueue.push({ stream, logLine });
 }
 
-// --- Write session metrics sidecar (on-disk backup, not ingested into Loki) ---
-// Includes session_duration_ms + compaction_count for local debugging context.
-function writeSessionMetricsSidecar(hp, sessionId, project, sessionEnrichments, tokenData) {
-  try {
-    const metricsDir = path.join(hp.cwd || process.cwd(), 'logs');
-    fs.mkdirSync(metricsDir, { recursive: true });
-    const line = JSON.stringify({
-      event: 'claude_session_metrics',
-      session_id: sessionId,
-      project,
-      machine,
-      env: envLabel,
-      timestamp: new Date().toISOString(),
-      session_duration_ms: sessionEnrichments.session_duration_ms,
-      compaction_count: sessionEnrichments.compaction_count,
-      session_type: sessionEnrichments.session_type,
-      plan_mode_entries: sessionEnrichments.plan_mode_entries,
-      ...(tokenData || {}),
-    });
-    fs.appendFileSync(path.join(metricsDir, 'claude-session-metrics.jsonl'), scrubSecrets(line) + '\n');
-  } catch {}
-}
 
-// --- Main ---
+// --- Main (CLI mode only) ---
+// Guarded with require.main so this module can be require()'d for its pure helpers
+// (MODEL_PRICING / getPricing / computeCostBreakdown / extractSessionTokens) without
+// reading stdin. scripts/backfill-subagent-usage.js depends on this.
+if (require.main === module) {
 let raw = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', c => { raw += c; });
@@ -634,6 +648,8 @@ process.stdin.on('end', () => {
   let hp;
   try { hp = JSON.parse(raw); } catch { hp = {}; }
 
+  let hookError;
+  try {
   const toolName = hp.tool_name || '';
   const sessionId = hp.session_id || '';
   const toolUseId = hp.tool_use_id || '';
@@ -775,14 +791,14 @@ process.stdin.on('end', () => {
     ? { app: 'claude-dev-logging', env: envLabel, component, level, session_type: enrichments.session_type }
     : { app: 'claude-dev-logging', env: envLabel, component, level };
   const logLine = scrubSecrets(buildEnrichedLogLine(hp, hookType, enrichments, base));
-  pushToLoki(stream, logLine);
+  queuePush(stream, logLine);
 
   // --- Stop hook: per-turn token delta → claude-dev-logging + claude-token-metrics ---
   // Fires after every Claude response. Pushes this turn's token burn + running total.
   if (hookType === 'stop' && hp.transcript_path) {
     const result = extractTokensIncremental(hp.transcript_path, sessionId);
     if (result) {
-      pushToLoki(
+      queuePush(
         { app: 'claude-dev-logging', env: envLabel, component: 'tokens', level: 'INFO' },
         scrubSecrets(JSON.stringify({
           event: 'claude_turn_tokens',
@@ -790,7 +806,9 @@ process.stdin.on('end', () => {
           project,
           machine,
           env: envLabel,
-          model: result.total.model || undefined,
+          model:       result.turn ? (result.turn.model || result.total.model) : result.total.model || undefined,
+          turn_number: result.turn ? result.turn.turn_number : undefined,
+          has_thinking: result.turn ? result.turn.has_thinking : false,
           // This turn's delta — what was just burned
           turn_input_tokens:          result.turn ? result.turn.input_tokens          : 0,
           turn_output_tokens:         result.turn ? result.turn.output_tokens         : 0,
@@ -820,7 +838,7 @@ process.stdin.on('end', () => {
 
       // Emit per-turn tool timing breakdown to claude-dev-logging
       if (turnToolTiming && totalToolCallsTurn > 0) {
-        pushToLoki(
+        queuePush(
           { app: 'claude-dev-logging', env: envLabel, component: 'tool-timing', level: 'INFO' },
           scrubSecrets(JSON.stringify({
             event:              'claude_turn_tool_timing',
@@ -837,8 +855,8 @@ process.stdin.on('end', () => {
 
       // Push per-turn delta to claude-token-metrics so dashboards update in real-time.
       // Each stop event pushes this turn's incremental cost/tokens; sum_over_time accumulates
-      // correctly. The session-end hook no longer pushes to claude-token-metrics to avoid
-      // double-counting (sidecar file remains the authoritative off-Loki record).
+      // correctly. The session-end hook pushes claude_session_summary to claude-dev-logging
+      // (not claude-token-metrics) to avoid double-counting against sum_over_time queries.
       if (result.turn && (result.turn.input_tokens > 0 || result.turn.output_tokens > 0
           || result.turn.cache_creation_tokens > 0 || result.turn.cache_read_tokens > 0)) {
         // Read effort from settings.json (same fallback used by full session extraction)
@@ -851,18 +869,21 @@ process.stdin.on('end', () => {
           if (mapped) stopEffort = mapped;
         } catch {}
         const sessionTypeForTurn = enrichments.session_type || 'unknown';
-        const turnCostUsd = computeCostUsd({
-          model:                       result.total.model,
+        // Use this turn's model for cost accuracy (handles mid-session model switches).
+        // Fall back to the session's first-seen model if the turn didn't surface one.
+        const turnModel = result.turn.model || result.total.model;
+        const turnCosts = computeCostBreakdown({
+          model:                       turnModel,
           total_input_tokens:          result.turn.input_tokens,
           total_output_tokens:         result.turn.output_tokens,
           total_cache_creation_tokens: result.turn.cache_creation_tokens,
           total_cache_read_tokens:     result.turn.cache_read_tokens,
-        });
-        pushToLoki(
+        }) || {};
+        queuePush(
           {
             app: 'claude-token-metrics',
             env: envLabel,
-            model: result.total.model || 'unknown',
+            model: turnModel || 'unknown',
             project: project || 'unknown',
             effort: stopEffort,
           },
@@ -874,11 +895,19 @@ process.stdin.on('end', () => {
             env:                         envLabel,
             is_final:                    false,
             timestamp:                   new Date().toISOString(),
-            model:                       result.total.model || undefined,
+            model:                       turnModel || undefined,
             effort:                      stopEffort,
             session_type:                sessionTypeForTurn,
+            turn_number:                 result.turn.turn_number,
+            has_thinking:                result.turn.has_thinking,
             thinking:                    result.total.thinking,
-            cost_usd:                    turnCostUsd,
+            pricing_known:               turnCosts.pricing_known,
+            cost_usd:                    turnCosts.cost_usd,
+            input_cost_usd:              turnCosts.input_cost_usd,
+            output_cost_usd:             turnCosts.output_cost_usd,
+            cache_write_cost_usd:        turnCosts.cache_write_cost_usd,
+            cache_read_cost_usd:         turnCosts.cache_read_cost_usd,
+            cache_savings_usd:           turnCosts.cache_savings_usd,
             plan_type:                   PLAN_TYPE,
             plan_monthly_cost_usd:       PLAN_MONTHLY_COST,
             pricing_model:               'api-retail',
@@ -899,7 +928,7 @@ process.stdin.on('end', () => {
       if (result.chunk) {
         const attributions = extractToolAttribution(result.chunk, sessionId, project);
         for (const attr of attributions) {
-          pushToLoki(
+          queuePush(
             { app: 'claude-dev-logging', env: envLabel, component: 'tool-attribution', level: 'INFO' },
             scrubSecrets(JSON.stringify(attr))
           );
@@ -908,19 +937,33 @@ process.stdin.on('end', () => {
     }
   }
 
-  // --- Session-end: full token summary → on-disk sidecar (no Loki push — per-turn stop
-  //     events have already pushed incremental deltas to claude-token-metrics, so a final
-  //     push here would double-count when dashboards run sum_over_time(cost_usd)). ---
+  // --- Session-end: full token summary → claude-dev-logging (not claude-token-metrics to
+  //     avoid double-counting with per-turn stop events that sum_over_time(cost_usd)). ---
   if (hookType === 'session-end' && hp.transcript_path) {
     const tokenData = extractSessionTokens(hp.transcript_path);
     if (tokenData) {
-      tokenData.cost_usd = computeCostUsd(tokenData);
-      writeSessionMetricsSidecar(hp, sessionId, project, enrichments, tokenData);
+      Object.assign(tokenData, computeCostBreakdown(tokenData) || {});
+      queuePush(
+        { app: 'claude-dev-logging', env: envLabel, component: 'lifecycle', level: 'INFO' },
+        scrubSecrets(JSON.stringify({
+          event: 'claude_session_summary',
+          session_id: sessionId,
+          project,
+          machine,
+          env: envLabel,
+          timestamp: new Date().toISOString(),
+          session_duration_ms: enrichments.session_duration_ms,
+          compaction_count: enrichments.compaction_count,
+          session_type: enrichments.session_type,
+          plan_mode_entries: enrichments.plan_mode_entries,
+          ...tokenData,
+        }))
+      );
     } else {
-      pushToLoki(
+      queuePush(
         { app: 'claude-dev-logging', env: envLabel, component: 'lifecycle', level: 'WARN' },
         scrubSecrets(JSON.stringify({
-          event: 'claude_session_metrics_error',
+          event: 'claude_session_summary_error',
           session_id: sessionId,
           project,
           machine,
@@ -932,4 +975,30 @@ process.stdin.on('end', () => {
     }
     cleanupTokenFiles(sessionId);
   }
+
+  } catch (err) {
+    hookError = err;
+  } finally {
+    // Timing log records blocking time only — before the network dispatch.
+    const errSuffix = hookError ? `\tERROR:${String(hookError.message || hookError)}` : '';
+    try { fs.appendFileSync(HOOK_TIMING_LOG, `${HOOK_START_TS}\tloki/${hookType}\t${Date.now() - HOOK_START_MS}ms${errSuffix}\n`); } catch {}
+
+    // Dispatch all queued pushes in one detached child — hook exits immediately.
+    if (pushQueue.length > 0) {
+      try {
+        const child = spawn(process.execPath, [path.join(__dirname, 'loki-push-worker.js')], {
+          detached: true,
+          stdio: ['pipe', 'ignore', 'ignore'],
+        });
+        child.stdin.end(JSON.stringify({ lokiUrl, lokiAuth, pushes: pushQueue }));
+        child.unref();
+      } catch {}
+    }
+  }
 });
+}
+
+// --- Module exports (require() consumers; no side effects) ---
+// Pure cost/token helpers reused by scripts/backfill-subagent-usage.js so it computes
+// subagent cost from their separate transcripts with the exact same pricing logic.
+module.exports = { MODEL_PRICING, getPricing, computeCostBreakdown, extractSessionTokens, loadModelPricing };
