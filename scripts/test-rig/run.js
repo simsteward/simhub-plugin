@@ -378,7 +378,7 @@ async function runSweepScenario({ ws, args, artifacts }) {
     if (msg.event === 'replay_incident_index_fast_forward_complete') completeBroadcastReceived = true;
   });
 
-  ws.send({ action: 'replay_incident_index_build', arg: '' });
+  ws.send({ action: 'replay_incident_index_build', arg: 'start' });
   log('[sweep] dispatched replay_incident_index_build; polling for index file…', artifacts);
 
   // Poll for index file existence with watchdog timeout.
@@ -407,7 +407,7 @@ async function runSweepScenario({ ws, args, artifacts }) {
   let indexJson = null;
   try {
     const text = await fsp.readFile(indexPath, 'utf8');
-    indexJson = JSON.parse(text);
+    indexJson = JSON.parse(text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text); // tolerate plugin UTF-8 BOM
     await artifacts.writeJson('index.json', indexJson);
   } catch (err) {
     return {
@@ -685,7 +685,7 @@ async function runSmokeScenario({ ws, args, artifacts }) {
   try { await fsp.unlink(indexPath); log('[smoke] removed pre-existing index', artifacts); } catch {}
 
   // 3. Trigger sweep.
-  ws.send({ action: 'replay_incident_index_build', arg: '' });
+  ws.send({ action: 'replay_incident_index_build', arg: 'start' });
   log('[smoke] dispatched replay_incident_index_build; polling for index file…', artifacts);
 
   // 4. Poll for the file.
@@ -715,7 +715,7 @@ async function runSmokeScenario({ ws, args, artifacts }) {
   let parseError = null;
   try {
     const text = await fsp.readFile(indexPath, 'utf8');
-    indexJson = JSON.parse(text);
+    indexJson = JSON.parse(text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text); // tolerate plugin UTF-8 BOM
     await artifacts.writeJson('index.json', indexJson);
   } catch (err) {
     parseError = err;
