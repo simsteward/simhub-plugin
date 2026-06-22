@@ -84,6 +84,7 @@ namespace SimSteward.Plugin
         private string _currentSessionSeq = "";
         /// <summary>Latest iRacing session context for structured logs (WebSocket thread reads; DataUpdate writes).</summary>
         private volatile string _logCtxSubsession = SessionLogging.NotInSession;
+        private int _lastHelloSubId = int.MinValue;  // forces a hello broadcast on first DataUpdate
         private volatile string _logCtxParent = SessionLogging.NotInSession;
         private volatile string _logCtxSessionNum = SessionLogging.NotInSession;
         private volatile string _logCtxTrack = SessionLogging.NotInSession;
@@ -225,6 +226,19 @@ namespace SimSteward.Plugin
             if (tail == null || tail.Count == 0) return null;
             var msg = new { type = "logEvents", entries = tail };
             return JsonConvert.SerializeObject(msg);
+        }
+
+        private string GetSessionHelloForNewClient()
+        {
+            int sub = 0;
+            string simMode = "";
+            try
+            {
+                sub = _irsdk?.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+                simMode = _irsdk?.Data?.SessionInfo?.WeekendInfo?.SimMode ?? "";
+            }
+            catch { }
+            return SessionHello.BuildJson(sub, simMode, _pluginMode);
         }
 
         private void OnLogWritten(LogEntry entry)
@@ -1575,7 +1589,8 @@ namespace SimSteward.Plugin
                     }
                     WriteBroadcastError("Broadcast skipped: 0 clients", null);
                     _broadcastNoClientsPending = true;
-                });
+                },
+                getHelloForNewClient: GetSessionHelloForNewClient);
 
             try
             {
@@ -1788,6 +1803,15 @@ namespace SimSteward.Plugin
             pluginManager.SetPropertyValue("SimSteward.ClientCount", GetType(), clientCount);
 
             if (_bridge == null) return;
+
+            int helloSubId = 0;
+            try { helloSubId = _irsdk?.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0; } catch { }
+            if (helloSubId != _lastHelloSubId)
+            {
+                _lastHelloSubId = helloSubId;
+                try { _bridge.BroadcastHello(GetSessionHelloForNewClient()); }
+                catch (Exception ex) { try { SentrySdk.CaptureException(ex); } catch { } }
+            }
 
             if (_broadcastNoClientsPending)
             {
