@@ -1,6 +1,0 @@
----
-description: Enforce minimal, concise AI responses to optimize token usage.
-alwaysApply: true
----
-
-Read and strictly follow the output rules defined in `docs/RULES-MinimalOutput.md`.

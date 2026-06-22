@@ -47,11 +47,11 @@ temp-rpc-docs/
 
 # Debug logs
 debug-*.log
-.cursor/debug-*.log
 
-# ContextStream local
-.contextstream/
-# Root `.mcp.json` is committed (no secrets; API key in `.env` via envmcp). Use `.mcp.local.json` for overrides if needed.
+# Test-rig runtime output (run artifacts, session metrics)
+logs/
+
+# Local MCP overrides
 .mcp.local.json
 
 # One-off MCP upload payload dumps (repo root)
@@ -66,9 +66,11 @@ debug-*.log
 # Local observability stack host data (Docker bind mounts)
 observability/local/.storage/
 
-# ContextStream logs/support exports
-contextstream-logs-*.json
-contextstream-support-case-*.md
+# Screenshots (transient verification/proof images)
+/*.png
 
-# Session metrics (local only)
-logs/claude-session-metrics.jsonl
+# Playwright MCP runtime artifacts
+.playwright-mcp/
+
+# Superpowers brainstorm sessions
+.superpowers/brainstorm/

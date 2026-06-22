@@ -1,9 +1,0 @@
-[     258ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/claude-subscription-economics?from=now-30d&to=now&orgId=1:0
-[   30486ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q101:0
-[   30487ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q102:0
-[   30506ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q103:0
-[   30507ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q100_1:0
-[   30514ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=loki&requestId=Q107_31:0
-[   60500ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q105:0
-[   60500ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q104:0
-[   87548ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q106:0

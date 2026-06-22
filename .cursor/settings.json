@@ -1,7 +1,0 @@
-{
-  "plugins": {
-    "grafana-assistant": {
-      "enabled": true
-    }
-  }
-}

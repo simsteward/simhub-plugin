@@ -1,1 +1,0 @@
-[     330ms] [ERROR] WebSocket connection to 'ws://localhost:3000/api/live/ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/public/build/3855.c53eb219979d7cb3b2d4.js:1312

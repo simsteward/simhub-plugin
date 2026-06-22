@@ -1,3 +1,0 @@
-[     435ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:3000/d/claude-token-cost/claude-code-e28094-token-and-cost-intelligence?orgId=1&from=now-24h&to=now&refresh=30s:0
-[   25426ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q103:0
-[   30385ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/ds/query?ds_type=__expr__&expression=true&requestId=Q106:0
