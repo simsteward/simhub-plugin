@@ -48,6 +48,23 @@ Per [iRacing SDK research](../.claude/plans/zany-kindling-marble.md):
 
 All broadcasts go through `DashboardBridge.Broadcast(json, channelKey)`. Channel keys feed the dedup throttle map; new keys: `"replayStateTick"` and `"replaySweepProgressTick"`.
 
+### `session_hello`
+
+Sent to each client right after it connects, and re-broadcast to all clients whenever the loaded subsession changes (so a client that connected before the replay finished loading still learns the id). One broadcast per change — never per tick. Built by `SessionHello.BuildJson`.
+
+```json
+{
+  "type": "session_hello",
+  "sub_session_id": 12345678,
+  "sim_mode": "replay",
+  "plugin_mode": "Replay"
+}
+```
+
+- `sub_session_id` is `null` when no session is loaded (`SubSessionID == 0` / IRSDK absent).
+- `sim_mode` is `null` when unknown; `plugin_mode` is `"Replay"` or `"Unknown"`.
+- The test rig (`scripts/test-rig/run.js`) reads this to auto-detect `--subsession`: flag omitted → use this id; flag supplied and mismatched → abort; no non-null id within 30 s → fail (`no_replay_loaded`). `sub_session_id` is intentionally **not** on `replay_state_tick`.
+
 ### `replay_state_tick`
 
 Emitted every 250 ms when `_pluginMode == "Replay"` AND `!_replayIndexBuildActive`.
