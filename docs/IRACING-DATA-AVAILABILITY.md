@@ -8,14 +8,12 @@
 
 | Variable | Notes |
 |---|---|
-| `PlayerCarMyIncidentCount` | Running total for your own car only. **Not per-car for others.** |
-| `PlayerCarDriverIncidentCount` | Team driver's current incident count. |
+| `PlayerCarDriverIncidentCount` | Team driver's current incident count. Requires driver-swap context not preserved in replay. |
 | `ChanLatency` / `ChanAvgLatency` / `ChanClockSkew` | Network comms data. Meaningless in replay context. |
 
 **Risks & Gaps:**
 
 - No per-car incident count for other drivers during the live race — this is the most significant gap in the entire data model
-- `PlayerCarMyIncidentCount` gives you a running total only — not the per-incident breakdown (no timestamp, no point value per incident)
 - Incident point severity (1x/2x/4x) is not exposed at all during live sessions
 
 ---
@@ -24,6 +22,7 @@
 
 | Variable | Notes |
 |---|---|
+| `PlayerCarMyIncidentCount` | Running total for your own car. Available in replay (jumps 0→N at start — see crosswalk Appendix B for workaround). |
 | `CarIdxLapDistPct` | Track position as % of lap. Core positioning data. |
 | `CarIdxLap` | Current lap number. |
 | `CarIdxLapCompleted` | Completed laps. |

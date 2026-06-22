@@ -51,12 +51,12 @@
 | PlayerCarDriverIncidentCount | int | B | Driver incident total (Penalties.cs) | not yet used | Multi-driver team context |
 | CarIdxSessionFlags | bitField[64] | B | Not directly read by CrewChief (uses global SessionFlags) | ReplayIncidentIndexDetector — per-car flag state for incident classification | CRITICAL: per-car black/meatball flags |
 | CarIdxTrackSurface | int[64] | B | Surface state per car (iRacingGameStateMapper — pit/off-track detection) | ReplayIncidentIndexDetector — off-track vs on-track decomposition | See Appendix A: TrackSurfaces enum |
-| CarIdxTrackSurfaceMaterial | int[64] | B | Surface material per car (iRacingGameStateMapper — surface detail) | not yet used | Grass/gravel/sand distinction |
-| Speed | float | P | Player speed m/s (DamageReporting.cs — impact detection) | Incident index — speed at time of incident | Meters per second |
-| LatAccel | float | P | Lateral acceleration (DamageReporting.cs — impact G classification) | Incident index — lateral G at detection | m/s^2; divide by 9.81 for G |
-| LongAccel | float | P | Longitudinal acceleration (DamageReporting.cs — braking/impact) | Incident index — longitudinal G at detection | Named LonAccel in some SDK versions |
+| CarIdxTrackSurfaceMaterial | int[64] | B | Surface material per car (iRacingGameStateMapper — surface detail) | ReplayIncidentIndexDetector — rumble strip filter for off-track false positives | See Appendix A: TrackSurfaceMaterial |
+| Speed | float | P | Player speed m/s (DamageReporting.cs — impact detection) | not yet used | Player-only; future severity classification |
+| LatAccel | float | P | Lateral acceleration (DamageReporting.cs — impact G classification) | not yet used | Player-only; future severity classification |
+| LongAccel | float | P | Longitudinal acceleration (DamageReporting.cs — braking/impact) | not yet used | Player-only; future severity classification. Named LonAccel in some SDK versions |
 | VertAccel | float | P | Vertical acceleration (DamageReporting.cs — airborne detection) | not yet used | Useful for flip/airborne |
-| YawRate | float | P | Yaw rotation rate (DamageReporting.cs — spin detection) | Incident index — spin detection signal | rad/s; high values = spinning |
+| YawRate | float | P | Yaw rotation rate (DamageReporting.cs — spin detection) | not yet used | Player-only; future severity classification |
 | CarIdxGear | int[64] | B | Gear per car (iRacingGameStateMapper) | Incident index — gear context (0=neutral, -1=reverse) | 0 during incidents suggests loss of control |
 
 ---
@@ -87,7 +87,7 @@
 |---|---|---|---|---|---|
 | PitRepairLeft | float | P | Mandatory repair time remaining (PitStops.cs — repair countdown) | not yet used | Seconds; 0 = no damage |
 | PitOptRepairLeft | float | P | Optional repair time remaining (PitStops.cs — optional repair estimate) | not yet used | Seconds |
-| CarIdxFastRepairsUsed | int[64] | B | Fast repairs consumed per car | not yet used | Limited per race |
+| CarIdxFastRepairsUsed | int[64] | B | Fast repairs consumed per car | ReplayIncidentIndexDetector — rising-edge detection (fast_repair source) | Limited per race |
 | EngineWarnings | bitField | P | Engine warning flags (EngineMonitor.cs — checks WaterTemp, OilPressure, FuelPressure, EngineStalled, PitSpeedLimiter) | not yet used | See Appendix A: EngineWarnings |
 
 ---
@@ -255,11 +255,11 @@ All `CarIdx*` arrays are indexed 0-63 (max 64 cars). Index corresponds to `CarId
 
 | iRacing SDK Field | Type | Avail | CrewChief Usage | SimSteward Usage | Notes |
 |---|---|---|---|---|---|
-| Speed | float | P | Impact detection (DamageReporting.cs) | Incident index — speed at detection | m/s |
-| LatAccel | float | P | Lateral G (DamageReporting.cs) | Incident index — lateral G | m/s^2 |
-| LongAccel | float | P | Longitudinal G (DamageReporting.cs) | Incident index — longitudinal G | m/s^2 |
+| Speed | float | P | Impact detection (DamageReporting.cs) | not yet used | Player-only; future severity classification |
+| LatAccel | float | P | Lateral G (DamageReporting.cs) | not yet used | Player-only; future severity classification |
+| LongAccel | float | P | Longitudinal G (DamageReporting.cs) | not yet used | Player-only; future severity classification |
 | VertAccel | float | P | Vertical G (DamageReporting.cs) | not yet used | m/s^2 |
-| YawRate | float | P | Spin rate (DamageReporting.cs) | Incident index — spin detection | rad/s |
+| YawRate | float | P | Spin rate (DamageReporting.cs) | not yet used | Player-only; future severity classification |
 | Pitch | float | P | Car pitch angle (iRacingData.cs) | not yet used | Radians |
 | Yaw | float | P | Car yaw angle (iRacingData.cs) | not yet used | Radians |
 | Roll | float | P | Car roll angle (iRacingData.cs) | not yet used | Radians |
