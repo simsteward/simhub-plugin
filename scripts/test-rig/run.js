@@ -1,17 +1,15 @@
-// Test Rig — Phase 6 Node orchestrator.
+// Test Rig — Node orchestrator.
 //
-// Drives: reset (PowerShell) -> WS connect -> anchor at frame 0 -> run scenario -> assert -> teardown.
+// Pre-condition: user has iRacing open with the replay loaded and IRSDK ready.
+// Drives: WS connect -> anchor at frame 0 -> run scenario -> assert -> [teardown].
 //
 // Contract:  docs/RULES-TestRig-Contract.md
-// Plan:      .claude/plans/zany-kindling-marble.md (Phase 6)
 //
 // Usage:
 //   node scripts/test-rig/run.js --subsession <id> --scenario <sweep|live-counters|jump-test|smoke>
-//                                [--include-steam] [--teardown]
+//                                [--teardown]
 //                                [--ws ws://localhost:19847]
-//                                [--reset-timeout-ms 600000]
 //                                [--scenario-timeout-ms 1200000]
-//                                [--no-reset]   (skip reset.ps1; assume rig already up)
 //
 // Cloud-only Loki: SIMSTEWARD_LOKI_URL/USER/TOKEN read from process.env (load .env via npm script if needed).
 // All ws/loki failures are non-fatal for logging — the orchestrator never crashes because Loki is down.
@@ -31,7 +29,6 @@ const { spawn } = require('node:child_process');
 // ────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_WS_URL              = 'ws://localhost:19847';
-const DEFAULT_RESET_TIMEOUT_MS    = 10 * 60 * 1000;        // 10 min
 const DEFAULT_SCENARIO_TIMEOUT_MS = {
   sweep:           20 * 60 * 1000,                          // 20 min
   'live-counters':  35 * 1000,                              // 30s play + 5s settle
@@ -47,7 +44,6 @@ const ANCHOR_FRAME_MAX            = 100;
 
 const REPO_ROOT      = path.resolve(__dirname, '..', '..');
 const TEST_RIG_DIR   = __dirname;
-const RESET_PS1      = path.join(TEST_RIG_DIR, 'reset.ps1');
 const STOP_ALL_PS1   = path.join(TEST_RIG_DIR, 'stop-all.ps1');
 
 // Index folder per ReplayIncidentIndexOutputPaths.cs (LocalApplicationData\SimSteward\replay-incident-index)
@@ -69,11 +65,8 @@ function parseArgs(argv) {
   const args = {
     subsession: null,
     scenario: null,
-    includeSteam: false,
     teardown: false,
-    noReset: false,
     wsUrl: DEFAULT_WS_URL,
-    resetTimeoutMs: DEFAULT_RESET_TIMEOUT_MS,
     scenarioTimeoutMs: null, // resolve from scenario after parse
     help: false,
   };
@@ -86,11 +79,8 @@ function parseArgs(argv) {
       case '--help':              args.help = true; break;
       case '--subsession':        args.subsession = parseInt(next(), 10); break;
       case '--scenario':          args.scenario = next(); break;
-      case '--include-steam':     args.includeSteam = true; break;
       case '--teardown':          args.teardown = true; break;
-      case '--no-reset':          args.noReset = true; break;
       case '--ws':                args.wsUrl = next(); break;
-      case '--reset-timeout-ms':  args.resetTimeoutMs = parseInt(next(), 10); break;
       case '--scenario-timeout-ms': args.scenarioTimeoutMs = parseInt(next(), 10); break;
       default:
         if (a.startsWith('--')) throw new Error(`unknown_arg:${a}`);
@@ -99,8 +89,11 @@ function parseArgs(argv) {
 
   if (args.help) return args;
 
-  if (!Number.isFinite(args.subsession) || args.subsession <= 0) {
-    throw new Error('missing_or_invalid:--subsession');
+  // --subsession is optional: omitted → auto-detect from session_hello.
+  // Supplied → must be a positive int (becomes a mismatch guardrail).
+  if (args.subsession !== null &&
+      (!Number.isFinite(args.subsession) || args.subsession <= 0)) {
+    throw new Error('invalid:--subsession');
   }
   if (!args.scenario || !SCENARIOS.includes(args.scenario)) {
     throw new Error(`missing_or_invalid:--scenario (must be one of ${SCENARIOS.join('|')})`);
@@ -113,21 +106,20 @@ function parseArgs(argv) {
 
 function printUsage() {
   process.stdout.write([
-    'Test Rig orchestrator — Phase 6',
+    'Test Rig orchestrator',
+    '',
+    'Pre-condition: iRacing is open with the replay loaded and IRSDK ready.',
     '',
     'Usage:',
     '  node scripts/test-rig/run.js --subsession <id> --scenario <name> [opts]',
     '',
     'Required:',
-    '  --subsession <int>             iRacing subsession id to load',
+    '  --subsession <int>             iRacing subsession id (used to locate index file)',
     `  --scenario <name>              one of: ${SCENARIOS.join(' | ')}`,
     '',
     'Options:',
-    '  --include-steam                pass through to reset.ps1',
     '  --teardown                     run stop-all.ps1 after scenario completes',
-    '  --no-reset                     skip reset; assume rig is already up at WS',
     `  --ws <url>                     WebSocket URL (default: ${DEFAULT_WS_URL})`,
-    '  --reset-timeout-ms <ms>        default 600000 (10 min)',
     '  --scenario-timeout-ms <ms>     scenario-specific default',
     '',
     'Scenarios:',
@@ -226,51 +218,9 @@ class Artifacts {
   }
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-//  Reset (spawn pwsh.exe scripts/test-rig/reset.ps1)
-// ────────────────────────────────────────────────────────────────────────────
-
-function runReset({ subsession, includeSteam, timeoutMs, artifacts, prefix = '[reset]' }) {
-  return new Promise((resolve, reject) => {
-    const args = ['-NoProfile', '-File', RESET_PS1, '-SubSessionId', String(subsession)];
-    if (includeSteam) args.push('-IncludeSteam');
-
-    log(`${prefix} spawning pwsh.exe ${args.join(' ')}`, artifacts);
-    const proc = spawn('pwsh.exe', args, { cwd: REPO_ROOT, env: process.env });
-
-    let timer = setTimeout(() => {
-      try { proc.kill('SIGTERM'); } catch {}
-      reject(new Error(`reset_timeout_after_${timeoutMs}ms`));
-    }, timeoutMs);
-
-    const forward = (chunk, label) => {
-      const text = chunk.toString('utf8');
-      for (const line of text.split(/\r?\n/)) {
-        if (!line) continue;
-        const tagged = `${prefix}${label}${line}`;
-        process.stdout.write(tagged + '\n');
-        artifacts?.appendConsole(tagged);
-      }
-    };
-    proc.stdout.on('data', d => forward(d, ' '));
-    proc.stderr.on('data', d => forward(d, '!'));
-
-    proc.on('error', err => {
-      clearTimeout(timer);
-      reject(err);
-    });
-    proc.on('exit', code => {
-      clearTimeout(timer);
-      if (code === 0) resolve();
-      else reject(new Error(`reset_exited_${code}`));
-    });
-  });
-}
-
-function runStopAll({ includeSteam, artifacts, prefix = '[stop-all]' }) {
+function runStopAll({ artifacts, prefix = '[stop-all]' }) {
   return new Promise((resolve) => {
     const args = ['-NoProfile', '-File', STOP_ALL_PS1];
-    if (includeSteam) args.push('-IncludeSteam');
     log(`${prefix} spawning pwsh.exe ${args.join(' ')}`, artifacts);
     const proc = spawn('pwsh.exe', args, { cwd: REPO_ROOT, env: process.env });
     proc.stdout.on('data', d => artifacts?.appendConsole(`${prefix} ${d.toString('utf8').trimEnd()}`));
@@ -825,6 +775,20 @@ function evaluateAssertions(assertions) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+//  Subsession resolution (pure — exported for tests)
+// ────────────────────────────────────────────────────────────────────────────
+
+// flagValue: number|null (from --subsession), helloValue: number|null (from session_hello).
+function resolveSubsession({ flagValue, helloValue }) {
+  const hello = Number.isFinite(helloValue) && helloValue > 0 ? helloValue : null;
+  const flag  = Number.isFinite(flagValue)  && flagValue  > 0 ? flagValue  : null;
+  if (hello === null) return { ok: false, error: 'no_replay_loaded' };
+  if (flag === null)  return { ok: true, subsession: hello, source: 'hello' };
+  if (flag === hello) return { ok: true, subsession: hello, source: 'flag' };
+  return { ok: false, error: 'subsession_mismatch', flag, loaded: hello };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 //  Main
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -859,18 +823,6 @@ async function main(argv) {
   let runError  = null;
 
   try {
-    if (!args.noReset) {
-      phase = 'reset';
-      await runReset({
-        subsession:   args.subsession,
-        includeSteam: args.includeSteam,
-        timeoutMs:    args.resetTimeoutMs,
-        artifacts,
-      });
-    } else {
-      log('[run] --no-reset: skipping reset.ps1', artifacts);
-    }
-
     phase = 'ws_connect';
     const ws = new WsClient(args.wsUrl, artifacts);
     await ws.connect({ timeoutMs: 30000 });
@@ -897,7 +849,7 @@ async function main(argv) {
     phase = 'teardown';
     ws.close();
     if (args.teardown) {
-      await runStopAll({ includeSteam: args.includeSteam, artifacts });
+      await runStopAll({ artifacts });
     }
   } catch (err) {
     runError = err;
@@ -963,6 +915,7 @@ module.exports = {
   aggregateByImpactClass,
   validateSmokeIndex,
   buildSmokeReport,
+  resolveSubsession,
   VALID_IMPACT_CLASSES,
   // for completeness — exposed for ad-hoc reuse
   pushLoki,

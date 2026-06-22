@@ -18,6 +18,7 @@ const {
   aggregateByImpactClass,
   validateSmokeIndex,
   buildSmokeReport,
+  resolveSubsession,
 } = require('./run.js');
 
 // ── parseArgs ───────────────────────────────────────────────────────────────
@@ -27,14 +28,15 @@ test('parseArgs: --help short-circuits', () => {
   assert.equal(r.help, true);
 });
 
-test('parseArgs: rejects missing --subsession', () => {
-  assert.throws(() => parseArgs(['--scenario', 'sweep']),
-    /missing_or_invalid:--subsession/);
+test('parseArgs: allows missing --subsession (auto-detect)', () => {
+  const r = parseArgs(['--scenario', 'sweep']);
+  assert.equal(r.subsession, null);
+  assert.equal(r.scenario, 'sweep');
 });
 
-test('parseArgs: rejects non-numeric subsession', () => {
+test('parseArgs: rejects non-numeric subsession when supplied', () => {
   assert.throws(() => parseArgs(['--subsession', 'abc', '--scenario', 'sweep']),
-    /missing_or_invalid:--subsession/);
+    /invalid:--subsession/);
 });
 
 test('parseArgs: rejects missing --scenario', () => {
@@ -63,32 +65,55 @@ test('parseArgs: accepts all four scenarios (incl. smoke)', () => {
   }
 });
 
-test('parseArgs: --include-steam and --teardown set booleans', () => {
+test('parseArgs: --teardown sets boolean', () => {
   const r = parseArgs([
     '--subsession', '12345678', '--scenario', 'sweep',
-    '--include-steam', '--teardown',
+    '--teardown',
   ]);
-  assert.equal(r.includeSteam, true);
   assert.equal(r.teardown, true);
 });
 
-test('parseArgs: --no-reset and --ws override defaults', () => {
+test('parseArgs: --ws overrides default', () => {
   const r = parseArgs([
     '--subsession', '12345678', '--scenario', 'live-counters',
-    '--no-reset', '--ws', 'ws://1.2.3.4:9999',
+    '--ws', 'ws://1.2.3.4:9999',
   ]);
-  assert.equal(r.noReset, true);
   assert.equal(r.wsUrl, 'ws://1.2.3.4:9999');
 });
 
-test('parseArgs: --reset-timeout-ms / --scenario-timeout-ms override defaults', () => {
+test('parseArgs: --scenario-timeout-ms overrides default', () => {
   const r = parseArgs([
     '--subsession', '12345678', '--scenario', 'sweep',
-    '--reset-timeout-ms', '1000',
     '--scenario-timeout-ms', '2000',
   ]);
-  assert.equal(r.resetTimeoutMs, 1000);
   assert.equal(r.scenarioTimeoutMs, 2000);
+});
+
+// ── resolveSubsession ───────────────────────────────────────────────────────
+
+test('resolveSubsession: flag omitted, hello present → use hello', () => {
+  const r = resolveSubsession({ flagValue: null, helloValue: 12345678 });
+  assert.deepEqual(r, { ok: true, subsession: 12345678, source: 'hello' });
+});
+
+test('resolveSubsession: flag matches hello → proceed', () => {
+  const r = resolveSubsession({ flagValue: 12345678, helloValue: 12345678 });
+  assert.deepEqual(r, { ok: true, subsession: 12345678, source: 'flag' });
+});
+
+test('resolveSubsession: flag mismatches hello → abort', () => {
+  const r = resolveSubsession({ flagValue: 999, helloValue: 12345678 });
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'subsession_mismatch');
+  assert.equal(r.flag, 999);
+  assert.equal(r.loaded, 12345678);
+});
+
+test('resolveSubsession: no hello → no_replay_loaded', () => {
+  assert.deepEqual(resolveSubsession({ flagValue: null, helloValue: null }),
+    { ok: false, error: 'no_replay_loaded' });
+  assert.deepEqual(resolveSubsession({ flagValue: 12345678, helloValue: 0 }),
+    { ok: false, error: 'no_replay_loaded' });
 });
 
 // ── evaluateAssertions ──────────────────────────────────────────────────────
