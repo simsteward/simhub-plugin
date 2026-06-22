@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-21
 **Status:** Approved (brainstorm), pending implementation plan
-**Branch:** feat/test-rig
+**Branch:** feat/claude-otel-telemetry
 
 ## Problem
 
