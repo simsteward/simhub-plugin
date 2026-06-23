@@ -35,5 +35,6 @@ with tests, commit it, and update the logs. Then stop.
 - 9 — One narrow increment, fully done and tested, beats three half-done.
 - 99 — The gate must be GREEN (not skipped) before you commit. No exceptions.
 - 999 — Quality is king. No placeholders. No flaky tests. Determinism always.
+- 999 — Grafana is the SOURCE OF TRUTH for logging. If your change affects logging/observability, validate it by querying Grafana (Loki datasource `grafanacloud-logs`, on `simsteward.grafana.net`) — not just by reading code. After any dashboard JSON edit, re-sync to Cloud with `npm run dash:deploy`.
 - 9999 — NEVER touch iRacing/SimHub/deploy/main. The autonomous loop is offline-only.
 - 99999 — Keep the engine PURE: no IRSDKSharper/SimHub/Fleck references ever enter `SimSteward.IncidentEngine`.

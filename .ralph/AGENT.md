@@ -10,6 +10,13 @@
 - The autonomous loop is **OFFLINE ONLY**. Never run `deploy.ps1`, never start/stop SimHub, never open a live sweep or the live WS, never touch iRacing.
 - `SimSteward.IncidentEngine` is **PURE**: no IRSDKSharper / SimHub / Fleck references. Ever.
 - No placeholders, no flaky tests, gate green (not skipped) to count an increment.
+- **Grafana is the source of truth for logging.** Validate any logging/observability-affecting change against Grafana (query the logs), not just code.
+
+## Logging — Grafana Cloud is the source of truth
+- **All logging is backed by Grafana Cloud** (`https://simsteward.grafana.net`, cloud-only). To validate logging behaviour, **query Grafana** — don't trust local files or code alone.
+- Query via the Grafana MCP tools (Loki datasource UID `grafanacloud-logs`). Active streams: `app="claude-token-metrics"` (per-turn cost/tokens), `app="claude-dev-logging"` (hook telemetry), `app="sim-steward"` (plugin/deploy). The `env` label on this machine is **`dev`**; dashboards filter `env=~"$env"`.
+- **Cloud dashboards are NOT provisioned from the repo.** After any dashboard JSON edit, re-sync with `npm run dash:deploy` (`scripts/deploy-dashboard.mjs`) or the Cloud silently drifts and panels go empty (the exact bug seen: Cloud `env` var ≠ data `env` → all panels matched nothing).
+- If an increment changes logging/observability behaviour, **confirm the expected entry actually lands in Grafana (Loki)** as part of validation.
 
 ## iRacing safety + recovery (we CANNOT restart iRacing from the loop)
 - The open replay is `subses85380877` (Winton National). A backup is at `tests/fixtures/replays/subses85380877.rpy` (1.37 GB, git-ignored).
