@@ -1,5 +1,5 @@
 # OpenTelemetry Collector (contrib): OTLP in → (1) local Prometheus scrape for offline
-# verification, (2) Grafana Cloud OTLP gateway for production metrics + logs.
+# verification, (2) Grafana Cloud via NATIVE push endpoints.
 #
 # Primary purpose: ingest Claude Code native telemetry (CLAUDE_CODE_ENABLE_TELEMETRY=1,
 # OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 — see .claude/settings.json). Those
@@ -7,17 +7,29 @@
 # main|subagent|auxiliary, so subagent usage is counted — this is the authoritative feed
 # that matches `/status` and closes the dashboard undercount.
 #
-# Grafana Cloud creds come from the repo .env (injected via docker-compose env_file), so no
-# secret lives in this file. With creds unset the collector still starts; GC exports just
-# 401 harmlessly and the local Prometheus path keeps working.
+# Cloud export (2026-06-22): the single Grafana Cloud OTLP *gateway* endpoint did NOT
+# authenticate for this stack (verified 401 against otlp-gateway-prod-us-east-0/-2 with both
+# the Loki and Mimir instance ids). The access-policy token IS valid and scoped for metrics
+# and logs — confirmed by direct push tests. So we use the stack's native push endpoints:
+#   metrics → Mimir remote_write  (prometheus-prod-56-prod-us-east-2, instance 2977402)
+#   logs    → Loki OTLP/HTTP       (logs-prod-036, instance 1484376)
+# Endpoints + instance ids come from the repo .env (docker-compose env_file); the shared
+# access-policy token is SIMSTEWARD_OTLP_TOKEN (== SIMSTEWARD_LOKI_TOKEN). With creds unset
+# the collector still starts and the local Prometheus path keeps working.
 
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
-  basicauth/grafanacloud:
+  # Mimir (metrics) basic auth — username = Prometheus/Mimir instance id.
+  basicauth/prom:
     client_auth:
-      username: ${env:SIMSTEWARD_OTLP_USER:-unset}
+      username: ${env:SIMSTEWARD_PROM_USER:-unset}
       password: ${env:SIMSTEWARD_OTLP_TOKEN:-unset}
+  # Loki (logs) basic auth — username = Loki instance id.
+  basicauth/loki:
+    client_auth:
+      username: ${env:SIMSTEWARD_LOKI_USER:-unset}
+      password: ${env:SIMSTEWARD_LOKI_TOKEN:-unset}
 
 receivers:
   otlp:
@@ -34,7 +46,7 @@ processors:
     limit_mib: 512
     spike_limit_mib: 128
   attributes/env:
-    # Stamp env=local|production as a DATAPOINT attribute (→ Prometheus/Mimir label, not a
+    # Stamp env=local|production|dev as a DATAPOINT attribute (→ Prometheus/Mimir label, not a
     # resource attribute Grafana Cloud might drop) so dashboards can filter the $env variable.
     actions:
       - key: env
@@ -51,21 +63,28 @@ exporters:
     const_labels:
       cluster: local
 
-  # (2) Grafana Cloud OTLP gateway — one endpoint + creds for BOTH metrics and logs.
-  #     Metrics → Mimir, logs (claude_code.api_request events) → Loki.
-  otlphttp/grafanacloud:
-    endpoint: ${env:SIMSTEWARD_OTLP_ENDPOINT:-https://otlp-gateway-prod-us-east-0.grafana.net/otlp}
+  # (2a) Grafana Cloud metrics → Mimir remote_write (replaces the non-working OTLP gateway).
+  prometheusremotewrite/grafanacloud:
+    endpoint: ${env:SIMSTEWARD_PROM_PUSH_URL:-https://prometheus-prod-56-prod-us-east-2.grafana.net/api/prom/push}
     auth:
-      authenticator: basicauth/grafanacloud
+      authenticator: basicauth/prom
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # (2b) Grafana Cloud logs → Loki OTLP/HTTP endpoint.
+  otlphttp/grafanacloudloki:
+    logs_endpoint: ${env:SIMSTEWARD_LOKI_OTLP_URL:-https://logs-prod-036.grafana.net/otlp/v1/logs}
+    auth:
+      authenticator: basicauth/loki
 
 service:
-  extensions: [health_check, basicauth/grafanacloud]
+  extensions: [health_check, basicauth/prom, basicauth/loki]
   pipelines:
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, attributes/env, batch]
-      exporters: [prometheus, otlphttp/grafanacloud]
+      exporters: [prometheus, prometheusremotewrite/grafanacloud]
     logs:
       receivers: [otlp]
       processors: [memory_limiter, attributes/env, batch]
-      exporters: [otlphttp/grafanacloud]
+      exporters: [otlphttp/grafanacloudloki]
