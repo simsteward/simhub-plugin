@@ -74,3 +74,5 @@ observability/local/.storage/
 
 # Superpowers brainstorm sessions
 .superpowers/brainstorm/
+tests/fixtures/replays/
+.ralph/state/
