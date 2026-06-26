@@ -41,6 +41,11 @@ receivers:
 
 processors:
   batch: {}
+  # Claude Code exports its metric sums with DELTA temporality, but the Prometheus
+  # remote_write exporter (Mimir) only accepts CUMULATIVE — without this it drops every
+  # claude_code.* sum at translate time ("invalid temporality and type combination").
+  # This processor accumulates delta → cumulative so Mimir ingests them.
+  deltatocumulative: {}
   memory_limiter:
     check_interval: 1s
     limit_mib: 512
@@ -82,7 +87,7 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, attributes/env, batch]
+      processors: [memory_limiter, deltatocumulative, attributes/env, batch]
       exporters: [prometheus, prometheusremotewrite/grafanacloud]
     logs:
       receivers: [otlp]
