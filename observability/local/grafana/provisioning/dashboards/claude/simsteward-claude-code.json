@@ -1,7 +1,7 @@
 {
   "uid": "simsteward-claude-code",
   "title": "SimSteward — Claude Code",
-  "description": "Claude Code usage. TOP section = Loki hook pipeline (main sessions live + backfilled subagents via scripts/backfill-subagent-usage.js). NOTE: OTEL PromQL panels (grafanacloud-prom) will replace these once SIMSTEWARD_OTLP_TOKEN is provisioned at grafana.com → Access Policies (metrics:write + logs:write). BOTTOM = legacy tool health + session audit. Subscription 5h/weekly limit % is NOT available via telemetry — see the Spend Context note.",
+  "description": "Claude Code usage. TOP section = OTel-native metrics (claude_code.cost.usage / claude_code.token.usage) via Grafana Cloud Mimir — live since 2026-07-18; no data before that date (see docs/GRAFANA-LOGGING.md). BOTTOM = legacy Loki hook-pipeline cross-check + tool health + session audit (no Mimir equivalent for these). Subscription 5h/weekly limit % is NOT available via telemetry — see the Spend Context note.",
   "refresh": "30s",
   "schemaVersion": 38,
   "version": 4,
@@ -31,7 +31,7 @@
   },
   "panels": [
     {
-      "type": "row", "title": "All Sources — cost & tokens incl. backfilled subagents (Loki · OTEL PromQL once OTLP creds provisioned)",
+      "type": "row", "title": "All Sources — cost & tokens (OTel / Mimir, live)",
       "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
       "collapsed": false, "panels": []
     },
@@ -114,12 +114,12 @@
     },
     {
       "type": "stat", "title": "API-equivalent Spend (selected range)",
-      "description": "Retail API-price equivalent of usage in the selected range. A volume/cost proxy — NOT your subscription plan-limit usage.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Retail API-price equivalent of usage in the selected range. A volume/cost proxy — NOT your subscription plan-limit usage. OTel-native (Mimir).",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 6, "w": 12, "x": 0, "y": 22},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7AA2F7", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Spend", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Spend", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "text", "title": "Why there is no plan-limit gauge",
