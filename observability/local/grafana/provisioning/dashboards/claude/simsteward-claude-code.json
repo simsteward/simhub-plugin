@@ -37,39 +37,39 @@
     },
     {
       "type": "stat", "title": "Total Cost (all sources)",
-      "description": "Sum of cost_usd across main sessions (live hook) + subagents (backfilled). Will switch to OTEL PromQL once SIMSTEWARD_OTLP_TOKEN provisioned.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Sum of claude_code.cost.usage across main sessions, subagents, and auxiliary requests. OTel-native (Mimir) — replaces the Loki hook-pipeline estimate.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7AA2F7", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Total Cost", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Total Cost", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Total Tokens (all sources)",
-      "description": "Total tokens across main sessions + backfilled subagents from hook pipeline.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Total tokens (input+output+cacheRead+cacheCreation) across main sessions, subagents, and auxiliary requests. OTel-native (Mimir).",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 1, "color": {"fixedColor": "#BB9AF7", "mode": "fixed"}, "noValue": "0"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_tokens [$__range]))", "legendFormat": "Total Tokens", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_token_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Total Tokens", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Subagent Share of Cost",
-      "description": "Fraction of total cost from backfilled subagents. The metric the old dashboard was blind to.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Fraction of total cost where query_source=subagent. Excludes query_source=auxiliary from the numerator (auxiliary is a separate, third category — see Cost by Source below), but auxiliary is still included in the denominator.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
       "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 1, "min": 0, "max": 1, "color": {"mode": "thresholds"}, "noValue": "0%", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 0.4}, {"color": "#7AA2F7", "value": 0.7}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__range])) / sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Subagent %", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\", query_source=\"subagent\"}[$__range])) / sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Subagent %", "queryType": "range", "refId": "A"}]
     },
     {
-      "type": "stat", "title": "Subagent Cost (backfilled)",
-      "description": "Absolute cost from backfilled subagent transcripts — previously invisible to all dashboards.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "type": "stat", "title": "Subagent Cost",
+      "description": "Absolute cost where query_source=subagent. OTel-native (Mimir) — live, not backfilled.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7DCFFF", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__range]))", "legendFormat": "Subagent Cost", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\", query_source=\"subagent\"}[$__range]))", "legendFormat": "Subagent Cost", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "timeseries", "title": "Cost by Source (main vs subagent)",
