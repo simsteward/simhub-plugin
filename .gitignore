@@ -74,5 +74,6 @@ observability/local/.storage/
 
 # Superpowers brainstorm sessions
 .superpowers/brainstorm/
+
+# Large replay fixture (not for git tracking)
 tests/fixtures/replays/
-.ralph/state/
