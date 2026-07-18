@@ -40,7 +40,12 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
-  batch: {}
+  # Wider batch window so remote_write to Mimir sends fewer, larger requests instead of
+  # tripping the tenant's 75 req/s cap (err-mimir-tenant-max-request-rate) under bursty
+  # export load (e.g. several concurrent subagent sessions).
+  batch:
+    timeout: 10s
+    send_batch_size: 1000
   # Claude Code exports its metric sums with DELTA temporality, but the Prometheus
   # remote_write exporter (Mimir) only accepts CUMULATIVE — without this it drops every
   # claude_code.* sum at translate time ("invalid temporality and type combination").
