@@ -268,7 +268,12 @@ const MODEL_PRICING = loadModelPricing() || {
   'claude-opus-4-8':   { input: 5,    output: 25,   cacheWrite: 6.25,  cacheRead: 0.50 },
   'claude-opus-4-7':   { input: 5,    output: 25,   cacheWrite: 6.25,  cacheRead: 0.50 },
   'claude-opus-4-6':   { input: 5,    output: 25,   cacheWrite: 6.25,  cacheRead: 0.50 },
-  'claude-sonnet-5':   { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30 },
+  // INTRO PRICING active through 2026-08-31 ($2/$10, vs standard $3/$15 after).
+  // TODO after 2026-08-31: revert to { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 }.
+  // The pricing-gap WARN log below will also fire once the intro rate no longer matches
+  // Claude Code's own OTel-reported cost, giving an earlier signal than this date if the
+  // rate changes sooner than expected.
+  'claude-sonnet-5':   { input: 2,    output: 10,   cacheWrite: 2.5,   cacheRead: 0.20 },
   'claude-sonnet-4-6': { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30 },
   'claude-haiku-4-5':  { input: 1,    output: 5,    cacheWrite: 1.25,  cacheRead: 0.10 },
   // Legacy generic fallbacks — substring-matched (longest key wins) for older
@@ -896,6 +901,31 @@ process.stdin.on('end', () => {
           total_cache_creation_tokens: result.turn.cache_creation_tokens,
           total_cache_read_tokens:     result.turn.cache_read_tokens,
         }) || {};
+        // Surface a pricing gap loudly instead of letting it silently zero out cost_usd/
+        // cache_savings_usd on every dashboard panel (this is exactly how the sonnet-5
+        // gap went unnoticed for a while). No live pricing API exists to self-heal this
+        // (the Models API exposes capabilities/context window, not $/token — see
+        // shared/models.md in the claude-api skill), so the honest, reliable mechanism is
+        // "fail loud" rather than "auto-fix": once per session per unrecognized model.
+        if (turnCosts.pricing_known !== true && turnModel) {
+          const warnMarkerId = 'pricing-warn-' + sessionId + '-' + turnModel;
+          if (!readTimingFile(warnMarkerId, false)) {
+            writeTimingFile(warnMarkerId, { warnedAt: Date.now() });
+            queuePush(
+              { app: 'claude-dev-logging', env: envLabel, component: 'cost-pricing', level: 'WARN' },
+              scrubSecrets(JSON.stringify({
+                event: 'pricing_unknown_model',
+                session_id: sessionId,
+                project,
+                machine,
+                env: envLabel,
+                timestamp: new Date().toISOString(),
+                model: turnModel,
+                message: `No MODEL_PRICING entry for "${turnModel}" — cost_usd/cache_savings_usd omitted from claude_turn_metrics until scripts/hooks/loki-log.js is updated (or an override is added at ~/.claude/model-pricing.json).`,
+              }))
+            );
+          }
+        }
         queuePush(
           {
             app: 'claude-token-metrics',
