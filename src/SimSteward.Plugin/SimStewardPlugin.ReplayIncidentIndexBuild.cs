@@ -110,11 +110,13 @@ namespace SimSteward.Plugin
         private void ReplayIncidentIndexOnIracingDisconnected()
         {
             StopReplayIncidentIndexRecordModeLocked("iracing_disconnected");
+            bool buildWasInProgress;
             lock (_replayIndexBuildLock)
             {
                 _replayIndexStartRequested = false;
                 _replayIndexCancelRequested = false;
-                if (_replayIndexBuildPhase == ReplayIndexBuildPhase.Idle)
+                buildWasInProgress = _replayIndexBuildPhase != ReplayIndexBuildPhase.Idle;
+                if (!buildWasInProgress)
                     return;
                 try
                 {
@@ -126,6 +128,13 @@ namespace SimSteward.Plugin
                 ClearReplayIndexBuildTransientLocked();
                 ChangePhaseLocked(ReplayIndexBuildPhase.Idle, "iracing_disconnected");
             }
+
+            // The aborted build never reached FinalizeReplayIndexBuildLocked, so no index file
+            // was written. Clear the dashboard's one-shot disk-load/auto-build gate — otherwise
+            // it stays permanently marked "already tried" for this subsession and the index
+            // never gets (re)loaded, even after iRacing reconnects.
+            _replayIndexDiskLoadAttemptedForSub = ReplayIncidentIndexDashboardGate.OnBuildAbortedBeforeFinalize(
+                buildWasInProgress, _replayIndexDiskLoadAttemptedForSub);
         }
 
         private void ProcessReplayIncidentIndexBuildTelemetry()
