@@ -14,7 +14,7 @@
 
 ## iRacing Shared Memory
 - Use **IRSDKSharper**. Do NOT use `GameRawData`.
-- **ADMIN LIMITATION**: Live races show 0 incidents for others unless admin. Replays track all.
+- **ADMIN LIMITATION is narrower than it sounds**: live races expose 0 *official incident count / point severity* for other cars unless admin (`docs/IRACING-DATA-AVAILABILITY.md` Group 1). Event-level detection is NOT gated — `CarIdxTrackSurface`/`CarIdxSessionFlags` (Group 2) are available live, for every car, no admin required, and are exactly what the off-track/flag detector already runs on. Don't read this as "incidents are invisible live for other cars" — only the exact official count/point value is.
 - **Incident types (deltas)**: 1x (off-track), 2x (wall/spin), 4x (heavy contact). Dirt: 2x heavy.
 - **Quick-succession**: 2x spin -> 4x contact records as +4 delta.
 - **Replay**: At 16x speed, YAML incident events are batched. Cross-reference `CarIdxGForce` and `CarIdxTrackSurface` to decompose type.
