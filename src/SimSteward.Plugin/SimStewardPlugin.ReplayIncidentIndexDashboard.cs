@@ -94,6 +94,18 @@ namespace SimSteward.Plugin
                 _replayIndexDiskLoadAttemptedForSub = sub;
                 if (ReplayIncidentIndexOutputPaths.TryReadIndexFile(sub, out var diskRoot))
                     _replayIndexDashboardCachedRoot = diskRoot;
+                else if (snap.IsReplayMode)
+                {
+                    // No index on disk yet for this subsession — auto-build instead of waiting for
+                    // a manual "Start" click. Reuses the exact flag DispatchAction sets for the
+                    // manual replay_incident_index_build "start" action; one attempt per subsession,
+                    // same gate as the disk-load-attempt above.
+                    _replayIndexStartRequested = true;
+                    var f = new Dictionary<string, object> { ["subsession_id"] = sub };
+                    MergeSessionAndRoutingFields(f);
+                    _logger?.Structured("INFO", "simhub-plugin", "replay_incident_index_auto_build_triggered",
+                        "No cached index found for this subsession — auto-starting build.", f, "lifecycle", null);
+                }
             }
 
             if (phase == ReplayIndexBuildPhase.Idle)
@@ -379,6 +391,9 @@ namespace SimSteward.Plugin
                 _irsdk.ReplaySearchSessionTime(sessionNum, sessionTimeMs);
                 if (carIdx >= 0)
                     _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, carIdx, 0, 0);
+                // Land paused on the incident frame — clicking an incident should stop there, not
+                // keep playing past it. Same mechanism as the standalone "replay_pause" action.
+                _irsdk.ReplaySetPlaySpeed(0, false);
                 LogActionResult(action, arg, correlationId, true, "");
                 return (true, "ok", null);
             }

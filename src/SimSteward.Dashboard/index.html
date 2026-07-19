@@ -18,7 +18,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
 
-.app { height: 100vh; display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.app { height: 100vh; display: flex; flex-direction: row; gap: 8px; padding: 8px; }
+.content-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
 
 /* ── Status bar ── */
 .status-bar {
@@ -49,27 +50,51 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .ws-badge.disconnected { color: var(--red);    border-color: rgba(255,95,95,0.3);  background: rgba(255,95,95,0.07); }
 .ws-badge.connecting   { color: var(--yellow); border-color: rgba(255,200,64,0.3); background: rgba(255,200,64,0.07); }
 
-/* ── Main grid ── */
-.main-grid {
-  flex: 1; display: grid; grid-template-columns: 300px 1fr;
-  gap: 8px; min-height: 0; overflow: hidden;
-}
+/* ── Left nav (full page height) + main content ── */
 .left-col {
-  display: flex; flex-direction: column; gap: 8px;
+  width: 300px; flex-shrink: 0; height: 100%; display: flex; flex-direction: column; gap: 8px;
   overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent;
 }
-.right-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+.right-col { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
 .right-col > .standings-panel {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
+.right-col > .standings-panel:not(.open) { flex: 0 0 auto; }
 .right-col > .standings-panel .std-body { flex: 1; min-height: 0; overflow-y: auto; }
+/* Collapsing Driver Standings hands its vertical space to the logs/incidents dock below. */
+.content-col.standings-collapsed .right-col { flex: 0 0 auto; }
+.content-col.standings-collapsed .bottom-dock-rows { flex: 1 1 auto; min-height: 0; }
+.content-col.standings-collapsed .bottom-dock-main { height: auto; flex: 1; min-height: 0; }
+/* Collapsing the logs/incidents dock shrinks it to just the tab strip; standings reclaims the space.
+   Declared after the standings-collapsed rules so this wins when both are collapsed. */
+.content-col.logs-collapsed .bottom-dock-rows { flex: 0 0 auto; min-height: 0; }
+.content-col.logs-collapsed .bottom-dock-main { height: auto; flex: 0 0 auto; }
+.content-col.logs-collapsed .log-section--streams .log-pane,
+.content-col.logs-collapsed .log-section--streams .incident-meta-strip { display: none !important; }
 
 /* ── Panel ── */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; flex-shrink: 0; }
 .panel-title { font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 10px; }
+
+/* ── Sim Steward status panel ── */
+.ss-status-panel { padding: 10px 14px; }
+.ss-status-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ss-pill {
+  display: flex; align-items: center; gap: 5px; padding: 3px 9px;
+  border-radius: 99px; font-size: 0.64rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid var(--border);
+  color: var(--muted);
+}
+.ss-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.15); flex-shrink: 0; }
+.ss-pill.on { color: var(--green); border-color: rgba(14,242,114,0.35); background: rgba(14,242,114,0.07); }
+.ss-pill.on .ss-pill-dot { background: var(--green); box-shadow: 0 0 4px rgba(14,242,114,0.5); }
+.ss-pill.sweep { color: var(--accent); border-color: rgba(31,156,255,0.35); background: rgba(31,156,255,0.07); }
+.ss-pill.sweep .ss-pill-dot { background: var(--accent); box-shadow: 0 0 4px rgba(31,156,255,0.5); }
+.ss-build-info { font-size: 0.65rem; color: var(--muted); font-family: "Courier New", monospace; margin-bottom: 6px; }
+.ss-transparency { font-size: 0.68rem; color: var(--muted); line-height: 1.35; }
 
 /* ── Replay ── */
 .btn-row { display: flex; gap: 4px; justify-content: center; margin-bottom: 10px; }
@@ -144,7 +169,10 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .cap-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .btn.cap { font-size: 0.8rem; padding: 7px 14px; flex-shrink: 0; border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.07); }
 .btn.cap.btn-scan {
-  flex: 1;
+  /* flex-basis 100% forces each onto its own row in the wrapping .cap-row — with plain flex:1 and a
+     narrow 300px column, two of these squeezed to ~half width each, wrapping "Walk this car's listed
+     incidents" across 5 lines and blowing out the panel's height. */
+  flex: 1 1 100%;
   min-width: 0;
   font-size: 0.72rem;
   font-weight: 600;
@@ -166,28 +194,12 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .cap-status.running { color: var(--accent); }
 @keyframes cap-pulse { 0%,100%{opacity:1} 50%{opacity:.55} }
 
-/* ── Telemetry ── */
+/* ── Car select (shared by telemetry-car and camera pickers) ── */
 .car-sel {
   width: 100%; padding: 5px 8px; background: rgba(255,255,255,0.05);
   border: 1px solid var(--border); border-radius: 6px; color: var(--text);
   font-size: 0.82rem; margin-bottom: 10px; cursor: pointer;
 }
-.input-rows { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; }
-.input-lbl { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); margin-bottom: 3px; }
-.bar-track { height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 5px; transition: width 0.08s ease; }
-.bar-fill.thr { background: linear-gradient(90deg, #0a7a35, var(--green)); }
-.bar-fill.brk { background: linear-gradient(90deg, #7a0a0a, var(--red)); }
-.steer-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.steer-lbl { font-size: 0.67rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.steer-svg { width: 100%; max-width: 210px; }
-.g-track  { stroke: rgba(255,255,255,0.09); stroke-width: 5; fill: none; stroke-linecap: round; }
-.g-active { stroke: var(--accent); stroke-width: 5; fill: none; stroke-linecap: round; }
-.g-ctick  { stroke: rgba(255,255,255,0.35); stroke-width: 1.5; }
-.g-needle { stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; }
-.g-hub    { fill: var(--accent); }
-.g-text   { fill: rgba(240,240,240,0.4); font-size: 8px; font-family: "Courier New", monospace; }
-.g-angle  { fill: rgba(240,240,240,0.6); font-size: 9px; font-family: "Courier New", monospace; }
 
 /* ── Incidents panel ── */
 .incidents-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -215,16 +227,64 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .car-num { font-family: "Courier New", monospace; font-size: 0.7rem; text-align: center; background: rgba(255,255,255,0.07); border-radius: 4px; padding: 2px 4px; color: var(--muted); }
 .inc-name { font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .inc-time { font-family: "Courier New", monospace; font-size: 0.7rem; color: var(--muted); }
-.sev-badge { font-family: "Courier New", monospace; font-size: 0.7rem; font-weight: 700; padding: 2px 5px; border-radius: 4px; min-width: 26px; text-align: center; }
-.sev-badge.s1 { background: rgba(14,242,114,0.12);  color: var(--green); }
-.sev-badge.s2 { background: rgba(255,200,64,0.12);  color: var(--yellow); }
-.sev-badge.s4 { background: rgba(255,95,95,0.12);   color: var(--red); }
+.points-badge { font-family: "Courier New", monospace; font-size: 0.7rem; font-weight: 700; padding: 2px 5px; border-radius: 4px; min-width: 26px; text-align: center; }
+.points-badge.s1 { background: rgba(14,242,114,0.12);  color: var(--green); }
+.points-badge.s2 { background: rgba(255,200,64,0.12);  color: var(--yellow); }
+.points-badge.s4 { background: rgba(255,95,95,0.12);   color: var(--red); }
+.points-badge.pending { background: rgba(255,255,255,0.06); color: var(--muted); }
 .cause-tag { font-size: 0.63rem; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
 .cause-tag.off-track { background: rgba(14,242,114,0.1);  color: var(--green); }
 .cause-tag.wall      { background: rgba(255,200,64,0.1);  color: var(--yellow); }
 .cause-tag.spin      { background: rgba(255,200,64,0.1);  color: var(--yellow); }
 .cause-tag.contact   { background: rgba(255,95,95,0.1);   color: var(--red); }
+.cause-tag.flagged   { background: rgba(31,156,255,0.1);  color: var(--accent); }
 .cause-tag.unknown   { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+/* ── Incidents table (Incidents tab) ── */
+.inc-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.inc-table thead th {
+  text-align: left; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg2);
+}
+.inc-table tbody tr.inc-row { cursor: pointer; transition: background 0.12s; }
+.inc-table tbody tr.inc-row:hover { background: rgba(255,255,255,0.05); }
+.inc-table tbody tr.inc-row.player { background: rgba(31,156,255,0.04); }
+.inc-table tbody tr.inc-row.player td:first-child { border-left: 3px solid var(--accent); }
+.inc-table tbody tr.inc-row.inc-card-expanded { outline: 2px solid var(--accent); outline-offset: -2px; background: rgba(255,255,255,0.06); }
+.inc-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+.inc-table td.inc-row-car, .inc-table td.inc-row-lap, .inc-table td.inc-row-time { font-family: "Courier New", monospace; color: var(--muted); white-space: nowrap; }
+.inc-table-note { font-size: 0.65rem; color: var(--muted); padding: 6px 4px 2px; font-style: italic; }
+
+/* ── Replay Index tab (merged from replay-incident-index.html) ── */
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.primary { border-color: var(--accent); color: var(--accent); background: rgba(31,156,255,0.08); }
+.btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
+.btn.record { font-size: 0.95rem; font-weight: 700; padding: 10px 20px; border-width: 2px; }
+.btn.record.on { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.12); animation: cap-pulse 1.2s ease-in-out infinite; }
+.ri-banner {
+  padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: rgba(255,200,64,0.06); font-size: 0.82rem; line-height: 1.4; margin-bottom: 10px;
+}
+.ri-banner.err { border-color: rgba(255,95,95,0.4); background: rgba(255,95,95,0.07); }
+.ri-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.ri-row:last-child { margin-bottom: 0; }
+.ri-meta { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+.ri-meta strong { color: var(--text); font-weight: 600; }
+.ri-grid-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; font-size: 0.78rem; margin-bottom: 4px; }
+.ri-grid-summary div { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+.ri-table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.ri-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+.ri-table th, .ri-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.ri-table th { position: sticky; top: 0; background: #121212; cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; }
+.ri-table th:hover { color: var(--text); }
+.ri-table tr:hover td { background: rgba(255,255,255,0.02); }
+.ri-mono { font-family: "Courier New", monospace; font-size: 0.68rem; }
+.ri-fp { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ri-section { margin-bottom: 14px; }
+.ri-section:last-child { margin-bottom: 0; }
+.ri-section-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; }
+.ri-pane-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
 /* ── Standings ── */
 .std-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
@@ -269,6 +329,12 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   padding: 0 12px; font-size: 0.67rem; color: var(--muted); cursor: pointer; user-select: none; border: none; background: transparent;
 }
 .log-autoscroll.on { color: var(--accent); }
+.log-collapse-btn {
+  display: flex; align-items: center; padding: 0 12px 0 4px; font-size: 0.7rem;
+  color: var(--muted); cursor: pointer; user-select: none; border: none; background: transparent;
+  transition: color 0.15s, transform 0.15s;
+}
+.log-collapse-btn:hover { color: var(--text); }
 .log-pane {
   flex: 1; overflow-y: auto; padding: 5px 10px; font-family: "Courier New", monospace;
   font-size: 0.73rem; line-height: 1.55; display: none;
@@ -297,37 +363,12 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   min-height: 0;
   height: 300px;
 }
-.log-section--telemetry {
-  width: 300px;
-  flex: none;
-  flex-shrink: 0;
-}
 .log-section-head {
   flex-shrink: 0;
   padding: 8px 12px 6px;
   border-bottom: 1px solid var(--border);
 }
-.log-section--telemetry .log-section-head { padding: 6px 10px 4px; }
 .log-section-head .panel-title { margin-bottom: 0; }
-.log-section-body--telem {
-  flex: 1;
-  min-height: 0;
-  padding: 6px 8px 8px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.log-section--telemetry .input-rows {
-  gap: 4px;
-  margin-bottom: 4px;
-}
-.log-section--telemetry .input-lbl { margin-bottom: 2px; }
-.log-section--telemetry .bar-track { height: 6px; border-radius: 3px; }
-.log-section--telemetry .bar-fill { border-radius: 3px; }
-.log-section--telemetry .steer-wrap { gap: 2px; }
-.log-section--telemetry .steer-lbl { font-size: 0.62rem; }
-.log-section--telemetry .steer-svg { max-width: 150px; }
 .log-section--streams {
   flex: 1;
   min-width: 0;
@@ -377,11 +418,10 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 }
 .captured-pane-inner .inc-list { flex: 1; min-height: 0; }
 .driver-inc-panel {
-  max-height: 260px;
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 .driver-inc-panel .inc-list { flex: 1; min-height: 0; }
 .captured-group {
@@ -492,27 +532,19 @@ Sentry.init({
 <body>
 <div class="app">
 
-  <!-- ── Status bar ── -->
-  <header class="status-bar">
-    <div class="mode-pill waiting" id="mode-pill"><span class="dot"></span><span id="mode-text">WAITING</span></div>
-    <span class="session-time" id="session-time">—:——</span>
-    <span class="session-time" id="plugin-version" style="opacity:.7;font-size:0.68rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Sim Steward plugin build">v—</span>
-    <div class="sb-spacer"></div>
-    <div class="diag-row">
-      <span class="diag-item"><span class="d-dot" id="d-irsdk"></span>iRacing</span>
-      <span class="diag-item"><span class="d-dot" id="d-steam"></span>Steam</span>
-      <span class="diag-item"><span class="d-dot" id="d-simhub"></span>SimHub</span>
-    </div>
-    <a href="replay-incident-index.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Replay incident index (TR-031–TR-038)">Replay index →</a>
-    <a href="test-rig.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Test rig (Phase 2)">Test rig →</a>
-<span class="ws-badge disconnected" id="ws-badge">WS ○</span>
-  </header>
-
-  <!-- ── Main grid ── -->
-  <div class="main-grid">
-
-    <!-- Left column -->
+  <!-- Left column (persistent nav — full page height) -->
     <div class="left-col">
+
+      <!-- Sim Steward status -->
+      <div class="panel ss-status-panel">
+        <div class="panel-title">Sim Steward Status</div>
+        <div class="ss-status-row">
+          <span class="ss-pill" id="ss-live-pill"><span class="ss-pill-dot"></span><span id="ss-live-text">Live detector —</span></span>
+          <span class="ss-pill" id="ss-sweep-pill" hidden><span class="ss-pill-dot"></span><span id="ss-sweep-text">Sweep —</span></span>
+        </div>
+        <div class="ss-build-info" id="ss-build-info">build —</div>
+        <div class="ss-transparency">Live: off-track &amp; flags for every car (no admin needed) — official point severity for other cars requires admin.</div>
+      </div>
 
       <!-- Replay controls -->
       <div class="panel">
@@ -535,8 +567,12 @@ Sentry.init({
           <button type="button" class="btn" title="Jump to end"  onclick="ra('replay_jump','end','replay-jump-end')">⏭</button>
         </div>
         <div class="btn-row">
-          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car)" onclick="ra('replay_seek','prev','replay-seek-prev')">Prev replay incident</button>
-          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car)"     onclick="ra('replay_seek','next','replay-seek-next')">Next replay incident</button>
+          <button type="button" class="btn label-inc" title="Jump to previous incident in the replay (session-wide, not scoped to telemetry car) — uses the plugin's own incident index" onclick="ra('index_prev_incident','','replay-seek-prev')">Prev field incident</button>
+          <button type="button" class="btn label-inc" title="Jump to next incident in the replay (session-wide, not scoped to telemetry car) — uses the plugin's own incident index"     onclick="ra('index_next_incident','','replay-seek-next')">Next field incident</button>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn label-inc" id="btn-prev-driver-incident" title="Jump to the selected driver's previous incident only" onclick="jumpDriverIncident('prev')" disabled>Prev driver incident</button>
+          <button type="button" class="btn label-inc" id="btn-next-driver-incident" title="Jump to the selected driver's next incident only"     onclick="jumpDriverIncident('next')" disabled>Next driver incident</button>
         </div>
         <div class="speed-pills" id="speed-pills">
           <button class="spill" data-s="0.25" onclick="setSpeed(this)">0.25×</button>
@@ -586,10 +622,12 @@ Sentry.init({
           </select>
         </div>
         <div class="cap-row">
-          <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()"
+          <button type="button" class="btn cap btn-scan" id="cap-btn" onclick="toggleCaptureDriver()" disabled
             title="Walk frames already on the leaderboard for the selected car (does not scan YAML for new incidents). Max 200 steps.">Walk this car’s listed incidents</button>
           <button type="button" class="btn cap btn-scan btn-scan-session" id="cap-btn-session" onclick="startCaptureSessionClick()"
             title="Walk every leaderboard frame in the session (does not discover new incidents from YAML). Confirms before start.">Walk all listed incidents (session)</button>
+          <button type="button" class="btn cap" id="cap-btn-cancel" onclick="cancelCapture()"
+            title="Clear the server-side capture queue (cancels any pending capture_all_incidents work).">Cancel capture</button>
           <span class="cap-status" id="cap-status">—</span>
         </div>
       </div>
@@ -601,6 +639,25 @@ Sentry.init({
       </div>
 
     </div><!-- /left-col -->
+
+  <!-- Main content (everything but the nav) -->
+  <div class="content-col">
+
+    <!-- ── Status bar ── -->
+    <header class="status-bar">
+      <div class="mode-pill waiting" id="mode-pill"><span class="dot"></span><span id="mode-text">WAITING</span></div>
+      <span class="session-time" id="session-time">—:——</span>
+      <span class="session-time" id="plugin-version" style="opacity:.7;font-size:0.68rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Sim Steward plugin build">v—</span>
+      <div class="sb-spacer"></div>
+      <div class="diag-row">
+        <span class="diag-item"><span class="d-dot" id="d-irsdk"></span>iRacing</span>
+        <span class="diag-item"><span class="d-dot" id="d-steam"></span>Steam</span>
+        <span class="diag-item"><span class="d-dot" id="d-simhub"></span>SimHub</span>
+      </div>
+      <a href="#" onclick="goToReplayIndexTab(); return false" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Replay incident index (TR-031–TR-038)">Replay index →</a>
+      <a href="test-rig.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Test rig (Phase 2)">Test rig →</a>
+      <span class="ws-badge disconnected" id="ws-badge">WS ○</span>
+    </header>
 
     <!-- Right column -->
     <div class="right-col">
@@ -618,47 +675,20 @@ Sentry.init({
       </div>
 
     </div><!-- /right-col -->
-  </div><!-- /main-grid -->
 
   <!-- ── Bottom: telemetry + single tab strip (leaderboard & captured are last tabs) ── -->
   <div class="bottom-dock-rows">
     <div class="bottom-dock-main">
-      <section class="log-section log-section--telemetry" aria-label="Telemetry">
-        <div class="log-section-head"><span class="panel-title">Telemetry</span></div>
-        <div class="log-section-body--telem">
-          <div class="input-rows">
-            <div>
-              <div class="input-lbl"><span>Throttle</span><span id="thr-pct">65%</span></div>
-              <div class="bar-track"><div class="bar-fill thr" id="thr-bar" style="width:65%"></div></div>
-            </div>
-            <div>
-              <div class="input-lbl"><span>Brake</span><span id="brk-pct">0%</span></div>
-              <div class="bar-track"><div class="bar-fill brk" id="brk-bar" style="width:0%"></div></div>
-            </div>
-          </div>
-          <div class="steer-wrap">
-            <span class="steer-lbl">Steering</span>
-            <svg class="steer-svg" viewBox="0 0 130 80">
-              <path class="g-track" d="M 10,72 A 55,55 0 0,1 120,72"/>
-              <path class="g-active" id="g-active" d=""/>
-              <line class="g-ctick" x1="65" y1="17" x2="65" y2="25"/>
-              <line class="g-needle" id="g-needle" x1="65" y1="72" x2="65" y2="22"/>
-              <circle class="g-hub" cx="65" cy="72" r="4.5"/>
-              <text class="g-text" x="2"  y="76">0°</text>
-              <text class="g-text" x="108" y="76">180°</text>
-              <text class="g-angle" id="g-angle" text-anchor="middle" x="65" y="62">0°</text>
-            </svg>
-          </div>
-        </div>
-      </section>
       <section class="log-section log-section--streams" aria-label="Logs and incident views">
         <div class="log-tabs">
           <button class="log-tab active" data-tab="events"     onclick="switchTab(this)">iRacing Events</button>
           <button class="log-tab"        data-tab="health"     onclick="switchTab(this)">App Health</button>
-          <button class="log-tab"        data-tab="telem"      onclick="switchTab(this)">Telemetry Data</button>
-          <button class="log-tab"        data-tab="leaderboard" onclick="switchTab(this)">Incident leaderboard</button>
+          <button class="log-tab"        data-tab="telem"      onclick="switchTab(this)">Session Timeline</button>
+          <button class="log-tab"        data-tab="leaderboard" onclick="switchTab(this)">Incidents</button>
           <button class="log-tab"        data-tab="captured"   onclick="switchTab(this)">Captured incidents</button>
+          <button class="log-tab"        data-tab="replayindex" onclick="switchTab(this)">Replay Index</button>
           <button class="log-autoscroll on" id="asbtn" onclick="toggleAS()">⬇ Auto</button>
+          <button class="log-collapse-btn" id="logs-collapse-btn" title="Collapse / expand this panel" onclick="toggleLogsCollapsed()">▼</button>
         </div>
         <div id="incident-meta-strip" class="incident-meta-strip meta-pane collapsed" role="region" aria-label="Selected incident details" aria-expanded="false">
           <div id="incident-meta-strip-body"></div>
@@ -669,7 +699,11 @@ Sentry.init({
         <div class="log-pane incidents-pane" id="log-leaderboard">
           <div class="leaderboard-pane-stack">
             <div class="panel-title" style="margin-bottom:4px">
-              Incident leaderboard <span id="inc-count" style="color:var(--muted)">(0)</span>
+              Incidents <span id="inc-count" style="color:var(--muted)">(0)</span>
+            </div>
+            <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px">
+              Live points for other cars aren't exposed by iRacing's SDK — confirmed empirically, not just documented (see <code>live_yaml_incident_probe</code> in Grafana). Badges marked "pending" resolve to real 1×/2×/4× values only in the
+              <a href="#" onclick="goToReplayIndexTab(); return false" style="color:var(--accent)">Replay Index tab</a> after the session, via the official results.
             </div>
             <div class="inc-header">
               <div class="chips">
@@ -694,13 +728,108 @@ Sentry.init({
             <div class="inc-list" id="captured-list"></div>
           </div>
         </div>
+        <div class="log-pane incidents-pane" id="log-replayindex">
+          <div class="ri-pane-scroll">
+            <div class="ri-banner" id="ri-guard-banner" hidden></div>
+
+            <div class="ri-section">
+              <div class="ri-section-title">Build</div>
+              <div class="ri-row" style="margin-bottom:6px">
+                <span style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);align-self:center">Mode</span>
+                <button type="button" class="btn record" id="ri-btn-record" onclick="riToggleRecord()">⏺ Record</button>
+                <span class="ri-meta" id="ri-record-path" style="margin-left:2px"></span>
+              </div>
+              <div style="height:1px;background:var(--border);margin-bottom:10px"></div>
+              <div class="ri-row">
+                <button type="button" class="btn primary" id="ri-btn-start" onclick="riSendBuild('start')">Start index build</button>
+                <button type="button" class="btn" id="ri-btn-finalize" onclick="riSendBuild('finalize')" disabled>Stop &amp; save</button>
+                <button type="button" class="btn danger" id="ri-btn-cancel" onclick="riSendBuild('cancel')" disabled>Cancel</button>
+              </div>
+              <div class="ri-meta" id="ri-build-meta">Waiting for iRacing connection…</div>
+              <div style="height:1px;background:var(--border);margin:10px 0"></div>
+              <div class="ri-row" style="margin-bottom:0">
+                <input type="file" id="ri-file-index-input" accept=".json,application/json" hidden onchange="riOnFileInputChange(event)" />
+                <button type="button" class="btn" id="ri-btn-load-index" onclick="riLoadIndexFromFile()">Load from file…</button>
+                <button type="button" class="btn" id="ri-btn-view-live" onclick="riViewLive()" hidden>View live session</button>
+                <span class="ri-meta" id="ri-file-load-state" style="margin-left:2px"></span>
+              </div>
+            </div>
+
+            <div class="ri-section" id="ri-navigate-panel">
+              <div class="ri-section-title">Navigate incidents (field-wide, all cars)</div>
+              <div class="ri-row">
+                <button type="button" class="btn" id="ri-btn-prev-incident" onclick="riNavIncident('prev')" disabled>← Prev</button>
+                <button type="button" class="btn primary" id="ri-btn-next-incident" onclick="riNavIncident('next')" disabled>Next →</button>
+                <span class="ri-meta" id="ri-cursor-display" style="margin-left:4px">—</span>
+              </div>
+              <div class="ri-row">
+                <button type="button" class="btn" id="ri-btn-walk-start" onclick="riWalkStart()" disabled>▶ Auto-walk</button>
+                <button type="button" class="btn danger" id="ri-btn-walk-stop" onclick="riWalkStop()" disabled>■ Stop walk</button>
+              </div>
+              <div style="height:1px;background:var(--border);margin:6px 0 10px"></div>
+              <div class="ri-row">
+                <button type="button" class="btn primary" id="ri-btn-capture-all" onclick="riCaptureAll()" disabled style="white-space:nowrap">Capture all mine</button>
+                <button type="button" class="btn danger" id="ri-btn-capture-cancel" onclick="riCaptureCancel()" style="white-space:nowrap">Cancel capture</button>
+              </div>
+            </div>
+
+            <div class="ri-section" id="ri-summary-panel">
+              <div class="ri-section-title">Summary</div>
+              <div class="ri-grid-summary" id="ri-summary-grid"></div>
+            </div>
+
+            <div class="ri-section" id="ri-validation-panel">
+              <div class="ri-section-title">Validation &amp; discrepancies (TR-022)</div>
+              <div class="ri-grid-summary" id="ri-validation-grid"></div>
+              <div class="ri-table-wrap" id="ri-discrepancy-table-wrap" style="margin-top:10px">
+                <table class="ri-table">
+                  <thead>
+                    <tr>
+                      <th>carIdx</th>
+                      <th>driver</th>
+                      <th>detected</th>
+                      <th>yaml</th>
+                      <th>gap</th>
+                      <th>sourcesHit</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ri-discrepancy-tbody"></tbody>
+                </table>
+              </div>
+              <p class="ri-meta" id="ri-discrepancy-empty-hint" style="margin-top:8px">No validation data for this index.</p>
+            </div>
+
+            <div class="ri-section">
+              <div class="ri-section-title">Incidents (TR-020 / TR-032)</div>
+              <div class="ri-table-wrap">
+                <table class="ri-table">
+                  <thead>
+                    <tr>
+                      <th data-k="fingerprint">fingerprint</th>
+                      <th data-k="carIdx">carIdx</th>
+                      <th data-k="lap">lap</th>
+                      <th data-k="sessionTimeMs">sessionTimeMs</th>
+                      <th data-k="detectionSource">detectionSource</th>
+                      <th data-k="incidentPoints">incidentPoints</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ri-tbody"></tbody>
+                </table>
+              </div>
+              <p class="ri-meta" id="ri-empty-hint" style="margin-top:8px">No index loaded for this subsession. Run a build or open a replay with an existing JSON index.</p>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
-  </div>
+  </div><!-- /bottom-dock-rows -->
 
+  </div><!-- /content-col -->
 </div><!-- /app -->
 <div class="toast" id="toast"></div>
 
+<script src="dashboard-ui-events.js"></script>
 <script>
 // ── Config ──────────────────────────────────────────────
 const WS_PORT = 19847;
@@ -709,17 +838,14 @@ function wsUrl() {
   return 'ws://' + h + ':' + WS_PORT;
 }
 const LOG_MAX        = 500;
-const STEER_MAX_RAD = 7.0;
-/** 180° axis: 90° = straight; left end 0°, right end 180°; +vd = CW on gauge = toward 180° (steer right). */
-const STEER_AXIS_HALF_DEG = 90;
 
 // ── Mock data ────────────────────────────────────────────
 const MOCK_INC = [
-  { id:1, time:'12:34.5', car:99, driver:'J. Smith',  sev:4, cause:'contact',  frame:54321, lap:12, player:true  },
-  { id:2, time:'12:20.1', car:12, driver:'A. Jones',  sev:2, cause:'wall',     frame:52100, lap:11, player:false },
-  { id:3, time:'11:45.8', car:42, driver:'B. Lee',    sev:1, cause:'off-track',frame:48900, lap:11, player:false },
-  { id:4, time:'11:12.3', car:7,  driver:'M. Wilson', sev:4, cause:'contact',  frame:45200, lap:10, player:false },
-  { id:5, time:'10:55.0', car:99, driver:'J. Smith',  sev:2, cause:'spin',     frame:44100, lap:10, player:true  },
+  { id:1, time:'12:34.5', car:99, driver:'J. Smith',  points:4, cause:'contact',  frame:54321, lap:12, player:true  },
+  { id:2, time:'12:20.1', car:12, driver:'A. Jones',  points:2, cause:'wall',     frame:52100, lap:11, player:false },
+  { id:3, time:'11:45.8', car:42, driver:'B. Lee',    points:1, cause:'off-track',frame:48900, lap:11, player:false },
+  { id:4, time:'11:12.3', car:7,  driver:'M. Wilson', points:4, cause:'contact',  frame:45200, lap:10, player:false },
+  { id:5, time:'10:55.0', car:99, driver:'J. Smith',  points:2, cause:'spin',     frame:44100, lap:10, player:true  },
 ];
 const MOCK_DRV = [
   { pos:1, car:99, name:'J. Smith',  inc:6, player:true  },
@@ -727,13 +853,6 @@ const MOCK_DRV = [
   { pos:3, car:12, name:'A. Jones',  inc:2, player:false },
   { pos:4, car:42, name:'B. Lee',    inc:1, player:false },
 ];
-const MOCK_CAR_TELEM = [
-  { t:0.65, b:0.00, s: 0.30 },
-  { t:0.90, b:0.00, s:-1.20 },
-  { t:0.00, b:0.75, s: 2.10 },
-  { t:0.45, b:0.00, s:-3.50 },
-];
-
 // ── State ────────────────────────────────────────────────
 let incidents   = [...MOCK_INC];
 let drivers     = [...MOCK_DRV];
@@ -747,7 +866,6 @@ let activeTab   = 'events';
 let ws          = null;
 let mockTime    = 0;
 let mockPaused  = false;  // paused when real WS connected
-let mockTelem   = { t:0.65, b:0.00, s:0.30 };
 let replayPaused = false;
 let lastReplaySpeed = '1';
 /** Focus-car lap from plugin state (telemetry CarIdxLap); -1 if unknown. */
@@ -756,10 +874,11 @@ let lastLap = -1;
 let incidentMetaSelection = null;
 let selectedIncident = null;
 let cameraGroups = [];
-/** Latest telemetry object from plugin state (throttle, brake, steeringWheelAngle); null before first state. */
-let lastPluginTelemetry = null;
 /** Last replay frame number from plugin state (for capture walk handshake). */
 let lastPluginFrame = 0;
+/** Session Timeline (telem tab) transition tracking — last mode / replay-session identity seen from state messages. */
+let lastKnownMode = null;
+let lastKnownSessionKey = null;
 
 // ── WebSocket ────────────────────────────────────────────
 function connectWs() {
@@ -775,7 +894,6 @@ function connectWs() {
       selectedIncident = null;
       hideSelectedIncidentPanel();
       cameraGroups = [];
-      lastPluginTelemetry = null;
       renderInc();
       renderStd();
       log('health','INFO ','ws_connected','WebSocket connected to plugin at ' + url);
@@ -812,46 +930,59 @@ function send(action, arg) {
   return true;
 }
 
-/** Structured UI telemetry for Loki (plugin → plugin-structured.jsonl; ingestion outside plugin). */
-function sendDashboardUiEvent({ element_id, event_type, message, value }) {
-  if (typeof Sentry !== 'undefined') {
-    Sentry.addBreadcrumb({
-      category: 'ui.' + event_type,
-      message: message,
-      data: { element_id },
-      level: 'info',
-    });
-  }
-  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-  const o = { action: 'log', event: 'dashboard_ui_event', element_id, event_type, message };
-  if (value !== undefined && value !== null) o.value = value;
-  try {
-    ws.send(JSON.stringify(o));
-    return true;
-  } catch (err) {
-    if (typeof Sentry !== 'undefined') Sentry.captureException(err);
-    return false;
-  }
-}
+// sendDashboardUiEvent() now lives in dashboard-ui-events.js (shared across all dashboard pages).
 
 function onMsg(m) {
   if (!m || !m.type) return;
   if (m.type === 'state')         onState(m);
   else if (m.type === 'logEvents')  (m.entries || []).forEach(e => log('health', (e.level||'INFO').toUpperCase().padEnd(5), e.event||'', e.message||''));
   else if (m.type === 'incidents')  { incidents = m.entries || []; renderInc(); }
-  else if (m.type === 'iracingEvent') log('events','EVENT', m.event||'event', m.data||JSON.stringify(m));
-  else if (m.type === 'telemetryData') log('telem','DATA ', 'telemetry', fmtTelem(m));
+  else if (m.type === 'iracingEvent') {
+    log('events','EVENT', m.event||'event', m.data||JSON.stringify(m));
+    if (isSessionTimelineEvent(m.event)) log('telem','EVENT', m.event||'event', m.data||JSON.stringify(m));
+  }
   else if (m.type === 'actionResult') onActionResult(m);
   else if (m.type === 'pong') {}
+}
+
+/** Session Timeline tab: iracingEvent names that represent session/flag-level transitions, not per-tick telemetry. */
+function isSessionTimelineEvent(name) {
+  return /session|flag|state/i.test(String(name || ''));
 }
 
 /** Plugin ack for dashboard actions (see DashboardBridge.SendActionResult). */
 function onActionResult(m) {
   if (m.success) return;
   const err = m.error || '';
+  const action = m.action || '';
   if (err === 'not_connected') {
-    const a = m.action || 'unknown';
-    toast('Not connected — iRacing isn’t running or has no active session for this plugin. Open the sim or load a replay, then try again.', 4200, 'actionResult:not_connected:' + a);
+    toast('Not connected — iRacing isn’t running or has no active session for this plugin. Open the sim or load a replay, then try again.', 4200, 'actionResult:not_connected:' + action);
+    return;
+  }
+  if (action === 'replay_jump_next_driver_incident' || action === 'replay_jump_prev_driver_incident') {
+    const msgs = {
+      no_car_selected: 'No driver selected.',
+      no_incidents_for_car: 'This driver has no recorded incidents in the index.',
+      at_end: 'Already at this driver’s last incident.',
+      at_start: 'Already at this driver’s first incident.',
+      index_unavailable: 'No incident index yet — it builds automatically once a replay loads.',
+      seek_throttled: 'Seeking too fast — wait a moment and try again.'
+    };
+    toast(msgs[err] || ('Jump failed: ' + err), 3200, 'actionResult:' + action + ':' + err);
+    return;
+  }
+  if (action === 'replay_incident_index_build' || action === 'index_next_incident' || action === 'index_prev_incident'
+    || action === 'index_walk_start' || action === 'index_walk_stop' || action === 'capture_all_incidents') {
+    const msgs = {
+      not_replay_mode: 'Not in replay mode — load a replay first.',
+      build_in_progress: 'Index build already running.',
+      bad_arg: 'Bad request.',
+      no_subsession: 'No subsession id — load a replay session.',
+      not_fast_forwarding: 'No active build to finalize.',
+      no_index: 'No incident index yet — start a build first.',
+      seek_throttled: 'Seeking too fast — wait a moment and try again.',
+    };
+    toast(msgs[err] || ('Replay index: ' + err), 3200, 'actionResult:' + action + ':' + err);
   }
 }
 
@@ -877,7 +1008,8 @@ function onState(m) {
   setDot('d-irsdk',  d.irsdkConnected);
   setDot('d-steam',  d.steamRunning);
   setDot('d-simhub', d.simHubHttpListening);
-  if (m.telemetry) setTelem(m.telemetry.throttle||0, m.telemetry.brake||0, m.telemetry.steeringWheelAngle||0);
+  renderSimStewardStatus(d, m.replayIncidentIndex);
+  logSessionTimelineTransitions(mode, m);
   if (m.drivers && Array.isArray(m.drivers)) {
     drivers = m.drivers.map((d, ix) => ({
       pos: ix + 1,
@@ -897,11 +1029,51 @@ function onState(m) {
     const csel = document.getElementById('camera-sel');
     if (csel) csel.innerHTML = '';
   }
-  if (m.telemetry) lastPluginTelemetry = m.telemetry;
   if (typeof m.lap === 'number' && !Number.isNaN(m.lap)) lastLap = m.lap;
   else lastLap = -1;
   if (m.frame !== undefined) setFrame(m.frame, m.frameEnd);
   updateReplaySessionRow(m);
+  riOnState(m);
+}
+
+/** Sim Steward status panel: live-detector pill, replay-sweep phase pill, build info (state.diagnostics / state.replayIncidentIndex). */
+function renderSimStewardStatus(diag, ridx) {
+  const livePill = document.getElementById('ss-live-pill');
+  const liveText = document.getElementById('ss-live-text');
+  if (livePill && liveText) {
+    const active = !!(diag && diag.liveDetectorActive);
+    livePill.classList.toggle('on', active);
+    liveText.textContent = 'Live detector ' + (active ? 'active' : 'inactive');
+  }
+  const sweepPill = document.getElementById('ss-sweep-pill');
+  const sweepText = document.getElementById('ss-sweep-text');
+  if (sweepPill && sweepText) {
+    const phase = ridx && ridx.phase ? String(ridx.phase) : 'idle';
+    const active = phase !== 'idle';
+    sweepPill.hidden = !active;
+    sweepPill.classList.toggle('sweep', active);
+    sweepText.textContent = 'Sweep: ' + phase;
+  }
+  const buildEl = document.getElementById('ss-build-info');
+  if (buildEl) {
+    const sha = diag && diag.gitSha ? String(diag.gitSha).slice(0, 8) : '—';
+    const ts = diag && diag.buildTimestampUtc ? String(diag.buildTimestampUtc) : '—';
+    buildEl.textContent = 'build ' + sha + '  ·  ' + ts;
+  }
+}
+
+/** Session Timeline (telem tab): log a line whenever plugin mode or the active replay session identity changes. */
+function logSessionTimelineTransitions(mode, m) {
+  if (lastKnownMode !== null && lastKnownMode !== mode) {
+    log('telem', 'EVENT', 'mode_change', lastKnownMode + ' -> ' + mode);
+  }
+  lastKnownMode = mode;
+  const sessionKey = (typeof m.replaySessionNum === 'number' ? m.replaySessionNum : '—') + '|' + (m.replaySessionName || '—');
+  const sessionCount = typeof m.replaySessionCount === 'number' ? m.replaySessionCount : 0;
+  if (lastKnownSessionKey !== null && lastKnownSessionKey !== sessionKey && sessionCount > 0) {
+    log('telem', 'EVENT', 'session_change', 'Now viewing: ' + (m.replaySessionName || 'Session') + '  (num ' + m.replaySessionNum + ')');
+  }
+  lastKnownSessionKey = sessionKey;
 }
 
 function updateReplaySessionRow(m) {
@@ -921,6 +1093,416 @@ function updateReplaySessionRow(m) {
   if (el) el.textContent = name + ' (' + idx + '/' + cnt + ')';
 }
 
+// ── Replay Index tab (merged from replay-incident-index.html) ─────────────
+let riLastIdx = null;
+let riLastDiagnostics = null;
+let riLastSessionNum = 0;
+let riSortKey = 'sessionTimeMs';
+let riSortDir = 1;
+let riLastSeekAt = 0;
+let riLoadedFileIdx = null;
+let riViewSource = 'live'; // 'live' | 'file'
+const RI_MAX_INDEX_FILE_BYTES = 5 * 1024 * 1024;
+
+function riCurrentDisplayIndex(rii) {
+  if (riViewSource === 'file' && riLoadedFileIdx) return riLoadedFileIdx;
+  return rii && rii.index;
+}
+function riFileViewSubMatches(rii) {
+  if (!(riViewSource === 'file' && riLoadedFileIdx)) return true;
+  const fileSub = riLoadedFileIdx.subSessionId;
+  const liveSub = rii ? rii.subSessionId : null;
+  return fileSub != null && liveSub != null && String(fileSub) === String(liveSub);
+}
+
+function riOnState(m) {
+  const rii = m.replayIncidentIndex;
+  riLastSessionNum = m.replaySessionNum != null ? m.replaySessionNum : 0;
+  riLastDiagnostics = m.diagnostics || null;
+  if (!rii) return;
+  riLastIdx = rii;
+  riRenderGuard(rii, m.diagnostics);
+  riRenderBuild(rii);
+  riRenderSummary(rii);
+  riRenderValidation(rii);
+  riRenderTable(rii);
+  riUpdateNavigatePanel(rii, m.diagnostics);
+  riRefreshFileViewUi();
+  document.getElementById('ri-btn-record').classList.toggle('on', !!rii.recordMode);
+  const rp = rii.recordSamplePath || '';
+  document.getElementById('ri-record-path').textContent = rp ? ('Record file: ' + rp) : '';
+}
+
+function riRenderGuard(rii, diag) {
+  const el = document.getElementById('ri-guard-banner');
+  const ir = diag && diag.irsdkConnected;
+  if (!ir) {
+    el.hidden = false;
+    el.className = 'ri-banner err';
+    el.textContent = 'iRacing SDK not connected. Load iRacing with a replay; no index build runs in this state (TR-037).';
+    return;
+  }
+  if (!rii.isReplayMode) {
+    el.hidden = false;
+    el.className = 'ri-banner err';
+    el.textContent = 'Session is not replay mode (SimMode ≠ replay). Index build and replay seeks are disabled (TR-037).';
+    return;
+  }
+  el.hidden = true;
+}
+
+function riRenderBuild(rii) {
+  const phase = rii.phase || 'idle';
+  const busy = phase !== 'idle';
+  const hasIndex = !busy && rii.incidentCount != null && rii.incidentCount >= 0 && rii.index != null;
+  document.getElementById('ri-btn-start').disabled = busy;
+  document.getElementById('ri-btn-finalize').disabled = phase !== 'fast_forward';
+  document.getElementById('ri-btn-cancel').disabled = !busy;
+  const fe = rii.replayFrameEnd != null ? rii.replayFrameEnd : 0;
+  const el = document.getElementById('ri-build-meta');
+  if (phase === 'idle') {
+    if (hasIndex) {
+      el.innerHTML = '<strong>Complete</strong> &nbsp;|&nbsp; <strong>' + rii.incidentCount + ' incident' + (rii.incidentCount !== 1 ? 's' : '') + ' found</strong>';
+    } else {
+      const estSec = fe > 0 ? Math.round(fe / (60 * 16)) : null;
+      const estStr = estSec != null ? ' — est. ~' + estSec + 's at 16×' : '';
+      el.innerHTML = '<strong>Ready</strong>' + (fe > 0 ? ' &nbsp;|&nbsp; <strong>Frames:</strong> ' + fe + estStr : ' — waiting for replay data');
+    }
+  } else {
+    const elapsed = rii.buildElapsedMs != null ? rii.buildElapsedMs : 0;
+    const fr = rii.replayFrameNum != null ? rii.replayFrameNum : 0;
+    const prog = fe > 0 ? Math.round(100 * fr / fe) + '%' : '—';
+    el.innerHTML =
+      '<strong>Phase:</strong> ' + phase +
+      ' &nbsp;|&nbsp; <strong>Elapsed:</strong> ' + elapsed + ' ms' +
+      ' &nbsp;|&nbsp; <strong>Frame:</strong> ' + fr + ' / ' + fe + ' (' + prog + ')';
+  }
+}
+
+function riRenderSummary(rii) {
+  const g = document.getElementById('ri-summary-grid');
+  const ix = riCurrentDisplayIndex(rii);
+  if (!ix) {
+    g.innerHTML = '<div style="grid-column:1/-1;color:var(--muted)">No completed index for this context (build in progress or none yet).</div>';
+    return;
+  }
+  const byCar = ix.incidentCountByCarIdx || {};
+  const carBits = Object.keys(byCar).sort((a,b)=>+a-+b).map(k => '#' + k + ': ' + byCar[k]).join(' · ') || '—';
+  g.innerHTML =
+    '<div><span style="color:var(--muted)">subSessionId</span><br><strong>' + escapeHtmlForCaptured(ix.subSessionId) + '</strong></div>' +
+    '<div><span style="color:var(--muted)">indexBuildTimeMs</span><br><strong>' + escapeHtmlForCaptured(ix.indexBuildTimeMs) + '</strong></div>' +
+    '<div><span style="color:var(--muted)">totalRaceIncidents</span><br><strong>' + escapeHtmlForCaptured(ix.totalRaceIncidents) + '</strong></div>' +
+    '<div style="grid-column:1/-1"><span style="color:var(--muted)">incidentCountByCarIdx</span><br><strong style="font-size:0.74rem">' + escapeHtmlForCaptured(carBits) + '</strong></div>';
+}
+
+function riRenderValidation(rii) {
+  const g = document.getElementById('ri-validation-grid');
+  const tb = document.getElementById('ri-discrepancy-tbody');
+  const empty = document.getElementById('ri-discrepancy-empty-hint');
+  const ix = riCurrentDisplayIndex(rii);
+  const v = ix && ix.validation;
+  if (!v) {
+    g.innerHTML = '<div style="grid-column:1/-1;color:var(--muted)">No validation data for this index.</div>';
+    tb.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No validation data for this index.';
+    return;
+  }
+  const matchPct = v.cameraSeekMatchPercent != null ? v.cameraSeekMatchPercent.toFixed(1) + '%' : '—';
+  g.innerHTML =
+    '<div><span style="color:var(--muted)">yamlResultsAvailable</span><br><strong style="color:' +
+      (v.yamlResultsAvailable ? 'var(--green)' : 'var(--yellow)') + '">' + (v.yamlResultsAvailable ? 'yes' : 'no') + '</strong></div>' +
+    (v.yamlParseError ? '<div><span style="color:var(--muted)">yamlParseError</span><br><strong style="color:var(--red)">' + escapeHtmlForCaptured(v.yamlParseError) + '</strong></div>' : '') +
+    (v.yamlSessionNumUsed != null ? '<div><span style="color:var(--muted)">yamlSessionNumUsed</span><br><strong>' + escapeHtmlForCaptured(v.yamlSessionNumUsed) + '</strong></div>' : '') +
+    '<div><span style="color:var(--muted)">cameraSeekAttempted</span><br><strong>' + escapeHtmlForCaptured(v.cameraSeekAttempted) + '</strong></div>' +
+    '<div><span style="color:var(--muted)">cameraSeekMatches</span><br><strong>' + escapeHtmlForCaptured(v.cameraSeekMatches) + '</strong></div>' +
+    '<div><span style="color:var(--muted)">cameraSeekMatchPercent</span><br><strong>' + escapeHtmlForCaptured(matchPct) + '</strong></div>';
+
+  const rows = v.discrepancies || [];
+  if (!rows.length) {
+    tb.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No discrepancies recorded (all cars matched, or no YAML results available).';
+    return;
+  }
+  empty.hidden = true;
+  tb.innerHTML = rows.map((r) => {
+    const gapColor = r.gap > 0 ? 'var(--yellow)' : (r.gap < 0 ? 'var(--red)' : 'var(--green)');
+    const sources = escapeHtmlForCaptured(Object.keys(r.sourcesHit || {}).sort()
+      .map((k) => k + ':' + r.sourcesHit[k]).join(' · ') || '—');
+    return '<tr>' +
+      '<td>' + escapeHtmlForCaptured(r.carIdx) + '</td>' +
+      '<td>' + escapeHtmlForCaptured(r.displayName || '—') + '</td>' +
+      '<td>' + escapeHtmlForCaptured(r.detectedEventCount) + '</td>' +
+      '<td>' + escapeHtmlForCaptured(r.yamlIncidents) + '</td>' +
+      '<td style="color:' + gapColor + '">' + escapeHtmlForCaptured(r.gap) + '</td>' +
+      '<td class="ri-mono">' + sources + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function riFmtMs(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const r = ms % 1000;
+  return m + ':' + String(s % 60).padStart(2, '0') + '.' + String(r).padStart(3, '0');
+}
+
+function riFpShort(fp) {
+  if (!fp || fp.length < 20) return fp || '—';
+  return fp.slice(0, 10) + '…' + fp.slice(-8);
+}
+
+function riRenderTable(rii) {
+  const tb = document.getElementById('ri-tbody');
+  const empty = document.getElementById('ri-empty-hint');
+  const ix = riCurrentDisplayIndex(rii);
+  const rows = (ix && ix.incidents) ? ix.incidents.slice() : [];
+  const rowsActive = riFileViewSubMatches(rii);
+  if (!rows.length) {
+    tb.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = (riViewSource === 'file')
+      ? 'Loaded file contains no incidents.'
+      : 'No index loaded for this subsession. Run a build or open a replay with an existing JSON index.';
+    return;
+  }
+  empty.hidden = true;
+  rows.sort((a, b) => {
+    const av = a[riSortKey];
+    const bv = b[riSortKey];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * riSortDir;
+    return String(av).localeCompare(String(bv)) * riSortDir;
+  });
+  const disAttr = rowsActive ? '' : ' disabled title="Loaded file is for a different subsession — Seek/Capture disabled"';
+  tb.innerHTML = rows.map((r) => {
+    const pts = r.incidentPoints == null ? 'null' : String(r.incidentPoints);
+    const arg = JSON.stringify({ sessionTimeMs: r.sessionTimeMs, sessionNum: riLastSessionNum, carIdx: r.carIdx });
+    return '<tr>' +
+      '<td class="ri-mono ri-fp" title="' + escapeHtmlForCaptured(r.fingerprint || '') + '">' + escapeHtmlForCaptured(riFpShort(r.fingerprint)) + '</td>' +
+      '<td>' + escapeHtmlForCaptured(r.carIdx) + '</td>' +
+      '<td>' + escapeHtmlForCaptured(r.lap != null && r.lap !== -1 ? r.lap : '—') + '</td>' +
+      '<td class="ri-mono">' + escapeHtmlForCaptured(r.sessionTimeMs) + ' <span style="color:var(--muted)">(' + escapeHtmlForCaptured(riFmtMs(r.sessionTimeMs)) + ')</span></td>' +
+      '<td>' + escapeHtmlForCaptured(r.detectionSource || '') + '</td>' +
+      '<td>' + escapeHtmlForCaptured(pts) + '</td>' +
+      '<td style="white-space:nowrap">' +
+      '<button type="button" class="btn primary" style="padding:4px 8px;font-size:0.65rem;white-space:nowrap" data-seek="' +
+      encodeURIComponent(arg) + '" onclick="window._riSeek(this)"' + disAttr + '>Seek</button>' +
+      ' <button type="button" class="btn" style="padding:4px 8px;font-size:0.65rem;white-space:nowrap" data-cap="' +
+      encodeURIComponent(JSON.stringify({frame:r.replayFrame??-1,camera:'',car:r.carIdx,fingerprint:r.fingerprint||'',sessionTimeMs:r.sessionTimeMs??-1,carIdx:r.carIdx,lap:r.lap??-1,incidentPoints:r.incidentPoints??0,detectionSource:r.detectionSource||''})) +
+      '" onclick="window._riCapture(this)"' + disAttr + '>Capture</button>' +
+      '</td></tr>';
+  }).join('');
+}
+
+window._riSeek = function (btn) {
+  riSeekRow(decodeURIComponent(btn.getAttribute('data-seek')));
+};
+
+window._riCapture = function (btn) {
+  const argJson = decodeURIComponent(btn.getAttribute('data-cap'));
+  sendDashboardUiEvent({ element_id: 'ri-row-capture', event_type: 'click', message: 'Capture incident row' });
+  send('capture_incident', argJson);
+};
+
+function riSeekRow(argJson) {
+  if (!riLastIdx || !riLastIdx.isReplayMode) {
+    toast('Seek unavailable (not replay mode).', undefined, 'ri-seek-unavailable');
+    return;
+  }
+  if (Date.now() - riLastSeekAt < 800) { toast('Seek cooldown — wait a moment.', undefined, 'ri-seek-cooldown'); return; }
+  riLastSeekAt = Date.now();
+  send('replay_incident_index_seek', argJson);
+}
+
+function riSendBuild(verb) {
+  sendDashboardUiEvent({ element_id: 'ri-btn-' + verb, event_type: 'click', message: 'Replay index build: ' + verb });
+  send('replay_incident_index_build', verb);
+}
+
+function riToggleRecord() {
+  const on = riLastIdx && riLastIdx.recordMode;
+  sendDashboardUiEvent({ element_id: 'ri-btn-record', event_type: 'click', message: 'Replay index record: ' + (on ? 'off' : 'on') });
+  send('replay_incident_index_record', on ? 'off' : 'on');
+}
+
+function riNavIncident(dir) {
+  if (Date.now() - riLastSeekAt < 800) { toast('Seek cooldown.', undefined, 'ri-seek-cooldown'); return; }
+  riLastSeekAt = Date.now();
+  sendDashboardUiEvent({ element_id: 'ri-btn-' + dir + '-incident', event_type: 'click', message: dir + ' incident (field-wide)' });
+  send(dir === 'next' ? 'index_next_incident' : 'index_prev_incident', '');
+}
+
+function riWalkStart() {
+  sendDashboardUiEvent({ element_id: 'ri-btn-walk-start', event_type: 'click', message: 'auto-walk start' });
+  send('index_walk_start', '');
+}
+
+function riWalkStop() {
+  sendDashboardUiEvent({ element_id: 'ri-btn-walk-stop', event_type: 'click', message: 'auto-walk stop' });
+  send('index_walk_stop', '');
+}
+
+function riCaptureAll() {
+  sendDashboardUiEvent({ element_id: 'ri-btn-capture-all', event_type: 'click', message: 'Capture all my incidents' });
+  send('capture_all_incidents', '');
+}
+
+function riCaptureCancel() {
+  sendDashboardUiEvent({ element_id: 'ri-btn-capture-cancel', event_type: 'click', message: 'Cancel capture queue' });
+  if (capturing) stopCapture();
+  send('capture_cancel', '');
+}
+
+function riUpdateNavigatePanel(rii, diag) {
+  const connected = diag && diag.irsdkConnected;
+  const replayOk = connected && rii && rii.isReplayMode;
+  const hasIndex = replayOk && rii.incidentCount > 0;
+  const cursor = rii && rii.cursorIdx != null ? rii.cursorIdx : -1;
+  const count = rii && rii.incidentCount != null ? rii.incidentCount : 0;
+  const walking = rii && rii.autoWalkActive;
+
+  // Nav buttons rely on the plugin's cursor (live state), so they only make sense in live view
+  // OR when a loaded file's subsession matches the current iRacing replay.
+  const navOk = riFileViewSubMatches(rii);
+
+  document.getElementById('ri-btn-prev-incident').disabled = !hasIndex || !navOk;
+  document.getElementById('ri-btn-next-incident').disabled = !hasIndex || !navOk;
+  document.getElementById('ri-btn-walk-start').disabled = !hasIndex || walking || !navOk;
+  document.getElementById('ri-btn-walk-stop').disabled = !walking;
+  document.getElementById('ri-btn-capture-all').disabled = !connected || !navOk;
+
+  // When viewing a matching file, show the file's incident count instead of the plugin's count.
+  if (riViewSource === 'file' && riLoadedFileIdx && navOk) {
+    const fileCount = (riLoadedFileIdx.incidents || []).length;
+    document.getElementById('ri-cursor-display').textContent =
+      fileCount > 0 ? '— of ' + fileCount + ' (file)' : '—';
+  } else {
+    document.getElementById('ri-cursor-display').textContent =
+      count > 0 && cursor >= 0 ? '#' + (cursor + 1) + ' of ' + count : (count > 0 ? '— of ' + count : '—');
+  }
+}
+
+function riLoadIndexFromFile() {
+  sendDashboardUiEvent({ element_id: 'ri-btn-load-index', event_type: 'click', message: 'Open file picker for index JSON' });
+  const input = document.getElementById('ri-file-index-input');
+  input.value = ''; // ensure re-selecting same file fires change
+  input.click();
+}
+
+function riOnFileInputChange(evt) {
+  const f = evt.target.files && evt.target.files[0];
+  if (!f) {
+    sendDashboardUiEvent({ element_id: 'ri-file-index-load-cancelled', event_type: 'ui_interaction', message: 'No file selected' });
+    return;
+  }
+  if (f.size > RI_MAX_INDEX_FILE_BYTES) {
+    sendDashboardUiEvent({ element_id: 'ri-file-index-load-failed', event_type: 'ui_interaction', message: 'File too large: ' + f.size + ' bytes (max ' + RI_MAX_INDEX_FILE_BYTES + ')' });
+    toast('File too large (max 5 MB).', undefined, 'ri-file-too-large');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = () => {
+    sendDashboardUiEvent({ element_id: 'ri-file-index-load-failed', event_type: 'ui_interaction', message: 'FileReader error: ' + ((reader.error && reader.error.message) || 'unknown') });
+    toast('Could not read file.', undefined, 'ri-file-read-error');
+  };
+  reader.onload = () => {
+    let parsed;
+    try { parsed = JSON.parse(reader.result); }
+    catch (e) {
+      const msg = (e && e.message) || 'parse error';
+      sendDashboardUiEvent({ element_id: 'ri-file-index-load-failed', event_type: 'ui_interaction', message: 'JSON parse error: ' + msg });
+      toast('Invalid JSON: ' + msg, undefined, 'ri-file-parse-error');
+      return;
+    }
+    const err = riValidateIndexShape(parsed);
+    if (err) {
+      sendDashboardUiEvent({ element_id: 'ri-file-index-load-failed', event_type: 'ui_interaction', message: 'Validation failed: ' + err });
+      toast('Index validation failed: ' + err, undefined, 'ri-file-validation-error');
+      return;
+    }
+    riLoadedFileIdx = parsed;
+    riViewSource = 'file';
+    const cnt = (parsed.incidents || []).length;
+    sendDashboardUiEvent({
+      element_id: 'ri-file-index-loaded',
+      event_type: 'ui_interaction',
+      message: 'Loaded file=' + (f.name || '?') + ' subSessionId=' + parsed.subSessionId + ' incidents=' + cnt
+    });
+    toast('Loaded ' + cnt + ' incident' + (cnt !== 1 ? 's' : '') + ' from ' + f.name, undefined, 'ri-file-loaded');
+    riRefreshFileViewUi();
+    if (riLastIdx) {
+      riRenderSummary(riLastIdx);
+      riRenderTable(riLastIdx);
+      riRenderValidation(riLastIdx);
+      riUpdateNavigatePanel(riLastIdx, riLastDiagnostics);
+    } else {
+      // No live state yet — still render summary/table from file
+      const synthetic = { index: null, incidentCount: cnt };
+      riRenderSummary(synthetic);
+      riRenderTable(synthetic);
+      riRenderValidation(synthetic);
+    }
+  };
+  reader.readAsText(f);
+}
+
+function riValidateIndexShape(o) {
+  if (!o || typeof o !== 'object') return 'not an object';
+  if (o.subSessionId == null || o.subSessionId === '') return 'missing subSessionId';
+  if (!Array.isArray(o.incidents)) return 'missing or invalid incidents array';
+  for (let i = 0; i < o.incidents.length; i++) {
+    const r = o.incidents[i];
+    if (!r || typeof r !== 'object') return 'incidents[' + i + '] not an object';
+    if (typeof r.carIdx !== 'number') return 'incidents[' + i + '].carIdx not numeric';
+    if (typeof r.sessionTimeMs !== 'number') return 'incidents[' + i + '].sessionTimeMs not numeric';
+  }
+  return null;
+}
+
+function riViewLive() {
+  sendDashboardUiEvent({ element_id: 'ri-btn-view-live', event_type: 'click', message: 'Return to live session view' });
+  riLoadedFileIdx = null;
+  riViewSource = 'live';
+  riRefreshFileViewUi();
+  if (riLastIdx) {
+    riRenderSummary(riLastIdx);
+    riRenderTable(riLastIdx);
+    riRenderValidation(riLastIdx);
+    riUpdateNavigatePanel(riLastIdx, riLastDiagnostics);
+  }
+}
+
+function riRefreshFileViewUi() {
+  const btnLive = document.getElementById('ri-btn-view-live');
+  const state = document.getElementById('ri-file-load-state');
+  if (riViewSource === 'file' && riLoadedFileIdx) {
+    btnLive.hidden = false;
+    const fileSub = riLoadedFileIdx.subSessionId;
+    const liveSub = riLastIdx ? riLastIdx.subSessionId : null;
+    const match = liveSub != null && String(liveSub) === String(fileSub);
+    const color = match ? 'var(--green)' : 'var(--yellow)';
+    state.innerHTML = '<strong style="color:' + color + '">Viewing file:</strong> subSessionId=' + escapeHtmlForCaptured(fileSub) +
+      (match ? ' <span style="color:var(--muted)">(matches current)</span>'
+             : ' <span style="color:var(--muted)">(≠ current ' + escapeHtmlForCaptured(liveSub != null ? liveSub : '—') + ' — Seek disabled)</span>');
+  } else {
+    btnLive.hidden = true;
+    state.textContent = '';
+  }
+}
+
+document.querySelectorAll('#log-replayindex th[data-k]').forEach((th) => {
+  th.addEventListener('click', () => {
+    const k = th.getAttribute('data-k');
+    if (riSortKey === k) riSortDir = -riSortDir;
+    else { riSortKey = k; riSortDir = 1; }
+    if (riLastIdx) riRenderTable(riLastIdx);
+  });
+});
+
 // ── Diag dots ────────────────────────────────────────────
 function setDot(id, ok) {
   const el = document.getElementById(id);
@@ -937,7 +1519,7 @@ function getFilteredIncidents() {
   return incidents.filter(i => {
     if (incFilter === 'all') return true;
     if (incFilter === 'player') return i.player;
-    return String(i.sev) === incFilter;
+    return String(i.points) === incFilter;
   });
 }
 
@@ -963,26 +1545,74 @@ function applySuggestedCamerasToIncidents() {
   }
 }
 
+/**
+ * Renders a points badge. `pointsResolved === false` means "not yet known" (structurally
+ * unavailable live for other cars — see docs/IRACING-DATA-AVAILABILITY.md), never "confirmed
+ * zero" — shown distinctly from a real 1x/2x/4x value rather than defaulting to a misleading "0×".
+ */
+function pointsBadgeHtml(i) {
+  if (!i.pointsResolved) {
+    return `<span class="points-badge pending" title="Not yet known — other cars' real incident points aren't exposed live by iRacing's SDK. Check the Replay Index tab after the session for the authoritative count.">pending</span>`;
+  }
+  return `<span class="points-badge s${escapeHtmlForCaptured(i.points)}">${escapeHtmlForCaptured(i.points)}×</span>`;
+}
+
 function incidentCardHtml(i) {
   const lapStr = (typeof i.lap === 'number' && i.lap >= 0) ? ` · L${i.lap}` : '';
+  const frame = Number(i.frame) || 0;
+  const cause = String(i.cause || 'unknown');
   return `
-    <div class="inc-card${i.player ? ' player' : ''}" data-frame="${i.frame}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onSessionIncidentClick(${i.frame})}" onclick="onSessionIncidentClick(${i.frame})">
-      <span class="car-num">#${i.car}</span>
-      <span class="inc-name">${i.driver}</span>
-      <span class="cause-tag ${i.cause}">${i.cause.replace('-', ' ')}</span>
-      <span class="sev-badge s${i.sev}">${i.sev}×</span>
-      <span class="inc-time">${i.time}${lapStr}</span>
+    <div class="inc-card${i.player ? ' player' : ''}" data-frame="${frame}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onSessionIncidentClick(${frame})}" onclick="onSessionIncidentClick(${frame})">
+      <span class="car-num">#${escapeHtmlForCaptured(i.car)}</span>
+      <span class="inc-name">${escapeHtmlForCaptured(i.driver)}</span>
+      <span class="cause-tag ${escapeHtmlForCaptured(cause)}">${escapeHtmlForCaptured(cause.replace('-', ' '))}</span>
+      ${pointsBadgeHtml(i)}
+      <span class="inc-time">${escapeHtmlForCaptured(i.time)}${escapeHtmlForCaptured(lapStr)}</span>
     </div>`;
+}
+
+/**
+ * One row of the Incidents tab table. Columns reflect exactly what the `incidents` WS entry
+ * shape carries today (car, driver, cause, points, time, lap, frame, player) — no fingerprint or
+ * detection_source per-incident yet, so those columns are omitted rather than invented; see the
+ * note rendered under the table.
+ */
+/** Escape untrusted string values before HTML interpolation (driver names, causes, etc. can contain arbitrary text). */
+function escapeHtmlForCaptured(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function incidentTableRowHtml(i) {
+  const lapStr = (typeof i.lap === 'number' && i.lap >= 0) ? i.lap : '—';
+  const cause = String(i.cause || 'unknown');
+  const frame = Number(i.frame) || 0;
+  return `
+    <tr class="inc-row${i.player ? ' player' : ''}" data-frame="${frame}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onSessionIncidentClick(${frame})}" onclick="onSessionIncidentClick(${frame})">
+      <td class="inc-row-driver">${escapeHtmlForCaptured(i.driver)}</td>
+      <td class="inc-row-car">#${escapeHtmlForCaptured(i.car)}</td>
+      <td><span class="cause-tag ${escapeHtmlForCaptured(cause)}">${escapeHtmlForCaptured(cause.replace('-', ' '))}</span></td>
+      <td>${pointsBadgeHtml(i)}</td>
+      <td class="inc-row-time">${escapeHtmlForCaptured(i.time)}</td>
+      <td class="inc-row-lap">${escapeHtmlForCaptured(lapStr)}</td>
+    </tr>`;
+}
+
+function incidentTableHtml(filtered) {
+  if (!filtered.length) return '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No incidents</div>';
+  return `
+    <table class="inc-table">
+      <thead><tr><th>Driver</th><th>Car #</th><th>Type</th><th>Points</th><th>Session Time</th><th>Lap</th></tr></thead>
+      <tbody>${filtered.map(incidentTableRowHtml).join('')}</tbody>
+    </table>
+    <div class="inc-table-note">Fingerprint / detection source aren't in this WS feed yet — shown here once the plugin includes them per-incident.</div>`;
 }
 
 function renderInc() {
   applySuggestedCamerasToIncidents();
   const filtered = getFilteredIncidents();
   const count = '(' + filtered.length + ')';
-  const empty = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:18px 0">No incidents</div>';
-  const html = !filtered.length ? empty : filtered.map(incidentCardHtml).join('');
   document.getElementById('inc-count').textContent = count;
-  document.getElementById('inc-list').innerHTML = html;
+  document.getElementById('inc-list').innerHTML = incidentTableHtml(filtered);
   renderDriverIncidents();
   if (!incidents.length && incidentMetaSelection && incidentMetaSelection.kind === 'session') {
     incidentMetaSelection = null;
@@ -1020,6 +1650,7 @@ function populateCarDropdown(driversArr) {
   if (!driversArr.length) {
     sel.innerHTML = '';
     renderDriverIncidents();
+    refreshDriverIncidentButtons();
     return;
   }
   const prevCar = getSelectedCarNumber();
@@ -1038,6 +1669,7 @@ function populateCarDropdown(driversArr) {
     }
   }
   renderDriverIncidents();
+  refreshDriverIncidentButtons();
 }
 
 function populateCameraDropdown() {
@@ -1063,10 +1695,10 @@ function showSelectedIncidentPanel(i) {
     const drvEsc = escapeHtmlForCaptured(String(i.driver || ''));
     const causeEsc = escapeHtmlForCaptured(causeDisp);
     const timeEsc = escapeHtmlForCaptured(String(i.time || ''));
-    const sev = [1, 2, 4].includes(+i.sev) ? +i.sev : 1;
+    const points = [1, 2, 4].includes(+i.points) ? +i.points : 1;
     meta.innerHTML =
       `<strong>#${carEsc}</strong> ${drvEsc}&nbsp;` +
-      `<span class="sev-badge s${sev}">${sev}×</span>&nbsp;` +
+      `<span class="points-badge s${points}">${points}×</span>&nbsp;` +
       `<span class="cause-tag ${causeClass}">${causeEsc}</span>&nbsp;` +
       `<span style="color:var(--muted)">${timeEsc}</span>`;
   }
@@ -1167,7 +1799,7 @@ function enrichCaptureRecord(frameNum, sessionTime, seq) {
       capturedAt: Date.now(),
       car: match.car,
       driver: match.driver,
-      sev: match.sev,
+      points: match.points,
       cause: match.cause,
       player: !!match.player,
       lap: lapVal
@@ -1180,7 +1812,7 @@ function enrichCaptureRecord(frameNum, sessionTime, seq) {
     capturedAt: Date.now(),
     car: null,
     driver: 'Unknown',
-    sev: 1,
+    points: 1,
     cause: 'unknown',
     player: false,
     lap: lapVal
@@ -1188,20 +1820,21 @@ function enrichCaptureRecord(frameNum, sessionTime, seq) {
 }
 
 function capturedRowHtml(rec) {
-  const sev = [1, 2, 4].includes(+rec.sev) ? +rec.sev : 1;
+  const points = [1, 2, 4].includes(+rec.points) ? +rec.points : 1;
   const raw = String(rec.cause || 'unknown');
   const cause = raw.replace(/[^a-z-]/gi, '') || 'unknown';
   const car = rec.car != null ? rec.car : '—';
   const player = !!rec.player;
   const label = cause.replace(/-/g, ' ');
   const lapStr = (typeof rec.lap === 'number' && rec.lap >= 0) ? ` · L${rec.lap}` : '';
+  const seq = Number(rec.seq) || 0;
   return `
-    <div class="inc-card${player ? ' player' : ''}" data-cap-seq="${rec.seq}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onCapturedIncidentClick(${rec.seq})}" onclick="onCapturedIncidentClick(${rec.seq})">
-      <span class="car-num">#${car}</span>
-      <span class="inc-name">${rec.driver}</span>
-      <span class="cause-tag ${cause}">${label}</span>
-      <span class="sev-badge s${sev}">${sev}×</span>
-      <span class="inc-time">${rec.sessionTime}${lapStr}</span>
+    <div class="inc-card${player ? ' player' : ''}" data-cap-seq="${seq}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onCapturedIncidentClick(${seq})}" onclick="onCapturedIncidentClick(${seq})">
+      <span class="car-num">#${escapeHtmlForCaptured(car)}</span>
+      <span class="inc-name">${escapeHtmlForCaptured(rec.driver)}</span>
+      <span class="cause-tag ${escapeHtmlForCaptured(cause)}">${escapeHtmlForCaptured(label)}</span>
+      <span class="points-badge s${escapeHtmlForCaptured(points)}">${escapeHtmlForCaptured(points)}×</span>
+      <span class="inc-time">${escapeHtmlForCaptured(rec.sessionTime)}${escapeHtmlForCaptured(lapStr)}</span>
     </div>`;
 }
 
@@ -1259,14 +1892,6 @@ function renderCaptured() {
   if (activeTab === 'captured' && autoScroll) el.scrollTop = el.scrollHeight;
 }
 
-function escapeHtmlForCaptured(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function capturedGroupHdrKeydown(e) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
@@ -1317,13 +1942,13 @@ function toggleCapturedGroup() {
 function formatIncidentMetaHtml(i) {
   const id = i.id != null ? String(i.id) : '—';
   const cap = i._capture
-    ? `<div class="im-row im-row-muted">Scan step #${id} · captured ${i.capturedAt ? new Date(i.capturedAt).toLocaleTimeString() : '—'}</div>`
+    ? `<div class="im-row im-row-muted">Scan step #${escapeHtmlForCaptured(id)} · captured ${i.capturedAt ? escapeHtmlForCaptured(new Date(i.capturedAt).toLocaleTimeString()) : '—'}</div>`
     : '';
   return `<div class="im-block im-block-single">
-    <div class="im-meta-hdr">Incident ${id} · session ${i.time}</div>
+    <div class="im-meta-hdr">Incident ${escapeHtmlForCaptured(id)} · session ${escapeHtmlForCaptured(i.time)}</div>
     ${cap}
-    <div class="im-row"><strong>Frame</strong> <code>${i.frame}</code> · <strong>lap</strong> ${(typeof i.lap === 'number' && i.lap >= 0) ? i.lap : '—'} · <strong>car</strong> #${i.car} · <strong>driver</strong> ${i.driver}</div>
-    <div class="im-row"><strong>Severity</strong> ${i.sev}× · <strong>cause</strong> ${String(i.cause).replace(/-/g, ' ')} · <strong>you</strong> ${i.player ? 'yes' : 'no'}</div>
+    <div class="im-row"><strong>Frame</strong> <code>${escapeHtmlForCaptured(i.frame)}</code> · <strong>lap</strong> ${(typeof i.lap === 'number' && i.lap >= 0) ? escapeHtmlForCaptured(i.lap) : '—'} · <strong>car</strong> #${escapeHtmlForCaptured(i.car)} · <strong>driver</strong> ${escapeHtmlForCaptured(i.driver)}</div>
+    <div class="im-row"><strong>Points</strong> ${i.pointsResolved ? escapeHtmlForCaptured(i.points) + '×' : 'pending'} · <strong>cause</strong> ${escapeHtmlForCaptured(String(i.cause).replace(/-/g, ' '))} · <strong>you</strong> ${i.player ? 'yes' : 'no'}</div>
     <div class="im-future">Nearby cars / other party (e.g. proximity): reserved for future telemetry.</div>
   </div>`;
 }
@@ -1350,11 +1975,11 @@ function collapseIncidentMetaStrip() {
 }
 
 function highlightIncidentCards(frame, capSeq) {
-  document.querySelectorAll('.inc-card[data-frame]').forEach(el => {
+  document.querySelectorAll('.inc-card[data-frame], .inc-row[data-frame]').forEach(el => {
     const match = capSeq == null && frame != null && +el.dataset.frame === frame;
     el.classList.toggle('inc-card-expanded', match);
   });
-  document.querySelectorAll('.inc-card[data-cap-seq]').forEach(el => {
+  document.querySelectorAll('.inc-card[data-cap-seq], .inc-row[data-cap-seq]').forEach(el => {
     const match = capSeq != null && +el.dataset.capSeq === capSeq;
     el.classList.toggle('inc-card-expanded', match);
   });
@@ -1420,7 +2045,7 @@ function onCapturedIncidentClick(seq) {
     time: r.sessionTime,
     car: r.car != null ? r.car : '—',
     driver: r.driver,
-    sev: r.sev,
+    points: r.points,
     cause: r.cause,
     player: !!r.player,
     frame: r.frame,
@@ -1466,88 +2091,87 @@ function renderStd() {
   document.getElementById('std-list').innerHTML = drivers.map(d => {
     const cls = d.inc===0?'zero':d.inc<=2?'low':d.inc<=4?'mid':'high';
     return `<div class="std-row${d.player?' player':''}">
-      <span class="std-pos">${d.pos}</span>
-      <span class="car-num">#${d.car}</span>
-      <span>${d.name}</span>
-      <span class="std-inc ${cls}">${d.inc}x</span>
+      <span class="std-pos">${escapeHtmlForCaptured(d.pos)}</span>
+      <span class="car-num">#${escapeHtmlForCaptured(d.car)}</span>
+      <span>${escapeHtmlForCaptured(d.name)}</span>
+      <span class="std-inc ${escapeHtmlForCaptured(cls)}">${escapeHtmlForCaptured(d.inc)}x</span>
     </div>`;
   }).join('');
 }
 function toggleStd() {
   const el = document.getElementById('std-panel');
   el.classList.toggle('open');
+  const collapsed = !el.classList.contains('open');
+  // Hand the freed vertical space to the logs/incidents dock (and take it back on expand).
+  const cc = document.querySelector('.content-col');
+  if (cc) cc.classList.toggle('standings-collapsed', collapsed);
   sendDashboardUiEvent({
     element_id: 'standings-panel',
     event_type: 'click',
     message: 'Driver standings toggle',
-    value: el.classList.contains('open') ? 'open' : 'collapsed'
+    value: collapsed ? 'collapsed' : 'open'
   });
 }
 
-// ── Telemetry ────────────────────────────────────────────
-function setTelem(t, b, sRad) {
-  const tp = Math.round(t*100), bp = Math.round(b*100);
-  document.getElementById('thr-bar').style.width = tp+'%';
-  document.getElementById('thr-pct').textContent  = tp+'%';
-  document.getElementById('brk-bar').style.width = bp+'%';
-  document.getElementById('brk-pct').textContent  = bp+'%';
-  updateWheel(sRad);
-}
-
-function formatSteerDeviation(vd) {
-  const a = Math.abs(vd);
-  if (a < 0.05) return '0°';
-  const mag = a < 10 ? String(+a.toFixed(1)).replace(/\.0$/, '') : String(Math.round(a));
-  return vd > 0 ? mag + '° R' : mag + '° L';
-}
-
-function updateWheel(sRad) {
-  const vd = Math.max(
-    -STEER_AXIS_HALF_DEG,
-    Math.min(STEER_AXIS_HALF_DEG, (sRad / STEER_MAX_RAD) * STEER_AXIS_HALF_DEG)
-  );
-  document.getElementById('g-needle').setAttribute('transform', `rotate(${vd},65,72)`);
-  const arc = document.getElementById('g-active');
-  arc.setAttribute('d', Math.abs(vd) < 0.5 ? '' : arcPath(65, 72, 55, 0, vd));
-  document.getElementById('g-angle').textContent = formatSteerDeviation(vd);
-}
-
-// SVG arc helper: 0°=up, +ve=clockwise
-function pxy(cx,cy,r,a) {
-  const rad=(a-90)*Math.PI/180;
-  return [cx+r*Math.cos(rad), cy+r*Math.sin(rad)];
-}
-function arcPath(cx,cy,r,a0,a1) {
-  const [sx,sy]=pxy(cx,cy,r,a0), [ex,ey]=pxy(cx,cy,r,a1);
-  const d=a1-a0, large=Math.abs(d)>180?1:0, sweep=d>0?1:0;
-  return `M ${sx.toFixed(2)},${sy.toFixed(2)} A ${r},${r} 0 ${large},${sweep} ${ex.toFixed(2)},${ey.toFixed(2)}`;
+function toggleLogsCollapsed() {
+  const cc = document.querySelector('.content-col');
+  if (!cc) return;
+  const collapsed = cc.classList.toggle('logs-collapsed');
+  const btn = document.getElementById('logs-collapse-btn');
+  if (btn) { btn.textContent = collapsed ? '▲' : '▼'; btn.title = collapsed ? 'Expand this panel' : 'Collapse this panel'; }
+  sendDashboardUiEvent({
+    element_id: 'logs-collapse-btn',
+    event_type: 'click',
+    message: 'Logs/incidents dock ' + (collapsed ? 'collapsed' : 'expanded'),
+    value: collapsed ? 'collapsed' : 'expanded'
+  });
 }
 
 function onCarSel() {
   const sel = document.getElementById('car-sel');
   const carIdx = +sel.value;
   const opt = sel.options[sel.selectedIndex];
-  if (ws && ws.readyState === WebSocket.OPEN && mockPaused && lastPluginTelemetry) {
-    const t = lastPluginTelemetry;
-    mockTelem = {
-      t: t.throttle != null ? t.throttle : 0,
-      b: t.brake != null ? t.brake : 0,
-      s: t.steeringWheelAngle != null ? t.steeringWheelAngle : 0
-    };
-    setTelem(mockTelem.t, mockTelem.b, mockTelem.s);
-  } else {
-    const ix = sel.selectedIndex >= 0 ? sel.selectedIndex % MOCK_CAR_TELEM.length : 0;
-    const m = MOCK_CAR_TELEM[ix];
-    mockTelem = m;
-    setTelem(m.t, m.b, m.s);
-  }
   renderDriverIncidents();
+  refreshDriverIncidentButtons();
   sendDashboardUiEvent({
     element_id: 'telemetry-car-sel',
     event_type: 'change',
     message: 'Telemetry car: ' + (opt ? opt.textContent.trim() : ''),
     value: String(carIdx)
   });
+}
+
+/** SDK CarIdx of the selected driver, or -1 if none selected (empty dropdown / no session). */
+function getSelectedCarIdx() {
+  const sel = document.getElementById('car-sel');
+  if (!sel || sel.selectedIndex < 0 || !sel.options.length) return -1;
+  const v = +sel.value;
+  return Number.isInteger(v) && v >= 0 ? v : -1;
+}
+
+/** Enable "Prev/Next driver incident" and "Walk this car's listed incidents" only when a real driver is selected. */
+function refreshDriverIncidentButtons() {
+  const disabled = getSelectedCarIdx() < 0;
+  const prev = document.getElementById('btn-prev-driver-incident');
+  const next = document.getElementById('btn-next-driver-incident');
+  const capBtn = document.getElementById('cap-btn');
+  if (prev) prev.disabled = disabled;
+  if (next) next.disabled = disabled;
+  if (capBtn && !capturing) capBtn.disabled = disabled;
+}
+
+function jumpDriverIncident(dir) {
+  const carIdx = getSelectedCarIdx();
+  if (carIdx < 0) return; // button should already be disabled, but don't send a bad request either way
+  const action = dir === 'next' ? 'replay_jump_next_driver_incident' : 'replay_jump_prev_driver_incident';
+  sendDashboardUiEvent({
+    element_id: 'btn-' + dir + '-driver-incident',
+    event_type: 'click',
+    message: 'Jump to driver\'s ' + dir + ' incident (car ' + carIdx + ')',
+    value: String(carIdx)
+  });
+  if (!send(action, String(carIdx))) toast('[PoC] ' + action + ' — not yet wired', undefined, 'replay:' + action);
+  log('events', 'INFO ', 'replay_action', action + ' carIdx=' + carIdx);
 }
 
 // ── Replay ───────────────────────────────────────────────
@@ -1791,6 +2415,14 @@ function stopCapture() {
   log('events', 'INFO ', 'capture_end', 'Incident scan stopped  kind:' + captureKind + '  incidents_visited:' + captureCount);
 }
 
+/** Stops whichever capture mechanism is active: the client-side Walk loop above, and/or the plugin's server-side capture queue (SimStewardPlugin.cs capture_cancel — used by the Replay Index tab's "Capture all mine"). */
+function cancelCapture() {
+  sendDashboardUiEvent({ element_id: 'cap-btn-cancel', event_type: 'click', message: 'Cancel capture queue' });
+  if (capturing) stopCapture();
+  if (!send('capture_cancel', '')) toast('[PoC] capture_cancel not connected', undefined, 'capture_cancel');
+  log('events', 'INFO ', 'capture_cancel', 'Cancel capture requested');
+}
+
 function captureStep() {
   if (!capturing) return;
   if (captureQueueIndex >= captureQueue.length) {
@@ -1841,7 +2473,7 @@ function setCaptureUI(active) {
   lbl.className = 'cap-status' + (active ? ' running' : '');
   if (!active) {
     lbl.textContent = captureCount ? 'Done (' + captureCount + ' found)' : '—';
-    btnD.disabled = false;
+    btnD.disabled = getSelectedCarIdx() < 0;
     btnS.disabled = false;
   }
 }
@@ -1881,6 +2513,12 @@ function log(tab, level, event, message) {
   if (autoScroll && tab === activeTab) pane.scrollTop = pane.scrollHeight;
 }
 
+function goToReplayIndexTab() {
+  const btn = document.querySelector('.log-tab[data-tab="replayindex"]');
+  if (btn) switchTab(btn);
+  if (window.location.hash !== '#replayindex') window.location.hash = 'replayindex';
+}
+
 function switchTab(el) {
   activeTab = el.dataset.tab;
   sendDashboardUiEvent({
@@ -1888,6 +2526,13 @@ function switchTab(el) {
     event_type: 'click',
     message: 'Log tab: ' + (el.textContent || '').trim()
   });
+  // Clicking any tab re-expands a collapsed dock — the user is asking to see that pane.
+  const cc = document.querySelector('.content-col');
+  if (cc && cc.classList.contains('logs-collapsed')) {
+    cc.classList.remove('logs-collapsed');
+    const btn = document.getElementById('logs-collapse-btn');
+    if (btn) { btn.textContent = '▼'; btn.title = 'Collapse this panel'; }
+  }
   document.querySelectorAll('.log-tab').forEach(t => t.classList.toggle('active', t===el));
   document.querySelectorAll('.log-pane').forEach(p => p.classList.remove('active'));
   const pane = document.getElementById('log-' + activeTab);
@@ -1903,10 +2548,6 @@ function toggleAS() {
     message: autoScroll ? 'Log autoscroll on' : 'Log autoscroll off',
     value: autoScroll ? 'on' : 'off'
   });
-}
-
-function fmtTelem(m) {
-  return `Throttle:${(m.throttle||0).toFixed(2)}  Brake:${(m.brake||0).toFixed(2)}  Steer:${(m.steeringAngle||0).toFixed(3)}rad  Speed:${(m.speed||0).toFixed(1)}mph`;
 }
 
 // ── Toast ────────────────────────────────────────────────
@@ -1931,18 +2572,10 @@ function toast(msg, durationMs, debounceKey) {
 function mockTick() {
   if (mockPaused) return;
   mockTime += 0.05;
-  const t = Math.max(0, Math.min(1, 0.6 + 0.35*Math.sin(mockTime*0.7)));
-  const b = Math.max(0, Math.min(1, Math.max(0, -Math.sin(mockTime*0.7+Math.PI))*0.8));
-  const s = 3.5*Math.sin(mockTime*0.4);
-  setTelem(t, b, s);
   const pct = (38 + 18*Math.sin(mockTime*0.04)).toFixed(1);
   document.getElementById('scrub-fill').style.width = pct + '%';
   const frame = Math.round(21000 + 4000*Math.sin(mockTime*0.04));
   document.getElementById('frame-cur').textContent = 'Frame ' + frame.toLocaleString();
-  // Emit mock telemetry log line occasionally
-  if (Math.round(mockTime*20)%40 === 0) {
-    log('telem','DATA ','telemetry', `Throttle:${t.toFixed(2)}  Brake:${b.toFixed(2)}  Steer:${s.toFixed(3)}rad`);
-  }
 }
 
 // ── Seed mock logs ────────────────────────────────────────
@@ -1970,12 +2603,7 @@ function seedLogs() {
   ].forEach(([t,l,e,m]) => log(t,l,e,m));
 
   [
-    ['telem','DATA ','telemetry','Throttle:0.65  Brake:0.00  Steer: 0.300rad  Speed:145.2mph'],
-    ['telem','DATA ','telemetry','Throttle:0.72  Brake:0.00  Steer:-0.120rad  Speed:148.7mph'],
-    ['telem','DATA ','telemetry','Throttle:0.00  Brake:0.82  Steer: 1.450rad  Speed:132.1mph'],
-    ['telem','DATA ','telemetry','Throttle:0.00  Brake:0.95  Steer: 2.100rad  Speed: 87.4mph'],
-    ['telem','DATA ','telemetry','Throttle:0.35  Brake:0.10  Steer: 1.950rad  Speed: 65.0mph'],
-    ['telem','DATA ','telemetry','Throttle:0.88  Brake:0.00  Steer: 0.500rad  Speed: 89.3mph'],
+    ['telem','INFO ','session_timeline_ready','Session Timeline — waiting for plugin mode / replay session transitions'],
   ].forEach(([t,l,e,m]) => log(t,l,e,m));
 }
 
@@ -1991,10 +2619,10 @@ function init() {
   renderCaptured();
   renderStd();
   seedLogs();
-  setTelem(mockTelem.t, mockTelem.b, mockTelem.s);
   updatePlayPauseBtn();
   setInterval(mockTick, 50);
   connectWs();
+  if (window.location.hash === '#replayindex') goToReplayIndexTab();
 }
 document.addEventListener('DOMContentLoaded', init);
 </script>

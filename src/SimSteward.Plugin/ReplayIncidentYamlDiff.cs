@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace SimSteward.Plugin
@@ -40,10 +41,16 @@ namespace SimSteward.Plugin
                 int delta = currCount - prevCount;
                 if (delta <= 0) continue;
 
-                // Map standard single-event deltas (1=off-track, 2=loss-of-control, 4=heavy contact);
-                // other values (e.g. multiple events between YAML snapshots) leave points null so
-                // downstream queries can recognize the aggregated case.
-                int? points = (delta == 1 || delta == 2 || delta == 4) ? (int?)delta : null;
+                // Map standard single-event deltas directly (1=off-track, 2=loss-of-control, 4=heavy
+                // contact). A delta spanning more than one iRacing-scored event between YAML snapshots
+                // (e.g. 3, 5, 6, 7...) is resolved to the highest plausible single-event tier (capped at
+                // 4) rather than nulled out — this matches iRacing's own official scoring rule ("if
+                // multiple incidents happen in quick succession, only the highest-scoring incident will
+                // be tallied"), so an aggregate should never be reported as *less* certain than its floor.
+                // IsAggregateDelta flags the capped case so downstream consumers can still tell a clean
+                // single-event read from a capped aggregate.
+                bool isAggregate = delta != 1 && delta != 2 && delta != 4;
+                int points = Math.Min(4, delta);
 
                 int lap = SessionLogging.LapUnknown;
                 if (carIdxLap != null && carIdx >= 0 && carIdx < carIdxLap.Length)
@@ -56,7 +63,8 @@ namespace SimSteward.Plugin
                     points,
                     replayFrame,
                     lap,
-                    sessionNum));
+                    sessionNum,
+                    isAggregateDelta: isAggregate));
             }
 
             return result;

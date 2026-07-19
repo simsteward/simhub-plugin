@@ -18,7 +18,7 @@ A **SimHub plugin + browser dashboard** for structured iRacing replay review. In
 | **Telemetry strip** | Throttle, brake, steering wheel (real data from plugin) |
 | **Selected Incident Panel** | Camera group dropdown (`cameraGroups` from plugin), ▶ Capture (`capture_incident`: pre-roll, optional camera, 1× speed), prev/next within filtered list |
 | **Observability** | Structured logs → Grafana Loki (`SIMSTEWARD_LOKI_URL`); optional **OTLP metrics** → local OpenTelemetry Collector → **Prometheus** (`OTEL_EXPORTER_OTLP_ENDPOINT`, **docs/observability-local.md**); `capture_incident` includes correlation fields on `action_result`; re-capture confirms before sending (Loki is append-only) |
-| **Replay incident index (iRacing replay)** | WebSocket actions `replay_incident_index_build` (`start` / `cancel`), `replay_incident_index_seek` (JSON `sessionTimeMs`, optional `sessionNum`), `replay_incident_index_record` (`on` / `off` — 60Hz NDJSON under `%LocalAppData%\SimSteward\replay-incident-index\record-samples\`). IRSDKSharper 60Hz poll, 16× fast-forward, detection → JSON index on disk (`...\{subSessionId}.json`, TR-020 v1). **Dashboard:** `http://<host>:8888/Web/sim-steward-dash/replay-incident-index.html` (summary, sortable table, build/record, seeks); main dash links to it. Spec: [docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md). |
+| **Replay incident index (iRacing replay)** | WebSocket actions `replay_incident_index_build` (`start` / `cancel`), `replay_incident_index_seek` (JSON `sessionTimeMs`, optional `sessionNum`), `replay_incident_index_record` (`on` / `off` — 60Hz NDJSON under `%LocalAppData%\SimSteward\replay-incident-index\record-samples\`). IRSDKSharper 60Hz poll, 16× fast-forward, detection → JSON index on disk (`...\{subSessionId}.json`, TR-020 v1). **Dashboard:** Replay Index tab in `http://<host>:8888/Web/sim-steward-dash/index.html` (`index.html#replayindex`; summary, sortable table, build/record, seeks); main dash header links to it. Spec: [docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md). |
 
 **North-star / gaps still open:** true plugin-side **YAML scan** (session walk still uses the leaderboard frame list), **scrub bar** seek (PoC / toast only), **plugin-owned `suggestedCamera`**, **dual-view** capture, **OBS** integration. See [docs/PRODUCT-FLOW.md](docs/PRODUCT-FLOW.md) and [docs/DATA-ROUTING-OBSERVABILITY.md](docs/DATA-ROUTING-OBSERVABILITY.md) for what belongs in Loki vs a future metrics path.
 
@@ -36,8 +36,7 @@ SimSteward.Plugin (C# / .NET 4.8 / SimHub)
     │  PluginLogger → plugin-structured.jsonl
     │
     ├──→ Browser dashboard (HTML/JS)
-    │         src/SimSteward.Dashboard/index.html
-    │         src/SimSteward.Dashboard/replay-incident-index.html (replay incident index / M6)
+    │         src/SimSteward.Dashboard/index.html (includes Replay Index tab / M6, #replayindex)
     │         served by SimHub HTTP → Web/sim-steward-dash/
     │
     └──→ Grafana Cloud Loki
@@ -56,7 +55,7 @@ Cloud-only: there is no local Loki, Grafana, or Sentinel stack. Logs and errors 
 ```
 src/
   SimSteward.Plugin/          C# SimHub plugin (.NET 4.8)
-  SimSteward.Dashboard/       Browser dashboard (index.html, replay-incident-index.html; no build step)
+  SimSteward.Dashboard/       Browser dashboard (index.html incl. Replay Index tab; no build step)
   SimSteward.Plugin.Tests/    xUnit unit tests
 
 docs/                         Documentation (start with docs/README.md)
@@ -103,10 +102,10 @@ http://localhost:8888/Web/sim-steward-dash/index.html
 **Replay incident index** (build status, TR-019 table, Record mode, seek-to-row): [docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](docs/IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md)
 
 ```
-http://localhost:8888/Web/sim-steward-dash/replay-incident-index.html
+http://localhost:8888/Web/sim-steward-dash/index.html#replayindex
 ```
 
-Both pages connect to the plugin WebSocket on port **19847** (`window.location.hostname`, so LAN clients use the same host). Optional: `?token=` / `?wsToken=` when `SIMSTEWARD_WS_TOKEN` is set.
+Both live in `index.html` and connect to the plugin WebSocket on port **19847** (`window.location.hostname`, so LAN clients use the same host). Optional: `?token=` / `?wsToken=` when `SIMSTEWARD_WS_TOKEN` is set.
 
 ### Cloud observability
 

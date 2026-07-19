@@ -33,7 +33,7 @@ The canonical project rule pack lives in `CLAUDE.md` (root) and `.claude/CLAUDE.
 | [observability-scaling.md](observability-scaling.md) | Many users, large grids, Loki cardinality |
 | [DATA-ROUTING-OBSERVABILITY.md](DATA-ROUTING-OBSERVABILITY.md) | OTel vs Loki vs Prometheus, ~1k-user sizing, car telemetry taxonomy |
 | [observability-testing.md](observability-testing.md) | Harness, AssertLokiQueries, Explore validation |
-| [IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md) | Replay-only incident index (SDK), TR-019 JSON, WebSocket actions, `Web/sim-steward-dash/replay-incident-index.html` |
+| [IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md](IRACING-REPLAY-INCIDENT-INDEX-REQUIREMENTS.md) | Replay-only incident index (SDK), TR-019 JSON, WebSocket actions, Replay Index tab in `Web/sim-steward-dash/index.html` (`index.html#replayindex`) |
 | [DATA-API-DEPLOY.md](DATA-API-DEPLOY.md) | Data API env (local vs prod) |
 | [REDEPLOY-CONCEPT.md](REDEPLOY-CONCEPT.md) | Redeploy mental model |
 

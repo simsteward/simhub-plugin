@@ -63,6 +63,35 @@ namespace SimSteward.Plugin
         /// <summary>True if any race session in the loaded replay has reached Checkered or CoolDown state.</summary>
         [JsonProperty("replaySessionCompleted")]
         public bool ReplaySessionCompleted { get; set; }
+
+        /// <summary>True when the live (non-replay) field-wide incident detector has a baseline and is actively watching.</summary>
+        [JsonProperty("liveDetectorActive")]
+        public bool LiveDetectorActive { get; set; }
+
+        /// <summary>Full git SHA of the running build (parsed from the informational version string).</summary>
+        [JsonProperty("gitSha")]
+        public string GitSha { get; set; } = "";
+
+        /// <summary>UTC timestamp of the plugin DLL on disk — a proxy for build time, not a tracked build-system value.</summary>
+        [JsonProperty("buildTimestampUtc")]
+        public string BuildTimestampUtc { get; set; } = "";
+
+        [JsonProperty("activeConfig")]
+        public PluginActiveConfig ActiveConfig { get; set; } = new PluginActiveConfig();
+    }
+
+    /// <summary>Config values in effect for this running plugin instance — for "is this configured the way I think" checks.</summary>
+    public sealed class PluginActiveConfig
+    {
+        /// <summary>Loki endpoint base URL (not a secret — auth is separate Basic-auth credentials, not embedded here); empty if not configured.</summary>
+        [JsonProperty("lokiUrl")]
+        public string LokiUrl { get; set; } = "";
+
+        [JsonProperty("fastForwardSweepSpeed")]
+        public int FastForwardSweepSpeed { get; set; }
+
+        [JsonProperty("incidentFingerprintVersion")]
+        public string IncidentFingerprintVersion { get; set; } = "v1";
     }
 
     /// <summary>Minimal snapshot for WebSocket state push.</summary>
@@ -112,6 +141,98 @@ namespace SimSteward.Plugin
         [JsonProperty("replayIncidentIndex")]
         public ReplayIncidentIndexDashboardSnapshot ReplayIncidentIndex { get; set; }
 
+        /// <summary>Live race running order, derived from total distance covered (see <see cref="RaceLeaderboardOrdering"/>), leader first.</summary>
+        [JsonProperty("leaderboard")]
+        public List<LeaderboardRow> Leaderboard { get; set; } = new List<LeaderboardRow>();
+    }
+
+    /// <summary>One row of the live-derived race leaderboard (WS <c>state.leaderboard[]</c>).</summary>
+    public sealed class LeaderboardRow
+    {
+        [JsonProperty("carIdx")]
+        public int CarIdx { get; set; }
+
+        [JsonProperty("driverName")]
+        public string DriverName { get; set; } = "";
+
+        /// <summary>Live-derived rank (1 = leader), updates every tick — see <see cref="RaceLeaderboardOrdering"/>.</summary>
+        [JsonProperty("liveRank")]
+        public int LiveRank { get; set; }
+
+        /// <summary>Raw CarIdxPosition — official, but only updates at the S/F line crossing.</summary>
+        [JsonProperty("officialPosition")]
+        public int OfficialPosition { get; set; }
+
+        [JsonProperty("lap")]
+        public int Lap { get; set; }
+
+        [JsonProperty("lapDistPct")]
+        public float LapDistPct { get; set; }
+
+        [JsonProperty("lastLapTime")]
+        public float LastLapTime { get; set; }
+
+        [JsonProperty("bestLapTime")]
+        public float BestLapTime { get; set; }
+
+        /// <summary>
+        /// CarIdxEstTime(car) - CarIdxEstTime(liveRank 1). CONFIRMED UNRELIABLE when cars are on
+        /// different laps (live-tested 2026-07-19): CarIdxEstTime is time-to-next-S/F-crossing, a
+        /// per-lap-cycle value, so subtracting across cars on different laps is not a real time gap.
+        /// Do not present this to users as an accurate gap until replaced with a proper
+        /// distance-based formula. Field kept for now so downstream code has a value, not omitted
+        /// silently to avoid re-deriving the same wrong number twice.
+        /// </summary>
+        [JsonProperty("gapToLeaderSec")]
+        public float GapToLeaderSec { get; set; }
+    }
+
+    /// <summary>
+    /// One row of the dashboard's "Incidents" tab (WS <c>{type:"incidents", entries:[...]}</c>).
+    /// Field names/shape match what index.html's incident renderer already expects (car, driver,
+    /// cause, points, time, lap, frame, player) — this was previously never actually broadcast by
+    /// any server code, discovered live when the tab showed nothing.
+    /// </summary>
+    public sealed class LiveIncidentBoardEntry
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; } = "";
+
+        /// <summary>Pre-formatted "m:ss.s" session time — the client displays this directly, no reformatting.</summary>
+        [JsonProperty("time")]
+        public string Time { get; set; } = "";
+
+        [JsonProperty("car")]
+        public int Car { get; set; }
+
+        [JsonProperty("driver")]
+        public string Driver { get; set; } = "";
+
+        /// <summary>1/2/4 per CLAUDE.md's incident-point convention (off-track/spin-wall/heavy-contact) — NOT a severity rating. Meaningless when <see cref="PointsResolved"/> is false (0 in that case is a display placeholder, not a confirmed zero).</summary>
+        [JsonProperty("points")]
+        public int Points { get; set; }
+
+        /// <summary>
+        /// True once a real incident-point value has resolved for this incident (player's own car via
+        /// PlayerCarMyIncidentCount, or — confirmed empirically — other cars only after the fact via the
+        /// Replay Index tab, never live; see docs/IRACING-DATA-AVAILABILITY.md). False means "not yet
+        /// known", not "confirmed zero" — the dashboard must render these states differently.
+        /// </summary>
+        [JsonProperty("pointsResolved")]
+        public bool PointsResolved { get; set; }
+
+        /// <summary>One of "off-track" | "spin" | "contact" | "flagged" | "unknown" — matches index.html's `.cause-tag` CSS classes.</summary>
+        [JsonProperty("cause")]
+        public string Cause { get; set; } = "unknown";
+
+        [JsonProperty("frame")]
+        public int Frame { get; set; }
+
+        [JsonProperty("lap")]
+        public int Lap { get; set; }
+
+        [JsonProperty("player")]
+        public bool Player { get; set; }
     }
 
     /// <summary>WebSocket <c>state.replayIncidentIndex</c> (TR-031–TR-033, TR-037–TR-038).</summary>

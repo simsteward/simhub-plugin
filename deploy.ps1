@@ -478,7 +478,7 @@ Copy-Item $DashboardSource $dashboardTargetFile -Force
 Write-Host "  index.html"
 $copiedDashboards = @("index.html")
 foreach ($f in Get-ChildItem -Path $dashboardSrcDir -File -ErrorAction SilentlyContinue) {
-    if ($f.Extension -eq ".html" -and $f.Name -ne "index.html") {
+    if (($f.Extension -eq ".html" -or $f.Extension -eq ".js") -and $f.Name -ne "index.html") {
         Copy-Item $f.FullName (Join-Path $DashboardTargetDir $f.Name) -Force
         Write-Host "  $($f.Name)"
         $copiedDashboards += $f.Name

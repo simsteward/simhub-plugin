@@ -154,5 +154,76 @@ namespace SimSteward.Plugin.Tests
             Assert.True(r.Ok);
             Assert.Equal(200, r.Row.ReplayFrame);
         }
+
+        private static List<ReplayIncidentIndexIncidentRow> IdxCar(params (int frame, int carIdx, string fp)[] rows)
+        {
+            var l = new List<ReplayIncidentIndexIncidentRow>();
+            foreach (var (f, c, fp) in rows)
+                l.Add(new ReplayIncidentIndexIncidentRow { ReplayFrame = f, CarIdx = c, Fingerprint = fp });
+            return l;
+        }
+
+        [Fact]
+        public void ResolveNextIncidentForCar_Empty_IndexUnavailable()
+        {
+            var r = ReplayControlActions.ResolveNextIncidentForCar(new List<ReplayIncidentIndexIncidentRow>(), 100, 5);
+            Assert.False(r.Ok);
+            Assert.Equal("index_unavailable", r.Error);
+        }
+
+        [Fact]
+        public void ResolveNextIncidentForCar_NegativeCarIdx_NoCarSelected()
+        {
+            var idx = IdxCar((100, 5, "a"));
+            var r = ReplayControlActions.ResolveNextIncidentForCar(idx, 0, -1);
+            Assert.False(r.Ok);
+            Assert.Equal("no_car_selected", r.Error);
+        }
+
+        [Fact]
+        public void ResolveNextIncidentForCar_CarHasNoIncidents_DistinctFromAtEnd()
+        {
+            var idx = IdxCar((100, 5, "a"), (200, 7, "b"));
+            var r = ReplayControlActions.ResolveNextIncidentForCar(idx, 0, 12);
+            Assert.False(r.Ok);
+            Assert.Equal("no_incidents_for_car", r.Error);
+        }
+
+        [Fact]
+        public void ResolveNextIncidentForCar_SkipsOtherCars_PicksThisCarsNext()
+        {
+            var idx = IdxCar((100, 5, "a"), (150, 7, "other"), (200, 5, "b"), (250, 7, "other2"), (300, 5, "c"));
+            var r = ReplayControlActions.ResolveNextIncidentForCar(idx, 150, 5);
+            Assert.True(r.Ok);
+            Assert.Equal(200, r.Row.ReplayFrame);
+            Assert.Equal(5, r.Row.CarIdx);
+        }
+
+        [Fact]
+        public void ResolveNextIncidentForCar_AtEnd_ForThisCar()
+        {
+            var idx = IdxCar((100, 5, "a"), (200, 5, "b"), (500, 7, "other_car_later"));
+            var r = ReplayControlActions.ResolveNextIncidentForCar(idx, 200, 5);
+            Assert.False(r.Ok);
+            Assert.Equal("at_end", r.Error);
+        }
+
+        [Fact]
+        public void ResolvePrevIncidentForCar_SkipsOtherCars_PicksThisCarsPrev()
+        {
+            var idx = IdxCar((100, 5, "a"), (150, 7, "other"), (200, 5, "b"), (300, 5, "c"));
+            var r = ReplayControlActions.ResolvePrevIncidentForCar(idx, 250, 5);
+            Assert.True(r.Ok);
+            Assert.Equal(200, r.Row.ReplayFrame);
+        }
+
+        [Fact]
+        public void ResolvePrevIncidentForCar_CarHasNoIncidents_DistinctFromAtStart()
+        {
+            var idx = IdxCar((100, 5, "a"));
+            var r = ReplayControlActions.ResolvePrevIncidentForCar(idx, 200, 12);
+            Assert.False(r.Ok);
+            Assert.Equal("no_incidents_for_car", r.Error);
+        }
     }
 }

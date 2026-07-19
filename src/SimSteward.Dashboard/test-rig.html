@@ -93,10 +93,12 @@ Sentry.init({
 <div class="wrap">
   <nav class="topnav">
     <a href="index.html">← Sim Steward dashboard</a>
-    <a href="replay-incident-index.html">Replay index →</a>
+    <a href="index.html#replayindex">Replay index →</a>
     <span style="color:var(--muted)">Test rig (Phase 2)</span>
     <span class="ws-pill bad" id="ws-pill">WS …</span>
   </nav>
+
+  <div class="banner err" id="tr-prereq-banner" hidden></div>
 
   <div class="banner err" id="tr-misfire-banner" hidden>
     <span><strong>Jump misfire.</strong>
@@ -196,6 +198,7 @@ Sentry.init({
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="dashboard-ui-events.js"></script>
 <script>
 const WS_PORT = 19847;
 function wsUrl() {
@@ -208,8 +211,11 @@ function wsUrl() {
 
 let ws = null;
 let wsBackoffMs = 500;
+let wsOpen = false;
 let lastTick = null;
 let lastSweep = null;
+let lastDiagnostics = null;
+let lastReplayIncidentIndex = null;
 let isSweeping = false;
 let lastSeekAt = 0;
 let lastJumpAt = 0;
@@ -227,10 +233,12 @@ function connectWs() {
       pill.textContent = 'WS connected';
       pill.className = 'ws-pill ok';
       wsBackoffMs = 500;
-      setControlsEnabled(true);
+      wsOpen = true;
+      renderPrereqGuard();
     };
     ws.onclose = () => {
       ws = null;
+      wsOpen = false;
       pill.textContent = 'WS reconnecting…';
       pill.className = 'ws-pill bad';
       setControlsEnabled(false);
@@ -258,25 +266,39 @@ function send(action, arg) {
   return true;
 }
 
-function logUi(elementId, message, eventType) {
-  send('log', JSON.stringify({
-    event: 'dashboard_ui_event',
-    element_id: elementId,
-    event_type: eventType || 'click',
-    message: message,
-    domain: 'ui'
-  }));
-}
-
 function onMsg(m) {
   if (!m || !m.type) return;
   try {
     if (m.type === 'replay_state_tick') applyTick(m);
     else if (m.type === 'replay_sweep_progress_tick') applySweepTick(m);
     else if (m.type === 'actionResult') onActionResult(m);
+    else if (m.type === 'state') onState(m);
   } catch (err) {
     if (typeof Sentry !== 'undefined') Sentry.captureException(err);
   }
+}
+
+// ── 'state' handler — pre-emptive control gating (mirrors index.html's Replay Index tab) ──
+function onState(m) {
+  lastDiagnostics = m.diagnostics || null;
+  lastReplayIncidentIndex = m.replayIncidentIndex || null;
+  renderPrereqGuard();
+}
+
+function renderPrereqGuard() {
+  const banner = document.getElementById('tr-prereq-banner');
+  const connected = !!(lastDiagnostics && lastDiagnostics.irsdkConnected);
+  const replayMode = !!(lastReplayIncidentIndex && lastReplayIncidentIndex.isReplayMode);
+  if (!connected) {
+    banner.hidden = false;
+    banner.textContent = 'iRacing SDK not connected. Load iRacing with a replay to enable replay controls.';
+  } else if (!replayMode) {
+    banner.hidden = false;
+    banner.textContent = 'Session is not in replay mode (SimMode ≠ replay). Replay controls are disabled.';
+  } else {
+    banner.hidden = true;
+  }
+  setControlsEnabled(wsOpen && connected && replayMode);
 }
 
 // ── Tick handler ─────────────────────────────────────────
@@ -498,7 +520,7 @@ function renderMisfire(mf) {
 }
 
 function dismissMisfire() {
-  logUi('tr-misfire-dismiss', 'Dismiss misfire banner', 'ui_interaction');
+  sendDashboardUiEvent({ element_id: 'tr-misfire-dismiss', event_type: 'ui_interaction', message: 'Dismiss misfire banner' });
   document.getElementById('tr-misfire-banner').hidden = true;
 }
 
@@ -524,17 +546,17 @@ function onPlayPause() {
   const btn = document.getElementById('tr-play-pause');
   const paused = btn.dataset.paused === '1';
   if (paused) {
-    logUi('tr-play-pause', 'Play replay');
+    sendDashboardUiEvent({ element_id: 'tr-play-pause', event_type: 'click', message: 'Play replay' });
     send('replay_play', '');
   } else {
-    logUi('tr-play-pause', 'Pause replay');
+    sendDashboardUiEvent({ element_id: 'tr-play-pause', event_type: 'click', message: 'Pause replay' });
     send('replay_pause', '');
   }
 }
 
 function onSetSpeed(n) {
   const id = 'tr-speed-' + n;
-  logUi(id, 'Set replay speed ' + n + '×');
+  sendDashboardUiEvent({ element_id: id, event_type: 'click', message: 'Set replay speed ' + n + '×' });
   send('replay_set_speed', String(n));
 }
 
@@ -542,7 +564,7 @@ function onDirectionToggle() {
   const btn = document.getElementById('tr-direction-toggle');
   const cur = btn.dataset.dir || 'forward';
   const next = cur === 'forward' ? 'reverse' : 'forward';
-  logUi('tr-direction-toggle', 'Set direction ' + next);
+  sendDashboardUiEvent({ element_id: 'tr-direction-toggle', event_type: 'click', message: 'Set direction ' + next });
   send('replay_set_direction', next);
 }
 
@@ -552,7 +574,7 @@ function onSeekFrame() {
   const v = parseInt(input.value, 10);
   if (!isFinite(v) || v < 0) { toast('Enter a frame number ≥ 0.'); return; }
   lastSeekAt = Date.now();
-  logUi('tr-seek-frame-go', 'Seek to frame ' + v);
+  sendDashboardUiEvent({ element_id: 'tr-seek-frame-go', event_type: 'click', message: 'Seek to frame ' + v });
   send('replay_seek_frame', String(v));
 }
 
@@ -560,7 +582,7 @@ function onJump(which) {
   if (Date.now() - lastSeekAt < 800) { toast('Seek cooldown.'); return; }
   lastSeekAt = Date.now();
   const id = which === 'start' ? 'tr-jump-start' : 'tr-jump-end';
-  logUi(id, 'Jump to ' + which);
+  sendDashboardUiEvent({ element_id: id, event_type: 'click', message: 'Jump to ' + which });
   send('replay_jump', which);
 }
 
@@ -568,7 +590,7 @@ function onJumpIncident(dir) {
   if (Date.now() - lastJumpAt < 800) { toast('Jump cooldown.'); return; }
   lastJumpAt = Date.now();
   const id = dir === 'next' ? 'tr-next-incident' : 'tr-prev-incident';
-  logUi(id, dir === 'next' ? 'Jump to next incident' : 'Jump to previous incident');
+  sendDashboardUiEvent({ element_id: id, event_type: 'click', message: dir === 'next' ? 'Jump to next incident' : 'Jump to previous incident' });
   send(dir === 'next' ? 'replay_jump_next_incident' : 'replay_jump_prev_incident', '');
 }
 
@@ -614,7 +636,7 @@ function toast(msg) {
 document.querySelectorAll('th[data-k]').forEach((th) => {
   th.addEventListener('click', () => {
     const k = th.getAttribute('data-k');
-    logUi('tr-table-sort-' + k, 'Sort by ' + k, 'ui_interaction');
+    sendDashboardUiEvent({ element_id: 'tr-table-sort-' + k, event_type: 'ui_interaction', message: 'Sort by ' + k });
     if (sortKey === k) sortDir = -sortDir;
     else { sortKey = k; sortDir = 1; }
     if (lastTick) renderTable(lastTick.drivers || []);

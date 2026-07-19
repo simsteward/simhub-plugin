@@ -105,7 +105,7 @@ Available via the SDK session string once results are official. Also available v
 
 | Field | Notes |
 |---|---|
-| `ResultsPositions[n].Incidents` | **Final incident count per driver.** Not available during the live race per-car. |
+| `ResultsPositions[n].Incidents` | **Final incident count per driver.** **Confirmed empirically live** (not just inferred): during a real live practice session (2026-07-19), 25 real off-track/flag detections fired for 7 different cars over ~1hr while a 5s-cadence probe (`live_yaml_incident_probe`) polled this exact field via `SessionInfoYaml` — it recorded **zero** deltas the entire time despite real incidents happening. The block itself is present and its car count changes as drivers join/leave the session, but `Incidents` genuinely does not tick up until results are official. Live per-car point-value resolution for cars other than the player is therefore structurally impossible, confirmed, not just documented. See `IncidentSeverityCorrelator`/`SimStewardPlugin.LiveIncidentDetection.cs` for how the plugin handles this (player-only live resolution; other cars resolve after the fact via the Replay Index tab's `ReplayIncidentYamlDiff`, which reads this same field once a session's results are final). |
 | `ResultsPositions[n].ReasonOutStr` / `ReasonOutId` | DNF reason per car — "Contact", "Mechanical", "Disconnected" etc. |
 | `ResultsPositions[n].LapsLed` | Laps led per driver. |
 | `ResultsPositions[n].LapsDriven` | Float — includes partial laps. |

@@ -43,7 +43,7 @@ Frame advancing at *exactly* `speed × 60` fps is the decisive tell — a fake/s
 
 The verification engine (monitor + capture) is identical for both; only the trigger differs.
 
-1. **Dashboard-driven (full-stack, exercises the real UI):** the driver clicks `tr-jump-start` + `tr-play-pause` (reset to frame 0, paused) on `test-rig.html`, then `btn-start` on `replay-incident-index.html`. Use this when validating the dashboard path itself, or when a human may be watching.
+1. **Dashboard-driven (full-stack, exercises the real UI):** the driver clicks `tr-jump-start` + `tr-play-pause` (reset to frame 0, paused) on `test-rig.html`, then `ri-btn-start` on `index.html`'s Replay Index tab (`index.html#replayindex`; the standalone `replay-incident-index.html` page was merged into this tab). Use this when validating the dashboard path itself, or when a human may be watching.
 2. **WS-driven (lean, best for unattended/CI):** `scripts/test-rig/run.js` sends `replay_jump:start` → `replay_pause` → `replay_incident_index_build:start` directly. Fewer moving parts (no browser), so more robust for unattended loops. **Note the verb:** `replay_incident_index_build` requires `arg:"start"` (also `cancel`/`finalize`); an empty arg returns `bad_arg`.
 
 Either way, **the monitor must already be connected before the trigger fires** (see "Hold the connection" below).

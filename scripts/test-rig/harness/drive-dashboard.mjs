@@ -74,7 +74,9 @@ fs.mkdirSync(SHOT_DIR, { recursive: true });
 const log = (s) => console.log(new Date().toISOString(), s);
 
 const TEST_RIG_URL = args.base.replace(/\/$/, '') + '/test-rig.html';
-const INDEX_URL    = args.base.replace(/\/$/, '') + '/replay-incident-index.html';
+// The replay-incident-index page was merged into index.html's "Replay Index" tab —
+// drive that tab directly instead of navigating to a separate page.
+const INDEX_URL    = args.base.replace(/\/$/, '') + '/index.html';
 
 // read session_time off the test-rig page (judge "at start" by time, NOT raw frame)
 async function readSessionTime(page) {
@@ -138,12 +140,15 @@ try {
         '(before=' + timeBefore + ' after=' + timeAfter + ') — continuing');
   }
 
-  // ── 2. open the index page, start the build ────────────────────────────────
-  log('[driver] opening index page: ' + INDEX_URL);
-  await gotoWithRetry(page, INDEX_URL, 'replay-incident-index.html');
+  // ── 2. open the dashboard, switch to the Replay Index tab, start the build ──
+  log('[driver] opening dashboard: ' + INDEX_URL);
+  await gotoWithRetry(page, INDEX_URL, 'index.html');
   await page.waitForTimeout(1500);
-  log('[driver] clicking #btn-start (start index build)');
-  await page.locator('#btn-start').click({ timeout: 10000 });
+  log('[driver] clicking Replay Index tab');
+  await page.locator('.log-tab[data-tab="replayindex"]').click({ timeout: 10000 });
+  await page.waitForTimeout(300);
+  log('[driver] clicking #ri-btn-start (start index build)');
+  await page.locator('#ri-btn-start').click({ timeout: 10000 });
   await page.waitForTimeout(1000);
 
   // ── 3. back on test-rig, confirm sweep speed ───────────────────────────────

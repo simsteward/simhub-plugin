@@ -52,6 +52,19 @@ namespace SimSteward.Plugin
         /// <summary>True when the material value indicates a rumble strip (kerb).</summary>
         public static bool IsRumbleStrip(int material) => material >= Rumble1Material && material <= Rumble4Material;
 
+        /// <summary>Racing-groove dirt materials (the actual line cars drive on) — indicates a genuine dirt session.</summary>
+        public const int RacingDirt1Material = 7;
+        /// <summary>Racing-groove dirt materials (the actual line cars drive on) — indicates a genuine dirt session.</summary>
+        public const int RacingDirt2Material = 8;
+
+        /// <summary>
+        /// True when the material value indicates the actual racing-groove surface is dirt (materials
+        /// 7/8, "RacingDirt1"/"RacingDirt2"). Deliberately does NOT include the generic off-track dirt
+        /// shoulder/verge materials (19-22, "Dirt1"-"Dirt4"), which can appear on non-dirt tracks too and
+        /// would false-positive a whole session into "dirt cap" mode if used directly.
+        /// </summary>
+        public static bool IsDirtRacingSurface(int material) => material == RacingDirt1Material || material == RacingDirt2Material;
+
         /// <summary>True when masked bits transition 0 → 1 between consecutive samples.</summary>
         public static bool IsRisingEdge(int prevRaw, int currRaw, int mask)
         {
@@ -87,7 +100,8 @@ namespace SimSteward.Plugin
             int lap = SessionLogging.LapUnknown,
             int sessionNum = SessionNumUnknown,
             float? lapDistPct = null,
-            int? carPosition = null)
+            int? carPosition = null,
+            bool isAggregateDelta = false)
         {
             CarIdx = carIdx;
             SessionTimeMs = sessionTimeMs;
@@ -98,6 +112,7 @@ namespace SimSteward.Plugin
             SessionNum = sessionNum;
             LapDistPct = lapDistPct;
             CarPosition = carPosition;
+            IsAggregateDelta = isAggregateDelta;
         }
 
         public int CarIdx { get; }
@@ -111,5 +126,12 @@ namespace SimSteward.Plugin
         public float? LapDistPct { get; }
         /// <summary>Race position at detection time (from CarIdxPosition). 0 = not classified.</summary>
         public int? CarPosition { get; }
+        /// <summary>
+        /// True when <see cref="IncidentPoints"/> was resolved by capping a YAML-poll delta that spanned
+        /// more than one iRacing-scored event between snapshots (not a clean single-event 1/2/4 read) —
+        /// see <see cref="ReplayIncidentYamlDiff"/>. Downstream consumers can use this to distinguish a
+        /// confirmed single-event value from a capped aggregate.
+        /// </summary>
+        public bool IsAggregateDelta { get; }
     }
 }
