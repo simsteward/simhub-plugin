@@ -144,10 +144,43 @@ classDiagram
 
 ## Data API Schema
 
-Cloudflare Worker + D1 (mirrors local Flask + SQLite). Applied from `worker/schema.sql`.
+Cloudflare Worker with **hybrid D1 + R2** storage, applied from `worker/schema.sql`. D1 holds the queryable relational rows below; R2 holds the full-fidelity `ReplayIncidentIndexFileRoot` JSON blob (key `incident-index/v1/{subSessionId}.json`), of which `INCIDENT_INDEX_BLOBS` is the D1-side pointer/manifest. Short-lived device-pairing state lives in KV (not D1). Full design: `docs/superpowers/specs/2026-07-19-cloudflare-incident-storage-design.md`.
+
+**Auth boundary.** The data-plane tables are written/read only through routes gated by our own JWT (`Authorization: Bearer <access_token>`, minted from a rotating `user_token` via device pairing). The human pages (`/approve`, `/admin/*`) that mutate `USERS`/`SUBSCRIPTIONS` are gated by **Cloudflare Access** (email OTP), verified against Cloudflare's JWKS — a separate system from our JWT, never mixed. Incident rows carry `source`/`source_rank` (1=live, 2=replay_reconciled); the D1 upsert is rank-gated so a replay-reconciled write wins over a live one and never regresses. `APPS`, `USERS`, `SUBSCRIPTIONS`, and `USER_TOKENS` back the multi-tenant auth model; `USER_TOKENS` rotates on every exchange (`rotated_from` chain) for replay/theft detection.
 
 ```mermaid
 erDiagram
+  APPS {
+    text app_id PK
+    text token_hash
+    text version_label
+    text revoked_at
+    text created_at
+  }
+  USERS {
+    text user_id PK
+    text email
+    text display_name
+    text created_at
+    text last_seen_at
+  }
+  SUBSCRIPTIONS {
+    text user_id PK
+    text tier
+    text status
+    text current_period_end
+    text updated_at
+  }
+  USER_TOKENS {
+    text token_id PK
+    text user_id FK
+    text token_hash
+    text rotated_from FK
+    text created_at
+    text revoked_at
+    text last_used_at
+    text device_label
+  }
   DRIVERS {
     int user_id PK
     text user_name
@@ -161,6 +194,8 @@ erDiagram
     text track_name
     text session_type
     text captured_at
+    text index_source
+    text index_updated_at
   }
   INCIDENTS {
     text id PK
@@ -175,8 +210,17 @@ erDiagram
     text cause
     int other_user_id
     text source
+    int source_rank
     text processed_at
     int fingerprint_version
+  }
+  INCIDENT_INDEX_BLOBS {
+    int sub_session_id PK
+    text r2_key
+    text content_sha256
+    int incident_count
+    int index_build_time_ms
+    text updated_at
   }
   INCIDENT_CAPTURES {
     text id PK
@@ -192,8 +236,11 @@ erDiagram
     text subscription_tier
     text captured_at
   }
+  USERS ||--o| SUBSCRIPTIONS : "user_id"
+  USERS ||--o{ USER_TOKENS : "user_id"
   DRIVERS ||--o{ INCIDENTS : "user_id"
   SESSIONS ||--o{ INCIDENTS : "sub_session_id"
+  SESSIONS ||--o| INCIDENT_INDEX_BLOBS : "sub_session_id"
   INCIDENTS ||--o{ INCIDENT_CAPTURES : "incident_id"
 ```
 

@@ -262,6 +262,13 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .btn.danger { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
 .btn.record { font-size: 0.95rem; font-weight: 700; padding: 10px 20px; border-width: 2px; }
 .btn.record.on { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.12); animation: cap-pulse 1.2s ease-in-out infinite; }
+.btn.cloud { border-color: rgba(31,156,255,0.4); color: var(--accent); background: rgba(31,156,255,0.08); }
+.btn.cloud:hover { border-color: var(--accent); }
+.cloud-src-badge {
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 2px 8px; border-radius: 99px; border: 1px solid rgba(31,156,255,0.35);
+  color: var(--accent); background: rgba(31,156,255,0.08); white-space: nowrap;
+}
 .ri-banner {
   padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
   background: rgba(255,200,64,0.06); font-size: 0.82rem; line-height: 1.4; margin-bottom: 10px;
@@ -502,6 +509,50 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .im-block-single { padding: 0; border: none; margin: 0; }
 .im-row-muted { font-size: 0.65rem; color: var(--muted); }
 
+/* ── Cloud sync ── */
+.cloud-area { display: flex; align-items: center; gap: 6px; }
+.cloud-badge {
+  font-size: 0.68rem; padding: 2px 8px; border-radius: 99px; border: 1px solid; cursor: default;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+}
+.cloud-badge.paired   { color: var(--green);  border-color: rgba(14,242,114,0.3); background: rgba(14,242,114,0.07); }
+.cloud-badge.unpaired { color: var(--muted);  border-color: var(--border);        background: transparent; }
+.cloud-badge.unknown  { color: var(--muted);  border-color: var(--border);        background: transparent; }
+.cloud-badge .cloud-pending {
+  font-family: "Courier New", monospace; font-weight: 700; color: var(--yellow);
+}
+.cloud-connect-btn {
+  font-size: 0.68rem; padding: 3px 9px; border-radius: 99px;
+  border: 1px solid rgba(31,156,255,0.35); color: var(--accent);
+  background: rgba(31,156,255,0.08); cursor: pointer; transition: background 0.15s;
+}
+.cloud-connect-btn:hover { background: rgba(31,156,255,0.16); }
+
+.cloud-pair-overlay {
+  position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.72);
+}
+.cloud-pair-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 22px 26px; max-width: min(420px, calc(100vw - 40px)); text-align: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+}
+.cloud-pair-title {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 12px;
+}
+.cloud-pair-instructions { font-size: 0.82rem; color: var(--text); margin-bottom: 14px; line-height: 1.4; }
+.cloud-pair-code {
+  font-family: "Courier New", monospace; font-size: 2.1rem; font-weight: 700; letter-spacing: 0.18em;
+  color: var(--accent); background: rgba(31,156,255,0.08); border: 1px solid rgba(31,156,255,0.25);
+  border-radius: 8px; padding: 12px 10px; margin-bottom: 14px; user-select: all; word-break: break-all;
+}
+.cloud-pair-link { display: inline-block; font-size: 0.8rem; color: var(--accent); text-decoration: none; margin-bottom: 12px; }
+.cloud-pair-link:hover { text-decoration: underline; }
+.cloud-pair-expiry { font-size: 0.72rem; color: var(--muted); margin-bottom: 16px; }
+.cloud-pair-expiry.expired { color: var(--red); }
+.cloud-pair-cancel { border-color: var(--red); color: var(--red); background: rgba(255,95,95,0.06); }
+.cloud-pair-cancel:hover { border-color: var(--red); background: rgba(255,95,95,0.14); }
+
 /* ── Toast ── */
 .toast {
   position: fixed; bottom: 18px; right: 18px; max-width: min(420px, calc(100vw - 36px)); padding: 9px 15px;
@@ -656,6 +707,10 @@ Sentry.init({
       </div>
       <a href="#" onclick="goToReplayIndexTab(); return false" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Replay incident index (TR-031–TR-038)">Replay index →</a>
       <a href="test-rig.html" style="font-size:0.72rem;color:var(--accent);text-decoration:none;margin-right:4px" title="Test rig (Phase 2)">Test rig →</a>
+      <div class="cloud-area" id="cloud-area">
+        <span class="cloud-badge unknown" id="cloud-badge" title="Cloud sync status">☁ —</span>
+        <button type="button" class="cloud-connect-btn" id="cloud-connect-btn" onclick="cloudPairStart()" hidden>Connect to Cloud</button>
+      </div>
       <span class="ws-badge disconnected" id="ws-badge">WS ○</span>
     </header>
 
@@ -750,6 +805,7 @@ Sentry.init({
               <div class="ri-row" style="margin-bottom:0">
                 <input type="file" id="ri-file-index-input" accept=".json,application/json" hidden onchange="riOnFileInputChange(event)" />
                 <button type="button" class="btn" id="ri-btn-load-index" onclick="riLoadIndexFromFile()">Load from file…</button>
+                <button type="button" class="btn cloud" id="ri-btn-load-cloud" onclick="riLoadIndexFromCloud()" hidden title="No local index for this subsession — fetch it from the cloud">Load from cloud…</button>
                 <button type="button" class="btn" id="ri-btn-view-live" onclick="riViewLive()" hidden>View live session</button>
                 <span class="ri-meta" id="ri-file-load-state" style="margin-left:2px"></span>
               </div>
@@ -827,6 +883,19 @@ Sentry.init({
 
   </div><!-- /content-col -->
 </div><!-- /app -->
+
+<!-- ── Cloud pairing overlay ── -->
+<div class="cloud-pair-overlay" id="cloud-pair-overlay" hidden>
+  <div class="cloud-pair-card" role="dialog" aria-modal="true" aria-labelledby="cloud-pair-title">
+    <div class="cloud-pair-title" id="cloud-pair-title">Connect to Cloud</div>
+    <div class="cloud-pair-instructions">Open the verification page and enter this code:</div>
+    <div class="cloud-pair-code" id="cloud-pair-code">————</div>
+    <a class="cloud-pair-link" id="cloud-pair-link" href="#" target="_blank" rel="noopener noreferrer" onclick="cloudPairLinkClick()">open verification page ↗</a>
+    <div class="cloud-pair-expiry" id="cloud-pair-expiry">Expires in —</div>
+    <button type="button" class="btn cloud-pair-cancel" id="cloud-pair-cancel-btn" onclick="cloudPairCancel()">Cancel</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="dashboard-ui-events.js"></script>
@@ -879,6 +948,12 @@ let lastPluginFrame = 0;
 /** Session Timeline (telem tab) transition tracking — last mode / replay-session identity seen from state messages. */
 let lastKnownMode = null;
 let lastKnownSessionKey = null;
+/** Cloud sync state from cloudSyncStatus pushes; null before first push. */
+let cloudPaired = null;
+/** Interval id for the pairing-code countdown; cleared when overlay hides. */
+let cloudPairCountdownTimer = null;
+/** Verification URI from the active cloudPairing push (opened on link click). */
+let cloudVerificationUri = '';
 
 // ── WebSocket ────────────────────────────────────────────
 function connectWs() {
@@ -942,6 +1017,9 @@ function onMsg(m) {
     if (isSessionTimelineEvent(m.event)) log('telem','EVENT', m.event||'event', m.data||JSON.stringify(m));
   }
   else if (m.type === 'actionResult') onActionResult(m);
+  else if (m.type === 'cloudPairing')    onCloudPairing(m);
+  else if (m.type === 'cloudSyncStatus') onCloudSyncStatus(m);
+  else if (m.type === 'cloudIncidentIndex') riOnCloudIncidentIndex(m);
   else if (m.type === 'pong') {}
 }
 
@@ -983,6 +1061,118 @@ function onActionResult(m) {
       seek_throttled: 'Seeking too fast — wait a moment and try again.',
     };
     toast(msgs[err] || ('Replay index: ' + err), 3200, 'actionResult:' + action + ':' + err);
+  }
+}
+
+// ── Cloud sync ───────────────────────────────────────────
+/** Begin device pairing (button visible when unpaired). */
+function cloudPairStart() {
+  sendDashboardUiEvent({ element_id: 'cloud-connect-btn', event_type: 'click', message: 'Connect to Cloud' });
+  if (!send('cloud_pair_start')) toast('Not connected — can’t start cloud pairing.', undefined, 'cloud_pair_start');
+  log('health', 'INFO ', 'cloud_pair_start', 'Requested cloud device pairing');
+}
+
+/** Abandon in-flight pairing (Cancel button in overlay). */
+function cloudPairCancel() {
+  sendDashboardUiEvent({ element_id: 'cloud-pair-cancel-btn', event_type: 'click', message: 'Cancel cloud pairing' });
+  send('cloud_pair_cancel');
+  hideCloudPairOverlay();
+  log('health', 'INFO ', 'cloud_pair_cancel', 'Cancelled cloud device pairing');
+}
+
+/** Verification link opened by the user (navigation, not an API call). */
+function cloudPairLinkClick() {
+  sendDashboardUiEvent({ element_id: 'cloud-pair-link', event_type: 'click', message: 'Open cloud verification page', value: cloudVerificationUri });
+}
+
+/** Show the pairing code + link + countdown from a cloudPairing push. */
+function onCloudPairing(m) {
+  const code = m.userCode != null ? String(m.userCode) : '';
+  const uri = m.verificationUri != null ? String(m.verificationUri) : '';
+  const expiresInSec = typeof m.expiresInSec === 'number' && m.expiresInSec > 0 ? Math.floor(m.expiresInSec) : 0;
+  cloudVerificationUri = uri;
+  const codeEl = document.getElementById('cloud-pair-code');
+  if (codeEl) codeEl.textContent = code || '————';
+  const linkEl = document.getElementById('cloud-pair-link');
+  if (linkEl) {
+    if (uri) { linkEl.href = uri; linkEl.hidden = false; }
+    else { linkEl.removeAttribute('href'); linkEl.hidden = true; }
+  }
+  const overlay = document.getElementById('cloud-pair-overlay');
+  if (overlay) overlay.hidden = false;
+  startCloudPairCountdown(expiresInSec);
+  log('health', 'INFO ', 'cloud_pairing', 'userCode=' + code + ' expiresInSec=' + expiresInSec);
+}
+
+function startCloudPairCountdown(expiresInSec) {
+  if (cloudPairCountdownTimer) { clearInterval(cloudPairCountdownTimer); cloudPairCountdownTimer = null; }
+  const expEl = document.getElementById('cloud-pair-expiry');
+  let remaining = expiresInSec;
+  const paint = function () {
+    if (!expEl) return;
+    if (remaining > 0) {
+      expEl.classList.remove('expired');
+      expEl.textContent = 'Expires in ' + remaining + 's';
+    } else {
+      expEl.classList.add('expired');
+      expEl.textContent = 'Code expired — start again to get a new code.';
+    }
+  };
+  paint();
+  if (expiresInSec <= 0) return;
+  cloudPairCountdownTimer = setInterval(function () {
+    remaining -= 1;
+    if (remaining <= 0) {
+      remaining = 0;
+      paint();
+      clearInterval(cloudPairCountdownTimer);
+      cloudPairCountdownTimer = null;
+    } else {
+      paint();
+    }
+  }, 1000);
+}
+
+function hideCloudPairOverlay() {
+  const overlay = document.getElementById('cloud-pair-overlay');
+  if (overlay) overlay.hidden = true;
+  if (cloudPairCountdownTimer) { clearInterval(cloudPairCountdownTimer); cloudPairCountdownTimer = null; }
+}
+
+/** Low-cadence sync status; contains only booleans/strings/numbers (never tokens). */
+function onCloudSyncStatus(m) {
+  cloudPaired = !!m.paired;
+  if (cloudPaired) hideCloudPairOverlay();
+  renderCloudStatus(m);
+}
+
+function formatCloudPushTime(lastPushUtc) {
+  if (!lastPushUtc) return null;
+  const d = new Date(lastPushUtc);
+  if (isNaN(d.getTime())) return String(lastPushUtc);
+  return d.toLocaleTimeString();
+}
+
+function renderCloudStatus(m) {
+  const badge = document.getElementById('cloud-badge');
+  const connectBtn = document.getElementById('cloud-connect-btn');
+  if (!badge) return;
+  if (cloudPaired) {
+    const pushStr = formatCloudPushTime(m && m.lastPushUtc);
+    const pending = (m && typeof m.outboxPendingCount === 'number') ? m.outboxPendingCount : 0;
+    let html = '☁ Synced';
+    if (pushStr) html += ' · ' + escapeHtmlForCaptured(pushStr);
+    if (pending > 0) html += ' · <span class="cloud-pending">' + pending + ' pending</span>';
+    badge.className = 'cloud-badge paired';
+    badge.innerHTML = html;
+    badge.title = 'Cloud sync active' + (pushStr ? ' — last push ' + pushStr : '') +
+      (pending > 0 ? ' — ' + pending + ' incident(s) pending upload' : '');
+    if (connectBtn) connectBtn.hidden = true;
+  } else {
+    badge.className = 'cloud-badge unpaired';
+    badge.textContent = '☁ Not connected';
+    badge.title = 'Cloud sync not paired';
+    if (connectBtn) connectBtn.hidden = false;
   }
 }
 
@@ -1102,6 +1292,8 @@ let riSortDir = 1;
 let riLastSeekAt = 0;
 let riLoadedFileIdx = null;
 let riViewSource = 'live'; // 'live' | 'file'
+/** True when the loaded index came from a cloud fetch (renders through the file-view path with a cloud label). */
+let riLoadedFromCloud = false;
 const RI_MAX_INDEX_FILE_BYTES = 5 * 1024 * 1024;
 
 function riCurrentDisplayIndex(rii) {
@@ -1119,7 +1311,7 @@ function riOnState(m) {
   const rii = m.replayIncidentIndex;
   riLastSessionNum = m.replaySessionNum != null ? m.replaySessionNum : 0;
   riLastDiagnostics = m.diagnostics || null;
-  if (!rii) return;
+  if (!rii) { riUpdateCloudLoadButton(null, m.diagnostics); return; }
   riLastIdx = rii;
   riRenderGuard(rii, m.diagnostics);
   riRenderBuild(rii);
@@ -1128,6 +1320,7 @@ function riOnState(m) {
   riRenderTable(rii);
   riUpdateNavigatePanel(rii, m.diagnostics);
   riRefreshFileViewUi();
+  riUpdateCloudLoadButton(rii, m.diagnostics);
   document.getElementById('ri-btn-record').classList.toggle('on', !!rii.recordMode);
   const rp = rii.recordSamplePath || '';
   document.getElementById('ri-record-path').textContent = rp ? ('Record file: ' + rp) : '';
@@ -1426,6 +1619,7 @@ function riOnFileInputChange(evt) {
     }
     riLoadedFileIdx = parsed;
     riViewSource = 'file';
+    riLoadedFromCloud = false;
     const cnt = (parsed.incidents || []).length;
     sendDashboardUiEvent({
       element_id: 'ri-file-index-loaded',
@@ -1467,12 +1661,66 @@ function riViewLive() {
   sendDashboardUiEvent({ element_id: 'ri-btn-view-live', event_type: 'click', message: 'Return to live session view' });
   riLoadedFileIdx = null;
   riViewSource = 'live';
+  riLoadedFromCloud = false;
   riRefreshFileViewUi();
   if (riLastIdx) {
     riRenderSummary(riLastIdx);
     riRenderTable(riLastIdx);
     riRenderValidation(riLastIdx);
     riUpdateNavigatePanel(riLastIdx, riLastDiagnostics);
+  }
+}
+
+// ── Cloud fetch ──────────────────────────────────────────
+/** Show "Load from cloud…" only when a live subsession exists but has no local index. */
+function riUpdateCloudLoadButton(rii, diag) {
+  const btn = document.getElementById('ri-btn-load-cloud');
+  if (!btn) return;
+  const connected = diag && diag.irsdkConnected;
+  const hasSub = rii && rii.subSessionId != null && rii.subSessionId !== '';
+  const hasLocalIndex = rii && rii.index != null;
+  btn.hidden = !(connected && hasSub && !hasLocalIndex);
+}
+
+function riLoadIndexFromCloud() {
+  const rii = riLastIdx;
+  const sub = rii && rii.subSessionId != null ? String(rii.subSessionId) : '';
+  sendDashboardUiEvent({ element_id: 'ri-btn-load-cloud', event_type: 'click', message: 'Fetch incident index from cloud subSessionId=' + (sub || '—') });
+  if (!sub) { toast('No subsession id — load a replay session first.'); return; }
+  send('cloud_incident_index_fetch', sub);
+  toast('Requesting incident index from cloud…');
+}
+
+/** Render a cloud-fetched index (root = ReplayIncidentIndexFileRoot) via the file-view path. */
+function riOnCloudIncidentIndex(m) {
+  const root = m && m.root;
+  const err = riValidateIndexShape(root);
+  if (err) {
+    sendDashboardUiEvent({ element_id: 'ri-cloud-index-load-failed', event_type: 'ui_interaction', message: 'Cloud index validation failed: ' + err });
+    toast('Cloud index invalid: ' + err);
+    return;
+  }
+  riLoadedFileIdx = root;
+  riViewSource = 'file';
+  riLoadedFromCloud = true;
+  const cnt = (root.incidents || []).length;
+  sendDashboardUiEvent({
+    element_id: 'ri-cloud-index-loaded',
+    event_type: 'ui_interaction',
+    message: 'Loaded cloud index subSessionId=' + root.subSessionId + ' incidents=' + cnt
+  });
+  toast('Loaded ' + cnt + ' incident' + (cnt !== 1 ? 's' : '') + ' from cloud');
+  riRefreshFileViewUi();
+  if (riLastIdx) {
+    riRenderSummary(riLastIdx);
+    riRenderTable(riLastIdx);
+    riRenderValidation(riLastIdx);
+    riUpdateNavigatePanel(riLastIdx, riLastDiagnostics);
+  } else {
+    const synthetic = { index: null, incidentCount: cnt };
+    riRenderSummary(synthetic);
+    riRenderTable(synthetic);
+    riRenderValidation(synthetic);
   }
 }
 
@@ -1485,7 +1733,9 @@ function riRefreshFileViewUi() {
     const liveSub = riLastIdx ? riLastIdx.subSessionId : null;
     const match = liveSub != null && String(liveSub) === String(fileSub);
     const color = match ? 'var(--green)' : 'var(--yellow)';
-    state.innerHTML = '<strong style="color:' + color + '">Viewing file:</strong> subSessionId=' + escapeHtmlForCaptured(fileSub) +
+    const label = riLoadedFromCloud ? 'Viewing cloud index:' : 'Viewing file:';
+    const cloudBadge = riLoadedFromCloud ? '<span class="cloud-src-badge" style="margin-right:6px">cloud</span>' : '';
+    state.innerHTML = cloudBadge + '<strong style="color:' + color + '">' + label + '</strong> subSessionId=' + escapeHtmlForCaptured(fileSub) +
       (match ? ' <span style="color:var(--muted)">(matches current)</span>'
              : ' <span style="color:var(--muted)">(≠ current ' + escapeHtmlForCaptured(liveSub != null ? liveSub : '—') + ' — Seek disabled)</span>');
   } else {

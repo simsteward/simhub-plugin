@@ -17,6 +17,7 @@ namespace SimSteward.Plugin
         private readonly Func<string> _getLogTailForNewClient;
         private readonly Func<string> _getHelloForNewClient;
         private readonly Func<string> _getIncidentsForNewClient;
+        private readonly Func<string> _getCloudStatusForNewClient;
         private readonly Func<string, string, string, (bool success, string result, string error)> _dispatchAction;
         private readonly Action<string, string, string> _onLog;
         private readonly Action<string, string, Dictionary<string, object>> _onStructuredLog;
@@ -37,12 +38,14 @@ namespace SimSteward.Plugin
             Action onNoClients = null,
             Action onLastClientDisconnected = null,
             Func<string> getHelloForNewClient = null,
-            Func<string> getIncidentsForNewClient = null)
+            Func<string> getIncidentsForNewClient = null,
+            Func<string> getCloudStatusForNewClient = null)
         {
             _getStateForNewClient = getStateForNewClient ?? (() => "{}");
             _getLogTailForNewClient = getLogTailForNewClient;
             _getHelloForNewClient = getHelloForNewClient ?? (() => null);
             _getIncidentsForNewClient = getIncidentsForNewClient ?? (() => null);
+            _getCloudStatusForNewClient = getCloudStatusForNewClient ?? (() => null);
             _dispatchAction = dispatchAction ?? ((_, __, ___) => (false, null, "missing_dispatch"));
             _onLog = onLog ?? ((_, __, ___) => { });
             _onStructuredLog = onStructuredLog;
@@ -117,6 +120,17 @@ namespace SimSteward.Plugin
                         {
                             SentrySdk.CaptureException(ex);
                             _logger?.Warn($"DashboardBridge: getIncidentsForNewClient failed: {ex.Message}");
+                        }
+                        try
+                        {
+                            var cloudStatusJson = _getCloudStatusForNewClient?.Invoke();
+                            if (!string.IsNullOrEmpty(cloudStatusJson))
+                                socket.Send(cloudStatusJson);
+                        }
+                        catch (Exception ex)
+                        {
+                            SentrySdk.CaptureException(ex);
+                            _logger?.Warn($"DashboardBridge: getCloudStatusForNewClient failed: {ex.Message}");
                         }
                     };
 

@@ -45,19 +45,18 @@ namespace SimSteward.Plugin
             }
         }
 
-        /// <summary>UTF-8 atomic write (temp + replace).</summary>
+        /// <summary>UTF-8 atomic write (temp + replace). Emits a UTF-8 BOM to match prior behavior.</summary>
         public static void WriteJsonAtomic(string finalPath, string json)
         {
-            string dir = Path.GetDirectoryName(finalPath);
-            if (!string.IsNullOrEmpty(dir))
-                Directory.CreateDirectory(dir);
-
-            string temp = finalPath + ".tmp";
-            File.WriteAllText(temp, json, System.Text.Encoding.UTF8);
-            if (File.Exists(finalPath))
-                File.Replace(temp, finalPath, null);
-            else
-                File.Move(temp, finalPath);
+            // Preserve the exact bytes File.WriteAllText(path, json, Encoding.UTF8) produced:
+            // Encoding.UTF8 emits a BOM preamble, so prepend it before the encoded body.
+            var enc = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+            byte[] preamble = enc.GetPreamble();
+            byte[] body = enc.GetBytes(json ?? "");
+            byte[] bytes = new byte[preamble.Length + body.Length];
+            System.Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+            System.Buffer.BlockCopy(body, 0, bytes, preamble.Length, body.Length);
+            AtomicFile.WriteAllBytesAtomic(finalPath, bytes);
         }
     }
 }

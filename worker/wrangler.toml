@@ -1,0 +1,59 @@
+name = "simsteward-worker"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ---------------------------------------------------------------------------
+# Non-secret config. These are safe to commit — they identify the Cloudflare
+# Access application, not credentials.
+#
+# ACCESS_TEAM_DOMAIN — your Access team domain, e.g. "simsteward" for
+#   https://simsteward.cloudflareaccess.com  (used to build the JWKS URL + iss).
+# ACCESS_AUD — the Access application's AUD tag (from the Access app config).
+#
+# ADMIN_EMAILS — comma-separated allowlist of Access-verified emails that may
+#   use the admin routes. Passing Cloudflare Access is NOT enough on its own:
+#   the resolved email must appear in this list (compared case-insensitively,
+#   whitespace trimmed) or the route returns 403 admin_required. Leaving this
+#   unset/empty locks every admin route for everyone.
+#   Example: ADMIN_EMAILS = "you@example.com,ops@example.com"
+#
+# ACCESS_DEV_BYPASS and ENVIRONMENT are intentionally NOT set here. Together
+# they disable real Access JWT verification on /approve + /admin/* so the flow
+# is testable locally/in CI — access-verify.ts requires BOTH ACCESS_DEV_BYPASS
+# AND ENVIRONMENT="development" before honoring the bypass, specifically so
+# that setting only one of them (e.g. a copy-paste mistake) cannot silently
+# open the bypass in production. NEVER add either to this file; they belong
+# only in a local dev/test environment (see vitest.config.ts and `wrangler dev`
+# notes in README).
+# ---------------------------------------------------------------------------
+[vars]
+ACCESS_TEAM_DOMAIN = "REPLACE_WITH_ACCESS_TEAM_DOMAIN"
+ACCESS_AUD = "REPLACE_WITH_ACCESS_AUD_TAG"
+ADMIN_EMAILS = "REPLACE_WITH_COMMA_SEPARATED_ADMIN_EMAILS"
+
+# D1 — relational store (drivers, sessions, incidents, users, tokens, subs).
+# Create with `wrangler d1 create simsteward-db`, then paste the printed id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "simsteward-db"
+database_id = "REPLACE_AFTER_D1_CREATE"
+
+# R2 — verbatim incident-index JSON blobs.
+# Create with `wrangler r2 bucket create simsteward-incident-index`.
+[[r2_buckets]]
+binding = "INCIDENT_INDEX_BUCKET"
+bucket_name = "simsteward-incident-index"
+
+# KV — short-lived device-pairing state (<=10 min TTL via expirationTtl).
+# Create with `wrangler kv namespace create simsteward-device-codes`,
+# then paste the printed id below.
+[[kv_namespaces]]
+binding = "DEVICE_CODES"
+id = "REPLACE_AFTER_KV_CREATE"
+
+# ---------------------------------------------------------------------------
+# Secrets — DO NOT put real values here. Set them out-of-band, e.g.:
+#   wrangler secret put JWT_HMAC_SECRET
+# JWT_HMAC_SECRET signs/verifies our own short-lived access-token JWTs (HS256).
+# ---------------------------------------------------------------------------

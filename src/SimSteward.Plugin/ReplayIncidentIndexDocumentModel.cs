@@ -57,6 +57,13 @@ namespace SimSteward.Plugin
         [JsonProperty("fingerprint")]
         public string Fingerprint { get; set; }
 
+        /// <summary>
+        /// Sampling-rate-stable fingerprint (v2) used as the cloud dedup key. Populated additively
+        /// alongside <see cref="Fingerprint"/> (v1); v1 is retained for existing local consumers.
+        /// </summary>
+        [JsonProperty("cloudFingerprint")]
+        public string CloudFingerprint { get; set; }
+
         [JsonProperty("carIdx")]
         public int CarIdx { get; set; }
 
@@ -165,9 +172,17 @@ namespace SimSteward.Plugin
                     s.DetectionSource,
                     s.IncidentPoints);
 
+                string cloudFp = ReplayIncidentIndexFingerprint.ComputeHexV2(
+                    subSessionId,
+                    s.CarIdx,
+                    s.SessionTimeMs,
+                    s.DetectionSource,
+                    s.IncidentPoints);
+
                 rows.Add(new ReplayIncidentIndexIncidentRow
                 {
                     Fingerprint = fp,
+                    CloudFingerprint = cloudFp,
                     CarIdx = s.CarIdx,
                     SessionTimeMs = s.SessionTimeMs,
                     DetectionSource = s.DetectionSource,

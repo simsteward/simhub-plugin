@@ -1566,6 +1566,21 @@ namespace SimSteward.Plugin
                 return (true, "ok", null);
             }
 
+            if (string.Equals(action, "cloud_pair_start", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchCloudPairStart(arg, correlationId);
+            }
+
+            if (string.Equals(action, "cloud_pair_cancel", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchCloudPairCancel(arg, correlationId);
+            }
+
+            if (string.Equals(action, "cloud_incident_index_fetch", StringComparison.OrdinalIgnoreCase))
+            {
+                return DispatchCloudIncidentIndexFetch(arg, correlationId);
+            }
+
             LogActionResult(action, arg, correlationId, false, "not_supported");
             return (false, null, "not_supported");
 
@@ -1775,7 +1790,8 @@ namespace SimSteward.Plugin
                     _replayIndexRecordModeEnabled = false;
                 },
                 getHelloForNewClient: GetSessionHelloForNewClient,
-                getIncidentsForNewClient: GetIncidentsForNewClient);
+                getIncidentsForNewClient: GetIncidentsForNewClient,
+                getCloudStatusForNewClient: GetCloudSyncStatusJson);
 
             try
             {
@@ -1858,6 +1874,8 @@ namespace SimSteward.Plugin
                         ["exception_type"] = ex.GetType().Name,
                     }, "lifecycle", null);
             }
+
+            InitCloudSync();
 
             RefreshDependencyChecks();
         }
@@ -1954,6 +1972,7 @@ namespace SimSteward.Plugin
                 ProcessCaptureQueueTick();
                 ProcessLiveReplayAggregatorTick();
                 ProcessJumpMisfireEvaluatorTick();
+                TickCloudSync();
 
                 if (++_captureManifestFlushTickCounter >= CaptureManifestFlushIntervalTicks)
                 {

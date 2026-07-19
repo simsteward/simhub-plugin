@@ -1192,6 +1192,7 @@ namespace SimSteward.Plugin
                 root.Sessions = BuildReplayIndexSessionsLocked();
                 string json = ReplayIncidentIndexDocumentBuilder.Serialize(root);
                 ReplayIncidentIndexOutputPaths.WriteJsonAtomic(path, json);
+                EnqueueReplayIndexForCloudSync(root, json);
                 ReplayIncidentIndexDashboardNotifyIndexWritten(subSessionId, root);
             }
             catch (Exception ex)
