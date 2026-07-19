@@ -856,6 +856,8 @@ const MOCK_DRV = [
 // ── State ────────────────────────────────────────────────
 let incidents   = [...MOCK_INC];
 let drivers     = [...MOCK_DRV];
+/** carIdx -> official point total, from WS {type:"liveIncidentTotals"} — populated once results go official while still live. Aggregate only, see pointsBadgeHtml(). */
+let liveTotalsByCarIdx = {};
 let capturedIncidents = [];
 let capturedGroupByDriver = false;
 /** Driver group labels (group-by-driver mode); when present, that group's rows are hidden. */
@@ -937,6 +939,11 @@ function onMsg(m) {
   if (m.type === 'state')         onState(m);
   else if (m.type === 'logEvents')  (m.entries || []).forEach(e => log('health', (e.level||'INFO').toUpperCase().padEnd(5), e.event||'', e.message||''));
   else if (m.type === 'incidents')  { incidents = m.entries || []; renderInc(); }
+  else if (m.type === 'liveIncidentTotals') {
+    liveTotalsByCarIdx = {};
+    (m.totals || []).forEach(t => { if (typeof t.carIdx === 'number') liveTotalsByCarIdx[t.carIdx] = t.points; });
+    renderInc();
+  }
   else if (m.type === 'iracingEvent') {
     log('events','EVENT', m.event||'event', m.data||JSON.stringify(m));
     if (isSessionTimelineEvent(m.event)) log('telem','EVENT', m.event||'event', m.data||JSON.stringify(m));
@@ -1549,10 +1556,27 @@ function applySuggestedCamerasToIncidents() {
  * Renders a points badge. `pointsResolved === false` means "not yet known" (structurally
  * unavailable live for other cars — see docs/IRACING-DATA-AVAILABILITY.md), never "confirmed
  * zero" — shown distinctly from a real 1x/2x/4x value rather than defaulting to a misleading "0×".
+ *
+ * Two independent, never-confused-with-resolved hints layer on top while unresolved:
+ *  - `estimatedPoints` — a best-effort guess for THIS incident, derived from its detection source
+ *    (off-track is confident; contact/flag guesses are conservative and can be visibly wrong).
+ *  - `liveTotalsByCarIdx[i.car]` — once results go official while still live, that driver's real
+ *    SESSION TOTAL (not this specific incident's value — see LiveIncidentTotalsBackfill).
+ * Both render as "~Nx" / "car total Nx" prefixed distinctly from a real resolved "Nx" badge.
  */
 function pointsBadgeHtml(i) {
   if (!i.pointsResolved) {
-    return `<span class="points-badge pending" title="Not yet known — other cars' real incident points aren't exposed live by iRacing's SDK. Check the Replay Index tab after the session for the authoritative count.">pending</span>`;
+    const est = i.estimatedPoints;
+    const total = liveTotalsByCarIdx[i.car];
+    const parts = [];
+    if (typeof est === 'number') parts.push(`~${escapeHtmlForCaptured(est)}× est`);
+    if (typeof total === 'number') parts.push(`car total ${escapeHtmlForCaptured(total)}×`);
+    const label = parts.length ? `pending <em>(${parts.join(' · ')})</em>` : 'pending';
+    const title = 'This incident\'s own point value isn\'t confirmed live — ' +
+      (typeof est === 'number' ? 'the ~' + est + '× is a best-effort guess from the detection type, not iRacing\'s real number. ' : '') +
+      (typeof total === 'number' ? 'The driver\'s official session total (' + total + '×) is known, but not attributable to this specific incident. ' : '') +
+      'Check the Replay Index tab after loading the replay for the authoritative per-incident breakdown.';
+    return `<span class="points-badge pending" title="${escapeHtmlForCaptured(title)}">${label}</span>`;
   }
   return `<span class="points-badge s${escapeHtmlForCaptured(i.points)}">${escapeHtmlForCaptured(i.points)}×</span>`;
 }

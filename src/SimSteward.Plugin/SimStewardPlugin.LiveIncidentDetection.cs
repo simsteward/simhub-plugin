@@ -48,10 +48,14 @@ namespace SimSteward.Plugin
         private DateTime _liveYamlProbeLastPollUtc = DateTime.MinValue;
         private static readonly TimeSpan LiveYamlProbePollInterval = TimeSpan.FromSeconds(5);
 
+        /// <summary>Last per-driver point totals broadcast to the Live tab via <see cref="BroadcastLiveIncidentTotals"/>; null until results go final. See LiveIncidentTotalsBackfill.</summary>
+        private Dictionary<int, int> _liveIncidentTotalsLastBroadcast;
+
         private const string EventLiveDetection = "live_incident_detection";
         private const string EventLiveBaselineReady = "live_incident_detection_baseline_ready";
         private const string EventLiveYamlProbe = "live_yaml_incident_probe";
         private const string EventLiveEscalated = "live_incident_escalated";
+        private const string EventLiveTotalsResolved = "live_incident_totals_resolved";
 
         /// <summary>
         /// Field-wide, no-admin-required incident detection during a genuine LIVE session (not replay,
@@ -118,6 +122,7 @@ namespace SimSteward.Plugin
                 _liveRaceLastSessionNum = sessionNum;
                 _liveIncidentBoardEntries.Clear(); // new session — old entries no longer apply
                 _liveYamlIncidentsProbePrev = null; // new session — YAML Incidents counts reset too
+                _liveIncidentTotalsLastBroadcast = null; // new session — prior totals no longer apply
                 BroadcastLiveIncidentBoard();
 
                 var f = new Dictionary<string, object>
@@ -178,14 +183,19 @@ namespace SimSteward.Plugin
         }
 
         /// <summary>
-        /// Empirical verification probe: does SessionInfoYaml's ResultsPositions[].Incidents block update
-        /// progressively during a genuinely LIVE (non-replay) session, for cars other than the player, or
-        /// only after the session ends? Reuses the same parse+diff helpers already proven correct on the
-        /// replay fast-forward path (ProcessYamlIncidentDiffLocked in SimStewardPlugin.ReplayIncidentIndexBuild.cs)
-        /// verbatim — no new parsing logic. Pure observation: logs every throttled poll (not just when
-        /// deltas exist) so the Loki timeseries shows the full trajectory of cars_in_snapshot across a
-        /// session. Does not feed samples/_liveIncidentBoardEntries — see plan doc for the branch decision
-        /// this gates.
+        /// Empirically confirmed (docs/IRACING-DATA-AVAILABILITY.md Group 5): SessionInfoYaml's
+        /// ResultsPositions[].Incidents block does NOT update progressively during a genuinely LIVE
+        /// (non-replay) session — it stays flat until results go official, then jumps straight to the
+        /// final per-driver total in one step. Reuses the same parse+diff helpers already proven
+        /// correct on the replay fast-forward path (ProcessYamlIncidentDiffLocked in
+        /// SimStewardPlugin.ReplayIncidentIndexBuild.cs) verbatim — no new parsing logic. Logs every
+        /// throttled poll (not just when deltas exist) so the Loki timeseries shows the full
+        /// trajectory of cars_in_snapshot across a session.
+        ///
+        /// Deliberately does NOT feed _liveIncidentBoardEntries (per-incident rows) — a single
+        /// finalization jump can't be attributed to one specific earlier row without the full
+        /// chronological re-sweep the Replay Index Build already does. It DOES feed an aggregate
+        /// per-driver TOTAL to the Live tab once finalized, via <see cref="TryBroadcastLiveIncidentTotalsLocked"/>.
         /// </summary>
         private void PollLiveYamlIncidentsForVerificationLocked(double sessionTimeSec, int subSessionId, int sessionNum)
         {
@@ -238,7 +248,70 @@ namespace SimSteward.Plugin
                 f, "lifecycle", null);
 
             if (parseOk)
+            {
                 _liveYamlIncidentsProbePrev = currByCar;
+                TryBroadcastLiveIncidentTotalsLocked(currByCar, subSessionId, sessionTimeSec);
+            }
+        }
+
+        /// <summary>
+        /// Aggregate-only live backfill (TR-continuation of the Live tab's "pending" points badge):
+        /// once results go official while still connected live, push each driver's real point TOTAL
+        /// to the dashboard. Never per-incident — see class remarks on
+        /// <see cref="PollLiveYamlIncidentsForVerificationLocked"/> for why that's not attributable.
+        /// No-op (and does not re-broadcast) until results are final or once totals stop changing.
+        /// </summary>
+        private void TryBroadcastLiveIncidentTotalsLocked(Dictionary<int, int> yamlByCarIdx, int subSessionId, double sessionTimeSec)
+        {
+            if (!LiveIncidentTotalsBackfill.IsFinal(yamlByCarIdx))
+                return;
+            if (!LiveIncidentTotalsBackfill.HasChanged(_liveIncidentTotalsLastBroadcast, yamlByCarIdx))
+                return;
+
+            _liveIncidentTotalsLastBroadcast = yamlByCarIdx;
+
+            var totals = new List<LiveIncidentTotalEntry>(yamlByCarIdx.Count);
+            foreach (var kv in yamlByCarIdx)
+            {
+                totals.Add(new LiveIncidentTotalEntry
+                {
+                    CarIdx = kv.Key,
+                    Driver = ResolveDriverNameForCarIdxOrEmpty(kv.Key),
+                    Points = kv.Value
+                });
+            }
+
+            if (_bridge != null)
+            {
+                try
+                {
+                    var msg = new { type = "liveIncidentTotals", totals };
+                    _bridge.Broadcast(JsonConvert.SerializeObject(msg), "liveIncidentTotals");
+                }
+                catch (Exception ex)
+                {
+                    _logger?.Warn("live_incident_totals broadcast: " + ex.Message);
+                }
+            }
+
+            var f = new Dictionary<string, object>
+            {
+                ["subsession_id"] = subSessionId,
+                ["session_time"] = Math.Round(sessionTimeSec, 2),
+                ["drivers_with_totals"] = yamlByCarIdx.Count,
+                ["total_points"] = SumPoints(yamlByCarIdx)
+            };
+            MergeSessionAndRoutingFields(f);
+            _logger?.Structured("INFO", "simhub-plugin", EventLiveTotalsResolved,
+                "Live incident totals: results went official while still live — backfilling per-driver totals to the dashboard.",
+                f, "lifecycle", null);
+        }
+
+        private static int SumPoints(Dictionary<int, int> yamlByCarIdx)
+        {
+            int total = 0;
+            foreach (var kv in yamlByCarIdx) total += kv.Value;
+            return total;
         }
 
         private void LogLiveIncidentDetectionsLocked(IReadOnlyList<IncidentSample> samples, double sessionTimeSec, int subSessionId, int replayFrame, int playerCarIdx)
@@ -296,6 +369,9 @@ namespace SimSteward.Plugin
                             Driver = string.IsNullOrEmpty(driverName) ? ("Car " + s.CarIdx) : driverName,
                             Points = s.IncidentPoints ?? 0,
                             PointsResolved = s.IncidentPoints.HasValue,
+                            EstimatedPoints = s.IncidentPoints.HasValue
+                                ? (int?)null
+                                : IncidentPointsEstimate.Estimate(s.DetectionSource, _liveRaceIsDirtSession),
                             Cause = result.Cause,
                             Frame = replayFrame,
                             Lap = s.Lap,
@@ -317,6 +393,11 @@ namespace SimSteward.Plugin
                         string fromCause = entry.Cause;
                         entry.Points = s.IncidentPoints ?? 0;
                         entry.PointsResolved = s.IncidentPoints.HasValue;
+                        // Real resolution supersedes any earlier guess; otherwise re-derive the
+                        // estimate since the driving detection source/cause may have changed.
+                        entry.EstimatedPoints = s.IncidentPoints.HasValue
+                            ? (int?)null
+                            : IncidentPointsEstimate.Estimate(s.DetectionSource, _liveRaceIsDirtSession);
                         entry.Cause = result.Cause;
 
                         var escFields = new Dictionary<string, object>

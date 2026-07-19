@@ -221,6 +221,14 @@ namespace SimSteward.Plugin
         [JsonProperty("pointsResolved")]
         public bool PointsResolved { get; set; }
 
+        /// <summary>
+        /// "Session observed" best-effort guess (see IncidentPointsEstimate) — null when no
+        /// defensible guess exists for this detection source. Meaningless once <see cref="PointsResolved"/>
+        /// is true; the dashboard must never blend this with a real resolved value.
+        /// </summary>
+        [JsonProperty("estimatedPoints")]
+        public int? EstimatedPoints { get; set; }
+
         /// <summary>One of "off-track" | "spin" | "contact" | "flagged" | "unknown" — matches index.html's `.cause-tag` CSS classes.</summary>
         [JsonProperty("cause")]
         public string Cause { get; set; } = "unknown";
@@ -233,6 +241,24 @@ namespace SimSteward.Plugin
 
         [JsonProperty("player")]
         public bool Player { get; set; }
+    }
+
+    /// <summary>
+    /// One row of WS <c>{type:"liveIncidentTotals", totals:[...]}</c> — aggregate-only per-driver
+    /// point total, broadcast once official results post while still connected live. See
+    /// LiveIncidentTotalsBackfill / SimStewardPlugin.LiveIncidentDetection.cs for why this is never
+    /// per-incident.
+    /// </summary>
+    public sealed class LiveIncidentTotalEntry
+    {
+        [JsonProperty("carIdx")]
+        public int CarIdx { get; set; }
+
+        [JsonProperty("driver")]
+        public string Driver { get; set; } = "";
+
+        [JsonProperty("points")]
+        public int Points { get; set; }
     }
 
     /// <summary>WebSocket <c>state.replayIncidentIndex</c> (TR-031–TR-033, TR-037–TR-038).</summary>
