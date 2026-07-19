@@ -15,7 +15,7 @@ Diagrams covering C# data structures, WebSocket message contracts, data API sche
 | Replay incident index (data) | `src/SimSteward.Plugin/SimStewardPlugin.ReplayIncidentIndex.cs`, `SimStewardPlugin.ReplayIncidentIndexBuild.cs` | Index build, TR-019-style payloads |
 | Replay incident index (dashboard / WS actions) | `src/SimSteward.Plugin/SimStewardPlugin.ReplayIncidentIndexDashboard.cs` | WS actions for index UI |
 | Data capture suite (SDK / Loki verification) | `src/SimSteward.Plugin/SimStewardPlugin.DataCaptureSuite.cs` | Capture-suite actions and plumbing |
-| Dashboard UI (SimHub HTTP) | `src/SimSteward.Dashboard/index.html`, `replay-incident-index.html`, `data-capture-suite.html` | Browser ES6+ clients; WS to plugin on `SIMSTEWARD_WS_PORT` |
+| Dashboard UI (SimHub HTTP) | `src/SimSteward.Dashboard/index.html` (includes Replay Index tab, `#log-replayindex`), `data-capture-suite.html` | Browser ES6+ clients; WS to plugin on `SIMSTEWARD_WS_PORT` |
 | Structured logging / Loki | `SessionLogging`, sinks under `src/SimSteward.Plugin/` (see [GRAFANA-LOGGING.md](GRAFANA-LOGGING.md)) | JSONL + optional Loki push |
 
 ---
@@ -242,31 +242,35 @@ sequenceDiagram
 
 How iRacing incidents flow from SDK shared memory to the dashboard leaderboard and Loki.
 
-**Platform availability** (what YAML exposes per car in live vs replay vs post-results) is documented in [docs/IRACING-DATA-AVAILABILITY.md](IRACING-DATA-AVAILABILITY.md). The plugin reads **`DriverInfo.Drivers[].CurDriverIncidentCount`** from the session YAML on `SessionInfoUpdate` and compares to a per-car baseline.
+**Platform availability** (what YAML exposes per car in live vs replay vs post-results) is documented in [docs/IRACING-DATA-AVAILABILITY.md](IRACING-DATA-AVAILABILITY.md). Live detection runs on per-tick telemetry (`CarIdxTrackSurface` off-track, `CarIdxSessionFlags` per-car flags, `PlayerCarMyIncidentCount` for the player's own points); other cars' official incident points are **not** available live — `Sessions[].ResultsPositions[].Incidents` does not update progressively during a live session, so those resolve only via the replay/results path.
 
 ```mermaid
 sequenceDiagram
   participant IR as iRacing shared memory
-  participant T as IncidentTracker
-  participant P as SimStewardPlugin
-  participant JSONL as plugin-structured.jsonl
+  participant Det as ReplayIncidentIndexDetector
+  participant Cause as IncidentCauseMapping
+  participant Corr as IncidentSeverityCorrelator
+  participant P as SimStewardPlugin.LiveIncidentDetection
   participant Loki as Grafana Loki
   participant D as Dashboard (JS)
 
   loop DataUpdate() ~60 Hz
-    IR->>P: Session YAML per driver CurDriverIncidentCount on SessionInfoUpdate
-    P->>T: OnSessionInfoUpdate() / tick
-    T->>T: Compare delta vs baseline per car
-    alt delta > 0 detected
-      T->>P: incident_detected callback
+    IR->>P: CarIdxTrackSurface, CarIdxSessionFlags, PlayerCarMyIncidentCount
+    P->>Det: ProcessLiveIncidentDetectionTick()
+    Det->>Cause: Classify cause (off-track / flagged / contact)
+    Det->>Corr: Merge same-car detections within ~6s quick-succession window (max points wins)
+    alt new or escalated detection
       P->>P: Enrich with session context (MergeSessionAndRoutingFields)
-      P->>JSONL: Write incident_detected NDJSON line
-      JSONL-->>Loki: External shipper or future batch POST (not in plugin today)
+      P->>Loki: live_incident_detection / live_incident_escalated
       P->>D: Broadcast updated incidents[] via WebSocket
       D->>D: Re-render leaderboard + filter chips
     end
   end
+  P->>Loki: live_incident_detection_baseline_ready (session boundary)
+  P->>Loki: live_yaml_incident_probe (verification-only: confirms other-car points stay static live)
 ```
+
+The replay path (`SimStewardPlugin.ReplayIncidentIndexBuild.cs`) runs the same `ReplayIncidentIndexDetector` against replay-driven ticks, and additionally resolves authoritative per-car points from the session YAML via `ReplayIncidentYamlDiff`/`ReplayIncidentIndexResultsYaml` once results are final, emitting `replay_incident_index_detection` and `replay_index_ff_yaml_snapshot`.
 
 ---
 

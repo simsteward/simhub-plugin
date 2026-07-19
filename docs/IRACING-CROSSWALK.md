@@ -46,7 +46,7 @@
 
 | iRacing SDK Field | Type | Avail | CrewChief Usage | SimSteward Usage | Notes |
 |---|---|---|---|---|---|
-| PlayerCarMyIncidentCount | int | B | Player incident total (Penalties.cs — incident announcements) | ReplayIncidentIndexDetector — primary incident signal, delta triggers detection | Cumulative; diff between ticks = new incident |
+| PlayerCarMyIncidentCount | int | B | Player incident total (iRacingGameStateMapper.cs — copies into SessionData.CurrentIncidentCount, no delta math; IRacingBroadcastMessageEvent.cs — voice announcement only) | ReplayIncidentIndexDetector — primary incident signal, delta triggers detection | Cumulative; diff between ticks = new incident |
 | PlayerCarTeamIncidentCount | int | B | Team incident total (Penalties.cs — team penalty tracking) | not yet used | Team races only |
 | PlayerCarDriverIncidentCount | int | B | Driver incident total (Penalties.cs) | not yet used | Multi-driver team context |
 | CarIdxSessionFlags | bitField[64] | B | Not directly read by CrewChief (uses global SessionFlags) | ReplayIncidentIndexDetector — per-car flag state for incident classification | CRITICAL: per-car black/meatball flags |
@@ -97,7 +97,7 @@
 | iRacing SDK Field | Type | Avail | CrewChief Usage | SimSteward Usage | Notes |
 |---|---|---|---|---|---|
 | CarIdxSessionFlags | bitField[64] | B | (see also Section 2) Black/Disqualify/Furled/Repair flags per car (FlagsMonitor.cs uses global SessionFlags) | ReplayIncidentIndexDetector — black flag detection per car | Bit 0x00010000=Black, 0x00020000=DQ |
-| PlayerCarMyIncidentCount | int | B | (see also Section 2) Threshold for penalty (Penalties.cs) | ReplayIncidentIndexDetector | Penalty threshold varies by series |
+| PlayerCarMyIncidentCount | int | B | (see also Section 2) iRacingGameStateMapper.cs passthrough; not read by Penalties.cs | ReplayIncidentIndexDetector | Penalty threshold varies by series |
 | PlayerCarTeamIncidentCount | int | B | Team total for DQ threshold (Penalties.cs) | not yet used | |
 
 ---
@@ -327,7 +327,7 @@ All `CarIdx*` arrays are indexed 0-63 (max 64 cars). Index corresponds to `CarId
 | Sessions[].ResultsPositions[].Time | float | Finish time (iRacingGameStateMapper) | not yet used | |
 | Sessions[].ResultsPositions[].FastestTime | float | Fastest lap (iRacingGameStateMapper) | not yet used | |
 | Sessions[].ResultsPositions[].FastestLap | int | Fastest lap number (iRacingGameStateMapper) | not yet used | |
-| Sessions[].ResultsPositions[].Incidents | int | Total incidents (Penalties.cs — race results) | not yet used | Cumulative for session |
+| Sessions[].ResultsPositions[].Incidents | int | Total incidents (Penalties.cs — race results) | `ReplayIncidentYamlDiff.cs`/`ReplayIncidentIndexResultsYaml` — authoritative per-car points (replay path); `PollLiveYamlIncidentsForVerificationLocked` in `SimStewardPlugin.LiveIncidentDetection.cs` — verification probe confirming this field is static during a live session (log-only, `live_yaml_incident_probe`) | Cumulative for session; confirmed via live probe (2026-07-19) NOT to update progressively live — only resolves after results are final |
 | Sessions[].ResultsPositions[].ReasonOutId | int | Reason out (iRacingGameStateMapper) | not yet used | See Appendix A: ReasonOutId |
 | Sessions[].ResultsPositions[].ReasonOutStr | string | Reason out text (iRacingGameStateMapper) | not yet used | Human-readable |
 | Sessions[].ResultsFastestLap.CarIdx | int | Fastest lap car (iRacingGameStateMapper) | not yet used | |
@@ -691,7 +691,9 @@ These are empirically discovered behaviors that differ from the SDK documentatio
 | Damage classification | Events/DamageReporting.cs | Impact detection from speed/accel changes, damage severity |
 | Pit stops | Events/PitStops.cs | Pit window, mandatory stops, pit countdown, tow time |
 | Fuel estimation | Events/Fuel.cs | Fuel consumption per lap, laps remaining, low fuel warning |
-| Penalties/incidents | Events/Penalties.cs | Incident count tracking, penalty type handling |
+| Penalties | Events/Penalties.cs | Drive-through/stop-go/cut-track penalty handling only — no IncidentCount references |
+| Incident count passthrough | iRacing/iRacingGameStateMapper.cs | Copies `PlayerCarMyIncidentCount` into `SessionData.CurrentIncidentCount`; no delta math |
+| Incident voice announcement | Events/IRacingBroadcastMessageEvent.cs | Announces incident count changes; does not compute/predict point values |
 | Tire monitoring | Events/TyreMonitor.cs | Tire wear/temp/condition, compound tracking |
 | Engine health | Events/EngineMonitor.cs | Engine temp warnings, oil/water/fuel pressure |
 | Position/overtakes | Events/Position.cs | Gap tracking, overtake detection, position change |

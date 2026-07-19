@@ -303,9 +303,9 @@ Milestone **M6** is **Complete**; TR-031–TR-038 and TR-041 are implemented as 
 | Item | Evidence |
 |------|----------|
 | **TR-041** | This subsection is the M6 milestone summary. |
-| **TR-031 / TR-032** | `src/SimSteward.Dashboard/replay-incident-index.html`: summary block (`subSessionId`, `indexBuildTimeMs`, `totalRaceIncidents`, `incidentCountByCarIdx`) and sortable table columns matching TR-020. |
+| **TR-031 / TR-032** | `src/SimSteward.Dashboard/index.html` Replay Index tab (`#log-replayindex`, formerly the standalone `replay-incident-index.html`): summary block (`subSessionId`, `indexBuildTimeMs`, `totalRaceIncidents`, `incidentCountByCarIdx`) and sortable table columns matching TR-020. |
 | **TR-033** | Plugin `state.replayIncidentIndex`: `phase` (`idle` / `seeking_start` / `fast_forward` / `camera_validating`), `buildElapsedMs`, `replaySessionTime`, `replayFrameNum`, `replayFrameEnd`. |
-| **TR-034** | Link from `src/SimSteward.Dashboard/index.html` header to `replay-incident-index.html`; deploy copies both to `Web/sim-steward-dash/`. |
+| **TR-034** | `goToReplayIndexTab()` link from `src/SimSteward.Dashboard/index.html` header to its own Replay Index tab (`index.html#replayindex`); deploy copies `index.html` to `Web/sim-steward-dash/`. |
 | **TR-035** | Same Fleck WebSocket as main dash; index payload embedded in throttled `state` broadcast (~200ms) via `BuildReplayIncidentIndexDashboardSnapshot` / `PluginSnapshot.ReplayIncidentIndex`. |
 | **TR-036** | WebSocket action `replay_incident_index_seek` with JSON arg `sessionTimeMs` and optional `sessionNum`; uses `ReplaySearchSessionTime`. Row **Seek** buttons on replay page. |
 | **TR-037** | Replay page guard banners when `!irsdkConnected` or `!isReplayMode`; build/seek actions return `not_connected` / `not_replay_mode` / `build_in_progress`. |

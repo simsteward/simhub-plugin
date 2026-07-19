@@ -136,11 +136,14 @@ Every log line has an `event` field. Key events:
 | `irsdk_started` | simhub-plugin | — | iRacing SDK started. |
 | `replay_incident_index_sdk_ready` | simhub-plugin | `irsdk_connected`, `update_interval_ms`, `log_env`, `loki_push_target` | Milestone 1 (TR-001): IRSDK memory map connected; emitted on `OnConnected` after `iracing_connected`. |
 | `replay_incident_index_session_context` | simhub-plugin | `sim_mode`, `subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, `is_replay_mode`, `session_yaml_fingerprint_sha256_16` (first 16 hex chars of SHA-256 of raw `SessionInfoYaml`), `session_yaml_length`, `session_info_update` (IRSDK `SessionInfoUpdate`), `log_env`, `loki_push_target` | Milestone 1 (TR-002/003): parsed `WeekendInfo` from session YAML on `OnSessionInfo`; throttled per `(SubSessionID, SessionNum, SimMode)`. **WARN** when `subsession_id` is set and `is_replay_mode` is false (loaded session but not replay). |
+| `replay_incident_index_auto_build_triggered` | simhub-plugin | `subsession_id`, spine fields | No cached index found on disk for a freshly-loaded replay's subsession — build auto-starts (sets the same flag the manual `replay_incident_index_build "start"` action sets) rather than waiting for a manual click. One attempt per subsession. |
 | `replay_incident_index_started` | simhub-plugin | `saved_replay_frame_before_seek`, `target_play_speed`, spine fields | Milestone 2 (TR-004): `replay_incident_index_build` action `start` queued; on next `OnTelemetryData` tick, `ReplaySearch(ToStart)` issued. |
 | `replay_incident_index_baseline_ready` | simhub-plugin | `replay_frame_num_end`, `car_idx_session_flags` (int\[64\] TR-005), `player_car_my_incident_count_baseline` (TR-006), spine fields | Milestone 2: baseline at stable `ReplayFrameNum==0` before fast-forward. |
 | `replay_incident_index_fast_forward_started` | simhub-plugin | `replay_play_speed_requested`, `replay_play_speed_telemetry`, `effective_sample_hz_vs_session_time` (NFR-008), `sdk_update_interval_ms`, spine fields | Milestone 2 (TR-008/009): `ReplaySetPlaySpeed` applied. |
 | `replay_incident_index_fast_forward_complete` | simhub-plugin | `index_build_time_ms`, `fast_forward_telemetry_samples`, `completion_reason` (`replay_finished` \| `paused_or_stopped`), `replay_play_speed`, `effective_sample_hz_vs_session_time`, `replay_frame_num_at_end`, `replay_frame_num_end`, `replay_session_time`, `detected_incident_samples`, `fast_repair_delta_events`, spine fields | Milestone 2 (TR-010/011): `IsReplayPlaying` became false; playback restored to 1×. **M3:** counts reflect `ReplayIncidentIndexDetector` output during fast-forward (TR-012–TR-018). |
-| `replay_incident_index_detection` | simhub-plugin | `fingerprint` (TR-020 v1 hex, same as JSON row), `car_idx`, `session_time_ms`, `detection_source` (`repair_flag` \| `furled_flag` \| `player_incident_count`), `incident_points` (int or null), `replay_frame`, `replay_session_time`, spine fields | Milestone 5 (TR-028): one line per primary detection during fast-forward; not emitted on every 60Hz tick. |
+| `replay_incident_index_detection` | simhub-plugin | `fingerprint` (TR-020 v1 hex, same as JSON row), `car_idx`, `driver_name`, `session_time_ms`, `detection_source` (`repair_flag` \| `furled_flag` \| `black_flag` \| `disqualify_flag` \| `track_surface` \| `fast_repair` \| `player_incident_count`), `incident_points` (int or null), `replay_frame`, `replay_session_time`, `car_lap` (renamed from `lap` — the spine's own `lap` field was silently clobbering this per-detection value), `lap_dist_pct`, `car_position`, `surface_material`, `car_rpm`, `car_gear`, `car_steer_rad`, `car_on_pit_road`, `car_tire_compound`, `track_location` (named corner e.g. "Hell Corner" when the track is in `TrackLandmarks.cs`'s CrewChiefV4-sourced table, else a generic "Sector 1/2/3" fallback, else null), `track_location_source` (`landmark` \| `sector_fallback` \| `unknown` — never present the sector guess as a real corner name), plus a player-only block (`player_throttle`/`player_brake`/`player_clutch`/`player_speed_mps`/`player_rpm`/`player_gear`/`player_steering_wheel_angle_rad`/`player_lat_accel`/`player_long_accel`/`player_vert_accel`) when the detected car is the player's, spine fields | Milestone 5 (TR-028): one line per primary detection during fast-forward; not emitted on every 60Hz tick. |
+| `live_incident_detection` | simhub-plugin | `fingerprint` (v1 hex), `car_idx`, `driver_name` (resolved via `DriverInfo.Drivers`, empty if unresolvable), `session_time_ms`, `detection_source` (`repair_flag` \| `furled_flag` \| `black_flag` \| `disqualify_flag` \| `track_surface` \| `fast_repair` \| `player_incident_count`), `incident_points` (int or null), `session_time`, `car_lap` (the detected car's lap — named to avoid collision with the spine's own `lap` field, which reflects the player's lap context, not the detected car's), `replay_frame` (live `ReplayFrameNum`, not meaningful outside replay), `lap_dist_pct`, `car_position`, `surface_material`, `car_rpm`, `car_gear`, `car_steer_rad`, `car_on_pit_road`, `car_tire_compound`, `track_location` (named corner e.g. "Hell Corner" when the track is in `TrackLandmarks.cs`'s CrewChiefV4-sourced table, else a generic "Sector 1/2/3" fallback, else null), `track_location_source` (`landmark` \| `sector_fallback` \| `unknown` — never present the sector guess as a real corner name), plus a player-only block (`player_throttle`/`player_brake`/`player_clutch`/`player_speed_mps`/`player_rpm`/`player_gear`/`player_steering_wheel_angle_rad`/`player_lat_accel`/`player_long_accel`/`player_vert_accel`) when the detected car is the player's, spine fields. `message` is a human-readable one-liner (`driver (car N)  detection_source  +Nx  t:Ss  frame:N  fp:16hex`) so the dashboard's log pane — which renders `message` only, not `fields` — shows the full context inline. | Field-wide (all cars), no-admin-required detection during a genuine LIVE session (not replay, not an FF sweep) — separate detector instance from `replay_incident_index_detection`, distinguished by event name rather than a discriminator field; one line per detection, not emitted on every tick. |
+| `live_incident_detection_baseline_ready` | simhub-plugin | `reason` (`first_run_live` \| `session_boundary`), `subsession_id`, `session_num`, spine fields | Baseline captured for the live field-wide detector — first connect while genuinely live, or a session/subsession boundary (e.g. Practice→Qualify→Race). No detections are emitted on the baseline tick itself. |
 | `replay_incident_index_build_error` | simhub-plugin | `error` (`seek_start_timeout`, …), spine fields | Milestone 2: seek timeout or speed command failure (WARN). |
 | `replay_incident_index_build_cancelled` | simhub-plugin | `reason`, spine fields | Milestone 2: `replay_incident_index_build` `cancel` or disconnect during build. |
 | `replay_incident_index_validation_summary` | simhub-plugin | `output_path`, `index_build_time_ms_total`, `detected_incident_rows`, `yaml_results_available`, `yaml_session_num_used`, `yaml_parse_error` (when parse fails), `discrepancy_count`, `camera_seek_attempted`, `camera_seek_matches`, `camera_seek_match_percent`, spine fields | Milestone 4 (TR-023–TR-025): after fast-forward and optional per-row `ReplaySearchSessionTime` + cooldown, JSON index written (TR-019); YAML vs detection discrepancies; camera match rate. |
@@ -163,19 +166,18 @@ Every log line has an `event` field. Key events:
 | `checkered_detected` | simhub-plugin | `session_state` | Emitted when replay/live crosses the line (SessionState ≥ 5); before attempting capture. |
 | `checkered_retry` | simhub-plugin | `session_state` | Emitted when running the 2s-delayed retry after checkered. |
 | `session_capture_skipped` | simhub-plugin | `trigger`, `error`, `details`, `will_retry` | When capture is attempted but ResultsPositions is empty (e.g. at checkered). |
-| `session_capture_incident_mismatch` | simhub-plugin | `results_incidents`, `tracker_incidents`, `player_car_idx` | WARN when player's ResultsPositions incident count ≠ IncidentTracker count (wrong session or SDK mapping). |
 | `session_summary_captured` | simhub-plugin | `trigger`, `session_num`, `driver_count`, `wanted_session_num`, `selected_session_num`, `session_match_exact`, `results_incident_sample` | When `TryCaptureAndEmitSessionSummary` succeeds. Use `session_match_exact` to see when fallback session was used; `results_incident_sample` = first 3 drivers' car_idx, position, incidents for SDK verification. |
 | `session_end_datapoints_session` | simhub-plugin | `trigger`, `session_id`, `session_num`, session-level fields (track, series_id, session_name, incident_limit, …), `telemetry_*` at capture, `results_driver_count` | Emitted once per successful session summary capture. Session metadata and telemetry snapshot only; no results array. Use with `session_end_datapoints_results` chunks to get full data. Scales to hundreds of drivers. |
 | `session_end_datapoints_results` | simhub-plugin | `session_id`, `session_num`, `chunk_index`, `chunk_total`, `results_driver_count`, `results` (array of up to 35 driver rows: pos, car_idx, driver, abbrev, car, class, laps, incidents, reason_out, user_id, team, irating, etc.) | One log line per chunk (35 drivers per chunk). Merge chunks by `session_id` and sort by `chunk_index` for full results table. See **docs/observability-scaling.md** and § LogQL reference below. |
 | `finalize_capture_started` / `complete` / `timeout` | simhub-plugin | `target_frame`, `duration_ms` | Debug / automation. |
-| `incident_detected` | tracker | `incident_type`, `car_number`, `driver_name`, `unique_user_id` (iRacing **CustID**), `delta`, `session_time`, `session_num`, `lap` (per-car `CarIdxLap` for the incident car), `replay_frame`, `replay_frame_end`, **`start_frame`** / **`end_frame`** (same window as replay frames; aliases for ingestion), **`camera_view`** (compact string, e.g. `cam_car_idx=N;group=Name`), `cause`, `other_car_number`, `subsession_id`, `parent_session_id`, `track_display_name`, `cam_car_idx` / `camera_group` (when available), `log_env`, `loki_push_target` | **Canonical rule name:** `iracing_incident` — **emitted JSON `event`:** `incident_detected` (use this string in LogQL until code renames). Each YAML delta from `OnSessionInfo` (per-car `CurDriverIncidentCount`). **Global uniqueness:** see § Global incident uniqueness signature below. Use `"not in session"` for `subsession_id` / `parent_session_id` when iRacing has no loaded session. |
-| `baseline_established` | tracker | `driver_count` | When tracker baseline is ready. |
-| `session_reset` | tracker | `old_session`, `new_session` | When `SessionNum` changes. |
-| `seek_backward_detected` | tracker | `from_frame`, `to_frame`, `session_time` | Replay seek. |
-| `yaml_update` | tracker | `session_info_update`, `session_num`, `session_time` | Debug-only. |
-| `session_digest` | simhub-plugin | `session_id`, `session_num`, `track`, `duration_minutes`, `total_incidents`, `results_incident_sum`, `incident_summary`, `incident_summary_truncated`, `results_table`, `results_driver_count`, `actions_dispatched`, … | Single-row session summary. **total_incidents** = count of `incident_detected` events (plugin); **results_incident_sum** = sum of iRacing per-driver incident points; **results_table** = authoritative ResultsPositions (pos, car, driver, incidents, laps, class, reason_out per driver). |
+| `live_incident_detection` | simhub-plugin | `fingerprint`, `car_idx`, `driver_name`, `detection_source`, `cause`, `incident_points`, `is_aggregate_delta`, `session_time`, `session_time_ms`, `car_lap`, `replay_frame`, `lap_dist_pct`, `car_position`, `track_location`, `track_location_source`, plus session/routing fields | Live per-tick detection from `ReplayIncidentIndexDetector` (off-track via `CarIdxTrackSurface`, flags via `CarIdxSessionFlags`, player's own points via `PlayerCarMyIncidentCount`), classified by `IncidentCauseMapping` and merged by `IncidentSeverityCorrelator`. Orchestrated from `SimStewardPlugin.LiveIncidentDetection.cs`. Other cars' official points are unresolved live — see `PointsResolved`/`live_yaml_incident_probe` below. |
+| `live_incident_detection_baseline_ready` | simhub-plugin | `reason`, `subsession_id`, `session_num`, `is_dirt_session` | Session boundary — emitted once when the live detector establishes its per-car baseline; no detections logged on this tick. |
+| `live_incident_escalated` | simhub-plugin | `fingerprint`, `car_idx`, `driver_name`, `from_points`, `to_points`, `from_cause`, `to_cause`, `detection_source`, `session_time`, `car_lap` | When an already-logged live incident's points/cause upgrade within the ~6s quick-succession window (`IncidentSeverityCorrelator`, max-points-wins per iRacing's "highest scoring incident wins" rule). |
+| `live_yaml_incident_probe` | simhub-plugin | `cars_in_snapshot`, `parse_ok`, `parse_error`, `yaml_session_num_used`, `deltas_since_last_poll`, `sample_deltas`, `session_time`, `is_live`, `baseline_established` | Log-only verification probe (`PollLiveYamlIncidentsForVerificationLocked`). Confirmed empirically (2026-07-19, 25 real off-track detections over ~1hr) that `Sessions[].ResultsPositions[].Incidents` does **not** update progressively during a live session — does not feed the incident board. |
+| `replay_incident_index_detection` | simhub-plugin | Same detection fields as `live_incident_detection` (same `ReplayIncidentIndexDetector`, replay-driven ticks) | Per-detection line emitted during the fast-forward replay sweep (TR-028), orchestrated from `SimStewardPlugin.ReplayIncidentIndexBuild.cs`. |
+| `replay_index_ff_yaml_snapshot` | simhub-plugin | `cars_in_snapshot`, deltas from `ReplayIncidentYamlDiff`, `baseline_established` | Authoritative per-car incident points parsed from `Sessions[].ResultsPositions[].Incidents` during replay FF, once results are final (`ReplayIncidentIndexResultsYaml`). |
 
-### Schema reference: `action_dispatched`, `action_result`, `iracing_incident`
+### Schema reference: `action_dispatched`, `action_result`, `live_incident_detection`
 
 PR checklist and `domain` taxonomy: **docs/RULES-ActionCoverage.md**. Full-field checklist below for dashboards, PR review, and Loki queries. Labels stay the four-label schema; everything else is JSON body.
 
@@ -203,35 +205,32 @@ PR checklist and `domain` taxonomy: **docs/RULES-ActionCoverage.md**. Full-field
 | `action`, `arg`, `correlation_id` | yes | Same command identity as `action_dispatched` |
 | Session + routing fields | yes | Same set as `action_dispatched` (`subsession_id`, `parent_session_id`, `session_num`, `track_display_name`, spine fields, `log_env`, `loki_push_target`), plus `session_yaml_fingerprint_sha256_16` when YAML is available |
 
-#### `iracing_incident` (canonical) / `incident_detected` (emitted)
+#### `live_incident_detection` / `replay_incident_index_detection`
 
 | Field | Required for completeness | Notes |
 |-------|---------------------------|--------|
-| `unique_user_id` | yes | iRacing CustID |
-| `driver_name` | yes | Display name in JSONL (`display_name` in coding rules = same concept) |
-| `session_time` | yes | Time of detection |
-| `subsession_id`, `parent_session_id`, `session_num`, `track_display_name` | yes | `"not in session"` when no session |
-| `replay_frame` | yes | Start frame; use `replay_frame_end` if the event spans a window |
-| `start_frame`, `end_frame` | yes | Same values as `replay_frame` / `replay_frame_end` for stable downstream keys |
-| `lap` | yes | `CarIdxLap` for the car incurring the incident; **`-1`** if unknown |
-| `cam_car_idx` / `camera_group` | when available | Camera / view context |
-| `camera_view` | recommended | Single string combining camera car and group (see table above) |
-| `incident_type`, `delta`, `car_number`, … | per implementation | Taxonomy / YAML delta fields |
+| `fingerprint` | yes | `ReplayIncidentIndexFingerprint.ComputeHexV1(subsession_id, car_idx, session_time_ms, detection_source, incident_points)` — the dedupe/join key |
+| `driver_name` | yes | Resolved from `DriverInfo.Drivers[]` for the detected `car_idx` |
+| `session_time`, `session_time_ms` | yes | Time of detection |
+| `subsession_id`, `parent_session_id`, `session_num`, `track_display_name` | yes | Via `MergeSessionAndRoutingFields()`; `"not in session"` when no session |
+| `replay_frame` | yes | `ReplayFrameNum` at detection (harmless/steady during live) |
+| `car_lap` | yes | `CarIdxLap` for the car incurring the incident |
+| `detection_source`, `cause` | yes | Detection origin (off-track / flag / contact) and `IncidentCauseMapping` classification |
+| `incident_points` | when resolved | `1`/`2`/`4` (or aggregate delta capped at 4, see `is_aggregate_delta`); `null` for other cars live — points resolve later via the replay/YAML path |
+| `car_position`, `lap_dist_pct`, `track_location` | when available | Position and on-track location context |
 
 ### Global incident uniqueness signature
 
-Use this tuple to **dedupe and join** incidents across splits, drivers, and time (Loki / warehouse / replay tools). All fields are in the JSON body (not Loki labels).
+Use `fingerprint` to **dedupe and join** incidents across splits, drivers, and time (Loki / warehouse / replay tools). It is computed from:
 
-1. **Split / event:** `subsession_id` (iRacing `WeekendInfo.SubSessionID`) + `parent_session_id` (`WeekendInfo.SessionID`) + `session_num` (practice / qual / race phase).
-2. **Driver:** `unique_user_id` (CustID) + `driver_name` (display name in the log line).
-3. **When / where:** `session_time` + `start_frame` + `end_frame` + `track_display_name`.
-4. **Perspective:** `camera_view` (or `cam_car_idx` + `camera_group`).
+1. **Split / event:** `subsession_id` (iRacing `WeekendInfo.SubSessionID`) + `session_num` (practice / qual / race phase).
+2. **Car:** `car_idx`.
+3. **When:** `session_time_ms`.
+4. **What:** `detection_source` + `incident_points`.
 
 If iRacing is not in a loaded session, `subsession_id`, `parent_session_id`, and `session_num` use the same `"not in session"` fallback as action logs.
 
-**LogQL today:** filter on `event = "incident_detected"`. If the emitter is renamed to `iracing_incident`, update queries and this doc in the same change.
-
-`incident_detected` and `session_digest` are the main LogQL entry points for incidents and session-level summaries (use **Explore** or any Loki panel you add).
+**LogQL today:** filter on `event = "live_incident_detection"` for the live board, `event = "replay_incident_index_detection"` for the replay sweep, and `event = "live_yaml_incident_probe"` to see other-car points resolving (or not) live.
 
 ## Local vs. cloud configuration
 
@@ -283,7 +282,7 @@ Use this checklist so button presses (Play, etc.) show up in Grafana:
 5. **Wait for flush** — After pressing Play or other buttons (or opening the dashboard, connecting iRacing, or an incident firing), wait 1–2 seconds; these events trigger a debounced flush so logs appear quickly. The periodic timer can still take up to 5 s for other events.
 6. **Check plugin.log** — Look for `loki_status` ("Loki logging enabled" vs "disabled") and `loki_first_push_ok` (confirms at least one batch reached Loki). If you see push failure warnings, Loki is unreachable (stack down or wrong URL).
 
-**Events that trigger prompt flush (1–2 s):** Button actions (`action_result`, `action_dispatched`), incidents (`incident_detected`), session lifecycle (`checkered_detected`, `checkered_retry`, `session_summary_captured`, `session_digest`, `session_end_datapoints_session`, `session_end_datapoints_results`, `session_capture_skipped`), dashboard and iRacing (`dashboard_opened`, `iracing_connected`, `iracing_disconnected`), tracker (`baseline_established`, `session_reset`), and bridge/plugin readiness (`plugin_ready`, `bridge_starting`, `ws_client_connected`, `ws_client_disconnected`). All other events are sent on the next batch-size or 5 s timer.
+**Events that trigger prompt flush (1–2 s):** Button actions (`action_result`, `action_dispatched`), incidents (`live_incident_detection`, `live_incident_escalated`, `replay_incident_index_detection`), session lifecycle (`checkered_detected`, `checkered_retry`, `session_summary_captured`, `session_digest`, `session_end_datapoints_session`, `session_end_datapoints_results`, `session_capture_skipped`), dashboard and iRacing (`dashboard_opened`, `iracing_connected`, `iracing_disconnected`), live incident detector (`live_incident_detection_baseline_ready`), and bridge/plugin readiness (`plugin_ready`, `bridge_starting`, `ws_client_connected`, `ws_client_disconnected`). All other events are sent on the next batch-size or 5 s timer.
 
 ## Debug mode
 
@@ -295,7 +294,7 @@ Set `SIMSTEWARD_LOG_DEBUG=1` for local debugging only. When enabled:
   - `tick_stats` every 60 ticks (≈1 s): running average `data_update_ms`, `frames_dropped`.
   - `yaml_update`: each `SessionInfoUpdate` refresh.
   - `ws_message_raw`: every WebSocket message (raw JSON) for debugging dashboard commands.
-  - `incident_detected` includes a `snapshot` field with the current `PluginSnapshot`.
+  - `live_incident_detection` / `live_incident_escalated`: emitted per detection/escalation regardless of debug mode; debug mode does not add extra fields to these events today.
 
 Never enable debug in production. For AI or assistant queries, filter with `| level != "DEBUG"`.
 
@@ -314,7 +313,7 @@ Never enable debug in production. For AI or assistant queries, filter with `| le
 
 **session_digest** is emitted at most once per session (guarded by `_sessionDigestEmitted`). It caps `incident_summary` to 20 entries (highest severity first) and sets `incident_summary_truncated: true` when truncated. Trigger the digest manually (`CaptureSessionSummaryNow`, `FinalizeThenCaptureSessionSummary`, or checkered flag) so downstream AI and Grafana panels see the session as complete.
 
-**Incident semantics:** `total_incidents` is the **count of incident_detected events** (from IncidentTracker CurDriverIncidentCount deltas). The **results_table** `incidents` column and **results_incident_sum** are iRacing’s per-driver incident **points** at session end (from ResultsPositions). So total_incidents (e.g. 12 events) and results_incident_sum (e.g. 24 points) can both be correct but differ. For **what iRacing can supply when** (live vs replay vs YAML vs REST), see **docs/IRACING-DATA-AVAILABILITY.md**.
+**Incident semantics:** live and replay incident *detections* (`live_incident_detection` / `replay_incident_index_detection`, from `ReplayIncidentIndexDetector`) count off-track/flag/contact telemetry events, not `Sessions[].ResultsPositions[].Incidents`. Official per-driver incident **points** only resolve from `Sessions[].ResultsPositions[].Incidents` after results are final — replay/YAML path only (`ReplayIncidentYamlDiff` / `ReplayIncidentIndexResultsYaml`). Confirmed empirically (`live_yaml_incident_probe`, 2026-07-19) that this field does **not** update progressively during a live session, so a live detection count and the eventual official points sum can both be correct but differ. For **what iRacing can supply when** (live vs replay vs YAML vs REST), see **docs/IRACING-DATA-AVAILABILITY.md**.
 
 ## Grafana dashboards (repo)
 
@@ -328,7 +327,7 @@ The provisioned Loki datasource (`observability/local/grafana/provisioning/datas
 
 | Derived field   | Extracted from | Notes |
 |-----------------|----------------|-------|
-| Event           | `event`        | Event type (e.g. `action_result`, `incident_detected`). |
+| Event           | `event`        | Event type (e.g. `action_result`, `live_incident_detection`). |
 | Correlation ID  | `correlation_id` | Clickable: runs LogQL filter by this correlation (trace). |
 | Session ID      | `session_id`   | Session identifier. |
 | Action          | `action`       | Command/action name. |
@@ -402,7 +401,8 @@ pnpm run obs:poll:grafana:env
 | Command audit | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "action_result"` |
 | Failed commands | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "action_result" \| success = "false"` |
 | Action volume (timeseries) | `count_over_time({app="sim-steward", component="simhub-plugin"} \| json \| event = "action_result" [$__interval])` |
-| Incident timeline | `{app="sim-steward", component="tracker"} \| json \| event = "incident_detected"` |
+| Incident timeline (live) | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "live_incident_detection"` |
+| Incident timeline (replay) | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "replay_incident_index_detection"` |
 | Plugin lifecycle | `{app="sim-steward", component="simhub-plugin"} \| json \| event =~ "plugin_started\|plugin_ready\|iracing_connected\|iracing_disconnected\|plugin_stopped"` |
 | Session digests | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_digest"` |
 | Session end metadata | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "session_end_datapoints_session"` |
@@ -417,8 +417,8 @@ pnpm run obs:poll:grafana:env
 |---------|-------|
 | Replay control by speed | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "replay_control" \| speed != ""` — filter by `speed` (e.g. 16, 8, 1) to see which replay speed was used. |
 | Replay control (all) | `{app="sim-steward", component="simhub-plugin"} \| json \| event = "replay_control"` — seek/play/pause and speed. |
-| Incident count (timeseries) | `count_over_time({app="sim-steward", component="tracker"} \| json \| event = "incident_detected" [$__interval])` |
-| Incident count (total in range) | `count_over_time({app="sim-steward", component="tracker"} \| json \| event = "incident_detected" [$__range])` |
+| Incident count (timeseries) | `count_over_time({app="sim-steward", component="simhub-plugin"} \| json \| event = "live_incident_detection" [$__interval])` |
+| Incident count (total in range) | `count_over_time({app="sim-steward", component="simhub-plugin"} \| json \| event = "live_incident_detection" [$__range])` |
 
 **session_summary_captured** is emitted only when the plugin successfully captures the session results table (ResultsPositions). It does **not** fire when results are not yet available (e.g. before checkered, or in a short replay clip that never reaches session end). Use **session_capture_skipped** to see when capture was attempted but results were empty; use **session_end_fingerprint** (when implemented) to see what data was available at session end.
 

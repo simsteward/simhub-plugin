@@ -16,6 +16,7 @@ namespace SimSteward.Plugin
         private readonly Func<string> _getStateForNewClient;
         private readonly Func<string> _getLogTailForNewClient;
         private readonly Func<string> _getHelloForNewClient;
+        private readonly Func<string> _getIncidentsForNewClient;
         private readonly Func<string, string, string, (bool success, string result, string error)> _dispatchAction;
         private readonly Action<string, string, string> _onLog;
         private readonly Action<string, string, Dictionary<string, object>> _onStructuredLog;
@@ -35,11 +36,13 @@ namespace SimSteward.Plugin
             Action<Exception, string> onSendError = null,
             Action onNoClients = null,
             Action onLastClientDisconnected = null,
-            Func<string> getHelloForNewClient = null)
+            Func<string> getHelloForNewClient = null,
+            Func<string> getIncidentsForNewClient = null)
         {
             _getStateForNewClient = getStateForNewClient ?? (() => "{}");
             _getLogTailForNewClient = getLogTailForNewClient;
             _getHelloForNewClient = getHelloForNewClient ?? (() => null);
+            _getIncidentsForNewClient = getIncidentsForNewClient ?? (() => null);
             _dispatchAction = dispatchAction ?? ((_, __, ___) => (false, null, "missing_dispatch"));
             _onLog = onLog ?? ((_, __, ___) => { });
             _onStructuredLog = onStructuredLog;
@@ -103,6 +106,17 @@ namespace SimSteward.Plugin
                         {
                             SentrySdk.CaptureException(ex);
                             _logger?.Warn($"DashboardBridge: getHelloForNewClient failed: {ex.Message}");
+                        }
+                        try
+                        {
+                            var incidentsJson = _getIncidentsForNewClient?.Invoke();
+                            if (!string.IsNullOrEmpty(incidentsJson))
+                                socket.Send(incidentsJson);
+                        }
+                        catch (Exception ex)
+                        {
+                            SentrySdk.CaptureException(ex);
+                            _logger?.Warn($"DashboardBridge: getIncidentsForNewClient failed: {ex.Message}");
                         }
                     };
 

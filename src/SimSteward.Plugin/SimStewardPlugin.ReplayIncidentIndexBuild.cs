@@ -34,6 +34,12 @@ namespace SimSteward.Plugin
         private readonly int[] _replayIndexScratchCarIdxPosition          = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _replayIndexScratchCarIdxFastRepairs       = new int[ReplayIncidentIndexBuild.CarSlotCount];
         private readonly int[] _replayIndexScratchCarIdxSurfaceMaterial   = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        // Incident-snapshot enrichment — plan §5.
+        private readonly float[] _replayIndexScratchCarIdxRPM             = new float[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxGear              = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly float[] _replayIndexScratchCarIdxSteer           = new float[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly bool[] _replayIndexScratchCarIdxOnPitRoad        = new bool[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _replayIndexScratchCarIdxTireCompound      = new int[ReplayIncidentIndexBuild.CarSlotCount];
 
         private Stopwatch _replayIndexBuildTotalWallClock;
         private int _replayIndexSessionNum;
@@ -88,6 +94,15 @@ namespace SimSteward.Plugin
             catch (Exception ex)
             {
                 _logger.Warn("replay_incident_index record sample: " + ex.Message);
+            }
+
+            try
+            {
+                ProcessLiveIncidentDetectionTick();
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn("live_incident_detection telemetry: " + ex.Message);
             }
         }
 
@@ -530,6 +545,15 @@ namespace SimSteward.Plugin
                 return;
 
             int subSessionId = _irsdk.Data?.SessionInfo?.WeekendInfo?.SubSessionID ?? 0;
+            int playerCarIdx = SafeGetInt("PlayerCarIdx");
+            string trackName = "";
+            float trackLengthMeters = 0f;
+            try
+            {
+                trackName = _irsdk.Data?.SessionInfo?.WeekendInfo?.TrackName ?? "";
+                trackLengthMeters = TrackLandmarks.ParseTrackLengthMeters(_irsdk.Data?.SessionInfo?.WeekendInfo?.TrackLength as string);
+            }
+            catch { }
 
             foreach (IncidentSample s in samples)
             {
@@ -541,18 +565,42 @@ namespace SimSteward.Plugin
                         s.SessionTimeMs,
                         s.DetectionSource,
                         s.IncidentPoints);
+                    var location = s.LapDistPct.HasValue
+                        ? TrackLandmarks.Resolve(trackName, s.LapDistPct.Value, trackLengthMeters)
+                        : new TrackLandmarks.Result(null, "unknown");
 
                     var fields = new Dictionary<string, object>
                     {
                         ["fingerprint"] = fp,
                         ["car_idx"] = s.CarIdx,
+                        ["driver_name"] = ResolveDriverNameForCarIdxOrEmpty(s.CarIdx),
+                        ["track_location"] = location.Label,
+                        ["track_location_source"] = location.Source,
                         ["session_time_ms"] = s.SessionTimeMs,
                         ["detection_source"] = s.DetectionSource,
                         ["replay_frame"] = s.ReplayFrame,
                         ["replay_session_time"] = Math.Round(replaySessionTimeSec, 6),
                         ["incident_points"] = s.IncidentPoints.HasValue ? (object)s.IncidentPoints.Value : null,
-                        ["lap"] = s.Lap
+                        // Renamed from "lap" — MergeSessionAndRoutingFields sets its own "lap" key
+                        // (the focus car's lap), which silently clobbered this per-detection value
+                        // before this fix (same bug already found and fixed on the live-detector path).
+                        ["car_lap"] = s.Lap,
+                        // Already captured on IncidentSample but previously dropped on the floor — plan §5.
+                        ["lap_dist_pct"] = s.LapDistPct.HasValue ? (object)s.LapDistPct.Value : null,
+                        ["car_position"] = s.CarPosition.HasValue ? (object)s.CarPosition.Value : null,
+                        ["surface_material"] = s.CarIdx >= 0 && s.CarIdx < _replayIndexScratchCarIdxSurfaceMaterial.Length
+                            ? _replayIndexScratchCarIdxSurfaceMaterial[s.CarIdx] : (int?)null,
+                        // Field-wide (Group 2, no admin needed) — plan §5.
+                        ["car_rpm"] = s.CarIdx >= 0 && s.CarIdx < _replayIndexScratchCarIdxRPM.Length ? _replayIndexScratchCarIdxRPM[s.CarIdx] : 0f,
+                        ["car_gear"] = s.CarIdx >= 0 && s.CarIdx < _replayIndexScratchCarIdxGear.Length ? _replayIndexScratchCarIdxGear[s.CarIdx] : 0,
+                        ["car_steer_rad"] = s.CarIdx >= 0 && s.CarIdx < _replayIndexScratchCarIdxSteer.Length ? _replayIndexScratchCarIdxSteer[s.CarIdx] : 0f,
+                        ["car_on_pit_road"] = s.CarIdx >= 0 && s.CarIdx < _replayIndexScratchCarIdxOnPitRoad.Length && _replayIndexScratchCarIdxOnPitRoad[s.CarIdx],
+                        ["car_tire_compound"] = s.CarIdx >= 0 && s.CarIdx < _replayIndexScratchCarIdxTireCompound.Length ? _replayIndexScratchCarIdxTireCompound[s.CarIdx] : 0
                     };
+
+                    // Player-only rich block (Group 3 — structurally unavailable for any other car).
+                    if (s.CarIdx == playerCarIdx)
+                        AddPlayerOnlyIncidentContext(fields);
 
                     MergeSessionAndRoutingFields(fields);
                     _logger.Structured(
@@ -782,6 +830,11 @@ namespace SimSteward.Plugin
                 SafeGetIntPerCar("CarIdxPosition", _replayIndexScratchCarIdxPosition);
                 SafeGetIntPerCar("CarIdxFastRepairsUsed", _replayIndexScratchCarIdxFastRepairs);
                 SafeGetIntPerCar("CarIdxTrackSurfaceMaterial", _replayIndexScratchCarIdxSurfaceMaterial);
+                SafeGetFloatPerCar("CarIdxRPM", _replayIndexScratchCarIdxRPM);
+                SafeGetIntPerCar("CarIdxGear", _replayIndexScratchCarIdxGear);
+                SafeGetFloatPerCar("CarIdxSteer", _replayIndexScratchCarIdxSteer);
+                SafeGetBoolPerCar("CarIdxOnPitRoad", _replayIndexScratchCarIdxOnPitRoad);
+                SafeGetIntPerCar("CarIdxTireCompound", _replayIndexScratchCarIdxTireCompound);
 
                 int playerIncidents = 0;
                 try { playerIncidents = _irsdk.Data.GetInt("PlayerCarMyIncidentCount"); } catch { }
@@ -1391,6 +1444,15 @@ namespace SimSteward.Plugin
             {
                 try { buffer[i] = _irsdk.Data.GetFloat(field, i); }
                 catch { buffer[i] = 0f; }
+            }
+        }
+
+        private void SafeGetBoolPerCar(string field, bool[] buffer)
+        {
+            for (int i = 0; i < buffer.Length; i++)
+            {
+                try { buffer[i] = _irsdk.Data.GetBool(field, i); }
+                catch { buffer[i] = false; }
             }
         }
     }

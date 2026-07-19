@@ -90,7 +90,7 @@ If you run a replay and incidents are not captured or signaled:
 ### Incident point accuracy
 
 - For the **player/focused car**, the plugin uses `PlayerCarMyIncidentCount` at 60 Hz. The **delta is the incident type** (1=off-track, 2=wall/spin, 4=heavy contact). Values should match iRacing.
-- For **other drivers**, the plugin compares **per-driver `CurDriverIncidentCount`** from the session YAML (`DriverInfo`) on each `SessionInfoUpdate` — not `ResultsPositions` directly (see **IRACING-DATA-AVAILABILITY.md** Group 5 for when **final** `ResultsPositions[].Incidents` is meaningful). **Live race:** no per-car telemetry incident count for others; YAML/session-info behavior may still differ from replay — see the availability doc. At high replay speeds (e.g. 16x), iRacing batches updates — you may see a single +6x event instead of separate 2x+2x+2x. The total is correct; the per-incident breakdown is approximated.
+- For **other drivers**, live detection is telemetry-based, not points-based: `ReplayIncidentIndexDetector` watches `CarIdxTrackSurface` (off-track) and `CarIdxSessionFlags` (per-car flags) every tick and classifies the cause via `IncidentCauseMapping` — no admin required (see **IRACING-DATA-AVAILABILITY.md** Group 2). Their **official incident points are not available live**: `Sessions[].ResultsPositions[].Incidents` does **not** update progressively during a live session (confirmed empirically — see **IRACING-DATA-AVAILABILITY.md** Group 1/5, and the `live_yaml_incident_probe` log event). Points only resolve after the fact, via the replay/Index-tab path (`ReplayIncidentYamlDiff`/`ReplayIncidentIndexResultsYaml`), once results are final. On the dashboard, a live incident row with `pointsResolved: false` was detected but its points value is still unknown. At high replay speeds (e.g. 16x), iRacing batches YAML updates — the replay path may see a single +6x delta instead of separate 2x+2x+2x; the total is correct, the per-incident breakdown is approximated (`IsAggregateDelta`).
 - iRacing's **quick-succession rule**: multiple incidents in rapid succession can be merged. A 2x spin followed by 4x contact may show as +4x only (highest counts).
 
 ---
@@ -124,12 +124,12 @@ The dashboard includes a collapsible **Diagnostics & Metrics** panel just below 
 
 **"Player car: Unknown"** means the player car index is not yet known from session YAML. Incident counts and feed still work for other drivers once the YAML baseline is established.
 
-### YAML incident counter
+### Live incident detection
 
-Incident detection uses session YAML `CurDriverIncidentCount` (`yamlIncidentEvents`). The count accumulates from the moment iRacing connects and resets when iRacing disconnects, when you seek the replay backward, or when the session changes.
+Live incident detection runs per-tick off `CarIdxTrackSurface`/`CarIdxSessionFlags`/`PlayerCarMyIncidentCount` (`ReplayIncidentIndexDetector`, orchestrated from `SimStewardPlugin.LiveIncidentDetection.cs`), not from a YAML incident counter. It re-baselines (clears pending state) when iRacing disconnects, when you seek the replay backward, or when the session changes (`live_incident_detection_baseline_ready`).
 
-- **`yamlIncidentEvents` = 0 and YAML updates > 0**: the session YAML is being parsed but no other-driver incident deltas have been found yet (may be correct early in a session, or non-admin in race).
-- **`yamlIncidentEvents` = 0**: iRacing is not connected or the replay has not advanced past an incident.
+- **No live incident rows appear**: check that a session baseline has been established (`live_incident_detection_baseline_ready` in plugin.log) and that the focused car is actually going off-track or triggering a flag.
+- **Live incident rows show no points (`pointsResolved: false`)**: expected for other cars — official points are not exposed live; they resolve later via the replay/Index-tab path.
 
 ---
 

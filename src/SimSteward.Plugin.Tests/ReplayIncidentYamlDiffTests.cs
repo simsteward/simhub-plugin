@@ -71,16 +71,34 @@ namespace SimSteward.Plugin.Tests
         }
 
         [Theory]
-        [InlineData(0, 3)]
-        [InlineData(2, 7)]
-        [InlineData(4, 9)]
-        public void Diff_NonStandardDelta_PointsNull(int prevCount, int currCount)
+        [InlineData(0, 3, 3)]  // delta 3 -> capped at 3 (still < 4, no capping needed, just non-standard)
+        [InlineData(2, 7, 4)]  // delta 5 -> capped at 4
+        [InlineData(4, 9, 4)]  // delta 5 -> capped at 4
+        [InlineData(0, 9, 4)]  // delta 9 -> capped at 4
+        public void Diff_NonStandardDelta_CapsAtFour(int prevCount, int currCount, int expectedPoints)
+        {
+            // A delta outside {1,2,4} spans more than one iRacing-scored event between YAML polls.
+            // Per iRacing's official "highest tier only" quick-succession rule, this resolves to the
+            // highest plausible single-event tier (capped at 4) instead of being nulled out.
+            var prev = new Dictionary<int, int> { [4] = prevCount };
+            var curr = new Dictionary<int, int> { [4] = currCount };
+            var r = ReplayIncidentYamlDiff.Diff(prev, curr, 10.0, 600, 2, Lap64());
+            Assert.Single(r);
+            Assert.Equal(expectedPoints, r[0].IncidentPoints);
+            Assert.True(r[0].IsAggregateDelta);
+        }
+
+        [Theory]
+        [InlineData(0, 1)]
+        [InlineData(0, 2)]
+        [InlineData(2, 6)]
+        public void Diff_StandardDelta_IsNotAggregate(int prevCount, int currCount)
         {
             var prev = new Dictionary<int, int> { [4] = prevCount };
             var curr = new Dictionary<int, int> { [4] = currCount };
             var r = ReplayIncidentYamlDiff.Diff(prev, curr, 10.0, 600, 2, Lap64());
             Assert.Single(r);
-            Assert.Null(r[0].IncidentPoints);
+            Assert.False(r[0].IsAggregateDelta);
         }
 
         [Fact]

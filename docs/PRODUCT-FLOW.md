@@ -26,7 +26,7 @@ flowchart TD
   D -- Yes --> L
 
   %% ── Scan ──────────────────────────────────────────────────
-  E --> F[Plugin scrubs replay YAML\nfor CurDriverIncidentCount deltas\nacross all cars all frames]
+  E --> F[Plugin sweeps replay frames:\nReplayIncidentIndexDetector off-track/flag events\n+ ReplayIncidentYamlDiff session YAML Incidents deltas\nacross all cars]
   F --> G[Authoritative incident list sent\nto dashboard via WS incidents message\nfields: driver · type · time · frame · suggestedCamera]
   G --> L
 

@@ -26,7 +26,7 @@ All actions go through `DispatchAction(action, arg, correlationId)` in `src/SimS
 
 ### REMOVED action
 
-- `replay_speed` — **DELETED**. Existing callers in `src/SimSteward.Dashboard/index.html` and `src/SimSteward.Dashboard/replay-incident-index.html` migrate to `replay_set_speed` (magnitude) + `replay_set_direction` (forward/reverse) as part of Phase 2.
+- `replay_speed` — **DELETED**. Existing callers in `src/SimSteward.Dashboard/index.html` (main dashboard and the merged Replay Index tab, formerly `replay-incident-index.html`) migrate to `replay_set_speed` (magnitude) + `replay_set_direction` (forward/reverse) as part of Phase 2.
 
 ### Speed semantics (sim-expert verified)
 

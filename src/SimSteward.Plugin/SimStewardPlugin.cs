@@ -175,7 +175,8 @@ namespace SimSteward.Plugin
                 drivers = BuildDriverList(),
                 cameraGroups = GetCameraGroupNames(),
                 diagnostics = snapshot.Diagnostics,
-                replayIncidentIndex = snapshot.ReplayIncidentIndex
+                replayIncidentIndex = snapshot.ReplayIncidentIndex,
+                leaderboard = snapshot.Leaderboard
             };
             return JsonConvert.SerializeObject(state);
         }
@@ -230,6 +231,13 @@ namespace SimSteward.Plugin
             var tail = _logger.GetTail(50);
             if (tail == null || tail.Count == 0) return null;
             var msg = new { type = "logEvents", entries = tail };
+            return JsonConvert.SerializeObject(msg);
+        }
+
+        private string GetIncidentsForNewClient()
+        {
+            if (_liveIncidentBoardEntries == null || _liveIncidentBoardEntries.Count == 0) return null;
+            var msg = new { type = "incidents", entries = _liveIncidentBoardEntries };
             return JsonConvert.SerializeObject(msg);
         }
 
@@ -310,6 +318,78 @@ namespace SimSteward.Plugin
         }
 
 #if SIMHUB_SDK
+        // Leaderboard scratch arrays — main-thread (DataUpdate/state-broadcast) only, deliberately
+        // separate from the native-telemetry-thread detector arrays in SimStewardPlugin.LiveIncidentDetection.cs.
+        private readonly int[] _leaderboardScratchCarIdxLap           = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly float[] _leaderboardScratchCarIdxLapDistPct  = new float[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly int[] _leaderboardScratchCarIdxPosition      = new int[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly float[] _leaderboardScratchCarIdxLastLapTime = new float[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly float[] _leaderboardScratchCarIdxBestLapTime = new float[ReplayIncidentIndexBuild.CarSlotCount];
+        private readonly float[] _leaderboardScratchCarIdxEstTime     = new float[ReplayIncidentIndexBuild.CarSlotCount];
+
+        /// <summary>
+        /// Live race leaderboard. Position is derived from total distance covered
+        /// (<see cref="RaceLeaderboardOrdering"/>), not raw CarIdxPosition, which iRacing only
+        /// updates at the S/F line — see docs/IRACING-DATA-AVAILABILITY.md.
+        /// </summary>
+        private List<LeaderboardRow> BuildLeaderboardRows()
+        {
+            var rows = new List<LeaderboardRow>();
+            if (_irsdk == null || !_irsdk.IsConnected) return rows;
+
+            IList drivers;
+            try { drivers = _irsdk.Data?.SessionInfo?.DriverInfo?.Drivers as IList; }
+            catch { drivers = null; }
+            if (drivers == null || drivers.Count == 0) return rows;
+
+            SafeGetIntPerCar("CarIdxLap", _leaderboardScratchCarIdxLap);
+            SafeGetFloatPerCar("CarIdxLapDistPct", _leaderboardScratchCarIdxLapDistPct);
+            SafeGetIntPerCar("CarIdxPosition", _leaderboardScratchCarIdxPosition);
+            SafeGetFloatPerCar("CarIdxLastLapTime", _leaderboardScratchCarIdxLastLapTime);
+            SafeGetFloatPerCar("CarIdxBestLapTime", _leaderboardScratchCarIdxBestLapTime);
+            SafeGetFloatPerCar("CarIdxEstTime", _leaderboardScratchCarIdxEstTime);
+
+            var carIndices = new List<int>();
+            foreach (var d in drivers)
+            {
+                if (d == null) continue;
+                try
+                {
+                    var t = d.GetType();
+                    var ciObj = t.GetProperty("CarIdx")?.GetValue(d);
+                    int ci = ciObj is int v ? v : Convert.ToInt32(ciObj ?? -1);
+                    if (ci >= 0 && ci < ReplayIncidentIndexBuild.CarSlotCount)
+                        carIndices.Add(ci);
+                }
+                catch { }
+            }
+            if (carIndices.Count == 0) return rows;
+
+            var progress = carIndices.Select(ci => new RaceLeaderboardOrdering.CarProgress(
+                ci, _leaderboardScratchCarIdxLap[ci], _leaderboardScratchCarIdxLapDistPct[ci]));
+            var order = RaceLeaderboardOrdering.DeriveLiveOrder(progress);
+
+            float leaderEstTime = order.Count > 0 ? _leaderboardScratchCarIdxEstTime[order[0]] : 0f;
+
+            for (int i = 0; i < order.Count; i++)
+            {
+                int ci = order[i];
+                rows.Add(new LeaderboardRow
+                {
+                    CarIdx = ci,
+                    DriverName = ResolveDriverNameForCarIdxOrEmpty(ci),
+                    LiveRank = i + 1,
+                    OfficialPosition = _leaderboardScratchCarIdxPosition[ci],
+                    Lap = _leaderboardScratchCarIdxLap[ci],
+                    LapDistPct = _leaderboardScratchCarIdxLapDistPct[ci],
+                    LastLapTime = _leaderboardScratchCarIdxLastLapTime[ci],
+                    BestLapTime = _leaderboardScratchCarIdxBestLapTime[ci],
+                    GapToLeaderSec = _leaderboardScratchCarIdxEstTime[ci] - leaderEstTime
+                });
+            }
+            return rows;
+        }
+
         private PluginSnapshot BuildPluginSnapshot()
         {
             var irConnected = _irsdk?.IsConnected ?? false;
@@ -347,7 +427,8 @@ namespace SimSteward.Plugin
                 ReplaySessionNum = replaySessionNum,
                 ReplaySessionName = replaySessionName,
                 Diagnostics = BuildDiagnostics(clientCount),
-                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot()
+                ReplayIncidentIndex = BuildReplayIncidentIndexDashboardSnapshot(),
+                Leaderboard = BuildLeaderboardRows()
             };
         }
 
@@ -364,7 +445,18 @@ namespace SimSteward.Plugin
                 SimHubHttpListening = _simHubHttpListening,
                 DashboardPing = _dashboardPingStatus,
                 GrafanaConfigured = !string.IsNullOrEmpty(_lokiBaseUrl),
-                ReplaySessionCompleted = IsReplaySessionCompleted()
+                ReplaySessionCompleted = IsReplaySessionCompleted(),
+                LiveDetectorActive = _liveRaceDetectorBaselineReady,
+                GitSha = PluginVersionInfo.GitSha,
+                BuildTimestampUtc = PluginVersionInfo.BuildTimestampUtc == DateTime.MinValue
+                    ? ""
+                    : PluginVersionInfo.BuildTimestampUtc.ToString("o"),
+                ActiveConfig = new PluginActiveConfig
+                {
+                    LokiUrl = _lokiBaseUrl,
+                    FastForwardSweepSpeed = ReplayIncidentIndexBuild.DefaultFastForwardPlaySpeed,
+                    IncidentFingerprintVersion = "v1"
+                }
             };
             if (_lastResourceSample != null)
             {
@@ -943,6 +1035,77 @@ namespace SimSteward.Plugin
                     _lastJumpEvaluated = false;
                     var sup = new System.Collections.Generic.Dictionary<string, object>
                     {
+                        ["expected_frame"] = picked.Row.ReplayFrame,
+                        ["expected_session_time_ms"] = picked.Row.SessionTimeMs,
+                        ["expected_fingerprint"] = picked.Row.Fingerprint ?? ""
+                    };
+                    LogActionResult(action, arg, correlationId, true, "", sup);
+                    return (true, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    var err = ex.Message ?? "replay_jump_failed";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+            }
+
+            // Driver-scoped incident navigation — the native SDK NextIncident (see "replay_seek" below)
+            // has no way to filter by car, so this is our own index, filtered to one carIdx (arg).
+            // Unlike "replay_jump_next_incident"/"replay_jump_prev_incident" above, this also pauses
+            // on arrival (matches DispatchReplayIncidentIndexSeek's fix for the same gap).
+            if (string.Equals(action, "replay_jump_next_driver_incident", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "replay_jump_prev_driver_incident", StringComparison.OrdinalIgnoreCase))
+            {
+                bool isNext = string.Equals(action, "replay_jump_next_driver_incident", StringComparison.OrdinalIgnoreCase);
+                if (!int.TryParse((arg ?? "").Trim(), out int carIdx))
+                {
+                    const string err = "bad_arg";
+                    LogActionResult(action, arg, correlationId, false, err);
+                    return (false, null, err);
+                }
+                var rows = _replayIndexDashboardCachedRoot?.Incidents;
+                if (rows == null || rows.Count == 0)
+                {
+                    LogActionResult(action, arg, correlationId, false, "index_unavailable");
+                    return (false, null, "index_unavailable");
+                }
+                if (_irsdk == null || !_irsdk.IsConnected)
+                {
+                    LogActionResult(action, arg, correlationId, false, "not_connected");
+                    return (false, null, "not_connected");
+                }
+                if (IsSeekThrottled())
+                {
+                    LogActionResult(action, arg, correlationId, false, "seek_throttled");
+                    return (false, null, "seek_throttled");
+                }
+                int currentFrame = SafeGetInt("ReplayFrameNum");
+                var picked = isNext
+                    ? ReplayControlActions.ResolveNextIncidentForCar(rows, currentFrame, carIdx)
+                    : ReplayControlActions.ResolvePrevIncidentForCar(rows, currentFrame, carIdx);
+                if (!picked.Ok)
+                {
+                    LogActionResult(action, arg, correlationId, false, picked.Error);
+                    return (false, null, picked.Error);
+                }
+                try
+                {
+                    MarkSeekIssued();
+                    int sessionNum = SafeGetInt("SessionNum");
+                    _irsdk.ReplaySearchSessionTime(sessionNum, picked.Row.SessionTimeMs);
+                    _irsdk.CamSwitchPos(IRacingSdkEnum.CamSwitchMode.FocusAtDriver, carIdx, 0, 0);
+                    _irsdk.ReplaySetPlaySpeed(0, false); // land paused, same as DispatchReplayIncidentIndexSeek
+                    _lastJumpRequestedAt = DateTime.UtcNow;
+                    _lastJumpDirection = isNext ? "next" : "prev";
+                    _lastJumpExpectedFrame = picked.Row.ReplayFrame;
+                    _lastJumpExpectedSessionTimeMs = picked.Row.SessionTimeMs;
+                    _lastJumpExpectedFingerprint = picked.Row.Fingerprint;
+                    _lastJumpEvaluated = false;
+                    var sup = new System.Collections.Generic.Dictionary<string, object>
+                    {
+                        ["car_idx"] = carIdx,
                         ["expected_frame"] = picked.Row.ReplayFrame,
                         ["expected_session_time_ms"] = picked.Row.SessionTimeMs,
                         ["expected_fingerprint"] = picked.Row.Fingerprint ?? ""
@@ -1611,7 +1774,8 @@ namespace SimSteward.Plugin
                     _replayIndexCancelRequested = true;
                     _replayIndexRecordModeEnabled = false;
                 },
-                getHelloForNewClient: GetSessionHelloForNewClient);
+                getHelloForNewClient: GetSessionHelloForNewClient,
+                getIncidentsForNewClient: GetIncidentsForNewClient);
 
             try
             {
@@ -1818,6 +1982,8 @@ namespace SimSteward.Plugin
                 _liveLastReplayFrame = -1;
                 _liveAggregator.Reset();
                 _lastJumpEvaluated = true;
+                // Live field-wide incident detector: force a fresh baseline on reconnect.
+                _liveRaceDetectorBaselineReady = false;
             }
 
             pluginManager.SetPropertyValue("SimSteward.PluginMode", GetType(), _pluginMode);

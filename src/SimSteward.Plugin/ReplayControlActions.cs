@@ -163,6 +163,49 @@ namespace SimSteward.Plugin
             return new JumpResolveResult(false, null, -1, "at_start");
         }
 
+        /// <summary>
+        /// Resolve the next-incident jump target scoped to one driver — first row with
+        /// <c>CarIdx == carIdx</c> and <c>ReplayFrame &gt; currentFrame</c>. Distinguishes "this car
+        /// has no incidents at all" (<c>no_incidents_for_car</c>) from "already past this car's last
+        /// one" (<c>at_end</c>) so the dashboard can show an accurate message either way.
+        /// </summary>
+        public static JumpResolveResult ResolveNextIncidentForCar(
+            IReadOnlyList<ReplayIncidentIndexIncidentRow> rows, int currentFrame, int carIdx)
+        {
+            if (rows == null || rows.Count == 0)
+                return new JumpResolveResult(false, null, -1, "index_unavailable");
+            if (carIdx < 0)
+                return new JumpResolveResult(false, null, -1, "no_car_selected");
+            bool carHasAny = false;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (rows[i].CarIdx != carIdx) continue;
+                carHasAny = true;
+                if (rows[i].ReplayFrame > currentFrame)
+                    return new JumpResolveResult(true, rows[i], i, null);
+            }
+            return new JumpResolveResult(false, null, -1, carHasAny ? "at_end" : "no_incidents_for_car");
+        }
+
+        /// <summary>Resolve the previous-incident jump target scoped to one driver — mirrors <see cref="ResolveNextIncidentForCar"/>.</summary>
+        public static JumpResolveResult ResolvePrevIncidentForCar(
+            IReadOnlyList<ReplayIncidentIndexIncidentRow> rows, int currentFrame, int carIdx)
+        {
+            if (rows == null || rows.Count == 0)
+                return new JumpResolveResult(false, null, -1, "index_unavailable");
+            if (carIdx < 0)
+                return new JumpResolveResult(false, null, -1, "no_car_selected");
+            bool carHasAny = false;
+            for (int i = rows.Count - 1; i >= 0; i--)
+            {
+                if (rows[i].CarIdx != carIdx) continue;
+                carHasAny = true;
+                if (rows[i].ReplayFrame < currentFrame)
+                    return new JumpResolveResult(true, rows[i], i, null);
+            }
+            return new JumpResolveResult(false, null, -1, carHasAny ? "at_start" : "no_incidents_for_car");
+        }
+
         // ── misfire evaluator ───────────────────────────────────────────────
         public readonly struct MisfireResult
         {
