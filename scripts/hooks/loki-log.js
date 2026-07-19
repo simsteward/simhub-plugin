@@ -260,6 +260,23 @@ function loadModelPricing() {
 }
 
 const MODEL_PRICING = loadModelPricing() || {
+  // Current-generation models (exact-match keys — checked before the substring
+  // fallback below, so these always win over the legacy generic entries even
+  // though e.g. 'claude-opus-4-8' textually contains 'claude-opus-4').
+  'claude-fable-5':    { input: 10,   output: 50,   cacheWrite: 12.5,  cacheRead: 1.00 },
+  'claude-mythos-5':   { input: 10,   output: 50,   cacheWrite: 12.5,  cacheRead: 1.00 },
+  'claude-opus-4-8':   { input: 5,    output: 25,   cacheWrite: 6.25,  cacheRead: 0.50 },
+  'claude-opus-4-7':   { input: 5,    output: 25,   cacheWrite: 6.25,  cacheRead: 0.50 },
+  'claude-opus-4-6':   { input: 5,    output: 25,   cacheWrite: 6.25,  cacheRead: 0.50 },
+  'claude-sonnet-5':   { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30 },
+  'claude-sonnet-4-6': { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30 },
+  'claude-haiku-4-5':  { input: 1,    output: 5,    cacheWrite: 1.25,  cacheRead: 0.10 },
+  // Legacy generic fallbacks — substring-matched (longest key wins) for older
+  // dated-snapshot model strings not listed above (e.g. claude-opus-4-1-20250805,
+  // claude-opus-4-20250514, claude-sonnet-4-20250514). Values are those models'
+  // actual launch pricing — do not repoint these at current-gen rates, since
+  // 'claude-opus-4-8'/'claude-haiku-4-5' etc. now resolve via the exact-match
+  // entries above and never reach this fallback.
   'claude-opus-4':   { input: 15,   output: 75,   cacheWrite: 18.75, cacheRead: 1.50 },
   'claude-sonnet-4': { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30 },
   'claude-haiku-4':  { input: 0.80, output: 4,    cacheWrite: 1.00,  cacheRead: 0.08 },
