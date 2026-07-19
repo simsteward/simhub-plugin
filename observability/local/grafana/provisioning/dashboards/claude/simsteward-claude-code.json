@@ -36,7 +36,7 @@
       "collapsed": false, "panels": []
     },
     {
-      "type": "stat", "title": "Total Cost (all sources)",
+      "type": "stat", "title": "Total Cost",
       "description": "Sum of claude_code.cost.usage across main sessions, subagents, and auxiliary requests. OTel-native (Mimir) — replaces the Loki hook-pipeline estimate.",
       "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
@@ -45,7 +45,7 @@
       "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Total Cost", "queryType": "range", "refId": "A"}]
     },
     {
-      "type": "stat", "title": "Total Tokens (all sources)",
+      "type": "stat", "title": "Total Tokens",
       "description": "Total tokens (input+output+cacheRead+cacheCreation) across main sessions, subagents, and auxiliary requests. OTel-native (Mimir).",
       "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
@@ -54,7 +54,7 @@
       "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_token_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Total Tokens", "queryType": "range", "refId": "A"}]
     },
     {
-      "type": "stat", "title": "Subagent Share of Cost",
+      "type": "stat", "title": "Subagent Share",
       "description": "Fraction of total cost where query_source=subagent. Excludes query_source=auxiliary from the numerator (auxiliary is a separate, third category — see Cost by Source below), but auxiliary is still included in the denominator.",
       "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
@@ -133,7 +133,7 @@
     },
     {
       "type": "stat", "title": "Total Cost (hook pipeline — cross-check)",
-      "description": "Per-turn cost_usd from the Loki hook pipeline (main session live; subagents only after running scripts/backfill-subagent-usage.js). Cross-check against the authoritative metric above.",
+      "description": "Per-turn cost_usd from the Loki hook pipeline (main session live; subagents only after running scripts/backfill-subagent-usage.js). Cross-check against the authoritative metric above — expect these two numbers to differ, typically by 20-35%, not match exactly. This panel estimates cache-write cost with a flat multiplier (scripts/hooks/loki-log.js MODEL_PRICING) because the transcript doesn't record which cache TTL tier (5-min vs 1-hour, priced differently) each write used; the Total Cost panel above reflects Claude Code's own native OTel cost accounting and is the more accurate figure. If this number is ever $0.00 or wildly larger than 2x the Total Cost panel, that's a real bug (e.g. an unpriced model — check the claude-dev-logging stream for a pricing_unknown_model WARN), not the expected estimation variance.",
       "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
       "gridPos": {"h": 4, "w": 6, "x": 0, "y": 29},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#565f89", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
