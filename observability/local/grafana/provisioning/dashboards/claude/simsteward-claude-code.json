@@ -73,12 +73,12 @@
     },
     {
       "type": "timeseries", "title": "Cost by Source (main / subagent / auxiliary)",
-      "description": "Cost split by query_source. OTel-native (Mimir) — auxiliary is a genuine third category (see docs/GRAFANA-LOGGING.md), not folded into subagent.",
+      "description": "Cost split by query_source. OTel-native (Mimir) — auxiliary is a genuine third category (see docs/GRAFANA-LOGGING.md), not folded into subagent. Query has a 15m minimum step so thin categories (auxiliary is sparse — occasional requests) reliably get >=2 samples per bucket and survive increase(); without this, a series with very few raw samples can silently vanish from the legend even though it has real, non-zero total cost.",
       "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
       "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum by (query_source) (increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__interval]))", "legendFormat": "{{query_source}}", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum by (query_source) (increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__interval]))", "legendFormat": "{{query_source}}", "queryType": "range", "refId": "A", "interval": "15m"}]
     },
     {
       "type": "piechart", "title": "Cost Share by Model",
