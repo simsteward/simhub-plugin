@@ -1,7 +1,7 @@
 {
   "uid": "simsteward-claude-code",
   "title": "SimSteward — Claude Code",
-  "description": "Claude Code usage. TOP section = Loki hook pipeline (main sessions live + backfilled subagents via scripts/backfill-subagent-usage.js). NOTE: OTEL PromQL panels (grafanacloud-prom) will replace these once SIMSTEWARD_OTLP_TOKEN is provisioned at grafana.com → Access Policies (metrics:write + logs:write). BOTTOM = legacy tool health + session audit. Subscription 5h/weekly limit % is NOT available via telemetry — see the Spend Context note.",
+  "description": "Claude Code usage. TOP section = OTel-native metrics (claude_code.cost.usage / claude_code.token.usage) via Grafana Cloud Mimir — live since 2026-07-18; no data before that date (see docs/GRAFANA-LOGGING.md). BOTTOM = legacy Loki hook-pipeline cross-check + tool health + session audit (no Mimir equivalent for these). Subscription 5h/weekly limit % is NOT available via telemetry — see the Spend Context note.",
   "refresh": "30s",
   "schemaVersion": 38,
   "version": 4,
@@ -31,89 +31,81 @@
   },
   "panels": [
     {
-      "type": "row", "title": "All Sources — cost & tokens incl. backfilled subagents (Loki · OTEL PromQL once OTLP creds provisioned)",
+      "type": "row", "title": "All Sources — cost & tokens (OTel / Mimir, live)",
       "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
       "collapsed": false, "panels": []
     },
     {
       "type": "stat", "title": "Total Cost (all sources)",
-      "description": "Sum of cost_usd across main sessions (live hook) + subagents (backfilled). Will switch to OTEL PromQL once SIMSTEWARD_OTLP_TOKEN provisioned.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Sum of claude_code.cost.usage across main sessions, subagents, and auxiliary requests. OTel-native (Mimir) — replaces the Loki hook-pipeline estimate.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7AA2F7", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Total Cost", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Total Cost", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Total Tokens (all sources)",
-      "description": "Total tokens across main sessions + backfilled subagents from hook pipeline.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Total tokens (input+output+cacheRead+cacheCreation) across main sessions, subagents, and auxiliary requests. OTel-native (Mimir).",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 1, "color": {"fixedColor": "#BB9AF7", "mode": "fixed"}, "noValue": "0"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_tokens [$__range]))", "legendFormat": "Total Tokens", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_token_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Total Tokens", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "stat", "title": "Subagent Share of Cost",
-      "description": "Fraction of total cost from backfilled subagents. The metric the old dashboard was blind to.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Fraction of total cost where query_source=subagent. Excludes query_source=auxiliary from the numerator (auxiliary is a separate, third category — see Cost by Source below), but auxiliary is still included in the denominator.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
       "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 1, "min": 0, "max": 1, "color": {"mode": "thresholds"}, "noValue": "0%", "thresholds": {"mode": "absolute", "steps": [{"color": "#9ECE6A", "value": null}, {"color": "#E0AF68", "value": 0.4}, {"color": "#7AA2F7", "value": 0.7}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__range])) / sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Subagent %", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\", query_source=\"subagent\"}[$__range])) / sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Subagent %", "queryType": "range", "refId": "A"}]
     },
     {
-      "type": "stat", "title": "Subagent Cost (backfilled)",
-      "description": "Absolute cost from backfilled subagent transcripts — previously invisible to all dashboards.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "type": "stat", "title": "Subagent Cost",
+      "description": "Absolute cost where query_source=subagent. OTel-native (Mimir) — live, not backfilled.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7DCFFF", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__range]))", "legendFormat": "Subagent Cost", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\", query_source=\"subagent\"}[$__range]))", "legendFormat": "Subagent Cost", "queryType": "range", "refId": "A"}]
     },
     {
-      "type": "timeseries", "title": "Cost by Source (main vs subagent)",
-      "description": "Daily cost split: subagent (backfilled) vs main session (live). Gap before backfill = main only.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "type": "timeseries", "title": "Cost by Source (main / subagent / auxiliary)",
+      "description": "Cost split by query_source. OTel-native (Mimir) — auxiliary is a genuine third category (see docs/GRAFANA-LOGGING.md), not folded into subagent.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
       "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent=\"true\"} | json | __error__=\"\" | unwrap cost_usd [$__interval]))", "legendFormat": "subagent", "queryType": "range", "refId": "A"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\", is_subagent!=\"true\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__interval]))", "legendFormat": "main", "queryType": "range", "refId": "B"}
-      ]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum by (query_source) (increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__interval]))", "legendFormat": "{{query_source}}", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "piechart", "title": "Cost Share by Model",
-      "description": "Cost breakdown by model — haiku/sonnet/opus from both main sessions and backfilled subagents.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Cost breakdown by model. OTel-native (Mimir).",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "color": {"mode": "palette-classic"}}, "overrides": []},
       "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}, "tooltip": {"mode": "single"}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "{{model}}", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum by (model) (increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "{{model}}", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "timeseries", "title": "Tokens by Type",
-      "description": "Token breakdown: input, output, cache_read, cache_write — across main sessions and backfilled subagents.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Token breakdown: input, output, cacheRead, cacheCreation. OTel-native (Mimir) — label values are claude_code_token_usage_tokens_total's own type attribute, camelCase.",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
       "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
       "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_input_tokens [$__interval]))", "legendFormat": "input", "queryType": "range", "refId": "A"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_output_tokens [$__interval]))", "legendFormat": "output", "queryType": "range", "refId": "B"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_read_tokens [$__interval]))", "legendFormat": "cache_read", "queryType": "range", "refId": "C"},
-        {"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap total_cache_creation_tokens [$__interval]))", "legendFormat": "cache_write", "queryType": "range", "refId": "D"}
-      ]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum by (type) (increase({__name__=~\"claude_code_token_usage.*\", env=~\"$env\"}[$__interval]))", "legendFormat": "{{type}}", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "timeseries", "title": "Cost by Model",
-      "description": "Cost over time broken down by model — includes backfilled subagent models (haiku-4-5, opus-4-6/4-7) that were previously invisible.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Cost over time broken down by model. OTel-native (Mimir).",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "custom": {"fillOpacity": 70, "lineInterpolation": "smooth", "lineWidth": 1, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
       "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum by (model) (sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__interval]))", "legendFormat": "{{model}}", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum by (model) (increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__interval]))", "legendFormat": "{{model}}", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "row", "title": "Spend Context — API-equivalent (NOT subscription plan-limit)",
@@ -122,12 +114,12 @@
     },
     {
       "type": "stat", "title": "API-equivalent Spend (selected range)",
-      "description": "Retail API-price equivalent of usage in the selected range. A volume/cost proxy — NOT your subscription plan-limit usage.",
-      "datasource": {"type": "loki", "uid": "grafanacloud-logs"},
+      "description": "Retail API-price equivalent of usage in the selected range. A volume/cost proxy — NOT your subscription plan-limit usage. OTel-native (Mimir).",
+      "datasource": {"type": "prometheus", "uid": "grafanacloud-prom"},
       "gridPos": {"h": 6, "w": 12, "x": 0, "y": 22},
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"fixedColor": "#7AA2F7", "mode": "fixed"}, "noValue": "$0.00"}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
-      "targets": [{"datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": "sum(sum_over_time({app=\"claude-token-metrics\", env=~\"$env\"} | json | __error__=\"\" | event=\"claude_turn_metrics\" | unwrap cost_usd [$__range]))", "legendFormat": "Spend", "queryType": "range", "refId": "A"}]
+      "targets": [{"datasource": {"type": "prometheus", "uid": "grafanacloud-prom"}, "expr": "sum(increase({__name__=~\"claude_code_cost_usage.*\", env=~\"$env\"}[$__range]))", "legendFormat": "Spend", "queryType": "range", "refId": "A"}]
     },
     {
       "type": "text", "title": "Why there is no plan-limit gauge",
