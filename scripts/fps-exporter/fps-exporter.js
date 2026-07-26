@@ -12,12 +12,11 @@ const { INITIAL_BACKOFF_MS, backoffAfterExit } = require('./backoff.js');
 
 const ALLOWLIST = ['iRacingSim64DX11.exe', 'chrome.exe'];
 const PRESENTMON_PATH = path.join(os.homedir(), 'Tools', 'PresentMon', 'PresentMon.exe');
+const CONNECTOR_MAP_PATH = path.join(__dirname, 'connector-map.json');
 const METRICS_PORT = 9101;
 const METRICS_HOST = '127.0.0.1';
 const LOG_DIR = path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'FpsExporter');
 const LOG_FILE = path.join(LOG_DIR, 'fps-exporter.log');
-
-const aggregator = new MetricsAggregator(ALLOWLIST);
 
 function log(message) {
   const line = `${new Date().toISOString()} ${message}\n`;
@@ -30,6 +29,29 @@ function log(message) {
   }
 }
 
+function loadConnectorMap() {
+  // Optional: {"0":"DisplayPort","1":"HDMI"} keyed by PresentMon's VidPnSourceId, produced by
+  // dump-display-topology.ps1 run from the interactive desktop session (this service runs in
+  // Session 0, which cannot see real monitor topology itself — see that script's header comment).
+  // Read once at startup; the physical monitor layout doesn't change often enough to warrant
+  // watching the file, and a stale/missing map just means output IDs render without a connector
+  // label rather than with a wrong one.
+  if (!fs.existsSync(CONNECTOR_MAP_PATH)) {
+    log(`no connector map at ${CONNECTOR_MAP_PATH} — outputs will be labeled by numeric ID only`);
+    return {};
+  }
+  try {
+    const map = JSON.parse(fs.readFileSync(CONNECTOR_MAP_PATH, 'utf8'));
+    log(`loaded connector map: ${JSON.stringify(map)}`);
+    return map;
+  } catch (err) {
+    log(`failed to parse connector map at ${CONNECTOR_MAP_PATH}: ${err.message} — ignoring it`);
+    return {};
+  }
+}
+
+const aggregator = new MetricsAggregator(ALLOWLIST, loadConnectorMap());
+
 function startPresentMon(backoffMs) {
   log(`starting PresentMon.exe (backoff was ${backoffMs}ms)`);
   const startedAt = Date.now();
@@ -38,6 +60,7 @@ function startPresentMon(backoffMs) {
     '--process_name', 'chrome.exe',
     '--output_stdout',
     '--no_console_stats',
+    '--write_display_metadata',
   ]);
 
   let headerCols = null;
