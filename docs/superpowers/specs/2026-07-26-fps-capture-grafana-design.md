@@ -113,6 +113,9 @@ One additive `prometheus.scrape` block in `config.alloy` targeting `127.0.0.1:91
 
 ## Risks / open verification items
 
-- **PresentMon 2.5.1's exact CSV column names are not yet empirically confirmed in this environment.** The earlier smoke test (this session) ran without elevation and produced zero output rows, so the parser design above (`MsBetweenPresents`, `MsBetweenDisplayChange`, a dropped-frame indicator) is based on PresentMon's documented schema, not a captured header. First implementation step should be an elevated capture with a real 3D app running, to confirm exact column names/format before writing the parser against them.
 - **Pit-wall process ambiguity.** `chrome.exe`'s FPS reflects whatever that process is rendering — if multiple Chrome windows/tabs are open and actively presenting (not just idle), the metric blends them. Recommend keeping the pit-wall dashboard in its own dedicated browser window (or profile) regardless of this feature, both for cleaner metrics and as generally better practice.
-- **NSSM vs. alternative service-install mechanisms** not yet finalized in detail — `node-windows` (npm-based self-install) was considered but would add a runtime dependency where NSSM (external tool, install-time only) keeps `fps-exporter` itself dependency-free. Implementation plan should confirm NSSM is acceptable before scripting the install.
+
+**Resolved during implementation planning:**
+
+- **PresentMon 2.5.1 CSV column names** — confirmed against PresentMon's own `README-ConsoleApplication.md` (not the earlier smoke test, which never produced output since it wasn't elevated). The relevant columns are `Application`, `MsBetweenPresents`, `MsBetweenDisplayChange`, and `DisplayedTime` (value `NA` — not a boolean `Dropped` column — indicates a frame that was rendered but never displayed). The implementation plan's parser is written against these confirmed names.
+- **Service-install mechanism** — NSSM via `winget install NSSM.NSSM`, confirmed available on this machine (`winget --version` → 1.29.280, package present in `winget search NSSM`). Keeps `fps-exporter` itself free of the `node-windows` runtime dependency that a self-install approach would have required.
