@@ -80,7 +80,10 @@ namespace SimSteward.Plugin
 
             try
             {
+                var __sw = System.Diagnostics.Stopwatch.StartNew();
                 ProcessReplayIncidentIndexBuildTelemetry();
+                __sw.Stop();
+                _metricsTelemetry?.RecordIncidentDetectionDuration("replay_sweep", __sw.Elapsed.TotalMilliseconds);
             }
             catch (Exception ex)
             {
@@ -98,7 +101,10 @@ namespace SimSteward.Plugin
 
             try
             {
+                var __sw = System.Diagnostics.Stopwatch.StartNew();
                 ProcessLiveIncidentDetectionTick();
+                __sw.Stop();
+                _metricsTelemetry?.RecordIncidentDetectionDuration("live", __sw.Elapsed.TotalMilliseconds);
             }
             catch (Exception ex)
             {
@@ -709,6 +715,19 @@ namespace SimSteward.Plugin
         /// </summary>
         private void BroadcastReplaySweepProgressIfDueLocked(int replayFrame, double replaySessionTimeSec)
         {
+            // Progress % feeds the simsteward.replay_index_build.progress_pct gauge unconditionally —
+            // independent of whether a dashboard client happens to be connected (the WS broadcast below is gated
+            // on client count, but the metrics gauge must reflect real build progress regardless).
+            {
+                int frameEndForMetrics = _replayIndexReplayFrameNumEndSnapshot > 0
+                    ? _replayIndexReplayFrameNumEndSnapshot
+                    : SafeGetInt("ReplayFrameNumEnd");
+                double pctForMetrics = frameEndForMetrics > 0 ? (100.0 * replayFrame / frameEndForMetrics) : 0.0;
+                if (pctForMetrics < 0) pctForMetrics = 0;
+                if (pctForMetrics > 100) pctForMetrics = 100;
+                _replayIndexBuildProgressPctForMetrics = pctForMetrics;
+            }
+
             if (_bridge == null || _bridge.ClientCount <= 0) return;
             var nowUtc = DateTime.UtcNow;
             if ((nowUtc - _lastSweepProgressTickAt).TotalMilliseconds < 1000)
@@ -988,6 +1007,9 @@ namespace SimSteward.Plugin
             MergeSessionAndRoutingFields(done);
             _logger.Structured("INFO", "simhub-plugin", ReplayIncidentIndexBuild.EventFastForwardComplete,
                 "Replay incident index: fast-forward complete (TR-010/011).", done, "lifecycle", null);
+
+            _metricsTelemetry?.RecordReplayIndexBuildCompleted(reason, wallMs);
+            _replayIndexBuildProgressPctForMetrics = 0;
 
             _replayIndexFfWallClock = null;
             _replayIndexLastValidationBlock = BuildReplayIndexValidationBlockLocked(_replayIndexIncidentSamples);

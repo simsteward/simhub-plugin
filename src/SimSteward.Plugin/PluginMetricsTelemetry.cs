@@ -18,18 +18,39 @@ namespace SimSteward.Plugin
         private readonly MeterProvider _meterProvider;
         private readonly Meter _meter;
         private readonly Func<SystemMetricsSample> _getSample;
+        private readonly Func<double> _getDataUpdateHz;
+        private readonly Func<int> _getClientCount;
+        private readonly Func<double> _getReplayBuildProgressPct;
         private readonly KeyValuePair<string, object>[] _baseTags;
+
+        private readonly Histogram<double> _dataUpdateTickIntervalMs;
+        private readonly Counter<long> _broadcastsSent;
+        private readonly Counter<long> _broadcastsSkippedThrottle;
+        private readonly Counter<long> _broadcastsSkippedNoClients;
+        private readonly Histogram<double> _broadcastDurationMs;
+        private readonly Counter<long> _sendErrors;
+        private readonly Histogram<double> _incidentDetectionDurationMs;
+        private readonly Histogram<double> _actionDurationMs;
+        private readonly Histogram<double> _replayIndexBuildDurationMs;
+        private readonly Counter<long> _replayIndexBuildsTotal;
 
         private PluginMetricsTelemetry(
             MeterProvider meterProvider,
             Meter meter,
             Func<SystemMetricsSample> getSample,
+            Func<double> getDataUpdateHz,
+            Func<int> getClientCount,
+            Func<double> getReplayBuildProgressPct,
             KeyValuePair<string, object>[] baseTags)
         {
             _meterProvider = meterProvider;
             _meter = meter;
             _getSample = getSample;
+            _getDataUpdateHz = getDataUpdateHz;
+            _getClientCount = getClientCount;
+            _getReplayBuildProgressPct = getReplayBuildProgressPct;
             _baseTags = baseTags;
+
             _meter.CreateObservableGauge(
                 "simsteward.plugin.ready",
                 ObserveReady,
@@ -45,12 +66,80 @@ namespace SimSteward.Plugin
                 ObserveWs,
                 unit: "MiBy",
                 description: "SimHub process working set.");
+
+            // --- DataUpdate loop health (real achieved tick rate vs. the ~60Hz game-tick target) ---
+            _meter.CreateObservableGauge(
+                "simsteward.dataupdate.hz",
+                ObserveDataUpdateHz,
+                unit: "Hz",
+                description: "Achieved DataUpdate() tick rate (EMA), vs. the ~60Hz game-tick target.");
+            _dataUpdateTickIntervalMs = _meter.CreateHistogram<double>(
+                "simsteward.dataupdate.tick_interval_ms",
+                unit: "ms",
+                description: "Distribution of inter-tick intervals for DataUpdate() — jitter/stall detection.");
+
+            // --- WebSocket dashboard broadcast path ---
+            _meter.CreateObservableGauge(
+                "simsteward.ws.clients",
+                ObserveClientCount,
+                unit: "1",
+                description: "Connected dashboard WebSocket clients.");
+            _broadcastsSent = _meter.CreateCounter<long>(
+                "simsteward.ws.broadcasts_sent",
+                unit: "1",
+                description: "State broadcasts successfully sent to dashboard clients.");
+            _broadcastsSkippedThrottle = _meter.CreateCounter<long>(
+                "simsteward.ws.broadcasts_skipped_throttle",
+                unit: "1",
+                description: "DataUpdate ticks where a broadcast was skipped due to the 200ms/5Hz throttle.");
+            _broadcastsSkippedNoClients = _meter.CreateCounter<long>(
+                "simsteward.ws.broadcasts_skipped_no_clients",
+                unit: "1",
+                description: "Broadcasts skipped because no dashboard client was connected.");
+            _broadcastDurationMs = _meter.CreateHistogram<double>(
+                "simsteward.ws.broadcast_duration_ms",
+                unit: "ms",
+                description: "Wall-clock time to build the state snapshot and send it to all connected clients.");
+            _sendErrors = _meter.CreateCounter<long>(
+                "simsteward.ws.send_errors",
+                unit: "1",
+                description: "Per-client WebSocket send failures.");
+
+            // --- Incident detection ---
+            _incidentDetectionDurationMs = _meter.CreateHistogram<double>(
+                "simsteward.incident_detection.duration_ms",
+                unit: "ms",
+                description: "Duration of a single incident-detection pass, tagged by path (live | replay_sweep).");
+
+            // --- Dashboard action dispatch ---
+            _actionDurationMs = _meter.CreateHistogram<double>(
+                "simsteward.action.duration_ms",
+                unit: "ms",
+                description: "Duration of a dispatched dashboard action, tagged by action name.");
+
+            // --- Replay incident index build (the >2s long-running operation) ---
+            _meter.CreateObservableGauge(
+                "simsteward.replay_index_build.progress_pct",
+                ObserveReplayBuildProgress,
+                unit: "%",
+                description: "Current replay-index fast-forward sweep completion percentage (0 when idle).");
+            _replayIndexBuildDurationMs = _meter.CreateHistogram<double>(
+                "simsteward.replay_index_build.duration_ms",
+                unit: "ms",
+                description: "Total wall-clock duration of a replay incident index build, tagged by completion_reason.");
+            _replayIndexBuildsTotal = _meter.CreateCounter<long>(
+                "simsteward.replay_index_build.builds_total",
+                unit: "1",
+                description: "Replay incident index builds completed, tagged by completion_reason.");
         }
 
         /// <summary>Returns null if OTLP is not configured (no endpoint env vars).</summary>
         public static PluginMetricsTelemetry TryCreate(
             PluginLogger logger,
-            Func<SystemMetricsSample> getSample)
+            Func<SystemMetricsSample> getSample,
+            Func<double> getDataUpdateHz = null,
+            Func<int> getClientCount = null,
+            Func<double> getReplayBuildProgressPct = null)
         {
             var endpoint = FirstNonEmpty(
                 Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT"),
@@ -95,7 +184,12 @@ namespace SimSteward.Plugin
                 })
                 .Build();
 
-            var telemetry = new PluginMetricsTelemetry(provider, meter, getSample, baseTags);
+            var telemetry = new PluginMetricsTelemetry(
+                provider, meter, getSample,
+                getDataUpdateHz ?? (() => 0),
+                getClientCount ?? (() => 0),
+                getReplayBuildProgressPct ?? (() => 0),
+                baseTags);
 
             logger?.Structured("INFO", "simhub-plugin", "otel_metrics_started",
                 "OTLP metrics export enabled (OpenTelemetry → collector).",
@@ -135,6 +229,75 @@ namespace SimSteward.Plugin
             var s = _getSample();
             var v = s?.ProcessWorkingSetMb ?? 0;
             yield return new Measurement<double>(v, _baseTags);
+        }
+
+        private IEnumerable<Measurement<double>> ObserveDataUpdateHz()
+        {
+            yield return new Measurement<double>(_getDataUpdateHz(), _baseTags);
+        }
+
+        private IEnumerable<Measurement<int>> ObserveClientCount()
+        {
+            yield return new Measurement<int>(_getClientCount(), _baseTags);
+        }
+
+        private IEnumerable<Measurement<double>> ObserveReplayBuildProgress()
+        {
+            yield return new Measurement<double>(_getReplayBuildProgressPct(), _baseTags);
+        }
+
+        // --- Imperative recording (histograms/counters, called from the hot paths that measure them) ---
+
+        public void RecordDataUpdateTickIntervalMs(double ms) =>
+            _dataUpdateTickIntervalMs.Record(ms, _baseTags);
+
+        public void RecordBroadcastSent(double durationMs)
+        {
+            _broadcastsSent.Add(1, _baseTags);
+            _broadcastDurationMs.Record(durationMs, _baseTags);
+        }
+
+        public void RecordBroadcastSkippedThrottle() =>
+            _broadcastsSkippedThrottle.Add(1, _baseTags);
+
+        public void RecordBroadcastSkippedNoClients() =>
+            _broadcastsSkippedNoClients.Add(1, _baseTags);
+
+        public void RecordSendError() =>
+            _sendErrors.Add(1, _baseTags);
+
+        /// <param name="path">Bounded label: "live" or "replay_sweep".</param>
+        public void RecordIncidentDetectionDuration(string path, double ms)
+        {
+            var tags = new[]
+            {
+                _baseTags[0],
+                new KeyValuePair<string, object>("path", path ?? "unknown"),
+            };
+            _incidentDetectionDurationMs.Record(ms, tags);
+        }
+
+        /// <param name="action">Bounded label: dashboard action name (~24 distinct values).</param>
+        public void RecordActionDuration(string action, double ms)
+        {
+            var tags = new[]
+            {
+                _baseTags[0],
+                new KeyValuePair<string, object>("action", action ?? "unknown"),
+            };
+            _actionDurationMs.Record(ms, tags);
+        }
+
+        /// <param name="completionReason">Bounded label: "success" | "cancelled" | "error" etc.</param>
+        public void RecordReplayIndexBuildCompleted(string completionReason, double durationMs)
+        {
+            var tags = new[]
+            {
+                _baseTags[0],
+                new KeyValuePair<string, object>("completion_reason", completionReason ?? "unknown"),
+            };
+            _replayIndexBuildDurationMs.Record(durationMs, tags);
+            _replayIndexBuildsTotal.Add(1, tags);
         }
 
         public void Dispose()

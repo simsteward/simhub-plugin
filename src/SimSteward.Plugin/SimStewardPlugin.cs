@@ -68,6 +68,9 @@ namespace SimSteward.Plugin
         private int _resourceSampleIntervalSec = 60;
         private SystemMetricsSample _lastResourceSample;
         private PluginMetricsTelemetry _metricsTelemetry;
+        private DateTime _lastDataUpdateTickUtc = DateTime.MinValue;
+        private double _dataUpdateEmaHz;
+        private double _replayIndexBuildProgressPctForMetrics;
 
 #if SIMHUB_SDK
         private IRacingSdk _irsdk;
@@ -754,6 +757,20 @@ namespace SimSteward.Plugin
         }
 
         private (bool success, string result, string error) DispatchAction(string action, string arg, string correlationId)
+        {
+            var __actionSw = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                return DispatchActionCore(action, arg, correlationId);
+            }
+            finally
+            {
+                __actionSw.Stop();
+                _metricsTelemetry?.RecordActionDuration(action, __actionSw.Elapsed.TotalMilliseconds);
+            }
+        }
+
+        private (bool success, string result, string error) DispatchActionCore(string action, string arg, string correlationId)
         {
             if (string.IsNullOrEmpty(action))
                 return (false, null, "missing_action");
@@ -1751,9 +1768,14 @@ namespace SimSteward.Plugin
                 OnLog,
                 _logger,
                 OnDashboardStructuredLog,
-                onSendError: (ex, payloadType) => WriteBroadcastError("Send:" + payloadType, ex),
+                onSendError: (ex, payloadType) =>
+                {
+                    _metricsTelemetry?.RecordSendError();
+                    WriteBroadcastError("Send:" + payloadType, ex);
+                },
                 onNoClients: () =>
                 {
+                    _metricsTelemetry?.RecordBroadcastSkippedNoClients();
                     var n = DateTime.UtcNow;
                     lock (_broadcastErrorLock)
                     {
@@ -1840,7 +1862,12 @@ namespace SimSteward.Plugin
 
             try
             {
-                _metricsTelemetry = PluginMetricsTelemetry.TryCreate(_logger, () => _lastResourceSample);
+                _metricsTelemetry = PluginMetricsTelemetry.TryCreate(
+                    _logger,
+                    () => _lastResourceSample,
+                    () => _dataUpdateEmaHz,
+                    () => _bridge != null ? _bridge.ClientCount : 0,
+                    () => _replayIndexBuildProgressPctForMetrics);
             }
             catch (Exception ex)
             {
@@ -1860,6 +1887,19 @@ namespace SimSteward.Plugin
         {
             try
             {
+            var __tickNowUtc = DateTime.UtcNow;
+            if (_lastDataUpdateTickUtc != DateTime.MinValue)
+            {
+                double __intervalMs = (__tickNowUtc - _lastDataUpdateTickUtc).TotalMilliseconds;
+                _metricsTelemetry?.RecordDataUpdateTickIntervalMs(__intervalMs);
+                if (__intervalMs > 0)
+                {
+                    double __instHz = 1000.0 / __intervalMs;
+                    _dataUpdateEmaHz = _dataUpdateEmaHz <= 0 ? __instHz : (_dataUpdateEmaHz * 0.9 + __instHz * 0.1);
+                }
+            }
+            _lastDataUpdateTickUtc = __tickNowUtc;
+
             _dataUpdateTick++;
             if (_dataUpdateTick % DependencyCheckIntervalTicks == 0)
                 RefreshDependencyChecks();
@@ -2004,11 +2044,17 @@ namespace SimSteward.Plugin
             var now = DateTime.UtcNow;
 
             if ((now - _lastBroadcastAt).TotalMilliseconds < BroadcastThrottleMs)
+            {
+                _metricsTelemetry?.RecordBroadcastSkippedThrottle();
                 return;
+            }
             _lastBroadcastAt = now;
 
+            var __broadcastSw = System.Diagnostics.Stopwatch.StartNew();
             var snapshot = BuildPluginSnapshot();
             _bridge.BroadcastState(BuildStateJson(snapshot));
+            __broadcastSw.Stop();
+            _metricsTelemetry?.RecordBroadcastSent(__broadcastSw.Elapsed.TotalMilliseconds);
             }
             catch (Exception ex)
             {
