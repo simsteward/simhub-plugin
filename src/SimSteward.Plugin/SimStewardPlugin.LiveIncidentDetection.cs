@@ -247,8 +247,8 @@ namespace SimSteward.Plugin
                 (parseOk ? currByCar.Count + " cars, " + deltaCount + " deltas" : "parse failed (" + parseErr + ")");
             if (LiveYamlProbeLogLevel.IsInfoWorthy(parseOk, deltaCount))
                 _logger?.Structured("INFO", "simhub-plugin", EventLiveYamlProbe, probeMessage, f, "lifecycle", null);
-            else
-                _logger?.Debug(probeMessage, "simhub-plugin", EventLiveYamlProbe, f);
+            else if (_logger != null && _logger.IsDebugMode)
+                _logger.Structured("DEBUG", "simhub-plugin", EventLiveYamlProbe, probeMessage, f, "lifecycle", null);
 
             if (parseOk)
             {
