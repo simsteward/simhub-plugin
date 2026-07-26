@@ -487,10 +487,11 @@ namespace SimSteward.Plugin
 
         private void BroadcastLiveIncidentBoard()
         {
-            if (_bridge == null) return;
+            if (_bridge == null || _bridge.ClientCount <= 0) return;
             try
             {
-                var msg = new { type = "incidents", entries = _liveIncidentBoardEntries };
+                var trimmed = LiveIncidentBoardTrim.Trim(_liveIncidentBoardEntries, LiveIncidentBoardTrim.DefaultMaxBroadcastEntries);
+                var msg = new { type = "incidents", entries = trimmed };
                 _bridge.Broadcast(JsonConvert.SerializeObject(msg), "incidents");
             }
             catch (Exception ex)
