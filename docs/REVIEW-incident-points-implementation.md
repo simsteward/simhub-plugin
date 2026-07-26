@@ -185,4 +185,34 @@ on-track / any-car material scan.
 7. **IMPROVEMENT 11** — self-contained escalation rows (location on the final-state row).
 8. **IMPROVEMENT 8** — board growth cap / delta broadcast.
 9. **TEST-GAP 9** — cover items 2, 3, 5, and board concurrency.
+
+---
+
+## GAP 12 — No spin / loss-of-control detector exists (2026-07-25)
+
+- **What's missing:** none of the current detection sources (`repair_flag`, `furled_flag`, `black_flag`,
+  `disqualify`, `player_incident_count`, `track_surface`, `yaml_incident_delta`, `fast_repair` — see
+  `ReplayIncidentIndexDetection.cs`) directly detect a spin. `IncidentCauseMapping.CauseSpin` ("spin") only
+  ever gets assigned as a side effect of a *resolved* points value of exactly 2 — which in practice means
+  only the player's own live `PlayerCarMyIncidentCount` delta, since no other car's points resolve live
+  (Group 1, `docs/IRACING-DATA-AVAILABILITY.md`). For every other car, a spin is invisible unless it happens
+  to also trip off-track, a flag, or a fast repair.
+- **Confirmed no prior art in CrewChief:** GitHub code search across the full `mrbelowski/CrewChiefV4` repo
+  found zero occurrences of `YawRate` anywhere, and `Yaw` only as an unused raw struct field in
+  `iRacingData.cs`. `DamageReporting.cs` and `iRacingSpotter.cs`/`NoisyCartesianCoordinateSpotter.cs` were
+  read directly — no yaw-rate, angular-velocity, or heading-change logic anywhere. `docs/IRACING-CROSSWALK.md`
+  previously miscited `DamageReporting.cs` for this and has been corrected.
+- **Confirmed no SDK-level event either:** iRacing's `SessionFlags` bitfield (all 32 bits enumerated in
+  `docs/IRACING-CROSSWALK.md` Appendix A) has no spin/loss-of-control bit. There is no dedicated "car X
+  spun" signal anywhere in the SDK, live or replay, for any car.
+- **What a from-scratch heuristic could use (any car, no admin):** `CarIdxLapDistPct` (position, 60Hz),
+  `CarIdxRPM` (direct), `CarIdxGear` (0/neutral during an incident is already flagged as a loose hint in
+  `IRACING-CROSSWALK.md`'s Section 2 notes, never acted on). Speed has no direct per-car field — it would
+  need to be derived by differentiating `CarIdxLapDistPct × track length` over time, same derivation noted
+  as a general SDK limitation in `docs/IRACING-DATA-AVAILABILITY.md` Group 2. A real yaw signal
+  (`Yaw`/`YawRate`) would be needed for a confident spin read and is player-only — no `CarIdxYaw` array
+  exists — so any heuristic built from position/speed/RPM/gear would be an approximation, not a confirmed
+  spin detection, exactly like the existing off-track/contact detectors already are for point values.
+- **Status:** not scheduled — flagged for a future planning pass, not part of the priority order above
+  (items 1-9 are fixes to the shipped feature; this is a net-new detector that doesn't exist yet).
 10. **UX residual** — "these tabs count differently" note (live merged vs. replay unmerged).
