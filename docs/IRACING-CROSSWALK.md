@@ -56,7 +56,7 @@
 | LatAccel | float | P | Lateral acceleration (DamageReporting.cs — impact G classification) | not yet used | Player-only; future severity classification |
 | LongAccel | float | P | Longitudinal acceleration (DamageReporting.cs — braking/impact) | not yet used | Player-only; future severity classification. Named LonAccel in some SDK versions |
 | VertAccel | float | P | Vertical acceleration (DamageReporting.cs — airborne detection) | not yet used | Useful for flip/airborne |
-| YawRate | float | P | Yaw rotation rate (DamageReporting.cs — spin detection) | not yet used | Player-only; future severity classification |
+| YawRate | float | P | **Not present in CrewChief** — verified via GitHub code search across the full repo, 0 hits. `DamageReporting.cs` has no yaw/spin logic (confirmed by direct source read); it does airborne/rollover detection off `Rotation` plus impact-severity off Lat/Long/VertAccel only. Prior entry attributing this to "DamageReporting.cs — spin detection" was wrong. | not yet used | Player-only even if we build our own; no `CarIdxYawRate` array exists |
 | CarIdxGear | int[64] | B | Gear per car (iRacingGameStateMapper) | Incident index — gear context (0=neutral, -1=reverse) | 0 during incidents suggests loss of control |
 
 ---
@@ -259,7 +259,7 @@ All `CarIdx*` arrays are indexed 0-63 (max 64 cars). Index corresponds to `CarId
 | LatAccel | float | P | Lateral G (DamageReporting.cs) | not yet used | Player-only; future severity classification |
 | LongAccel | float | P | Longitudinal G (DamageReporting.cs) | not yet used | Player-only; future severity classification |
 | VertAccel | float | P | Vertical G (DamageReporting.cs) | not yet used | m/s^2 |
-| YawRate | float | P | Spin rate (DamageReporting.cs) | not yet used | Player-only; future severity classification |
+| YawRate | float | P | **Not present in CrewChief** (see Section 2 entry for verification detail) | not yet used | Player-only; no per-car equivalent |
 | Pitch | float | P | Car pitch angle (iRacingData.cs) | not yet used | Radians |
 | Yaw | float | P | Car yaw angle (iRacingData.cs) | not yet used | Radians |
 | Roll | float | P | Car roll angle (iRacingData.cs) | not yet used | Radians |

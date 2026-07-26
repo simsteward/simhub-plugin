@@ -124,8 +124,12 @@ detected-vs-expected counts match for every driver, not just you?
   *other* cars, which is the harder, less-tested half of the system.
 
 **Open questions this run should answer (not yet known):**
-- Does `live_incident_totals_resolved` (today's new live-totals backfill) ever fire in a practice
-  session, or only in races? (Phase 9)
+- ~~Does `live_incident_totals_resolved` ever fire in a practice session, or only in races?~~
+  **ANSWERED 2026-07-19, outside this plan's own run** — confirmed live during an actual hosted
+  session (subsession 87331584, Spa-Francorchamps): fired the moment `session_num` rolled `0→1`
+  (practice segment ending, race/quali segment starting), not tied to the whole event finishing.
+  18 drivers, 7 total points, correctly broadcast. Results go official per-*segment*, not just
+  per-event.
 - Does pit-lane speeding produce any SDK-visible signal at all via the fields we already read? (Phase 7)
 - Does a genuinely light wall touch register as 0x (silently, correctly) or does our detector
   currently over-report it? (Phase 4.1)
