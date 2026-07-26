@@ -1437,13 +1437,22 @@ namespace SimSteward.Plugin
             return entries;
         }
 
+        private readonly PerCarReadFailureThrottle _safeGetIntPerCarFailureThrottle = new PerCarReadFailureThrottle(TimeSpan.FromSeconds(30));
+        private readonly PerCarReadFailureThrottle _safeGetFloatPerCarFailureThrottle = new PerCarReadFailureThrottle(TimeSpan.FromSeconds(30));
+        private readonly PerCarReadFailureThrottle _safeGetBoolPerCarFailureThrottle = new PerCarReadFailureThrottle(TimeSpan.FromSeconds(30));
+
         /// <summary>Read one int per car slot into <paramref name="buffer"/>, defaulting to 0 on any error.</summary>
         private void SafeGetIntPerCar(string field, int[] buffer)
         {
             for (int i = 0; i < buffer.Length; i++)
             {
                 try { buffer[i] = _irsdk.Data.GetInt(field, i); }
-                catch { buffer[i] = 0; }
+                catch (Exception ex)
+                {
+                    buffer[i] = 0;
+                    if (_safeGetIntPerCarFailureThrottle.ShouldLog(DateTime.UtcNow))
+                        _logger?.Warn($"SafeGetIntPerCar field='{field}' idx={i}: {ex.Message}");
+                }
             }
         }
 
@@ -1452,7 +1461,12 @@ namespace SimSteward.Plugin
             for (int i = 0; i < buffer.Length; i++)
             {
                 try { buffer[i] = _irsdk.Data.GetFloat(field, i); }
-                catch { buffer[i] = 0f; }
+                catch (Exception ex)
+                {
+                    buffer[i] = 0f;
+                    if (_safeGetFloatPerCarFailureThrottle.ShouldLog(DateTime.UtcNow))
+                        _logger?.Warn($"SafeGetFloatPerCar field='{field}' idx={i}: {ex.Message}");
+                }
             }
         }
 
@@ -1461,7 +1475,12 @@ namespace SimSteward.Plugin
             for (int i = 0; i < buffer.Length; i++)
             {
                 try { buffer[i] = _irsdk.Data.GetBool(field, i); }
-                catch { buffer[i] = false; }
+                catch (Exception ex)
+                {
+                    buffer[i] = false;
+                    if (_safeGetBoolPerCarFailureThrottle.ShouldLog(DateTime.UtcNow))
+                        _logger?.Warn($"SafeGetBoolPerCar field='{field}' idx={i}: {ex.Message}");
+                }
             }
         }
     }
