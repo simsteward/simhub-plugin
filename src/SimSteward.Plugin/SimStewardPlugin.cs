@@ -230,7 +230,8 @@ namespace SimSteward.Plugin
         private string GetIncidentsForNewClient()
         {
             if (_liveIncidentBoardEntries == null || _liveIncidentBoardEntries.Count == 0) return null;
-            var msg = new { type = "incidents", entries = _liveIncidentBoardEntries };
+            var trimmed = LiveIncidentBoardTrim.Trim(_liveIncidentBoardEntries, LiveIncidentBoardTrim.DefaultMaxBroadcastEntries);
+            var msg = new { type = "incidents", entries = trimmed };
             return JsonConvert.SerializeObject(msg);
         }
 
