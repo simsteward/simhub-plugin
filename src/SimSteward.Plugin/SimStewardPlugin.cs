@@ -82,6 +82,7 @@ namespace SimSteward.Plugin
         private int _replayFrameMax;
         private string _currentSessionId = "";
         private string _currentSessionSeq = "";
+        private readonly SessionSeqCache _sessionSeqCache = new SessionSeqCache();
         /// <summary>Latest iRacing session context for structured logs (WebSocket thread reads; DataUpdate writes).</summary>
         private volatile string _logCtxSubsession = SessionLogging.NotInSession;
         private int _lastHelloSubId = int.MinValue;  // forces a hello broadcast on first DataUpdate
@@ -206,14 +207,6 @@ namespace SimSteward.Plugin
             return $"{minutes}:{seconds:D2}";
         }
 
-        private static string BuildSessionSeq(string trackName)
-        {
-            if (string.IsNullOrEmpty(trackName)) return "";
-            var safe = new System.Text.StringBuilder();
-            foreach (var c in trackName)
-                safe.Append(char.IsLetterOrDigit(c) ? c : '_');
-            return $"{safe}_{DateTime.UtcNow:yyyyMMdd}";
-        }
 #endif
 
         private string GetStateForNewClient()
@@ -1925,7 +1918,7 @@ namespace SimSteward.Plugin
                 }
                 catch { }
                 int sessionNum = SafeGetInt("SessionNum");
-                _currentSessionSeq = BuildSessionSeq(trackName);
+                _currentSessionSeq = _sessionSeqCache.Resolve(trackName, DateTime.UtcNow);
                 _currentSessionId = subId > 0 ? subId.ToString() : _currentSessionSeq;
 
                 _logCtxSubsession = subId > 0 ? subId.ToString() : SessionLogging.NotInSession;
