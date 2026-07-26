@@ -37,7 +37,6 @@ function startPresentMon(backoffMs) {
     '--process_name', 'iRacingSim64DX11.exe',
     '--process_name', 'chrome.exe',
     '--output_stdout',
-    '--no_csv',
     '--no_console_stats',
   ]);
 
