@@ -1450,7 +1450,7 @@ namespace SimSteward.Plugin
                 catch (Exception ex)
                 {
                     buffer[i] = 0;
-                    if (_safeGetIntPerCarFailureThrottle.ShouldLog(DateTime.UtcNow))
+                    if (_safeGetIntPerCarFailureThrottle.ShouldLog(field, DateTime.UtcNow))
                         _logger?.Warn($"SafeGetIntPerCar field='{field}' idx={i}: {ex.Message}");
                 }
             }
@@ -1464,7 +1464,7 @@ namespace SimSteward.Plugin
                 catch (Exception ex)
                 {
                     buffer[i] = 0f;
-                    if (_safeGetFloatPerCarFailureThrottle.ShouldLog(DateTime.UtcNow))
+                    if (_safeGetFloatPerCarFailureThrottle.ShouldLog(field, DateTime.UtcNow))
                         _logger?.Warn($"SafeGetFloatPerCar field='{field}' idx={i}: {ex.Message}");
                 }
             }
@@ -1478,7 +1478,7 @@ namespace SimSteward.Plugin
                 catch (Exception ex)
                 {
                     buffer[i] = false;
-                    if (_safeGetBoolPerCarFailureThrottle.ShouldLog(DateTime.UtcNow))
+                    if (_safeGetBoolPerCarFailureThrottle.ShouldLog(field, DateTime.UtcNow))
                         _logger?.Warn($"SafeGetBoolPerCar field='{field}' idx={i}: {ex.Message}");
                 }
             }
