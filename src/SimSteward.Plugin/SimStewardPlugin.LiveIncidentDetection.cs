@@ -243,9 +243,12 @@ namespace SimSteward.Plugin
                 ["baseline_established"] = (_liveYamlIncidentsProbePrev != null)
             };
             MergeSessionAndRoutingFields(f);
-            _logger?.Structured("INFO", "simhub-plugin", EventLiveYamlProbe,
-                "Live YAML incident probe: " + (parseOk ? currByCar.Count + " cars, " + deltaCount + " deltas" : "parse failed (" + parseErr + ")"),
-                f, "lifecycle", null);
+            string probeMessage = "Live YAML incident probe: " +
+                (parseOk ? currByCar.Count + " cars, " + deltaCount + " deltas" : "parse failed (" + parseErr + ")");
+            if (LiveYamlProbeLogLevel.IsInfoWorthy(parseOk, deltaCount))
+                _logger?.Structured("INFO", "simhub-plugin", EventLiveYamlProbe, probeMessage, f, "lifecycle", null);
+            else
+                _logger?.Debug(probeMessage, "simhub-plugin", EventLiveYamlProbe, f);
 
             if (parseOk)
             {
