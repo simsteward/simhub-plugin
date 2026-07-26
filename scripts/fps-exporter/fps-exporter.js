@@ -4,18 +4,21 @@ const { spawn } = require('node:child_process');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
 const { parseHeader, parseRow } = require('./presentmon-csv.js');
 const { MetricsAggregator } = require('./metrics-aggregator.js');
 const { INITIAL_BACKOFF_MS, backoffAfterExit } = require('./backoff.js');
 
+// Hardcoded, not derived from os.homedir()/%LOCALAPPDATA% — this runs as a LocalSystem
+// Windows Service (see install-service.ps1), and under that account both resolve to
+// C:\Windows\system32\config\systemprofile, not the interactive user's profile. This is a
+// single-user personal machine, so a fixed absolute path is correct here, not a compromise.
 const ALLOWLIST = ['iRacingSim64DX11.exe', 'chrome.exe'];
-const PRESENTMON_PATH = path.join(os.homedir(), 'Tools', 'PresentMon', 'PresentMon.exe');
+const PRESENTMON_PATH = 'C:\\Users\\winth\\Tools\\PresentMon\\PresentMon.exe';
 const CONNECTOR_MAP_PATH = path.join(__dirname, 'connector-map.json');
 const METRICS_PORT = 9101;
 const METRICS_HOST = '127.0.0.1';
-const LOG_DIR = path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'FpsExporter');
+const LOG_DIR = 'C:\\Users\\winth\\AppData\\Local\\FpsExporter';
 const LOG_FILE = path.join(LOG_DIR, 'fps-exporter.log');
 
 function log(message) {
