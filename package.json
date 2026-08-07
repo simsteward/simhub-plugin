@@ -15,7 +15,7 @@
     "obs:ps": "docker compose -f observability/local/docker-compose.yml ps"
   },
   "devDependencies": {
-    "@secretlint/secretlint-rule-preset-recommend": "^11.4.0",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.2",
     "dotenv-cli": "^7.4.4",
     "secretlint": "^11.4.0"
   }
